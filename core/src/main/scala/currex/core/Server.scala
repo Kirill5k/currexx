@@ -1,10 +1,10 @@
-package io.github.kirill5k.template
+package currex.core
 
 import cats.effect.Async
 import fs2.Stream
 import org.http4s.{HttpApp, HttpRoutes}
 import org.http4s.blaze.server.BlazeServerBuilder
-import io.github.kirill5k.template.common.config.ServerConfig
+import currex.core.common.config.ServerConfig
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*

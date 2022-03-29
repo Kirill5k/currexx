@@ -1,4 +1,4 @@
-package io.github.kirill5k.template
+package currex.core
 
 import cats.effect.IO
 import org.scalatest.matchers.must.Matchers

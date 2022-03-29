@@ -1,7 +1,7 @@
-package io.github.kirill5k.template.health
+package currex.core.health
 
 import cats.effect.{IO, Ref}
-import io.github.kirill5k.template.ControllerSpec
+import currex.core.ControllerSpec
 import org.http4s.implicits.*
 import org.http4s.*
 import org.http4s.Header.Raw

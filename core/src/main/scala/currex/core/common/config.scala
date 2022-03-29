@@ -1,4 +1,4 @@
-package io.github.kirill5k.template.common
+package currex.core.common
 
 import cats.effect.Sync
 import pureconfig.*

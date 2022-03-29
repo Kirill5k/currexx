@@ -1,8 +1,8 @@
-package io.github.kirill5k.template.health
+package currex.core.health
 
 import cats.effect.Async
 import cats.implicits.*
-import io.github.kirill5k.template.common.http.Controller
+import currex.core.common.http.Controller
 
 trait Health[F[_]]:
   def controller: Controller[F]

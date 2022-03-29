@@ -1,9 +1,8 @@
-package io.github.kirill5k.template
+package currex.core
 
 import scala.io.Source
 
 object FileReader:
-
   def fromResources(path: String): String =
     val source = Source.fromResource(path)
     try source.getLines().toList.mkString

@@ -1,4 +1,4 @@
-package io.github.kirill5k.template.common.http
+package currex.core.common.http
 
 import org.http4s.HttpRoutes
 import sttp.tapir.generic.SchemaDerivation

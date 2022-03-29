@@ -1,4 +1,4 @@
-package io.github.kirill5k.template
+package currex.core
 
 import org.mockito.ArgumentMatchers
 import org.mockito.Mockito
@@ -8,8 +8,7 @@ import org.mockito.stubbing.Stubber
 import org.mockito.verification.VerificationMode
 import org.scalatestplus.mockito.MockitoSugar
 
-trait MockitoMatchers extends MockitoSugar {
-
+trait MockitoMatchers extends MockitoSugar:
   def any[A]: A                                      = ArgumentMatchers.any[A]()
   def eqTo[A](value: A): A                           = ArgumentMatchers.eq[A](value)
   def doAnswer[A](answer: Answer[A]): Stubber        = Mockito.doAnswer(answer)
@@ -19,4 +18,3 @@ trait MockitoMatchers extends MockitoSugar {
   def verify[A](mock: A): A                          = verify(mock, Mockito.times(1))
   def verifyNoInteractions(mocks: AnyRef*): Unit     = Mockito.verifyNoInteractions(mocks*)
   def verifyNoMoreInteractions(mocks: AnyRef*): Unit = Mockito.verifyNoMoreInteractions(mocks*)
-}

@@ -1,9 +1,9 @@
-package io.github.kirill5k.template.common
+package currex.core.common
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-import io.github.kirill5k.template.CatsSpec
-import io.github.kirill5k.template.common.config.AppConfig
+import config.AppConfig
+import currex.core.CatsSpec
 
 class AppConfigSpec extends CatsSpec {
 

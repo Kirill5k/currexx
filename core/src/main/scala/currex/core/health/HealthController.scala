@@ -1,4 +1,4 @@
-package io.github.kirill5k.template.health
+package currex.core.health
 
 import cats.effect.Async
 import cats.effect.Ref
@@ -6,8 +6,9 @@ import cats.effect.Temporal
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import currex.core.common.http.Controller
 import io.circe.Codec
-import io.github.kirill5k.template.common.http.Controller
+
 import java.time.Instant
 import org.http4s.HttpRoutes
 import sttp.tapir.*
