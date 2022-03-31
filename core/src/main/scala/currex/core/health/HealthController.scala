@@ -6,6 +6,7 @@ import cats.effect.Temporal
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import currex.core.auth.Authenticator
 import currex.core.common.http.Controller
 import io.circe.Codec
 
@@ -19,14 +20,12 @@ final class HealthController[F[_]: Async](
     private val startupTime: Ref[F, Instant]
 ) extends Controller[F] {
 
-  implicit val statusSchema: Schema[HealthController.AppStatus] = Schema.string
-
   private val statusEndpoint: ServerEndpoint[Any, F] = infallibleEndpoint.get
     .in("health" / "status")
     .out(jsonBody[HealthController.AppStatus])
     .serverLogicSuccess(req => startupTime.get.map(t => HealthController.AppStatus(t)))
 
-  def routes: HttpRoutes[F] = Http4sServerInterpreter[F]().toRoutes(statusEndpoint)
+  def routes(using auth: Authenticator[F]): HttpRoutes[F] = Http4sServerInterpreter[F]().toRoutes(statusEndpoint)
 }
 
 object HealthController:

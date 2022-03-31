@@ -10,13 +10,20 @@ object Dependencies {
     val http4s     = "0.23.10"
     val logback    = "1.2.11"
     val log4cats   = "2.2.0"
-    val tapir      = "1.0.0-M5"
+    val squants    = "1.8.3"
+    val bcrypt     = "4.3.0"
+    val refined    = "0.9.28"
+    val tapir      = "1.0.0-M4"
+    val jwt        = "9.0.5"
 
     val scalaTest = "3.2.11"
     val mockito   = "3.2.10.0"
   }
 
   object Libraries {
+    val squants = "org.typelevel"        %% "squants"      % Versions.squants
+    val bcrypt  = "com.github.t3hnar"    %% "scala-bcrypt" % Versions.bcrypt
+    val jwt     = "com.github.jwt-scala" %% "jwt-circe"    % Versions.jwt
 
     object mongo4cats {
       val core     = "io.github.kirill5k" %% "mongo4cats-core"     % Versions.mongo4cats
@@ -31,23 +38,26 @@ object Dependencies {
     object logging {
       val logback  = "ch.qos.logback" % "logback-classic" % Versions.logback
       val log4cats = "org.typelevel" %% "log4cats-slf4j"  % Versions.log4cats
-
       val all = Seq(log4cats, logback)
     }
 
     object circe {
       val core    = "io.circe" %% "circe-core"    % Versions.circe
       val generic = "io.circe" %% "circe-generic" % Versions.circe
+      val refined = "io.circe" %% "circe-refined" % Versions.circe
       val parser  = "io.circe" %% "circe-parser"  % Versions.circe
+      val all     = Seq(core, generic, refined, parser)
+    }
 
-      val all = Seq(core, generic, parser)
+    object refined {
+      val core = "eu.timepit" %% "refined" % Versions.refined
+      val all  = Seq(core)
     }
 
     object sttp {
       val core        = "com.softwaremill.sttp.client3" %% "core"                           % Versions.sttp
       val circe       = "com.softwaremill.sttp.client3" %% "circe"                          % Versions.sttp
       val catsBackend = "com.softwaremill.sttp.client3" %% "async-http-client-backend-cats" % Versions.sttp
-
       val all = Seq(core, circe, catsBackend)
     }
 
@@ -67,11 +77,13 @@ object Dependencies {
     val mockito   = "org.scalatestplus" %% "mockito-3-4" % Versions.mockito
   }
 
-  val core =
-    Seq(
+  val core = Seq(
       Libraries.mongo4cats.core,
       Libraries.mongo4cats.circe,
       Libraries.pureconfig.core,
+      Libraries.squants,
+      Libraries.jwt,
+      Libraries.bcrypt.cross(CrossVersion.for3Use2_13),
       Libraries.http4s.blazeServer
     ) ++
       Libraries.circe.all ++
