@@ -8,12 +8,11 @@ import org.http4s.{Header, Headers, Method, Request, Response, Status}
 import org.scalatest.Assertion
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatestplus.mockito.MockitoSugar
 import org.typelevel.ci.CIString
 
 import scala.io.Source
 
-trait ControllerSpec extends AnyWordSpec with MockitoSugar with Matchers {
+trait ControllerSpec extends AnyWordSpec with MockitoMatchers with Matchers {
 
   def requestWithAuthHeader(
       uri: org.http4s.Uri,

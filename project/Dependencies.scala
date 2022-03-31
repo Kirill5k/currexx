@@ -70,7 +70,9 @@ object Dependencies {
     }
 
     object http4s {
-      val blazeServer = "org.http4s" %% "http4s-blaze-server" % Versions.http4s
+      val blaze = "org.http4s" %% "http4s-blaze-server" % Versions.http4s
+      val circe = "org.http4s" %% "http4s-circe"        % Versions.http4s
+      val all   = Seq(blaze, circe)
     }
 
     val scalaTest = "org.scalatest"     %% "scalatest"   % Versions.scalaTest
@@ -83,13 +85,13 @@ object Dependencies {
       Libraries.pureconfig.core,
       Libraries.squants,
       Libraries.jwt,
-      Libraries.bcrypt.cross(CrossVersion.for3Use2_13),
-      Libraries.http4s.blazeServer
+      Libraries.bcrypt.cross(CrossVersion.for3Use2_13)
     ) ++
       Libraries.circe.all ++
       Libraries.tapir.all ++
       Libraries.logging.all ++
-      Libraries.sttp.all
+      Libraries.sttp.all ++
+      Libraries.http4s.all
 
   val test = Seq(
     Libraries.scalaTest           % Test,
