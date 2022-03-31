@@ -10,9 +10,6 @@ import mongo4cats.bson.ObjectId
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
 import mongo4cats.embedded.EmbeddedMongo
-import org.scalatest.matchers.must.Matchers
-import org.scalatest.wordspec.AsyncWordSpec
-import squants.market.USD
 
 import java.time.Instant
 import scala.concurrent.Future

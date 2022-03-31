@@ -35,8 +35,8 @@ val core = project
   .enablePlugins(JavaAppPackaging, JavaAgent, DockerPlugin)
   .settings(docker)
   .settings(
-    name       := "currrex-core",
-    moduleName := "currrex-core",
+    name       := "currexx-core",
+    moduleName := "currexx-core",
     libraryDependencies ++= Dependencies.core ++ Dependencies.test
   )
 
@@ -44,6 +44,6 @@ val root = project
   .in(file("."))
   .settings(noPublish)
   .settings(
-    name := "currrex"
+    name := "currexx"
   )
   .aggregate(core)
