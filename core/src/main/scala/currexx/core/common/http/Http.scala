@@ -1,23 +1,27 @@
-package currexx.core
+package currexx.core.common.http
 
 import cats.Monad
 import cats.effect.Async
 import cats.implicits.*
-import currexx.core.auth.Authenticator
+import currexx.core.auth.jwt.BearerToken
+import currexx.core.auth.{Auth, Authenticator}
 import currexx.core.health.Health
 import org.http4s.*
 import org.http4s.implicits.*
+import org.http4s.server.Router
 import org.http4s.server.middleware.*
 
 import scala.concurrent.duration.*
 
 final class Http[F[_]: Async] private (
-    private val health: Health[F]
+    private val health: Health[F],
+    private val auth: Auth[F]
 ) {
 
   private val routes: HttpRoutes[F] = {
-    given Authenticator[F] = _ => Async[F].raiseError(new RuntimeException())
-    health.controller.routes
+    given Authenticator[F] = (token: BearerToken) => auth.session.authenticate(token)
+    val api                = auth.controller.routes
+    Router("/api" -> api, "/" -> health.controller.routes)
   }
 
   private val middleware: HttpRoutes[F] => HttpRoutes[F] = { (http: HttpRoutes[F]) => AutoSlash(http) }
@@ -31,4 +35,7 @@ final class Http[F[_]: Async] private (
 }
 
 object Http:
-  def make[F[_]: Async](health: Health[F]): F[Http[F]] = Monad[F].pure(new Http[F](health))
+  def make[F[_]: Async](
+      health: Health[F],
+      auth: Auth[F]
+  ): F[Http[F]] = Monad[F].pure(new Http[F](health, auth))
