@@ -1,19 +1,18 @@
 import sbt._
 
 object Dependencies {
-
   object Versions {
     val mongo4cats = "0.4.7"
     val pureConfig = "0.17.1"
     val circe      = "0.14.1"
     val sttp       = "3.5.1"
-    val http4s     = "0.23.10"
+    val http4s     = "0.23.11"
     val logback    = "1.2.11"
     val log4cats   = "2.2.0"
     val squants    = "1.8.3"
     val bcrypt     = "4.3.0"
     val refined    = "0.9.28"
-    val tapir      = "1.0.0-M4"
+    val tapir      = "1.0.0-M5"
     val jwt        = "9.0.5"
 
     val scalaTest = "3.2.11"
@@ -38,7 +37,7 @@ object Dependencies {
     object logging {
       val logback  = "ch.qos.logback" % "logback-classic" % Versions.logback
       val log4cats = "org.typelevel" %% "log4cats-slf4j"  % Versions.log4cats
-      val all = Seq(log4cats, logback)
+      val all      = Seq(log4cats, logback)
     }
 
     object circe {
@@ -58,7 +57,7 @@ object Dependencies {
       val core        = "com.softwaremill.sttp.client3" %% "core"                           % Versions.sttp
       val circe       = "com.softwaremill.sttp.client3" %% "circe"                          % Versions.sttp
       val catsBackend = "com.softwaremill.sttp.client3" %% "async-http-client-backend-cats" % Versions.sttp
-      val all = Seq(core, circe, catsBackend)
+      val all         = Seq(core, circe, catsBackend)
     }
 
     object tapir {
@@ -80,18 +79,18 @@ object Dependencies {
   }
 
   val core = Seq(
-      Libraries.mongo4cats.core,
-      Libraries.mongo4cats.circe,
-      Libraries.pureconfig.core,
-      Libraries.squants,
-      Libraries.jwt,
-      Libraries.bcrypt.cross(CrossVersion.for3Use2_13)
-    ) ++
-      Libraries.circe.all ++
-      Libraries.tapir.all ++
-      Libraries.logging.all ++
-      Libraries.sttp.all ++
-      Libraries.http4s.all
+    Libraries.mongo4cats.core,
+    Libraries.mongo4cats.circe,
+    Libraries.pureconfig.core,
+    Libraries.squants,
+    Libraries.jwt,
+    Libraries.bcrypt.cross(CrossVersion.for3Use2_13)
+  ) ++
+    Libraries.circe.all ++
+    Libraries.tapir.all ++
+    Libraries.logging.all ++
+    Libraries.sttp.all ++
+    Libraries.http4s.all
 
   val test = Seq(
     Libraries.scalaTest           % Test,
