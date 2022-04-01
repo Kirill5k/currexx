@@ -13,7 +13,7 @@ object Resources:
   private def mongoDb[F[_]: Async](config: MongoConfig): Resource[F, MongoDatabase[F]] =
     MongoClient
       .fromConnectionString[F](config.connectionUri)
-      .evalMap(_.getDatabase("expense-tracker"))
+      .evalMap(_.getDatabase("currexx"))
 
   def make[F[_]: Async](config: AppConfig): Resource[F, Resources[F]] =
     mongoDb[F](config.mongo).map { db =>
