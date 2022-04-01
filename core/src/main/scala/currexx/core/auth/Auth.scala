@@ -19,7 +19,7 @@ final class Auth[F[_]] private (
     val controller: Controller[F]
 )
 
-object Auth {
+object Auth:
   def make[F[_]: Async: Logger](config: AuthConfig, resources: Resources[F]): F[Auth[F]] =
     for
       sessRepo <- SessionRepository.make[F](resources.mongo)
@@ -30,4 +30,3 @@ object Auth {
       usrSvc   <- UserService.make[F](accRepo, encr)
       authCtrl <- AuthController.make[F](usrSvc, sessSvc)
     yield Auth[F](sessSvc, authCtrl)
-}
