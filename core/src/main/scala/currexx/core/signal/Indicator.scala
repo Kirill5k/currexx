@@ -8,8 +8,8 @@ import scala.util.Try
 enum Direction:
   case Up, Down
 object Direction:
-  inline given Encoder[Direction] = Encoder.encodeString.contramap(_.toString)
-  inline given Decoder[Direction] = Decoder.decodeString.emapTry(s => Try(Direction.valueOf(s)))
+  inline given Encoder[Direction] = Encoder.encodeString.contramap(_.toString.toLowerCase)
+  inline given Decoder[Direction] = Decoder.decodeString.emapTry(s => Try(Direction.valueOf(s.capitalize)))
 
 sealed trait Indicator
 object Indicator:
