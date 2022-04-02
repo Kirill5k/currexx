@@ -1,18 +1,11 @@
-package currexx.core.indicator
+package currexx.core.signal
 
 import cats.syntax.either.*
 import currexx.core.auth.user.UserId
-import currexx.core.common.validations.CurrencyPairString
 import io.circe.{Codec, Decoder, Encoder}
 import squants.market.{Currency, defaultMoneyContext}
 
 import java.time.Instant
-
-enum Direction:
-  case Up, Down
-
-enum Indicator:
-  case MACD(direction: Direction, value: BigDecimal)
 
 final case class CurrencyPair(base: Currency, quote: Currency)
 object CurrencyPair:
@@ -30,4 +23,4 @@ final case class Signal(
     currencyPair: CurrencyPair,
     indicator: Indicator,
     time: Instant
-)
+) derives Codec.AsObject
