@@ -5,6 +5,7 @@ import eu.timepit.refined.string.MatchesRegex
 import org.bson.types.ObjectId
 
 object validations {
+  type CurrencyPairString = String Refined MatchesRegex["^[A-Z]{3}\\/[A-Z]{3}$"]
   type EmailString = String Refined MatchesRegex["^[a-zA-Z0-9.]+@[a-zA-Z0-9]+\\.[a-zA-Z]+$"]
 
   type IdString = String Refined ValidId
