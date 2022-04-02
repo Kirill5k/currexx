@@ -9,24 +9,13 @@ import scala.util.Try
 object json extends JsonCodecs
 
 transparent trait JsonCodecs {
-  inline given Decoder[Currency] = Decoder[JsonObject].emap { json =>
-    for
-      code     <- json("code").flatMap(_.asString).toRight("Missing currency code")
-      currency <- Currency(code)(defaultMoneyContext).toEither.leftMap(_.getMessage)
-    yield currency
-  }
-
-  inline given Encoder[Currency] = Encoder[JsonObject].contramap { c =>
-    JsonObject(
-      "code"   -> Json.fromString(c.code),
-      "symbol" -> Json.fromString(c.symbol)
-    )
-  }
+  inline given Decoder[Currency] = Decoder.decodeString.emap(c => Currency(c)(defaultMoneyContext).toEither.leftMap(_.getMessage))
+  inline given Encoder[Currency] = Encoder.encodeString.contramap(_.code)
 
   inline given monDec(using d: Decoder[Currency]): Decoder[Money] = Decoder[JsonObject].emap { json =>
     for
-      rawValue    <- json("value").flatMap(_.asNumber).toRight("Missing the actual amount")
-      rawCurrency <- json("currency").toRight("Missing currency")
+      rawValue    <- json("amount").flatMap(_.asNumber).toRight("Missing the actual amount")
+      rawCurrency <- json("currency").toRight("Missing currency code")
       currency    <- d.decodeJson(rawCurrency).leftMap(_.message)
       value       <- Try(rawValue.toDouble).map(roundUp).toEither.leftMap(_.getMessage)
     yield Money(value, currency)
@@ -34,7 +23,7 @@ transparent trait JsonCodecs {
 
   inline given monEnc(using e: Encoder[Currency]): Encoder[Money] = Encoder[JsonObject].contramap { m =>
     JsonObject(
-      "value"    -> Json.fromBigDecimal(roundUp(m.amount)),
+      "amount"   -> Json.fromBigDecimal(roundUp(m.amount)),
       "currency" -> e(m.currency)
     )
   }
