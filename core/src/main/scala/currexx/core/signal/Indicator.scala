@@ -1,6 +1,6 @@
 package currexx.core.signal
 
-import io.circe.{Codec, Decoder, DecodingFailure, Encoder}
+import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder}
 import io.circe.syntax.*
 
 import scala.util.Try
@@ -18,7 +18,7 @@ object Indicator:
   inline given Decoder[Indicator] = Decoder.instance { c =>
     c.downField("kind").as[String].flatMap {
       case "macd" => c.as[Indicator.MACD]
-      case kind   => Left(DecodingFailure(s"unexpected indicator kind $kind", Nil))
+      case kind   => Left(DecodingFailure(s"Unexpected indicator kind $kind", List(CursorOp.Field("kind"))))
     }
   }
   inline given Encoder[Indicator] = Encoder.instance {

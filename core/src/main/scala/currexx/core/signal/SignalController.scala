@@ -1,6 +1,8 @@
 package currexx.core.signal
 
 import cats.Monad
+import cats.syntax.flatMap.*
+import cats.syntax.functor.*
 import cats.effect.Async
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
@@ -17,10 +19,31 @@ final private class SignalController[F[_]](
 )(using
     F: Async[F]
 ) extends Controller[F] {
+  import SignalController.*
+
+  private def submitSignal(using auth: Authenticator[F]) =
+    submitSignalEndpoint.withAuthenticatedSession
+      .serverLogic { session => req =>
+        for {
+          time <- F.realTimeInstant
+          signal = Signal(session.userId, req.currencyPair, req.indicator, time)
+          res  <- service.submit(signal).voidResponse
+        } yield res
+      }
+
+  private def getAllSignals(using auth: Authenticator[F]) =
+    getAllSignalsEndpoint.withAuthenticatedSession
+      .serverLogic { session => _ =>
+        service
+          .getAll(session.userId)
+          .mapResponse(_.map(SignalView.from))
+      }
 
   def routes(using authenticator: Authenticator[F]): HttpRoutes[F] =
     Http4sServerInterpreter[F](Controller.serverOptions).toRoutes(
       List(
+        submitSignal,
+        getAllSignals
       )
     )
 }
