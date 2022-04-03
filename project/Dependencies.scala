@@ -90,7 +90,8 @@ object Dependencies {
     Libraries.tapir.all ++
     Libraries.logging.all ++
     Libraries.sttp.all ++
-    Libraries.http4s.all
+    Libraries.http4s.all ++
+    Libraries.refined.all
 
   val test = Seq(
     Libraries.scalaTest           % Test,
