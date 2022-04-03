@@ -1,0 +1,26 @@
+name: Publish to OKTETO container registry
+on: [workflow_dispatch]
+
+jobs:
+
+  build-image:
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_REPO_URI: "registry.cloud.okteto.net"
+      DOCKER_USERNAME: "currexx-kirill5k"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: "registry.cloud.okteto.net"
+          username: "kirill5k"
+          password: ${{ secrets.OKTETO_API_KEY }}
+
+      - uses: olafurpg/setup-scala@v10
+        with:
+          java-version: adopt@1.15
+      - name: Build and push Core Docker image
+        run: sbt docker:publish
