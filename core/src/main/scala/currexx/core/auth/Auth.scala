@@ -15,7 +15,7 @@ import org.http4s.HttpRoutes
 import org.typelevel.log4cats.Logger
 
 final class Auth[F[_]] private (
-    val session: SessionService[F],
+    val authenticator: Authenticator[F],
     val controller: Controller[F]
 )
 
@@ -29,4 +29,4 @@ object Auth:
       encr     <- PasswordEncryptor.make[F](config)
       usrSvc   <- UserService.make[F](accRepo, encr)
       authCtrl <- AuthController.make[F](usrSvc, sessSvc)
-    yield Auth[F](sessSvc, authCtrl)
+    yield Auth[F](sessSvc.authenticate(_), authCtrl)

@@ -6,6 +6,7 @@ import cats.implicits.*
 import currexx.core.auth.jwt.BearerToken
 import currexx.core.auth.{Auth, Authenticator}
 import currexx.core.health.Health
+import currexx.core.signal.Signals
 import org.http4s.*
 import org.http4s.implicits.*
 import org.http4s.server.Router
@@ -15,12 +16,13 @@ import scala.concurrent.duration.*
 
 final class Http[F[_]: Async] private (
     private val health: Health[F],
-    private val auth: Auth[F]
+    private val auth: Auth[F],
+    private val signals: Signals[F]
 ) {
 
   private val routes: HttpRoutes[F] = {
-    given Authenticator[F] = (token: BearerToken) => auth.session.authenticate(token)
-    val api                = auth.controller.routes
+    given Authenticator[F] = auth.authenticator
+    val api                = auth.controller.routes <+> signals.controller.routes
     Router("/api" -> api, "/" -> health.controller.routes)
   }
 
@@ -37,5 +39,6 @@ final class Http[F[_]: Async] private (
 object Http:
   def make[F[_]: Async](
       health: Health[F],
-      auth: Auth[F]
-  ): F[Http[F]] = Monad[F].pure(new Http[F](health, auth))
+      auth: Auth[F],
+      signals: Signals[F]
+  ): F[Http[F]] = Monad[F].pure(new Http[F](health, auth, signals))
