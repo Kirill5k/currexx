@@ -12,12 +12,12 @@ import org.http4s.{Method, Request, Status, Uri}
 class SignalControllerSpec extends ControllerSpec {
 
   "A SignalController" when {
+    given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
+
     "POST /signals" should {
       "return 204 on success" in {
         val svc = mock[SignalService[IO]]
         when(svc.submit(any[Signal])).thenReturn(IO.unit)
-
-        given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
         val reqBody = parseJson(s"""{
              |"currencyPair":"GBP/EUR",
@@ -37,8 +37,6 @@ class SignalControllerSpec extends ControllerSpec {
       "return error on unrecognized signal" in {
         val svc = mock[SignalService[IO]]
 
-        given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
-
         val reqBody = parseJson(s"""{
              |  "currencyPair":"GBP/EUR",
              |  "indicator": {"kind": "foo"}
@@ -52,8 +50,6 @@ class SignalControllerSpec extends ControllerSpec {
 
       "return error on invalid currency pair signal" in {
         val svc = mock[SignalService[IO]]
-
-        given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
         val reqBody = parseJson(s"""{
              |  "currencyPair":"FOO/BAR",
@@ -79,8 +75,6 @@ class SignalControllerSpec extends ControllerSpec {
       "return error on malformed currency pair signal" in {
         val svc = mock[SignalService[IO]]
 
-        given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
-
         val reqBody = parseJson(s"""{
                |  "currencyPair":"FOO-BAR",
                |  "indicator": {
@@ -101,8 +95,6 @@ class SignalControllerSpec extends ControllerSpec {
       "return all submitted signals" in {
         val svc = mock[SignalService[IO]]
         when(svc.getAll(any[UserId])).thenReturn(IO.pure(List(Signals.macd)))
-
-        given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
         val req = requestWithAuthHeader(uri"/signals", Method.GET)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))

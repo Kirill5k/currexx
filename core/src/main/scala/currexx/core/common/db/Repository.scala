@@ -27,8 +27,8 @@ trait Repository[F[_]] {
 
   private def idEqFilter(name: String, id: Option[String]): Filter = Filter.eq(name, id.map(ObjectId.apply).orNull)
   protected def idEq(id: String): Filter                           = idEqFilter(Field.Id, id.some)
-  protected def userIdEq(aid: Option[UserId]): Filter              = idEqFilter(Field.UId, aid.map(_.value))
-  protected def userIdEq(aid: UserId): Filter                      = idEqFilter(Field.UId, aid.value.some)
+  protected def userIdEq(uid: Option[UserId]): Filter              = idEqFilter(Field.UId, uid.map(_.value))
+  protected def userIdEq(uid: UserId): Filter                      = idEqFilter(Field.UId, uid.value.some)
 
   protected def errorIfNull[A](error: Throwable)(res: A)(using F: MonadError[F, Throwable]): F[A] =
     F.fromOption(Option(res), error)
