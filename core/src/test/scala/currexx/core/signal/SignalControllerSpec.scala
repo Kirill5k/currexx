@@ -21,11 +21,8 @@ class SignalControllerSpec extends ControllerSpec {
 
         val reqBody = parseJson(s"""{
              |"currencyPair":"GBP/EUR",
-             |"indicator": {
-             |  "kind": "macd",
-             |  "direction": "down",
-             |  "value": 0.4
-             |}
+             |"indicator": "macd",
+             |"condition": {"kind":"crossing-up","value":0.05}
              |}""".stripMargin)
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
@@ -34,17 +31,32 @@ class SignalControllerSpec extends ControllerSpec {
         verify(svc).submit(any[Signal])
       }
 
-      "return error on unrecognized signal" in {
+      "return error on unrecognized indicator" in {
         val svc = mock[SignalService[IO]]
 
         val reqBody = parseJson(s"""{
              |  "currencyPair":"GBP/EUR",
-             |  "indicator": {"kind": "foo"}
+             |  "indicator":"foo"
              |}""".stripMargin)
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.UnprocessableEntity, Some("""{"message":"Unexpected indicator kind foo"}"""))
+        verifyJsonResponse(res, Status.UnprocessableEntity, Some("""{"message":"Unrecognized indicator foo, condition is required"}"""))
+        verifyNoInteractions(svc)
+      }
+
+      "return error on unrecognized condition" in {
+        val svc = mock[SignalService[IO]]
+
+        val reqBody = parseJson(s"""{
+             |"currencyPair":"GBP/EUR",
+             |"indicator": "macd",
+             |"condition": {"kind":"foo","value":0.05}
+             |}""".stripMargin)
+        val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
+        val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        verifyJsonResponse(res, Status.UnprocessableEntity, Some("""{"message":"Unexpected condition kind foo"}"""))
         verifyNoInteractions(svc)
       }
 
@@ -52,12 +64,9 @@ class SignalControllerSpec extends ControllerSpec {
         val svc = mock[SignalService[IO]]
 
         val reqBody = parseJson(s"""{
-             |  "currencyPair":"FOO/BAR",
-             |  "indicator": {
-             |    "kind": "macd",
-             |    "direction": "down",
-             |    "value": 0.4
-             |}
+             |"currencyPair":"FOO/BAR",
+             |"indicator": "macd",
+             |"condition": {"kind":"crossing-up","value":0.05}
              |}""".stripMargin)
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
@@ -76,12 +85,9 @@ class SignalControllerSpec extends ControllerSpec {
         val svc = mock[SignalService[IO]]
 
         val reqBody = parseJson(s"""{
-               |  "currencyPair":"FOO-BAR",
-               |  "indicator": {
-               |    "kind": "macd",
-               |    "direction": "down",
-               |    "value": 0.4
-               |}
+               |"currencyPair":"FOO-BAR",
+               |"indicator": "macd",
+               |"condition": {"kind":"crossing-up","value":0.05}
                |}""".stripMargin)
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
@@ -102,11 +108,8 @@ class SignalControllerSpec extends ControllerSpec {
         val responseBody = s"""[{
                |"currencyPair":"GBP/EUR",
                |"time": "${Signals.ts}",
-               |"indicator": {
-               |  "kind": "macd",
-               |  "direction": "down",
-               |  "value": 0.4
-               |}
+               |"indicator": "macd",
+               |"condition": {"kind":"crossing-up","value":0.05}
                |}]""".stripMargin
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
         verify(svc).getAll(Users.uid)

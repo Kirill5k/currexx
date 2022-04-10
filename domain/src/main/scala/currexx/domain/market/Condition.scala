@@ -5,7 +5,6 @@ import io.circe.syntax.*
 
 sealed trait Condition(val kind: String)
 object Condition {
-  final case class Crossing(value: BigDecimal)     extends Condition("crossing") derives Codec.AsObject
   final case class CrossingUp(value: BigDecimal)   extends Condition("crossing-up") derives Codec.AsObject
   final case class CrossingDown(value: BigDecimal) extends Condition("crossing-down") derives Codec.AsObject
 
@@ -14,14 +13,12 @@ object Condition {
 
   inline given Decoder[Condition] = Decoder.instance { c =>
     c.downField(discriminatorField).as[String].flatMap {
-      case "crossing"      => c.as[Crossing]
       case "crossing-up"   => c.as[CrossingUp]
       case "crossing-down" => c.as[CrossingDown]
       case kind            => Left(DecodingFailure(s"Unexpected condition kind $kind", List(CursorOp.Field(discriminatorField))))
     }
   }
   inline given Encoder[Condition] = Encoder.instance {
-    case cross: Crossing         => cross.asJson.deepMerge(discriminatorJson(cross))
     case crossUp: CrossingUp     => crossUp.asJson.deepMerge(discriminatorJson(crossUp))
     case crossDown: CrossingDown => crossDown.asJson.deepMerge(discriminatorJson(crossDown))
   }
