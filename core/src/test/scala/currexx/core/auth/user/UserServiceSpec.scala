@@ -5,6 +5,7 @@ import cats.effect.unsafe.implicits.global
 import currexx.core.CatsSpec
 import currexx.core.fixtures.Users
 import currexx.core.auth.user.db.UserRepository
+import currexx.domain.user.*
 import currexx.domain.errors.AppError.{InvalidEmailOrPassword, InvalidPassword}
 
 class UserServiceSpec extends CatsSpec {

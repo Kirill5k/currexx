@@ -4,12 +4,11 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import jwt.*
 import currexx.core.common.config.JwtConfig
-import currexx.domain.errors.AppError
 import currexx.core.CatsSpec
 import currexx.core.auth.jwt.JwtEncoder
 import currexx.domain.session.SessionId
 import currexx.domain.user.UserId
-import currexx.core.common.JsonCodecs
+import currexx.domain.JsonCodecs
 import currexx.domain.errors.AppError
 import org.scalatest.wordspec.AsyncWordSpec
 import pdi.jwt.algorithms.JwtUnknownAlgorithm

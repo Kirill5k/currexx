@@ -4,6 +4,7 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import currexx.core.CatsSpec
 import currexx.core.common.config.{AuthConfig, JwtConfig}
+import currexx.domain.user.*
 
 class PasswordEncryptorSpec extends CatsSpec {
 
