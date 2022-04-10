@@ -2,9 +2,9 @@ package currexx.core.auth
 
 import cats.effect.IO
 import currexx.core.ControllerSpec
-import currexx.core.auth.user.*
+import currexx.domain.user.*
 import currexx.core.auth.session.{CreateSession, SessionId, SessionService}
-import currexx.core.common.errors.AppError.{AccountAlreadyExists, InvalidEmailOrPassword, SessionDoesNotExist}
+import currexx.domain.errors.AppError.{AccountAlreadyExists, InvalidEmailOrPassword, SessionDoesNotExist}
 import currexx.core.auth.jwt.BearerToken
 import currexx.core.fixtures.{Sessions, Users}
 import org.http4s.circe.CirceEntityCodec.*

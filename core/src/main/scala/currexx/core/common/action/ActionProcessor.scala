@@ -4,7 +4,7 @@ import cats.Monad
 import cats.effect.Temporal
 import cats.syntax.apply.*
 import cats.syntax.applicativeError.*
-import currexx.core.common.errors.AppError
+import currexx.domain.errors.AppError
 import fs2.Stream
 import org.typelevel.log4cats.Logger
 

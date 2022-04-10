@@ -78,20 +78,23 @@ object Dependencies {
     val mockito   = "org.scalatestplus" %% "mockito-3-4" % Versions.mockito
   }
 
-  val core = Seq(
+  val domain = Seq(
+    Libraries.squants,
     Libraries.mongo4cats.core,
     Libraries.mongo4cats.circe,
-    Libraries.pureconfig.core,
-    Libraries.squants,
+    Libraries.pureconfig.core
+  ) ++
+    Libraries.circe.all ++
+    Libraries.refined.all
+
+  val core = Seq(
     Libraries.jwt,
     Libraries.bcrypt.cross(CrossVersion.for3Use2_13)
   ) ++
-    Libraries.circe.all ++
     Libraries.tapir.all ++
     Libraries.logging.all ++
     Libraries.sttp.all ++
-    Libraries.http4s.all ++
-    Libraries.refined.all
+    Libraries.http4s.all
 
   val test = Seq(
     Libraries.scalaTest           % Test,

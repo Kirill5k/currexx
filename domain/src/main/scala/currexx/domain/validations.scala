@@ -1,4 +1,4 @@
-package currexx.core.common
+package currexx.domain
 
 import eu.timepit.refined.api.{Refined, RefinedTypeOps, Validate}
 import eu.timepit.refined.string.MatchesRegex

@@ -2,7 +2,7 @@ package currexx.core.signal
 
 import cats.Monad
 import cats.syntax.flatMap.*
-import currexx.core.auth.user.UserId
+import currexx.domain.user.UserId
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.signal.db.SignalRepository
 

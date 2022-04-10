@@ -1,6 +1,6 @@
 package currexx.core
 
-import currexx.core.auth.user.*
+import currexx.domain.user.*
 import mongo4cats.bson.{Document, ObjectId}
 import mongo4cats.embedded.EmbeddedMongo
 

@@ -1,7 +1,7 @@
 package currexx.core.fixtures
 
-import currexx.core.auth.session.{CreateSession, IpAddress, Session, SessionId, SessionStatus}
-import currexx.core.auth.user.UserId
+import currexx.domain.session.{CreateSession, IpAddress, Session, SessionId, SessionStatus}
+import currexx.domain.user.UserId
 import mongo4cats.bson.ObjectId
 
 import java.time.Instant

@@ -1,8 +1,9 @@
 package currexx.core.signal.db
 
 import io.circe.Codec
-import currexx.core.auth.user.UserId
-import currexx.core.signal.{CurrencyPair, Indicator, Signal}
+import currexx.domain.user.UserId
+import currexx.core.signal.Signal
+import currexx.domain.market.{Condition, CurrencyPair, Indicator}
 import mongo4cats.bson.ObjectId
 import mongo4cats.circe.given
 
@@ -13,10 +14,11 @@ final case class SignalEntity(
     userId: ObjectId,
     currencyPair: CurrencyPair,
     indicator: Indicator,
+    condition: Condition,
     time: Instant
 ) derives Codec.AsObject:
-  def toDomain: Signal = Signal(UserId(userId), currencyPair, indicator, time)
+  def toDomain: Signal = Signal(UserId(userId), currencyPair, indicator, condition, time)
 
 object SignalEntity:
   def from(signal: Signal): SignalEntity =
-    SignalEntity(ObjectId(), signal.userId.toObjectId, signal.currencyPair, signal.indicator, signal.time)
+    SignalEntity(ObjectId(), signal.userId.toObjectId, signal.currencyPair, signal.indicator, signal.condition, signal.time)

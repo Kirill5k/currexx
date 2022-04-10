@@ -1,6 +1,6 @@
 package currexx.core.auth.user.db
 
-import currexx.core.auth.user.{PasswordHash, User, UserDetails, UserEmail, UserId, UserName}
+import currexx.domain.user.{PasswordHash, User, UserDetails, UserEmail, UserId, UserName}
 import io.circe.Codec
 import mongo4cats.bson.ObjectId
 import mongo4cats.circe.given

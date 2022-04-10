@@ -1,8 +1,7 @@
-package currexx.core.common
+package currexx.domain
 
-import currexx.core.auth.session.SessionId
-import currexx.core.auth.user.{UserEmail, UserId}
-import pdi.jwt.JwtAlgorithm
+import currexx.domain.session.SessionId
+import currexx.domain.user.{UserEmail, UserId}
 
 object errors {
 
@@ -51,8 +50,8 @@ object errors {
 
     case object IdMismatch extends BadReq:
       override val message: String = "The id supplied in the path does not match with the id in the request body"
-    
-    final case class InvalidJwtEncryptionAlgorithm(alg: JwtAlgorithm) extends AppError:
+
+    final case class InvalidJwtEncryptionAlgorithm(alg: String) extends AppError:
       override val message = s"unrecognized jwt encryption algorithm $alg"
 
     final case class InvalidJwtToken(message: String) extends Forbidden

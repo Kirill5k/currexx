@@ -6,6 +6,7 @@ import cats.syntax.functor.*
 import cats.effect.Async
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator}
 import io.circe.Codec
 import org.http4s.HttpRoutes
 import sttp.model.StatusCode
@@ -24,11 +25,11 @@ final private class SignalController[F[_]](
   private def submitSignal(using auth: Authenticator[F]) =
     submitSignalEndpoint.withAuthenticatedSession
       .serverLogic { session => req =>
-        for {
+        for
           time <- F.realTimeInstant
           signal = Signal(session.userId, req.currencyPair, req.indicator, time)
-          res  <- service.submit(signal).voidResponse
-        } yield res
+          res <- service.submit(signal).voidResponse
+        yield res
       }
 
   private def getAllSignals(using auth: Authenticator[F]) =
@@ -52,19 +53,20 @@ object SignalController extends TapirSchema with TapirJson {
 
   final case class SubmitSignalRequest(
       currencyPair: CurrencyPair,
-      indicator: Indicator
+      indicator: Indicator,
+      condition: Condition
   ) derives Codec.AsObject
 
   final case class SignalView(
       currencyPair: CurrencyPair,
       indicator: Indicator,
+      condition: Condition,
       time: Instant
   ) derives Codec.AsObject
 
-  object SignalView {
+  object SignalView:
     def from(signal: Signal): SignalView =
-      SignalView(signal.currencyPair, signal.indicator, signal.time)
-  }
+      SignalView(signal.currencyPair, signal.indicator, signal.condition, signal.time)
 
   private val basePath = "signals"
 

@@ -2,7 +2,6 @@ package currexx.core.common.http
 
 import cats.syntax.option.*
 import eu.timepit.refined.types.string.NonEmptyString
-import currexx.core.common.validations.{EmailString, IdString}
 import squants.Money
 import squants.market.Currency
 import sttp.tapir.generic.SchemaDerivation

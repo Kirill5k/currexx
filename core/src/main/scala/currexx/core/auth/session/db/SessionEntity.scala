@@ -1,8 +1,8 @@
 package currexx.core.auth.session.db
 
 import io.circe.Codec
-import currexx.core.auth.user.UserId
-import currexx.core.auth.session.{CreateSession, IpAddress, Session, SessionId, SessionStatus}
+import currexx.domain.user.UserId
+import currexx.domain.session.{CreateSession, IpAddress, Session, SessionId, SessionStatus}
 import mongo4cats.bson.ObjectId
 import mongo4cats.circe.given
 

@@ -3,8 +3,8 @@ package currexx.core.auth.user.db
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
-import currexx.core.auth.user.{PasswordHash, User, UserDetails, UserEmail, UserId, UserName}
-import currexx.core.common.errors.AppError.{AccountAlreadyExists, AccountDoesNotExist}
+import currexx.domain.user.{PasswordHash, User, UserDetails, UserEmail, UserId, UserName}
+import currexx.domain.errors.AppError.{AccountAlreadyExists, AccountDoesNotExist}
 import currexx.core.fixtures.Users
 import mongo4cats.bson.ObjectId
 import mongo4cats.client.MongoClient

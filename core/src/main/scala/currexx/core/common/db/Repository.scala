@@ -3,8 +3,8 @@ package currexx.core.common.db
 import cats.MonadError
 import cats.syntax.option.*
 import com.mongodb.client.result.UpdateResult
-import currexx.core.common.types.IdType
-import currexx.core.auth.user.UserId
+import currexx.domain.types.IdType
+import currexx.domain.user.UserId
 import mongo4cats.bson.ObjectId
 import mongo4cats.collection.operations.{Filter, Update}
 

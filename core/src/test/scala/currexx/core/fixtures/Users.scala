@@ -1,6 +1,6 @@
 package currexx.core.fixtures
 
-import currexx.core.auth.user.{Password, PasswordHash, User, UserDetails, UserEmail, UserId, UserName}
+import currexx.domain.user.{Password, PasswordHash, User, UserDetails, UserEmail, UserId, UserName}
 import mongo4cats.bson.ObjectId
 
 import java.time.Instant

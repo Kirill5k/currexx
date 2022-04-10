@@ -4,13 +4,13 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import jwt.*
 import currexx.core.common.config.JwtConfig
-import currexx.core.common.errors.AppError
+import currexx.domain.errors.AppError
 import currexx.core.CatsSpec
 import currexx.core.auth.jwt.JwtEncoder
-import currexx.core.auth.session.SessionId
-import currexx.core.auth.user.UserId
+import currexx.domain.session.SessionId
+import currexx.domain.user.UserId
 import currexx.core.common.JsonCodecs
-import currexx.core.common.errors.AppError
+import currexx.domain.errors.AppError
 import org.scalatest.wordspec.AsyncWordSpec
 import pdi.jwt.algorithms.JwtUnknownAlgorithm
 
@@ -66,7 +66,7 @@ class JwtEncoderSpec extends CatsSpec with JsonCodecs {
       val result = JwtEncoder.circeJwtEncoder[IO](config.copy(alg = "foo"))
 
       result.attempt.unsafeToFuture().map { res =>
-        res mustBe Left(AppError.InvalidJwtEncryptionAlgorithm(JwtUnknownAlgorithm("FOO")))
+        res mustBe Left(AppError.InvalidJwtEncryptionAlgorithm(JwtUnknownAlgorithm("FOO").fullName))
       }
     }
   }

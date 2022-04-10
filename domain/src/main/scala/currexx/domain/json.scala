@@ -1,8 +1,8 @@
-package currexx.core.common
+package currexx.domain
 
 import cats.syntax.either.*
 import io.circe.{Decoder, Encoder, Json, JsonObject}
-import squants.market.{Currency, Money, defaultMoneyContext}
+import squants.market.{Currency, defaultMoneyContext, Money}
 
 import scala.util.Try
 

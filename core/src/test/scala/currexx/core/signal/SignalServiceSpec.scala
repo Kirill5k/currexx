@@ -3,7 +3,7 @@ package currexx.core.signal
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import currexx.core.CatsSpec
-import currexx.core.auth.user.UserId
+import currexx.domain.user.UserId
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.fixtures.{Signals, Users}
 import currexx.core.signal.db.SignalRepository

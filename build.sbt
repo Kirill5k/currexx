@@ -32,14 +32,23 @@ val docker = Seq(
   }
 )
 
+val domain = project
+  .in(file("domain"))
+  .settings(
+    name       := "currexx-domain",
+    moduleName := "currexx-domain",
+    libraryDependencies ++= Dependencies.domain ++ Dependencies.test
+  )
+
 val core = project
   .in(file("core"))
   .enablePlugins(JavaAppPackaging, JavaAgent, DockerPlugin)
+  .dependsOn(domain % "compile->compile;test->test")
   .settings(docker)
   .settings(
     name       := "currexx-core",
     moduleName := "currexx-core",
-    libraryDependencies ++= Dependencies.core ++ Dependencies.test
+    libraryDependencies ++= Dependencies.core
   )
 
 val root = project

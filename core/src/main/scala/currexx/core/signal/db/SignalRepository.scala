@@ -4,9 +4,10 @@ import cats.effect.Async
 import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
-import currexx.core.auth.user.UserId
 import currexx.core.common.db.Repository
-import currexx.core.signal.{CurrencyPair, Signal}
+import currexx.core.signal.Signal
+import currexx.domain.CurrencyPair
+import currexx.domain.user.UserId
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
 import mongo4cats.collection.operations.Filter
@@ -34,6 +35,6 @@ object SignalRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[SignalRepository[F]] =
     for
       collNames <- db.listCollectionNames
-      _    <- if (collNames.toSet.contains(collectionName)) ().pure[F] else db.createCollection(collectionName, collectionOptions)
-      coll <- db.getCollectionWithCodec[SignalEntity](collectionName)
+      _         <- if (collNames.toSet.contains(collectionName)) ().pure[F] else db.createCollection(collectionName, collectionOptions)
+      coll      <- db.getCollectionWithCodec[SignalEntity](collectionName)
     yield LiveSignalRepository[F](coll.withAddedCodec[CurrencyPair])

@@ -1,11 +1,11 @@
-package currexx.core.common
+package currexx.domain
 
-import currexx.core.auth.session.SessionId
+import currexx.domain.session.SessionId
 import io.circe.DecodingFailure
 import io.circe.parser.*
 import io.circe.syntax.*
-import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.matchers.must.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 import squants.Money
 import squants.market.{Currency, GBP}
 

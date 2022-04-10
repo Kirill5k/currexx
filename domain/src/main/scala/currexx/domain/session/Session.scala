@@ -1,7 +1,7 @@
-package currexx.core.auth.session
+package currexx.domain.session
 
-import currexx.core.common.types.IdType
-import currexx.core.auth.user.UserId
+import currexx.domain.types.IdType
+import currexx.domain.user.UserId
 import io.circe.{Decoder, Encoder}
 
 import java.time.Instant

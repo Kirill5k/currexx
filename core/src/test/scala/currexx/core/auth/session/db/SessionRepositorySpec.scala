@@ -7,7 +7,7 @@ import cats.syntax.option.*
 import currexx.core.MongoSpec
 import currexx.core.fixtures.{Sessions, Users}
 import currexx.core.auth.session.*
-import currexx.core.auth.user.UserId
+import currexx.domain.user.UserId
 import mongo4cats.bson.ObjectId
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase

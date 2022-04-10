@@ -3,7 +3,7 @@ package currexx.core.signal
 import cats.effect.IO
 import currexx.core.ControllerSpec
 import currexx.core.auth.Authenticator
-import currexx.core.auth.user.UserId
+import currexx.domain.user.UserId
 import currexx.core.fixtures.{Sessions, Signals, Users}
 import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.implicits.*

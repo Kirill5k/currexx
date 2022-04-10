@@ -4,9 +4,9 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import currexx.core.CatsSpec
 import currexx.core.auth.jwt.{BearerToken, JwtEncoder, JwtToken}
-import currexx.core.auth.user.UserId
+import currexx.domain.user.UserId
 import currexx.core.auth.session.db.SessionRepository
-import currexx.core.common.errors.AppError
+import currexx.domain.errors.AppError
 import currexx.core.fixtures.{Sessions, Users}
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{verify, verifyNoInteractions, when}

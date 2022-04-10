@@ -1,7 +1,7 @@
-package currexx.core.auth.user
+package currexx.domain.user
 
-import currexx.core.common.types.{IdType, StringType}
-import currexx.core.common.validations.EmailString
+import currexx.domain.types.{IdType, StringType}
+import currexx.domain.validations.EmailString
 import io.circe.Codec
 
 import java.time.Instant

@@ -8,11 +8,10 @@ import cats.syntax.functor.*
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string.MatchesRegex
 import eu.timepit.refined.types.string.NonEmptyString
-import currexx.core.auth.user.*
+import currexx.domain.user.*
 import currexx.core.auth.session.{CreateSession, IpAddress, Session, SessionService}
-import currexx.core.common.errors.AppError.SomeoneElsesSession
+import currexx.domain.errors.AppError.SomeoneElsesSession
 import currexx.core.auth.jwt.BearerToken
-import currexx.core.common.validations.*
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
 import io.circe.Codec
 import io.circe.refined.*

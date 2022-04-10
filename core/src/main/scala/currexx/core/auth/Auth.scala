@@ -8,6 +8,7 @@ import currexx.core.auth.user.{PasswordEncryptor, UserService}
 import currexx.core.auth.user.db.UserRepository
 import currexx.core.auth.session.db.SessionRepository
 import currexx.core.auth.session.SessionService
+import currexx.core.auth.user.PasswordEncryptor
 import currexx.core.common.config.AuthConfig
 import currexx.core.common.http.Controller
 import jwt.JwtEncoder

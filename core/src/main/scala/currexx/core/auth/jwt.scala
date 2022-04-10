@@ -3,12 +3,10 @@ package currexx.core.auth
 import cats.effect.Sync
 import cats.syntax.either.*
 import currexx.core.common.config.JwtConfig
-import currexx.core.common.errors.AppError
-import currexx.core.common.types.StringType
-import currexx.core.auth.session.SessionId
-import currexx.core.auth.user.UserId
-import currexx.core.common.config.JwtConfig
-import currexx.core.common.errors.AppError
+import currexx.domain.types.StringType
+import currexx.domain.session.SessionId
+import currexx.domain.user.UserId
+import currexx.domain.errors.AppError
 import io.circe.*
 import io.circe.syntax.*
 import io.circe.Codec
@@ -41,7 +39,7 @@ object jwt {
       case a if JwtAlgorithm.allAsymmetric().contains(a) =>
         (t: String) => JwtCirce.decodeJson(t, secret, List(a.asInstanceOf[JwtAsymmetricAlgorithm]))
       case a =>
-        (_: String) => Failure(AppError.InvalidJwtEncryptionAlgorithm(a))
+        (_: String) => Failure(AppError.InvalidJwtEncryptionAlgorithm(a.fullName))
 
     override def encode(token: JwtToken): F[BearerToken] =
       F.delay(JwtCirce.encode(token.asJson, secret, alg))
@@ -56,6 +54,6 @@ object jwt {
         case alg if JwtAlgorithm.allHmac().contains(alg) | JwtAlgorithm.allAsymmetric().contains(alg) =>
           F.pure(new CirceJwtEncoder(config.secret, alg))
         case alg =>
-          F.raiseError(AppError.InvalidJwtEncryptionAlgorithm(alg))
+          F.raiseError(AppError.InvalidJwtEncryptionAlgorithm(alg.fullName))
 
 }

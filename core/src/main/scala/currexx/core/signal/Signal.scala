@@ -1,26 +1,17 @@
 package currexx.core.signal
 
-import cats.syntax.either.*
-import currexx.core.auth.user.UserId
-import io.circe.{Codec, Decoder, Encoder}
-import squants.market.{Currency, defaultMoneyContext}
+import currexx.domain.user.UserId
+import currexx.domain.market.{Condition, CurrencyPair, Indicator}
+import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder}
+import io.circe.syntax.*
 
 import java.time.Instant
-
-final case class CurrencyPair(base: Currency, quote: Currency)
-object CurrencyPair:
-  inline given Encoder[CurrencyPair] = Encoder.encodeString.contramap(cp => s"${cp.base.code}/${cp.quote.code}")
-  inline given Decoder[CurrencyPair] = Decoder.decodeString.emap { cp =>
-    for
-      pair  <- Either.cond(cp.matches("^[A-Z]{3}\\/[A-Z]{3}$"), cp.split("/"), s"$cp is not valid currency pair representation")
-      base  <- Currency(pair.head)(defaultMoneyContext).toEither.leftMap(_.getMessage)
-      quote <- Currency(pair.last)(defaultMoneyContext).toEither.leftMap(_.getMessage)
-    yield CurrencyPair(base, quote)
-  }
+import scala.util.Try
 
 final case class Signal(
     userId: UserId,
     currencyPair: CurrencyPair,
     indicator: Indicator,
+    condition: Condition,
     time: Instant
 ) derives Codec.AsObject

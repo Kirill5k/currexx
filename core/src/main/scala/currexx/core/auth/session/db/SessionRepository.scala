@@ -2,10 +2,10 @@ package currexx.core.auth.session.db
 
 import cats.effect.Async
 import cats.syntax.functor.*
-import currexx.core.auth.user.UserId
-import currexx.core.auth.session.{CreateSession, Session, SessionId, SessionStatus}
 import currexx.core.common.db.Repository
-import currexx.core.common.json.given
+import currexx.domain.session.{CreateSession, Session, SessionId, SessionStatus}
+import currexx.domain.user.UserId
+import currexx.domain.json.given
 import mongo4cats.database.MongoDatabase
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.operations.Update

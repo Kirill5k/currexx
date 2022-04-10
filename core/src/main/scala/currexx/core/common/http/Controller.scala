@@ -8,9 +8,10 @@ import cats.syntax.applicativeError.*
 import currexx.core.auth.Authenticator
 import eu.timepit.refined.types.string.NonEmptyString
 import currexx.core.auth.jwt.BearerToken
-import currexx.core.common.errors.AppError
-import currexx.core.auth.session.Session
-import currexx.core.common.JsonCodecs
+import currexx.domain.errors.AppError
+import currexx.domain.session.Session
+import currexx.domain.JsonCodecs
+import currexx.domain.session.Session
 import io.circe.Codec
 import mongo4cats.bson.ObjectId
 import org.http4s.HttpRoutes

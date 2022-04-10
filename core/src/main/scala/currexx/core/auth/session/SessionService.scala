@@ -4,9 +4,9 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.{ApplicativeThrow, Monad, MonadThrow}
 import currexx.core.auth.jwt.{BearerToken, JwtEncoder, JwtToken}
-import currexx.core.auth.user.UserId
 import currexx.core.auth.session.db.SessionRepository
-import currexx.core.common.errors.AppError
+import currexx.domain.user.UserId
+import currexx.domain.errors.AppError
 
 trait SessionService[F[_]]:
   def authenticate(token: BearerToken): F[Session]

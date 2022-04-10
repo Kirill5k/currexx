@@ -6,7 +6,8 @@ import cats.syntax.apply.*
 import cats.syntax.functor.*
 import cats.syntax.applicativeError.*
 import currexx.core.auth.user.db.UserRepository
-import currexx.core.common.errors.AppError.*
+import currexx.domain.errors.AppError.*
+import currexx.domain.user.*
 
 enum LoginResult:
   case Fail

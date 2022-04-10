@@ -5,8 +5,8 @@ import cats.syntax.flatMap.*
 import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.applicativeError.*
-import currexx.core.auth.user.*
-import currexx.core.common.errors.AppError.{AccountAlreadyExists, AccountDoesNotExist}
+import currexx.domain.user.*
+import currexx.domain.errors.AppError.{AccountAlreadyExists, AccountDoesNotExist}
 import currexx.core.common.db.Repository
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.operations.{Filter, Update}
