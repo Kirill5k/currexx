@@ -9,9 +9,12 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string.MatchesRegex
 import eu.timepit.refined.types.string.NonEmptyString
 import currexx.domain.user.*
-import currexx.core.auth.session.{CreateSession, IpAddress, Session, SessionService}
+import currexx.domain.session.{CreateSession, IpAddress, Session}
 import currexx.domain.errors.AppError.SomeoneElsesSession
+import currexx.domain.validations.*
 import currexx.core.auth.jwt.BearerToken
+import currexx.core.auth.session.SessionService
+import currexx.core.auth.user.UserService
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
 import io.circe.Codec
 import io.circe.refined.*

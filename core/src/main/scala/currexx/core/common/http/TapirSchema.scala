@@ -4,6 +4,7 @@ import cats.syntax.option.*
 import eu.timepit.refined.types.string.NonEmptyString
 import squants.Money
 import squants.market.Currency
+import currexx.domain.validations.{EmailString, IdString}
 import sttp.tapir.generic.SchemaDerivation
 import sttp.tapir.{FieldName, Schema}
 import sttp.tapir.Schema.SName

@@ -27,7 +27,7 @@ final private class SignalController[F[_]](
       .serverLogic { session => req =>
         for
           time <- F.realTimeInstant
-          signal = Signal(session.userId, req.currencyPair, req.indicator, time)
+          signal = Signal(session.userId, req.currencyPair, req.indicator, req.condition, time)
           res <- service.submit(signal).voidResponse
         yield res
       }

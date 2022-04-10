@@ -3,8 +3,7 @@ package currexx.domain.market
 import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder, Json}
 import io.circe.syntax.*
 
-sealed abstract class Condition(val kind: String)
-
+sealed trait Condition(val kind: String)
 object Condition {
   final case class Crossing(value: BigDecimal)     extends Condition("crossing") derives Codec.AsObject
   final case class CrossingUp(value: BigDecimal)   extends Condition("crossing-up") derives Codec.AsObject
@@ -21,7 +20,7 @@ object Condition {
       case kind            => Left(DecodingFailure(s"Unexpected condition kind $kind", List(CursorOp.Field(discriminatorField))))
     }
   }
-  inline given Encoder[Indicator] = Encoder.instance {
+  inline given Encoder[Condition] = Encoder.instance {
     case cross: Crossing         => cross.asJson.deepMerge(discriminatorJson(cross))
     case crossUp: CrossingUp     => crossUp.asJson.deepMerge(discriminatorJson(crossUp))
     case crossDown: CrossingDown => crossDown.asJson.deepMerge(discriminatorJson(crossDown))
