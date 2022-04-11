@@ -4,6 +4,7 @@ import io.circe.{Decoder, Encoder}
 
 enum Indicator(val kind: String):
   case MACD extends Indicator("macd")
+  case RSI  extends Indicator("rsi")
 
 object Indicator:
   def from(kind: String): Either[String, Indicator] =
