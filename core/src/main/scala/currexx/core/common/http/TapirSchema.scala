@@ -1,6 +1,7 @@
 package currexx.core.common.http
 
 import cats.syntax.option.*
+import currexx.domain.market.Trend
 import eu.timepit.refined.types.string.NonEmptyString
 import squants.Money
 import squants.market.Currency
@@ -11,12 +12,13 @@ import sttp.tapir.Schema.SName
 import sttp.tapir.SchemaType.{SProduct, SProductField}
 
 transparent trait TapirSchema extends SchemaDerivation {
-  given Schema[IdString]       = Schema.string
-  given Schema[NonEmptyString] = Schema.string
-  given Schema[EmailString]    = Schema.string
-  given Schema[Currency]       = Schema.string
+  inline given Schema[IdString]       = Schema.string
+  inline given Schema[NonEmptyString] = Schema.string
+  inline given Schema[EmailString]    = Schema.string
+  inline given Schema[Currency]       = Schema.string
+  inline given Schema[Trend]          = Schema.string
 
-  given (using currencySchema: Schema[Currency]): Schema[Money] = Schema(
+  inline given (using currencySchema: Schema[Currency]): Schema[Money] = Schema(
     SProduct(
       List(
         SProductField(FieldName("currency"), currencySchema, _.currency.some),
