@@ -32,6 +32,14 @@ val docker = Seq(
   }
 )
 
+val calculations = project
+  .in(file("calculations"))
+  .settings(
+    name       := "currexx-calculations",
+    moduleName := "currexx-calculations",
+    libraryDependencies ++= Dependencies.test
+  )
+
 val domain = project
   .in(file("domain"))
   .settings(
@@ -57,4 +65,4 @@ val root = project
   .settings(
     name := "currexx"
   )
-  .aggregate(core)
+  .aggregate(core, calculations)
