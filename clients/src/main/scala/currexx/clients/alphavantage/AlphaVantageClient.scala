@@ -108,4 +108,10 @@ private[clients] object AlphaVantageClient {
   final case class IntradayTimeSeriesResponse(
       `Meta Data`: IntradayResponseMetadata
   ) derives Codec.AsObject
+
+  def make[F[_]: Temporal: Logger](
+      config: MarketDataClientConfig,
+      backend: SttpBackend[F, Any]
+  ): F[MarketDataClient[F]] =
+    Temporal[F].pure(AlphaVantageClient(config, backend))
 }
