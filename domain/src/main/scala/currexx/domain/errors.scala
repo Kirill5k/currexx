@@ -18,6 +18,11 @@ object errors {
     sealed trait Forbidden     extends AppError
     sealed trait Unprocessable extends AppError
 
+    final case class JsonParsingFailure(original: String, error: String) extends AppError:
+      override val message: String = s"Failed to parse json response: $error"
+
+    final case class AccessDenied(message: String) extends AppError
+
     final case class AccountAlreadyExists(email: UserEmail) extends Conflict:
       override val message: String = s"An account with email $email already exists"
 

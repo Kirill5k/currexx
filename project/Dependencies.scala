@@ -84,16 +84,17 @@ object Dependencies {
     Libraries.mongo4cats.circe,
     Libraries.pureconfig.core
   ) ++
+    Libraries.logging.all ++
     Libraries.circe.all ++
     Libraries.refined.all
+
+  val clients = Libraries.sttp.all
 
   val core = Seq(
     Libraries.jwt,
     Libraries.bcrypt.cross(CrossVersion.for3Use2_13)
   ) ++
     Libraries.tapir.all ++
-    Libraries.logging.all ++
-    Libraries.sttp.all ++
     Libraries.http4s.all
 
   val test = Seq(
