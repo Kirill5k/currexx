@@ -3,11 +3,12 @@ package currexx.clients.alphavantage
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import currexx.clients.{ApiClientSpec, MarketDataClientConfig}
-import currexx.domain.market.{CurrencyPair, PriceRange, Interval}
+import currexx.domain.market.{CurrencyPair, Interval, PriceRange}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import squants.market.{GBP, USD}
 import sttp.client3.{Response, SttpBackend}
+import sttp.model.StatusCode
 
 import java.time.Instant
 
@@ -91,6 +92,26 @@ class AlphaVantageClientSpec extends ApiClientSpec {
           BigDecimal(1.33307),
           Instant.parse("2021-11-26T00:00:00Z")
         )
+      }
+    }
+
+    "retry on client or server error" in {
+      val testingBackend: SttpBackend[IO, Any] = backendStub
+        .whenAnyRequest
+        .thenRespondCyclicResponses(
+          Response("uh-oh!", StatusCode.BadRequest),
+          Response.ok(json("alphavantage/gbp-usd-hourly-prices-response.json"))
+        )
+
+      val result = for
+        client <- AlphaVantageClient.make[IO](config, testingBackend)
+        res    <- client.timeSeriesData(pair, Interval.H1)
+      yield res
+
+      result.unsafeToFuture().map { timeSeriesData =>
+        timeSeriesData.currencyPair mustBe pair
+        timeSeriesData.interval mustBe Interval.H1
+        timeSeriesData.prices must have size 100
       }
     }
   }
