@@ -81,7 +81,7 @@ class AlphaVantageClientSpec extends ApiClientSpec {
           BigDecimal(1.31472),
           BigDecimal(1.30320),
           BigDecimal(1.30395),
-          Instant.parse("2022-04-14T00:00:00Z")
+          Instant.parse("2022-04-14T14:10:00Z")
         )
 
         timeSeriesData.prices.last mustBe PriceRange(
