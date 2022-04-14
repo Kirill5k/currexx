@@ -2,7 +2,7 @@ package currexx.clients.alphavantage
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-import currexx.clients.{ApiClientSpec, MarketDataClientConfig}
+import currexx.clients.{ApiClientSpec, HttpClientConfig}
 import currexx.domain.market.{CurrencyPair, Interval, PriceRange}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -16,7 +16,7 @@ class AlphaVantageClientSpec extends ApiClientSpec {
 
   given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
-  val config = MarketDataClientConfig("http://alpha-vantage.com", "api-key")
+  val config = HttpClientConfig("http://alpha-vantage.com", "api-key")
   val pair   = CurrencyPair(GBP, USD)
 
   "An AlphaVantageClient" should {

@@ -8,6 +8,11 @@ import sttp.client3.{Request, Response, SttpBackend}
 
 import scala.concurrent.duration.*
 
+final case class HttpClientConfig(
+    baseUri: String,
+    apiKey: String
+)
+
 trait HttpClient[F[_]] {
   protected val name: String
   protected val backend: SttpBackend[F, Any]

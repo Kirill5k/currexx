@@ -4,7 +4,7 @@ import cats.effect.Temporal
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import currexx.clients.{MarketDataClient, MarketDataClientConfig}
+import currexx.clients.{HttpClientConfig, MarketDataClient}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import io.circe.{Codec, JsonObject}
@@ -16,7 +16,7 @@ import sttp.model.{StatusCode, Uri}
 import scala.concurrent.duration.*
 
 final private[clients] class AlphaVantageClient[F[_]](
-    private val config: MarketDataClientConfig,
+    private val config: HttpClientConfig,
     override protected val backend: SttpBackend[F, Any]
 )(using
     F: Temporal[F],
@@ -110,7 +110,7 @@ private[clients] object AlphaVantageClient {
   ) derives Codec.AsObject
 
   def make[F[_]: Temporal: Logger](
-      config: MarketDataClientConfig,
+      config: HttpClientConfig,
       backend: SttpBackend[F, Any]
   ): F[MarketDataClient[F]] =
     Temporal[F].pure(AlphaVantageClient(config, backend))
