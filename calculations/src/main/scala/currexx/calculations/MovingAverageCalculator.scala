@@ -1,14 +1,13 @@
 package currexx.calculations
 
 import scala.annotation.tailrec
-import scala.collection.mutable.ListBuffer
 
 object MovingAverageCalculator {
 
-  private val EmaSmoothing: BigDecimal = BigDecimal(2.0D)
+  val EmaSmoothing: BigDecimal = BigDecimal(2.0D)
 
-  def ema(values: List[BigDecimal], n: Int): List[BigDecimal] = {
-    val k = EmaSmoothing / (1 + n)
+  def ema(values: List[BigDecimal], n: Int, smoothing: BigDecimal = EmaSmoothing): List[BigDecimal] = {
+    val k = smoothing / (1 + n)
     @tailrec
     def calc(remainingValues: List[BigDecimal], emas: List[BigDecimal]): List[BigDecimal] =
       if (remainingValues.isEmpty) emas
