@@ -1,4 +1,4 @@
-package currexx.clients.alphavintage
+package currexx.clients.alphavantage
 
 import cats.effect.Temporal
 import cats.syntax.apply.*
@@ -7,7 +7,7 @@ import cats.syntax.functor.*
 import currexx.clients.{MarketDataClient, MarketDataClientConfig}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
-import io.circe.{Codec, Json}
+import io.circe.{Codec, JsonObject}
 import org.typelevel.log4cats.Logger
 import sttp.client3.*
 import sttp.client3.circe.*
@@ -15,16 +15,16 @@ import sttp.model.{StatusCode, Uri}
 
 import scala.concurrent.duration.*
 
-final private[clients] class AlphaVintageClient[F[_]](
+final private[clients] class AlphaVantageClient[F[_]](
     private val config: MarketDataClientConfig,
     override protected val backend: SttpBackend[F, Any]
 )(using
     F: Temporal[F],
     logger: Logger[F]
 ) extends MarketDataClient[F]:
-  import AlphaVintageClient.*
+  import AlphaVantageClient.*
 
-  override protected val name: String                         = "alpha-vintage"
+  override protected val name: String                         = "alpha-vantage"
   override protected val delayBetweenFailures: FiniteDuration = 5.seconds
 
   override def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] =
@@ -62,8 +62,8 @@ final private[clients] class AlphaVintageClient[F[_]](
       .map(prs => MarketTimeSeriesData(pair, interval, prs))
   }
 
-  private def sendRequest(uri: Uri, mapper: Json => Either[AppError, List[PriceRange]]): F[List[PriceRange]] =
-    dispatch(basicRequest.get(uri).response(asJson[Json]))
+  private def sendRequest(uri: Uri, mapper: JsonObject => Either[AppError, List[PriceRange]]): F[List[PriceRange]] =
+    dispatch(basicRequest.get(uri).response(asJson[JsonObject]))
       .flatMap { r =>
         r.body match {
           case Right(value) =>
@@ -80,7 +80,7 @@ final private[clients] class AlphaVintageClient[F[_]](
         }
       }
 
-private[clients] object AlphaVintageClient {
+private[clients] object AlphaVantageClient {
 
   final case class OHLC(
       `1. open`: BigDecimal,
