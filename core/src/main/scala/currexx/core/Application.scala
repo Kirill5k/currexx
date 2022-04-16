@@ -26,7 +26,7 @@ object Application extends IOApp.Simple:
           signals    <- Signals.make(res.mongo, dispatcher)
           monitors   <- Monitors.make(res.mongo, clients, dispatcher)
           http       <- Http.make[IO](health, auth, signals, monitors)
-          processor  <- ActionProcessor.make[IO](dispatcher)
+          processor  <- ActionProcessor.make[IO](dispatcher, monitors.service)
           _ <- Server
             .serve[IO](config.server, http.app, runtime.compute)
             .concurrently(processor.run)

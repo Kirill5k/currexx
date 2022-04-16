@@ -1,15 +1,20 @@
 package currexx.core.monitor
 
 import cats.Monad
+import cats.effect.Temporal
 import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.clients.MarketDataClient
 import currexx.core.common.action.{Action, ActionDispatcher}
+import currexx.core.common.time.*
 import currexx.core.monitor.db.MonitorRepository
 import currexx.domain.user.UserId
 
+import scala.concurrent.duration.Duration
+
 trait MonitorService[F[_]]:
+  def rescheduleAll: F[Unit]
   def create(cm: CreateMonitor): F[MonitorId]
   def getAll(uid: UserId): F[List[Monitor]]
   def get(uid: UserId, id: MonitorId): F[Monitor]
@@ -18,10 +23,12 @@ trait MonitorService[F[_]]:
   def resume(uid: UserId, id: MonitorId): F[Unit]
   def query(uid: UserId, id: MonitorId): F[Unit]
 
-final private class LiveMonitorService[F[_]: Monad](
+final private class LiveMonitorService[F[_]](
     private val repository: MonitorRepository[F],
     private val actionDispatcher: ActionDispatcher[F],
     private val marketDataClient: MarketDataClient[F]
+)(using
+    F: Temporal[F]
 ) extends MonitorService[F] {
   override def getAll(uid: UserId): F[List[Monitor]]       = repository.getAll(uid)
   override def get(uid: UserId, id: MonitorId): F[Monitor] = repository.find(uid, id)
@@ -44,10 +51,25 @@ final private class LiveMonitorService[F[_]: Monad](
         else ().pure[F]
       _ <- actionDispatcher.dispatch(Action.ScheduleMonitor(uid, id, mon.period))
     yield ()
+
+  override def rescheduleAll: F[Unit] =
+    F.realTimeInstant.flatMap { now =>
+      repository.stream
+        .evalMap { mon =>
+          val period = mon.lastQueriedAt
+            .map(now.durationBetween)
+            .filter(_ <= mon.period)
+            .map(mon.period - _)
+            .getOrElse(Duration.Zero)
+          actionDispatcher.dispatch(Action.ScheduleMonitor(mon.userId, mon.id, period))
+        }
+        .compile
+        .drain
+    }
 }
 
 object MonitorService:
-  def make[F[_]: Monad](
+  def make[F[_]: Temporal](
       repository: MonitorRepository[F],
       actionDispatcher: ActionDispatcher[F],
       marketDataClient: MarketDataClient[F]

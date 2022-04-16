@@ -4,6 +4,7 @@ import cats.Monad
 import cats.effect.Temporal
 import cats.syntax.apply.*
 import cats.syntax.applicativeError.*
+import currexx.core.monitor.MonitorService
 import currexx.domain.errors.AppError
 import fs2.Stream
 import org.typelevel.log4cats.Logger
@@ -13,9 +14,11 @@ import scala.concurrent.duration.*
 trait ActionProcessor[F[_]]:
   def run: Stream[F, Unit]
 
-final private class LiveActionProcessor[F[_]: Temporal](
-    private val dispatcher: ActionDispatcher[F]
+final private class LiveActionProcessor[F[_]](
+    private val dispatcher: ActionDispatcher[F],
+    private val monitorService: MonitorService[F]
 )(using
+    F: Temporal[F],
     logger: Logger[F]
 ) extends ActionProcessor[F] {
 
@@ -26,8 +29,8 @@ final private class LiveActionProcessor[F[_]: Temporal](
     (action match {
       case Action.SignalSubmitted(signal)           => logger.info(s"received signal submitted action $signal")
       case Action.ProcessMarketData(uid, data)      => logger.info(s"processing market data for ${data.currencyPair} pair")
-      case Action.QueryMonitor(uid, mid)            => logger.info(s"querying monitor $mid")
-      case Action.ScheduleMonitor(uid, mid, period) => logger.info(s"scheduling monitor $mid to run after $period")
+      case Action.QueryMonitor(uid, mid)            => monitorService.query(uid, mid)
+      case Action.ScheduleMonitor(uid, mid, period) => F.sleep(period) *> dispatcher.dispatch(Action.QueryMonitor(uid, mid))
     }).handleErrorWith {
       case error: AppError =>
         logger.warn(error)(s"domain error while processing action $action")
@@ -39,5 +42,8 @@ final private class LiveActionProcessor[F[_]: Temporal](
 }
 
 object ActionProcessor:
-  def make[F[_]: Temporal: Logger](dispatcher: ActionDispatcher[F]): F[ActionProcessor[F]] =
-    Monad[F].pure(new LiveActionProcessor[F](dispatcher))
+  def make[F[_]: Temporal: Logger](
+      dispatcher: ActionDispatcher[F],
+      monitorService: MonitorService[F]
+  ): F[ActionProcessor[F]] =
+    Monad[F].pure(LiveActionProcessor[F](dispatcher, monitorService))
