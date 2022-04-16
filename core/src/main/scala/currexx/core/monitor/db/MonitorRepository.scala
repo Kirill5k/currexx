@@ -23,6 +23,7 @@ trait MonitorRepository[F[_]] extends Repository[F]:
   def stream(uid: UserId): Stream[F, Monitor]
   def create(monitor: CreateMonitor): F[MonitorId]
   def activate(uid: UserId, id: MonitorId, active: Boolean): F[Unit]
+  def updateQueriedTimestamp(uid: UserId, id: MonitorId): F[Unit]
 
 final private class LiveMonitorRepository[F[_]](
     private val collection: MongoCollection[F, MonitorEntity]
@@ -53,8 +54,14 @@ final private class LiveMonitorRepository[F[_]](
   }
 
   override def activate(uid: UserId, id: MonitorId, active: Boolean): F[Unit] =
+    runUpdate(uid, id, Update.set(Field.Active, active))
+
+  override def updateQueriedTimestamp(uid: UserId, id: MonitorId): F[Unit] =
+    runUpdate(uid, id, Update.currentTimestamp(Field.LastQueriedAt))
+  
+  private def runUpdate(uid: UserId, id: MonitorId, update: Update): F[Unit] =
     collection
-      .updateOne(idEq(id.value) && userIdEq(uid), Update.set("active", active))
+      .updateOne(idEq(id.value) && userIdEq(uid), update)
       .flatMap(errorIfNoMatches(AppError.EntityDoesNotExist("Monitor", id.value)))
 
   override def delete(uid: UserId, id: MonitorId): F[Unit] =

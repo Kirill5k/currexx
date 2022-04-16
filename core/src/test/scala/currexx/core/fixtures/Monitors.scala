@@ -9,9 +9,10 @@ import java.time.Instant
 import scala.concurrent.duration.*
 
 object Monitors {
-  lazy val mid: MonitorId     = MonitorId(ObjectId.get())
-  lazy val updatedAt: Instant = Instant.now
-  lazy val monitor: Monitor   = Monitor(mid, Users.uid, true, Markets.gbpeur, Interval.H1, 3.hours, Some(updatedAt))
+  lazy val mid: MonitorId         = MonitorId(ObjectId.get())
+  lazy val updatedAt: Instant     = Instant.now
+  lazy val period: FiniteDuration = 3.hours
+  lazy val monitor: Monitor       = Monitor(mid, Users.uid, true, Markets.gbpeur, Interval.H1, period, Some(updatedAt))
 
   def create(
       uid: UserId = Users.uid,

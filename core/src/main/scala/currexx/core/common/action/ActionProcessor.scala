@@ -24,8 +24,10 @@ final private class LiveActionProcessor[F[_]: Temporal](
 
   private def handleAction(action: Action): F[Unit] =
     (action match {
-      case Action.SignalSubmitted(signal) => logger.info(s"received signal submitted action $signal")
-      case Action.QueryMonitor(uid, mid) => logger.info(s"querying monitor $mid")
+      case Action.SignalSubmitted(signal)           => logger.info(s"received signal submitted action $signal")
+      case Action.ProcessMarketData(uid, data)      => logger.info(s"processing market data for ${data.currencyPair} pair")
+      case Action.QueryMonitor(uid, mid)            => logger.info(s"querying monitor $mid")
+      case Action.ScheduleMonitor(uid, mid, period) => logger.info(s"scheduling monitor $mid to run after $period")
     }).handleErrorWith {
       case error: AppError =>
         logger.warn(error)(s"domain error while processing action $action")
