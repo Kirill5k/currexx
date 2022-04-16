@@ -64,7 +64,7 @@ final private class AuthController[F[_]](
       .serverLogic { req =>
         userService
           .create(req.userDetails, req.userPassword)
-          .mapResponse(uid => CreateUserResponse(uid.value))
+          .mapResponse(uid => CreateUserResponse(uid))
       }
 
   private def login =
@@ -102,7 +102,7 @@ object AuthController extends TapirSchema with TapirJson {
     def userPassword: Password = Password(password.value)
   }
 
-  final case class CreateUserResponse(id: String) derives Codec.AsObject
+  final case class CreateUserResponse(id: UserId) derives Codec.AsObject
 
   final case class LoginRequest(
       email: EmailString,

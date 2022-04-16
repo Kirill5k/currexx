@@ -1,6 +1,7 @@
 package currexx.domain
 
 import currexx.domain.session.SessionId
+import currexx.domain.market.Interval
 import io.circe.DecodingFailure
 import io.circe.parser.*
 import io.circe.syntax.*
@@ -10,6 +11,16 @@ import squants.Money
 import squants.market.{Currency, GBP}
 
 class JsonCodecsSpec extends AnyWordSpec with Matchers with JsonCodecs {
+
+  "Interval codec" should {
+    "decode and encode interval" in {
+      val interval = Interval.H1
+      val json = interval.asJson.noSpaces
+
+      json mustBe """"H1""""
+      decode[Interval](json) mustBe Right(Interval.H1)
+    }
+  }
 
   "Currency codec" should {
     "convert json to currency" in {

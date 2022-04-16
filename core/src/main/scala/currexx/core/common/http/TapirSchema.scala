@@ -6,12 +6,16 @@ import eu.timepit.refined.types.string.NonEmptyString
 import squants.Money
 import squants.market.Currency
 import currexx.domain.validations.{EmailString, IdString}
+import currexx.domain.user.UserId
+import currexx.core.monitor.MonitorId
 import sttp.tapir.generic.SchemaDerivation
 import sttp.tapir.{FieldName, Schema}
 import sttp.tapir.Schema.SName
 import sttp.tapir.SchemaType.{SProduct, SProductField}
 
 transparent trait TapirSchema extends SchemaDerivation {
+  inline given Schema[UserId]         = Schema.string
+  inline given Schema[MonitorId]      = Schema.string
   inline given Schema[IdString]       = Schema.string
   inline given Schema[NonEmptyString] = Schema.string
   inline given Schema[EmailString]    = Schema.string
