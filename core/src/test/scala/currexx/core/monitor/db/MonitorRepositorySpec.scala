@@ -30,6 +30,18 @@ class MonitorRepositorySpec extends MongoSpec {
           mon mustBe Monitor(mid, Users.uid, true, Markets.gbpeur, Interval.H1, 3.hours, None)
         }
       }
+
+      "return error when creating monitor for an existing currency pair" in withEmbeddedMongoDb { client =>
+        val result = for
+          repo <- MonitorRepository.make(client)
+          _ <- repo.create(Monitors.create())
+          _ <- repo.create(Monitors.create())
+        yield ()
+
+        result.attempt.map { res =>
+          res mustBe Left(AppError.AlreadyBeingMonitored(Markets.gbpeur))
+        }
+      }
     }
 
     "find" should {
@@ -62,7 +74,7 @@ class MonitorRepositorySpec extends MongoSpec {
         val result = for
           repo <- MonitorRepository.make(client)
           mid1 <- repo.create(Monitors.create())
-          mid2 <- repo.create(Monitors.create())
+          mid2 <- repo.create(Monitors.create(pair = Markets.gbpusd))
           mons <- repo.getAll(Users.uid)
         yield (List(mid1, mid2), mons)
 
@@ -112,6 +124,30 @@ class MonitorRepositorySpec extends MongoSpec {
         val result = for
           repo <- MonitorRepository.make(client)
           _    <- repo.activate(Users.uid, Monitors.mid, false)
+        yield ()
+
+        result.attempt.map { res =>
+          res mustBe Left(AppError.EntityDoesNotExist("Monitor", Monitors.mid.value))
+        }
+      }
+    }
+
+    "delete" should {
+      "delete monitor from db" in withEmbeddedMongoDb { client =>
+        val result = for
+          repo <- MonitorRepository.make(client)
+          mid  <- repo.create(Monitors.create())
+          _    <- repo.delete(Users.uid, mid)
+          mons  <- repo.getAll(Users.uid)
+        yield mons
+
+        result.map(_ mustBe Nil)
+      }
+
+      "return error when monitor does not exist" in withEmbeddedMongoDb { client =>
+        val result = for
+          repo <- MonitorRepository.make(client)
+          _    <- repo.delete(Users.uid, Monitors.mid)
         yield ()
 
         result.attempt.map { res =>

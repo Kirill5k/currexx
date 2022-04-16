@@ -2,7 +2,7 @@ package currexx.core.common.db
 
 import cats.MonadError
 import cats.syntax.option.*
-import com.mongodb.client.result.UpdateResult
+import com.mongodb.client.result.{DeleteResult, UpdateResult}
 import currexx.domain.types.IdType
 import currexx.domain.user.UserId
 import mongo4cats.bson.ObjectId
@@ -17,13 +17,12 @@ trait Repository[F[_]] {
     val Name           = "name"
     val UId            = "userId"
     val Email          = "email"
-    val Hidden         = "hidden"
     val LastUpdatedAt  = "lastUpdatedAt"
     val Status         = "status"
     val LastAccessedAt = "lastAccessedAt"
+    val Active         = "active"
+    val CurrencyPair   = "currencyPair"
   }
-
-  protected val notHidden: Filter = Filter.ne(Field.Hidden, true)
 
   private def idEqFilter(name: String, id: Option[String]): Filter = Filter.eq(name, id.map(ObjectId.apply).orNull)
   protected def idEq(id: String): Filter                           = idEqFilter(Field.Id, id.some)
@@ -33,9 +32,9 @@ trait Repository[F[_]] {
   protected def errorIfNull[A](error: Throwable)(res: A)(using F: MonadError[F, Throwable]): F[A] =
     F.fromOption(Option(res), error)
 
+  protected def errorIfNotDeleted(error: Throwable)(res: DeleteResult)(using F: MonadError[F, Throwable]): F[Unit] =
+    F.raiseWhen(res.getDeletedCount == 0)(error)
+
   protected def errorIfNoMatches(error: Throwable)(res: UpdateResult)(using F: MonadError[F, Throwable]): F[Unit] =
     F.raiseWhen(res.getMatchedCount == 0)(error)
-
-  protected def updateHidden(hidden: Boolean): Update =
-    Update.set(Field.Hidden, hidden).currentDate(Field.LastUpdatedAt)
 }

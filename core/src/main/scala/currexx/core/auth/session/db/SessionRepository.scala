@@ -21,8 +21,8 @@ final private class LiveSessionRepository[F[_]: Async](
     private val collection: MongoCollection[F, SessionEntity]
 ) extends SessionRepository[F] {
 
-  private val logoutUpdate     = Update.set(Field.Status, SessionStatus.LoggedOut).set("active", false)
-  private val invalidateUpdate = Update.set(Field.Status, SessionStatus.Invalidated).set("active", false)
+  private val logoutUpdate     = Update.set(Field.Status, SessionStatus.LoggedOut).set(Field.Active, false)
+  private val invalidateUpdate = Update.set(Field.Status, SessionStatus.Invalidated).set(Field.Active, false)
 
   override def create(cs: CreateSession): F[SessionId] = {
     val createSession = SessionEntity.create(cs)

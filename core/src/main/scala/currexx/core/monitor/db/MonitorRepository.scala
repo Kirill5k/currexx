@@ -7,7 +7,8 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.common.db.Repository
 import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId}
-import currexx.domain.errors.AppError.EntityDoesNotExist
+import currexx.domain.errors.AppError
+import currexx.domain.market.CurrencyPair
 import currexx.domain.user.UserId
 import fs2.Stream
 import mongo4cats.circe.MongoJsonCodecs
@@ -17,6 +18,7 @@ import mongo4cats.database.MongoDatabase
 
 trait MonitorRepository[F[_]] extends Repository[F]:
   def find(uid: UserId, id: MonitorId): F[Monitor]
+  def delete(uid: UserId, id: MonitorId): F[Unit]
   def getAll(uid: UserId): F[List[Monitor]]
   def stream(uid: UserId): Stream[F, Monitor]
   def create(monitor: CreateMonitor): F[MonitorId]
@@ -32,7 +34,7 @@ final private class LiveMonitorRepository[F[_]](
     collection
       .find(idEq(id.value) && userIdEq(uid))
       .first
-      .flatMap(maybeMon => F.fromOption(maybeMon.map(_.toDomain), EntityDoesNotExist("Monitor", id.value)))
+      .flatMap(maybeMon => F.fromOption(maybeMon.map(_.toDomain), AppError.EntityDoesNotExist("Monitor", id.value)))
 
   override def getAll(uid: UserId): F[List[Monitor]] =
     collection.find(userIdEq(uid)).all.map(_.map(_.toDomain).toList)
@@ -40,22 +42,29 @@ final private class LiveMonitorRepository[F[_]](
   override def stream(uid: UserId): Stream[F, Monitor] =
     collection.find(userIdEq(uid)).stream.map(_.toDomain)
 
-  override def create(monitor: CreateMonitor): F[MonitorId] = {
-    val entity = MonitorEntity.from(monitor)
-    collection.insertOne(entity).as(MonitorId(entity._id))
+  override def create(mon: CreateMonitor): F[MonitorId] = {
+    val entity = MonitorEntity.from(mon)
+    collection
+      .count(userIdEq(mon.userId) && Filter.eq(Field.CurrencyPair, mon.currencyPair))
+      .flatMap {
+        case 0 => collection.insertOne(entity).as(MonitorId(entity._id))
+        case _ => AppError.AlreadyBeingMonitored(mon.currencyPair).raiseError[F, MonitorId]
+      }
   }
 
-  def activate(uid: UserId, id: MonitorId, active: Boolean): F[Unit] =
+  override def activate(uid: UserId, id: MonitorId, active: Boolean): F[Unit] =
     collection
       .updateOne(idEq(id.value) && userIdEq(uid), Update.set("active", active))
-      .map(_.getMatchedCount)
-      .flatMap(notFoundErrorIfNoMatches(id))
+      .flatMap(errorIfNoMatches(AppError.EntityDoesNotExist("Monitor", id.value)))
 
-  private def notFoundErrorIfNoMatches(id: MonitorId)(matchCount: Long): F[Unit] =
-    if (matchCount == 0) EntityDoesNotExist("Monitor", id.value).raiseError[F, Unit] else ().pure[F]
+  override def delete(uid: UserId, id: MonitorId): F[Unit] =
+    collection
+      .deleteOne(idEq(id.value) && userIdEq(uid))
+      .flatMap(errorIfNotDeleted(AppError.EntityDoesNotExist("Monitor", id.value)))
 }
 
 object MonitorRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[MonitorRepository[F]] =
     db.getCollectionWithCodec[MonitorEntity]("monitors")
+      .map(_.withAddedCodec[CurrencyPair])
       .map(coll => LiveMonitorRepository[F](coll))
