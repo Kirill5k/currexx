@@ -26,8 +26,8 @@ object errors {
     final case class AccountAlreadyExists(email: UserEmail) extends Conflict:
       override val message: String = s"An account with email $email already exists"
 
-    final case class AccountDoesNotExist(id: UserId) extends NotFound:
-      override val message: String = s"Account with id $id does not exist"
+    final case class EntityDoesNotExist(entityName: String, id: String) extends NotFound:
+      override val message: String = s"$entityName with id $id does not exist"
 
     case object InvalidEmailOrPassword extends Unauth:
       override val message: String = "Invalid email or password"
@@ -49,9 +49,6 @@ object errors {
 
     final case class InvalidAuthorizationHeader(error: String) extends Forbidden:
       override val message: String = s"Invalid authorization header - $error"
-
-    final case class SessionDoesNotExist(id: SessionId) extends Forbidden:
-      override val message: String = s"Session with id $id does not exist"
 
     case object IdMismatch extends BadReq:
       override val message: String = "The id supplied in the path does not match with the id in the request body"

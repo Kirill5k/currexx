@@ -27,7 +27,7 @@ final private class LiveSessionService[F[_]](
     for
       jwt          <- jwtEncoder.decode(token)
       maybeSession <- repository.find(jwt.sessionId)
-      session      <- F.fromOption(maybeSession, AppError.SessionDoesNotExist(jwt.sessionId))
+      session      <- F.fromOption(maybeSession, AppError.EntityDoesNotExist("Session", jwt.sessionId.value))
       _            <- F.ensure(F.pure(session.userId))(AppError.SomeoneElsesSession)(_ == jwt.userId)
       _            <- F.ensure(F.pure(session))(AppError.ExpiredSession)(_.active)
     yield session

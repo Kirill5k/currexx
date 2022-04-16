@@ -6,7 +6,7 @@ import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.applicativeError.*
 import currexx.domain.user.*
-import currexx.domain.errors.AppError.{AccountAlreadyExists, AccountDoesNotExist}
+import currexx.domain.errors.AppError.{AccountAlreadyExists, EntityDoesNotExist}
 import currexx.core.common.db.Repository
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.operations.{Filter, Update}
@@ -46,12 +46,12 @@ final private class LiveUserRepository[F[_]](
     collection
       .find(idEq(uid.value))
       .first
-      .flatMap(maybeUser => F.fromOption(maybeUser.map(_.toDomain), AccountDoesNotExist(uid)))
+      .flatMap(maybeUser => F.fromOption(maybeUser.map(_.toDomain), EntityDoesNotExist("User", uid.value)))
 
-  override def updatePassword(aid: UserId)(password: PasswordHash): F[Unit] =
+  override def updatePassword(uid: UserId)(password: PasswordHash): F[Unit] =
     collection
-      .updateOne(idEq(aid.value), Update.set("password", password.value))
-      .flatMap(errorIfNoMatches(AccountDoesNotExist(aid)))
+      .updateOne(idEq(uid.value), Update.set("password", password.value))
+      .flatMap(errorIfNoMatches(EntityDoesNotExist("User", uid.value)))
 }
 
 object UserRepository extends MongoJsonCodecs:

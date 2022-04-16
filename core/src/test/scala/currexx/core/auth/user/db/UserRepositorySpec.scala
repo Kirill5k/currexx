@@ -4,7 +4,7 @@ import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
 import currexx.domain.user.{PasswordHash, User, UserDetails, UserEmail, UserId, UserName}
-import currexx.domain.errors.AppError.{AccountAlreadyExists, AccountDoesNotExist}
+import currexx.domain.errors.AppError.{AccountAlreadyExists, EntityDoesNotExist}
 import currexx.core.fixtures.Users
 import mongo4cats.bson.ObjectId
 import mongo4cats.client.MongoClient
@@ -41,7 +41,7 @@ class UserRepositorySpec extends MongoSpec {
             acc  <- repo.find(Users.uid2)
           yield acc
 
-          result.attempt.map(_ mustBe Left(AccountDoesNotExist(Users.uid2)))
+          result.attempt.map(_ mustBe Left(EntityDoesNotExist("Account", Users.uid2.value)))
         }
       }
     }
@@ -96,7 +96,7 @@ class UserRepositorySpec extends MongoSpec {
             acc  <- repo.updatePassword(id)(Users.hash)
           yield acc
 
-          result.attempt.map(_ mustBe Left(AccountDoesNotExist(id)))
+          result.attempt.map(_ mustBe Left(EntityDoesNotExist("Account", id.value)))
         }
       }
     }
