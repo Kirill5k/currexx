@@ -64,7 +64,7 @@ object Controller extends TapirSchema with TapirJson {
     val errorEndpointOut = (e: Throwable) => Some(ValuedEndpointOutput(error, Controller.mapError(e)))
     Http4sServerOptions
       .customInterceptors[F, F]
-      .exceptionHandler((ctx: ExceptionContext) => errorEndpointOut(ctx.e))
+      .exceptionHandler(ExceptionHandler.pure((ctx: ExceptionContext) => errorEndpointOut(ctx.e)))
       .decodeFailureHandler { (ctx: DecodeFailureContext) =>
         if (ctx.failingInput.toString.matches("Header.Authorization.*")) {
           ctx.failure match
