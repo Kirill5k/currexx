@@ -50,6 +50,9 @@ object errors {
     final case class InvalidAuthorizationHeader(error: String) extends Forbidden:
       override val message: String = s"Invalid authorization header - $error"
 
+    final case class SessionDoesNotExist(id: SessionId) extends Forbidden:
+      override val message: String = s"Session with id $id does not exist"
+
     case object IdMismatch extends BadReq:
       override val message: String = "The id supplied in the path does not match with the id in the request body"
 

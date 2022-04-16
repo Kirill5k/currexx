@@ -6,7 +6,7 @@ import currexx.core.auth.session.SessionService
 import currexx.core.auth.user.UserService
 import currexx.domain.session.*
 import currexx.domain.user.*
-import currexx.domain.errors.AppError.{AccountAlreadyExists, EntityDoesNotExist, InvalidEmailOrPassword}
+import currexx.domain.errors.AppError.{AccountAlreadyExists, InvalidEmailOrPassword, SessionDoesNotExist}
 import currexx.core.auth.jwt.BearerToken
 import currexx.core.fixtures.{Sessions, Users}
 import org.http4s.circe.CirceEntityCodec.*
@@ -202,7 +202,7 @@ class AuthControllerSpec extends ControllerSpec {
       "return forbidden if session does not exist" in {
         val (usrSvc, sessSvc) = mocks
 
-        given auth: Authenticator[IO] = (auth: BearerToken) => IO.raiseError(EntityDoesNotExist("Session", Sessions.sid.value))
+        given auth: Authenticator[IO] = (auth: BearerToken) => IO.raiseError(SessionDoesNotExist(Sessions.sid))
 
         val req = requestWithAuthHeader(uri"/auth/logout", method = Method.POST)
         val res = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))

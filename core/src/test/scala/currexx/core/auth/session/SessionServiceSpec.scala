@@ -53,7 +53,7 @@ class SessionServiceSpec extends CatsSpec {
         result.attempt.unsafeToFuture().map { res =>
           verify(jwtEnc).decode(bearerToken)
           verify(repo).find(Sessions.sid)
-          res mustBe Left(AppError.EntityDoesNotExist("Session", Sessions.sid.value))
+          res mustBe Left(AppError.SessionDoesNotExist(Sessions.sid))
         }
       }
 

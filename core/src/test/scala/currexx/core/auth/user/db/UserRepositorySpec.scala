@@ -41,7 +41,7 @@ class UserRepositorySpec extends MongoSpec {
             acc  <- repo.find(Users.uid2)
           yield acc
 
-          result.attempt.map(_ mustBe Left(EntityDoesNotExist("Account", Users.uid2.value)))
+          result.attempt.map(_ mustBe Left(EntityDoesNotExist("User", Users.uid2.value)))
         }
       }
     }
@@ -96,7 +96,7 @@ class UserRepositorySpec extends MongoSpec {
             acc  <- repo.updatePassword(id)(Users.hash)
           yield acc
 
-          result.attempt.map(_ mustBe Left(EntityDoesNotExist("Account", id.value)))
+          result.attempt.map(_ mustBe Left(EntityDoesNotExist("User", id.value)))
         }
       }
     }
