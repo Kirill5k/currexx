@@ -17,10 +17,10 @@ import mongo4cats.collection.operations.{Filter, Update}
 import mongo4cats.database.MongoDatabase
 
 trait MonitorRepository[F[_]] extends Repository[F]:
+  def stream: Stream[F, Monitor]
   def find(uid: UserId, id: MonitorId): F[Monitor]
   def delete(uid: UserId, id: MonitorId): F[Unit]
   def getAll(uid: UserId): F[List[Monitor]]
-  def stream(uid: UserId): Stream[F, Monitor]
   def create(monitor: CreateMonitor): F[MonitorId]
   def activate(uid: UserId, id: MonitorId, active: Boolean): F[Unit]
   def updateQueriedTimestamp(uid: UserId, id: MonitorId): F[Unit]
@@ -31,6 +31,9 @@ final private class LiveMonitorRepository[F[_]](
     F: Async[F]
 ) extends MonitorRepository[F] {
 
+  override def stream: Stream[F, Monitor] =
+    collection.find.stream.map(_.toDomain)
+
   override def find(uid: UserId, id: MonitorId): F[Monitor] =
     collection
       .find(idEq(id.value) && userIdEq(uid))
@@ -39,9 +42,6 @@ final private class LiveMonitorRepository[F[_]](
 
   override def getAll(uid: UserId): F[List[Monitor]] =
     collection.find(userIdEq(uid)).all.map(_.map(_.toDomain).toList)
-
-  override def stream(uid: UserId): Stream[F, Monitor] =
-    collection.find(userIdEq(uid)).stream.map(_.toDomain)
 
   override def create(mon: CreateMonitor): F[MonitorId] = {
     val entity = MonitorEntity.from(mon)
@@ -58,7 +58,7 @@ final private class LiveMonitorRepository[F[_]](
 
   override def updateQueriedTimestamp(uid: UserId, id: MonitorId): F[Unit] =
     runUpdate(uid, id, Update.currentTimestamp(Field.LastQueriedAt))
-  
+
   private def runUpdate(uid: UserId, id: MonitorId, update: Update): F[Unit] =
     collection
       .updateOne(idEq(id.value) && userIdEq(uid), update)
