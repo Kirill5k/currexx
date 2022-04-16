@@ -25,7 +25,7 @@ object errors {
     final case class AccessDenied(message: String) extends AppError
 
     final case class AlreadyBeingMonitored(cp: CurrencyPair) extends Conflict:
-      override val message: String = s"Monitor for currency pair ${cp.base.code}/${cp.quote.code} already exists"
+      override val message: String = s"Monitor for currency pair $cp already exists"
     
     final case class AccountAlreadyExists(email: UserEmail) extends Conflict:
       override val message: String = s"An account with email $email already exists"
