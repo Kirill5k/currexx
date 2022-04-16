@@ -56,12 +56,11 @@ final private class LiveMonitorService[F[_]](
     F.realTimeInstant.flatMap { now =>
       repository.stream
         .evalMap { mon =>
-          val period = mon.lastQueriedAt
+          mon.lastQueriedAt
             .map(now.durationBetween)
             .filter(_ <= mon.period)
-            .map(mon.period - _)
-            .getOrElse(Duration.Zero)
-          actionDispatcher.dispatch(Action.ScheduleMonitor(mon.userId, mon.id, period))
+            .map(db => actionDispatcher.dispatch(Action.ScheduleMonitor(mon.userId, mon.id, mon.period - db)))
+            .getOrElse(actionDispatcher.dispatch(Action.QueryMonitor(mon.userId, mon.id)))
         }
         .compile
         .drain

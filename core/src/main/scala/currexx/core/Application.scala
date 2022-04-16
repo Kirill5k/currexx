@@ -3,7 +3,7 @@ package currexx.core
 import cats.effect.{IO, IOApp}
 import currexx.clients.Clients
 import currexx.core.auth.Auth
-import currexx.core.common.action.{ActionDispatcher, ActionProcessor}
+import currexx.core.common.action.{Action, ActionDispatcher, ActionProcessor}
 import currexx.core.common.config.AppConfig
 import currexx.core.common.http.Http
 import currexx.core.health.Health
@@ -26,6 +26,7 @@ object Application extends IOApp.Simple:
           signals    <- Signals.make(res.mongo, dispatcher)
           monitors   <- Monitors.make(res.mongo, clients, dispatcher)
           http       <- Http.make[IO](health, auth, signals, monitors)
+          _          <- dispatcher.dispatch(Action.RescheduleAllMonitors)
           processor  <- ActionProcessor.make[IO](dispatcher, monitors.service)
           _ <- Server
             .serve[IO](config.server, http.app, runtime.compute)

@@ -9,6 +9,9 @@ import currexx.core.fixtures.{Markets, Monitors, Users}
 import currexx.core.monitor.db.MonitorRepository
 import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.user.UserId
+import fs2.Stream
+
+import java.time.Instant
 
 class MonitorServiceSpec extends CatsSpec {
 
@@ -65,6 +68,62 @@ class MonitorServiceSpec extends CatsSpec {
           verify(repo).create(Monitors.create())
           verify(disp).dispatch(Action.QueryMonitor(Users.uid, Monitors.mid))
           mid mustBe Monitors.mid
+        }
+      }
+    }
+
+    "rescheduleAll" should {
+      "schedule monitors without lastQueriedAt to start immediately" in {
+        val (repo, disp, client) = mocks
+        when(repo.stream).thenReturn(Stream(Monitors.monitor.copy(lastQueriedAt = None)))
+        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+
+        val result = for
+          svc <- MonitorService.make[IO](repo, disp, client)
+          res <- svc.rescheduleAll
+        yield res
+
+        result.unsafeToFuture().map { res =>
+          verify(repo).stream
+          verify(disp).dispatch(Action.QueryMonitor(Users.uid, Monitors.mid))
+          verifyNoInteractions(client)
+          res mustBe ()
+        }
+      }
+
+      "schedule monitors with old lastQueriedAt to start immediately" in {
+        val (repo, disp, client) = mocks
+        when(repo.stream).thenReturn(Stream(Monitors.monitor.copy(lastQueriedAt = Some(Instant.parse("2020-01-01T00:00:00Z")))))
+        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+
+        val result = for
+          svc <- MonitorService.make[IO](repo, disp, client)
+          res <- svc.rescheduleAll
+        yield res
+
+        result.unsafeToFuture().map { res =>
+          verify(repo).stream
+          verify(disp).dispatch(Action.QueryMonitor(Users.uid, Monitors.mid))
+          verifyNoInteractions(client)
+          res mustBe ()
+        }
+      }
+
+      "schedule monitors with recent lastQueriedAt to wait" in {
+        val (repo, disp, client) = mocks
+        when(repo.stream).thenReturn(Stream(Monitors.monitor.copy(lastQueriedAt = Some(Instant.now.minusSeconds(50)))))
+        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+
+        val result = for
+          svc <- MonitorService.make[IO](repo, disp, client)
+          res <- svc.rescheduleAll
+        yield res
+
+        result.unsafeToFuture().map { res =>
+          verify(repo).stream
+          verify(disp).dispatch(any[Action.ScheduleMonitor])
+          verifyNoInteractions(client)
+          res mustBe ()
         }
       }
     }
