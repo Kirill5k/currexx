@@ -1,7 +1,7 @@
 package currexx.core.common.http
 
 import cats.syntax.option.*
-import currexx.domain.market.Trend
+import currexx.domain.market.{Interval, Trend}
 import eu.timepit.refined.types.string.NonEmptyString
 import squants.Money
 import squants.market.Currency
@@ -13,6 +13,8 @@ import sttp.tapir.{FieldName, Schema}
 import sttp.tapir.Schema.SName
 import sttp.tapir.SchemaType.{SProduct, SProductField}
 
+import scala.concurrent.duration.FiniteDuration
+
 transparent trait TapirSchema extends SchemaDerivation {
   inline given Schema[UserId]         = Schema.string
   inline given Schema[MonitorId]      = Schema.string
@@ -21,6 +23,8 @@ transparent trait TapirSchema extends SchemaDerivation {
   inline given Schema[EmailString]    = Schema.string
   inline given Schema[Currency]       = Schema.string
   inline given Schema[Trend]          = Schema.string
+  inline given Schema[Interval]       = Schema.string
+  inline given Schema[FiniteDuration] = Schema.string
 
   inline given (using currencySchema: Schema[Currency]): Schema[Money] = Schema(
     SProduct(
