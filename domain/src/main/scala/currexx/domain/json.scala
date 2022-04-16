@@ -2,8 +2,9 @@ package currexx.domain
 
 import cats.syntax.either.*
 import io.circe.{Decoder, Encoder, Json, JsonObject}
-import squants.market.{Currency, defaultMoneyContext, Money}
+import squants.market.{Currency, Money, defaultMoneyContext}
 
+import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
 
 object json extends JsonCodecs
@@ -11,6 +12,14 @@ object json extends JsonCodecs
 transparent trait JsonCodecs {
   inline given Decoder[Currency] = Decoder.decodeString.emap(c => Currency(c)(defaultMoneyContext).toEither.leftMap(_.getMessage))
   inline given Encoder[Currency] = Encoder.encodeString.contramap(_.code)
+
+  inline given Encoder[FiniteDuration] = Encoder.encodeString.contramap(_.toCoarsest.toString)
+  inline given Decoder[FiniteDuration] = Decoder.decodeString.emap { fdStr =>
+    Try {
+      val Array(length, unit) = fdStr.split(" ")
+      FiniteDuration(length.toLong, unit)
+    }.toEither.leftMap(_ => s"$fdStr is not valid finite duration string. Expected format is '<length> <unit>'")
+  }
 
   inline given monDec(using d: Decoder[Currency]): Decoder[Money] = Decoder[JsonObject].emap { json =>
     for
