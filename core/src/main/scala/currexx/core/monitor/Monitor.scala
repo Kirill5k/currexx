@@ -13,6 +13,7 @@ object MonitorId extends IdType[MonitorId]
 final case class Monitor(
     id: MonitorId,
     userId: UserId,
+    active: Boolean,
     currencyPair: CurrencyPair,
     interval: Interval,
     period: FiniteDuration,

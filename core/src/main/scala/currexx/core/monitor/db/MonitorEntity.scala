@@ -12,8 +12,9 @@ import java.time.Instant
 import scala.concurrent.duration.FiniteDuration
 
 final case class MonitorEntity(
-    id: ObjectId,
+    _id: ObjectId,
     userId: ObjectId,
+    active: Boolean,
     currencyPair: CurrencyPair,
     interval: Interval,
     period: FiniteDuration,
@@ -21,8 +22,9 @@ final case class MonitorEntity(
 ) derives Codec.AsObject:
   def toDomain: Monitor =
     Monitor(
-      MonitorId(id),
+      MonitorId(_id),
       UserId(userId),
+      active,
       currencyPair,
       interval,
       period,
@@ -34,6 +36,7 @@ object MonitorEntity {
     MonitorEntity(
       ObjectId.get,
       create.userId.toObjectId,
+      true,
       create.currencyPair,
       create.interval,
       create.period,
