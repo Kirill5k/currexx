@@ -18,7 +18,7 @@ final case class MonitorEntity(
     currencyPair: CurrencyPair,
     interval: Interval,
     period: FiniteDuration,
-    lastUpdatedAt: Option[Instant]
+    lastQueriedAt: Option[Instant]
 ) derives Codec.AsObject:
   def toDomain: Monitor =
     Monitor(
@@ -28,7 +28,7 @@ final case class MonitorEntity(
       currencyPair,
       interval,
       period,
-      lastUpdatedAt
+      lastQueriedAt
     )
 
 object MonitorEntity {

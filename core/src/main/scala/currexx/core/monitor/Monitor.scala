@@ -17,7 +17,7 @@ final case class Monitor(
     currencyPair: CurrencyPair,
     interval: Interval,
     period: FiniteDuration,
-    lastUpdatedAt: Option[Instant]
+    lastQueriedAt: Option[Instant]
 )
 
 final case class CreateMonitor(

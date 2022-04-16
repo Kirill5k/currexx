@@ -20,11 +20,12 @@ final private class LiveActionProcessor[F[_]: Temporal](
 ) extends ActionProcessor[F] {
 
   override def run: Stream[F, Unit] =
-    dispatcher.stream.evalMap(handleAction)
+    dispatcher.stream.map(a => Stream.eval(handleAction(a))).parJoinUnbounded
 
   private def handleAction(action: Action): F[Unit] =
     (action match {
       case Action.SignalSubmitted(signal) => logger.info(s"received signal submitted action $signal")
+      case Action.QueryMonitor(uid, mid) => logger.info(s"querying monitor $mid")
     }).handleErrorWith {
       case error: AppError =>
         logger.warn(error)(s"domain error while processing action $action")
