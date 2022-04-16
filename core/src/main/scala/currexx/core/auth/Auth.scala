@@ -12,6 +12,7 @@ import currexx.core.auth.user.PasswordEncryptor
 import currexx.core.common.config.AuthConfig
 import currexx.core.common.http.Controller
 import jwt.JwtEncoder
+import mongo4cats.database.MongoDatabase
 import org.http4s.HttpRoutes
 import org.typelevel.log4cats.Logger
 
@@ -21,12 +22,12 @@ final class Auth[F[_]] private (
 )
 
 object Auth:
-  def make[F[_]: Async: Logger](config: AuthConfig, resources: Resources[F]): F[Auth[F]] =
+  def make[F[_]: Async: Logger](config: AuthConfig, database: MongoDatabase[F]): F[Auth[F]] =
     for
-      sessRepo <- SessionRepository.make[F](resources.mongo)
+      sessRepo <- SessionRepository.make[F](database)
       jwtEnc   <- JwtEncoder.circeJwtEncoder[F](config.jwt)
       sessSvc  <- SessionService.make[F](jwtEnc, sessRepo)
-      accRepo  <- UserRepository.make[F](resources.mongo)
+      accRepo  <- UserRepository.make[F](database)
       encr     <- PasswordEncryptor.make[F](config)
       usrSvc   <- UserService.make[F](accRepo, encr)
       authCtrl <- AuthController.make[F](usrSvc, sessSvc)

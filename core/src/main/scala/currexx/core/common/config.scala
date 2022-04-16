@@ -1,6 +1,7 @@
 package currexx.core.common
 
 import cats.effect.Sync
+import currexx.clients.ClientsConfig
 import pureconfig.*
 import pureconfig.generic.derivation.default.*
 
@@ -27,7 +28,8 @@ object config {
   final case class AppConfig(
       server: ServerConfig,
       auth: AuthConfig,
-      mongo: MongoConfig
+      mongo: MongoConfig,
+      clients: ClientsConfig
   ) derives ConfigReader
 
   object AppConfig {
