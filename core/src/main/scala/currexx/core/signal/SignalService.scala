@@ -2,15 +2,11 @@ package currexx.core.signal
 
 import cats.Monad
 import cats.effect.Concurrent
-import cats.syntax.applicative.*
-import cats.syntax.either.*
 import cats.syntax.flatMap.*
-import cats.syntax.option.*
 import currexx.domain.user.UserId
 import currexx.calculations.MovingAverageCalculator
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.signal.db.SignalRepository
-import currexx.domain.errors.AppError
 import currexx.domain.market.{Condition, Indicator, MarketTimeSeriesData}
 import fs2.Stream
 
