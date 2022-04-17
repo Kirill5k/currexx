@@ -3,6 +3,7 @@ package currexx.clients.alphavantage
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import currexx.clients.{ApiClientSpec, ClientConfig}
+import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval, PriceRange}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -112,6 +113,21 @@ class AlphaVantageClientSpec extends ApiClientSpec {
         timeSeriesData.currencyPair mustBe pair
         timeSeriesData.interval mustBe Interval.H1
         timeSeriesData.prices must have size 100
+      }
+    }
+
+    "return error when not enough data points" in {
+      val testingBackend: SttpBackend[IO, Any] = backendStub
+        .whenAnyRequest
+        .thenRespond(Response.ok(json("alphavantage/gbp-usd-daily-almost-empty-response.json")))
+
+      val result = for
+        client <- AlphaVantageClient.make[IO](config, testingBackend)
+        res    <- client.timeSeriesData(pair, Interval.D1)
+      yield res
+
+      result.attempt.unsafeToFuture().map { res =>
+        res mustBe Left(AppError.NotEnoughDataPoints("alpha-vantage", 2))
       }
     }
   }
