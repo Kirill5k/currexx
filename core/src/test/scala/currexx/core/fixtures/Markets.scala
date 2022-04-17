@@ -1,5 +1,6 @@
 package currexx.core.fixtures
 
+import cats.data.NonEmptyList
 import squants.market.{EUR, GBP, USD}
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 
@@ -11,9 +12,9 @@ object Markets {
 
   lazy val ts             = Instant.now
   lazy val priceRange     = PriceRange(BigDecimal(2.0), BigDecimal(4.0), BigDecimal(1.0), BigDecimal(3.0), ts)
-  lazy val timeSeriesData = MarketTimeSeriesData(gbpeur, Interval.H1, List(priceRange))
+  lazy val timeSeriesData = MarketTimeSeriesData(gbpeur, Interval.H1, NonEmptyList.one(priceRange))
 
-  lazy val priceRanges = List(
+  lazy val priceRanges = NonEmptyList.of(
     BigDecimal("1.30580"),
     BigDecimal("1.30707"),
     BigDecimal("1.31147"),

@@ -25,4 +25,10 @@ object Condition {
     case crossDown: CrossingDown                    => crossDown.asJson.deepMerge(discriminatorJson(crossDown))
     case trendDirectionChange: TrendDirectionChange => trendDirectionChange.asJson.deepMerge(discriminatorJson(trendDirectionChange))
   }
+
+  def lineCrossing(line1Curr: BigDecimal, line2Curr: BigDecimal, line1Prev: BigDecimal, line2Prev: BigDecimal): Option[Condition] =
+    (line1Curr, line2Curr, line1Prev, line2Prev) match
+      case (l1c, l2c, l1p, l2p) if l1c > l2c && l1p < l2p => Some(Condition.CrossingUp())
+      case (l1c, l2c, l1p, l2p) if l1c < l2c && l1p > l2p => Some(Condition.CrossingDown())
+      case _                                              => None
 }

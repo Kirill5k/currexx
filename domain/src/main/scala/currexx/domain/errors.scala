@@ -18,13 +18,17 @@ object errors {
     sealed trait BadReq        extends AppError
     sealed trait Forbidden     extends AppError
     sealed trait Unprocessable extends AppError
+    sealed trait BadData       extends AppError
 
+    final case class NotEnoughDataPoints(source: String, returnedCount: Int) extends BadData:
+      override val message: String = s"$source response returned only $returnedCount data points"
+
+    final case class FailedCalculation(message: String) extends BadData
+    
     final case class JsonParsingFailure(original: String, error: String) extends AppError:
       override val message: String = s"Failed to parse json response: $error"
 
     final case class AccessDenied(message: String) extends AppError
-
-    final case class FailedCalculation(message: String) extends AppError
 
     final case class AlreadyBeingMonitored(cp: CurrencyPair) extends Conflict:
       override val message: String = s"Monitor for currency pair $cp already exists"

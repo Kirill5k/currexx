@@ -1,5 +1,6 @@
 package currexx.domain.market
 
+import cats.data.NonEmptyList
 import io.circe.{Codec, Decoder, Encoder}
 
 import java.time.Instant
@@ -26,5 +27,5 @@ final case class PriceRange(
 final case class MarketTimeSeriesData(
     currencyPair: CurrencyPair,
     interval: Interval,
-    prices: List[PriceRange]
+    prices: NonEmptyList[PriceRange]
 )

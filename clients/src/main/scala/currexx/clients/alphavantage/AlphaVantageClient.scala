@@ -1,5 +1,6 @@
 package currexx.clients.alphavantage
 
+import cats.data.NonEmptyList
 import cats.effect.Temporal
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
@@ -62,7 +63,7 @@ final private[clients] class AlphaVantageClient[F[_]](
       .map(prs => MarketTimeSeriesData(pair, interval, prs))
   }
 
-  private def sendRequest(uri: Uri, mapper: JsonObject => Either[AppError, List[PriceRange]]): F[List[PriceRange]] =
+  private def sendRequest(uri: Uri, mapper: JsonObject => Either[AppError, NonEmptyList[PriceRange]]): F[NonEmptyList[PriceRange]] =
     dispatch(basicRequest.get(uri).response(asJson[JsonObject]))
       .flatMap { r =>
         r.body match {

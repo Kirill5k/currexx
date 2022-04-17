@@ -24,7 +24,7 @@ final private class LiveSignalService[F[_]](
     private val repository: SignalRepository[F],
     private val dispatcher: ActionDispatcher[F]
 )(using
-  F: Concurrent[F]
+    F: Concurrent[F]
 ) extends SignalService[F] {
   override def submit(signal: Signal): F[Unit] =
     repository.save(signal) >> dispatcher.dispatch(Action.SignalSubmitted(signal))
@@ -35,22 +35,18 @@ final private class LiveSignalService[F[_]](
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
     F.fromEither(detectMacdCrossing(uid, data)).flatMap {
       case Some(signal) => submit(signal)
-      case None => ().pure[F]
+      case None         => ().pure[F]
     }
 
   private def detectMacdCrossing(uid: UserId, data: MarketTimeSeriesData): Either[AppError, Option[Signal]] =
     Try {
       val closingPrices                = data.prices.map(_.close)
-      val (macdLine, signalLine)       = MovingAverageCalculator.macdWithSignal(closingPrices)
+      val (macdLine, signalLine)       = MovingAverageCalculator.macdWithSignal(closingPrices.toList)
       val List(macdCurr, macdPrev)     = macdLine.take(2)
       val List(signalCurr, signalPrev) = signalLine.take(2)
-      val condition = (macdCurr, signalCurr, macdPrev, signalPrev) match
-        case (mc, sc, mp, sp) if mc > sc && mp < sc => Some(Condition.CrossingUp())
-        case (mc, sc, mp, sp) if mc < sc && mp > sc => Some(Condition.CrossingDown())
-        case _                                      => None
-      condition.map { c =>
-        Signal(uid, data.currencyPair, Indicator.MACD, c, data.prices.head.time)
-      }
+      Condition
+        .lineCrossing(macdCurr, signalCurr, macdPrev, signalPrev)
+        .map(c => Signal(uid, data.currencyPair, Indicator.MACD, c, data.prices.head.time))
     }.toEither
       .leftMap(e => AppError.FailedCalculation(s"Error during macd crossing detection for ${data.currencyPair}: ${e.getMessage}"))
 }

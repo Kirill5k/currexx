@@ -1,5 +1,6 @@
 package currexx.core.signal
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import currexx.core.CatsSpec
@@ -106,4 +107,8 @@ class SignalServiceSpec extends CatsSpec {
 
   def mocks: (SignalRepository[IO], ActionDispatcher[IO]) =
     (mock[SignalRepository[IO]], mock[ActionDispatcher[IO]])
+
+  extension [A](nel: NonEmptyList[A])
+    def drop(n: Int): NonEmptyList[A] =
+      NonEmptyList.fromListUnsafe(nel.toList.drop(n))
 }
