@@ -21,16 +21,15 @@ object MovingAverageCalculator {
   }
 
   def sma(values: List[BigDecimal], n: Int): List[BigDecimal] = {
-    values
-      .reverse
-      .foldLeft((List.empty[BigDecimal], Queue.empty[BigDecimal])) { case ((smas, queue), v) =>
-        if (queue.size < n) (smas, queue.addOne(v))
-        else {
-          val updatedQueue = queue.drop(1).addOne(v)
-          val sma = updatedQueue.sum / n
-          (sma :: smas, updatedQueue)
-        }
+    @tailrec
+    def go(smas: List[BigDecimal], queue: Queue[BigDecimal], remaining: List[BigDecimal]): List[BigDecimal] =
+      if (remaining.isEmpty) smas
+      else if (queue.size < n) go(smas, queue.addOne(remaining.head), remaining.tail)
+      else {
+        val updatedQueue = queue.drop(1).addOne(remaining.head)
+        val sma = updatedQueue.sum / n
+        go(sma :: smas, updatedQueue, remaining.tail)
       }
-      ._1
+    go(List.empty, Queue.empty, values.reverse)
   }
 }
