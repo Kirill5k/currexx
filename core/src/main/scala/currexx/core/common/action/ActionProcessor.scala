@@ -30,8 +30,8 @@ final private class LiveActionProcessor[F[_]](
       case Action.RescheduleAllMonitors             => monitorService.rescheduleAll
       case Action.ScheduleMonitor(uid, mid, period) => F.sleep(period) *> dispatcher.dispatch(Action.QueryMonitor(uid, mid))
       case Action.QueryMonitor(uid, mid)            => monitorService.query(uid, mid)
-      case Action.SignalSubmitted(signal)           => logger.info(s"received signal submitted action $signal")
       case Action.ProcessMarketData(uid, data)      => logger.info(s"processing market data for ${data.currencyPair} pair")
+      case Action.SignalSubmitted(signal)           => logger.info(s"received signal submitted action $signal")
     ).handleErrorWith {
       case error: AppError =>
         logger.warn(error)(s"domain error while processing action $action")

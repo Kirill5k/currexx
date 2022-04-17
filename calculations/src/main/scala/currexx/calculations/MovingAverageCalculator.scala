@@ -1,6 +1,7 @@
 package currexx.calculations
 
 import scala.annotation.tailrec
+import scala.collection.mutable.Queue
 
 object MovingAverageCalculator {
 
@@ -17,5 +18,19 @@ object MovingAverageCalculator {
       }
     val allValues = values.reverse
     calc(allValues.tail, allValues.head :: Nil)
+  }
+
+  def sma(values: List[BigDecimal], n: Int): List[BigDecimal] = {
+    values
+      .reverse
+      .foldLeft((List.empty[BigDecimal], Queue.empty[BigDecimal])) { case ((smas, queue), v) =>
+        if (queue.size < n) (smas, queue.addOne(v))
+        else {
+          val updatedQueue = queue.drop(1).addOne(v)
+          val sma = updatedQueue.sum / n
+          (sma :: smas, updatedQueue)
+        }
+      }
+      ._1
   }
 }
