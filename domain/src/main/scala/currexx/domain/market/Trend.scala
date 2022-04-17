@@ -10,5 +10,6 @@ enum Trend:
 object Trend:
   inline given Encoder[Trend] = Encoder.encodeString.contramap(_.toString.toLowerCase)
   inline given Decoder[Trend] = Decoder.decodeString.emap { t =>
-    Try(Trend.valueOf(t.capitalize)).toOption.toRight(s"$t is not valid trend value. Accepted value: ${Trend.values}")
+    Try(Trend.valueOf(t.capitalize)).toOption
+      .toRight(s"$t is not valid trend value. Accepted value: ${Trend.values.map(_.toString.toLowerCase).mkString(", ")}")
   }
