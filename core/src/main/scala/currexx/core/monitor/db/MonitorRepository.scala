@@ -57,7 +57,7 @@ final private class LiveMonitorRepository[F[_]](
     runUpdate(uid, id, Update.set(Field.Active, active))
 
   override def updateQueriedTimestamp(uid: UserId, id: MonitorId): F[Unit] =
-    runUpdate(uid, id, Update.currentTimestamp(Field.LastQueriedAt))
+    runUpdate(uid, id, Update.currentDate(Field.LastQueriedAt))
 
   private def runUpdate(uid: UserId, id: MonitorId, update: Update): F[Unit] =
     collection
