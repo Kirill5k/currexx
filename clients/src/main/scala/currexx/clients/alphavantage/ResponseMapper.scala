@@ -16,9 +16,10 @@ private[alphavantage] object ResponseMapper {
       metaJson <- res("Meta Data").toRight(AppError.JsonParsingFailure(res.toString, "Missing 'Meta Data' field"))
       meta     <- metaJson.as[DailyResponseMetadata].leftMap(e => AppError.JsonParsingFailure(res.toString, e.getMessage))
       timeSeriesField = "Time Series FX (Daily)"
-      pricesJson <- res(timeSeriesField).toRight(AppError.JsonParsingFailure(res.toString, s"Missing '$timeSeriesField' field"))
-      prices     <- pricesJson.as[ListMap[String, OHLC]].leftMap(e => AppError.JsonParsingFailure(res.toString, e.getMessage))
-    yield prices.zipWithIndex.map { case ((date, priceRange), i) =>
+      pricesJson    <- res(timeSeriesField).toRight(AppError.JsonParsingFailure(res.toString, s"Missing '$timeSeriesField' field"))
+      pricesByDates <- pricesJson.as[ListMap[String, OHLC]].leftMap(e => AppError.JsonParsingFailure(res.toString, e.getMessage))
+      prices = pricesByDates.zipWithIndex.toList
+    yield prices.map { case ((date, priceRange), i) =>
       val dateTime = if (i == 0) meta.`5. Last Refreshed`.replaceFirst(" ", "T") else s"${date}T00:00:00"
       PriceRange(
         priceRange.`1. open`,
@@ -27,16 +28,17 @@ private[alphavantage] object ResponseMapper {
         priceRange.`4. close`,
         LocalDateTime.parse(dateTime).atZone(ZoneId.of(meta.`6. Time Zone`)).toInstant
       )
-    }.toList
+    }
 
   def mapIntradayTimeSeriesData(res: JsonObject): Either[AppError, List[PriceRange]] =
     for
       metaJson <- res("Meta Data").toRight(AppError.JsonParsingFailure(res.toString, "Missing 'Meta Data' field"))
       meta     <- metaJson.as[IntradayResponseMetadata].leftMap(e => AppError.JsonParsingFailure(res.toString, e.getMessage))
       timeSeriesField = s"Time Series FX (${meta.`5. Interval`})"
-      pricesJson <- res(timeSeriesField).toRight(AppError.JsonParsingFailure(res.toString, s"Missing '$timeSeriesField' field"))
-      prices     <- pricesJson.as[ListMap[String, OHLC]].leftMap(e => AppError.JsonParsingFailure(res.toString, e.getMessage))
-    yield prices.zipWithIndex.map { case ((date, priceRange), i) =>
+      pricesJson    <- res(timeSeriesField).toRight(AppError.JsonParsingFailure(res.toString, s"Missing '$timeSeriesField' field"))
+      pricesByDates <- pricesJson.as[ListMap[String, OHLC]].leftMap(e => AppError.JsonParsingFailure(res.toString, e.getMessage))
+      prices = pricesByDates.zipWithIndex.toList
+    yield prices.map { case ((date, priceRange), i) =>
       val dateTime = if (i == 0) meta.`4. Last Refreshed`.replaceFirst(" ", "T") else date.replaceFirst(" ", "T")
       PriceRange(
         priceRange.`1. open`,
@@ -45,5 +47,5 @@ private[alphavantage] object ResponseMapper {
         priceRange.`4. close`,
         LocalDateTime.parse(dateTime).atZone(ZoneId.of(meta.`7. Time Zone`)).toInstant
       )
-    }.toList
+    }
 }
