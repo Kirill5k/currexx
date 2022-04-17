@@ -10,7 +10,9 @@ enum Interval:
 
 object Interval:
   inline given Encoder[Interval] = Encoder.encodeString.contramap(_.toString.toUpperCase)
-  inline given Decoder[Interval] = Decoder.decodeString.emapTry(s => Try(Interval.valueOf(s.toUpperCase)))
+  inline given Decoder[Interval] = Decoder.decodeString.emap { i =>
+    Try(Interval.valueOf(i.toUpperCase)).toOption.toRight(s"$i is not valid interval value. Accepted value: ${Interval.values}")
+  }
 
 final case class PriceRange(
     open: BigDecimal,
