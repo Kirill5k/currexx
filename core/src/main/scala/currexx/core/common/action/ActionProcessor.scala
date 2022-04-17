@@ -5,6 +5,7 @@ import cats.effect.Temporal
 import cats.syntax.apply.*
 import cats.syntax.applicativeError.*
 import currexx.core.monitor.MonitorService
+import currexx.core.signal.SignalService
 import currexx.domain.errors.AppError
 import fs2.Stream
 import org.typelevel.log4cats.Logger
@@ -16,7 +17,8 @@ trait ActionProcessor[F[_]]:
 
 final private class LiveActionProcessor[F[_]](
     private val dispatcher: ActionDispatcher[F],
-    private val monitorService: MonitorService[F]
+    private val monitorService: MonitorService[F],
+    private val signalService: SignalService[F]
 )(using
     F: Temporal[F],
     logger: Logger[F]
@@ -30,7 +32,7 @@ final private class LiveActionProcessor[F[_]](
       case Action.RescheduleAllMonitors             => monitorService.rescheduleAll
       case Action.ScheduleMonitor(uid, mid, period) => F.sleep(period) *> dispatcher.dispatch(Action.QueryMonitor(uid, mid))
       case Action.QueryMonitor(uid, mid)            => monitorService.query(uid, mid)
-      case Action.ProcessMarketData(uid, data)      => logger.info(s"processing market data for ${data.currencyPair} pair")
+      case Action.ProcessMarketData(uid, data)      => signalService.processMarketData(uid, data)
       case Action.SignalSubmitted(signal)           => logger.info(s"received signal submitted action $signal")
     ).handleErrorWith {
       case error: AppError =>
@@ -45,6 +47,7 @@ final private class LiveActionProcessor[F[_]](
 object ActionProcessor:
   def make[F[_]: Temporal: Logger](
       dispatcher: ActionDispatcher[F],
-      monitorService: MonitorService[F]
+      monitorService: MonitorService[F],
+      signalService: SignalService[F]
   ): F[ActionProcessor[F]] =
-    Monad[F].pure(LiveActionProcessor[F](dispatcher, monitorService))
+    Monad[F].pure(LiveActionProcessor[F](dispatcher, monitorService, signalService))
