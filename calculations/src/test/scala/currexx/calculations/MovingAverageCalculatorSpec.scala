@@ -39,6 +39,17 @@ class MovingAverageCalculatorSpec extends AnyWordSpec with Matchers {
         BigDecimal("1.3152")
       )
     }
+
+    "calculate Moving Average Convergence/Divergence" in {
+      val macd = MovingAverageCalculator.macd(values)
+      macd.take(5).map(rounded(4)) mustBe List(
+        BigDecimal("-0.0051"),
+        BigDecimal("-0.0054"),
+        BigDecimal("-0.0057"),
+        BigDecimal("-0.0065"),
+        BigDecimal("-0.0062")
+      )
+    }
   }
 
   def rounded(scale: Int)(num: BigDecimal): BigDecimal =
