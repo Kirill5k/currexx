@@ -33,12 +33,9 @@ final private class LiveSignalService[F[_]](
     Stream(detectMacdCrossing(uid, data)).unNone.evalMap(submit).compile.drain
 
   private def detectMacdCrossing(uid: UserId, data: MarketTimeSeriesData): Option[Signal] = {
-    val closingPrices                = data.prices.map(_.close)
-    val (macdLine, signalLine)       = MovingAverageCalculator.macdWithSignal(closingPrices.toList)
-    val List(macdCurr, macdPrev)     = macdLine.take(2)
-    val List(signalCurr, signalPrev) = signalLine.take(2)
+    val (macdLine, signalLine) = MovingAverageCalculator.macdWithSignal(data.prices.map(_.close).toList)
     Condition
-      .lineCrossing(macdCurr, signalCurr, macdPrev, signalPrev)
+      .lineCrossing(macdLine.head, signalLine.head, macdLine.drop(1).head, signalLine.drop(1).head)
       .map(c => Signal(uid, data.currencyPair, Indicator.MACD, c, data.prices.head.time))
   }
 }
