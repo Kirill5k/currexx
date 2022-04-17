@@ -26,13 +26,13 @@ final private class LiveActionProcessor[F[_]](
     dispatcher.stream.map(a => Stream.eval(handleAction(a))).parJoinUnbounded
 
   private def handleAction(action: Action): F[Unit] =
-    (action match {
+    (action match
       case Action.RescheduleAllMonitors             => monitorService.rescheduleAll
       case Action.ScheduleMonitor(uid, mid, period) => F.sleep(period) *> dispatcher.dispatch(Action.QueryMonitor(uid, mid))
       case Action.QueryMonitor(uid, mid)            => monitorService.query(uid, mid)
       case Action.SignalSubmitted(signal)           => logger.info(s"received signal submitted action $signal")
       case Action.ProcessMarketData(uid, data)      => logger.info(s"processing market data for ${data.currencyPair} pair")
-    }).handleErrorWith {
+    ).handleErrorWith {
       case error: AppError =>
         logger.warn(error)(s"domain error while processing action $action")
       case error =>

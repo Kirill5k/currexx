@@ -22,20 +22,24 @@ final class Http[F[_]: Async] private (
     private val monitors: Monitors[F]
 ) {
 
-  private val routes: HttpRoutes[F] = {
+  private val apiRoutes: HttpRoutes[F] = {
     given Authenticator[F] = auth.authenticator
-    val api                = auth.controller.routes <+> signals.controller.routes <+> monitors.controller.routes
-    Router("/api" -> api, "/" -> health.controller.routes)
+    Router("/api" -> (auth.controller.routes <+> signals.controller.routes <+> monitors.controller.routes))
+  }
+
+  private val healthRoutes: HttpRoutes[F] = {
+    given Authenticator[F] = auth.authenticator
+    Router("/" -> health.controller.routes)
   }
 
   private val middleware: HttpRoutes[F] => HttpRoutes[F] = { (http: HttpRoutes[F]) => AutoSlash(http) }
     .andThen((http: HttpRoutes[F]) => CORS.policy.withAllowOriginAll.withAllowCredentials(false).apply(http))
     .andThen((http: HttpRoutes[F]) => Timeout(60.seconds)(http))
 
-  private val loggers: HttpApp[F] => HttpApp[F] = { (http: HttpApp[F]) => RequestLogger.httpApp(true, true)(http) }
-    .andThen((http: HttpApp[F]) => ResponseLogger.httpApp(true, true)(http))
+  private val loggers: HttpRoutes[F] => HttpRoutes[F] = { (http: HttpRoutes[F]) => RequestLogger.httpRoutes(true, true)(http) }
+    .andThen((http: HttpRoutes[F]) => ResponseLogger.httpRoutes(true, true)(http))
 
-  val app: HttpApp[F] = loggers(middleware(routes).orNotFound)
+  val app: HttpApp[F] = (loggers(middleware(apiRoutes)) <+> healthRoutes).orNotFound
 }
 
 object Http:

@@ -74,4 +74,4 @@ val root = project
   .settings(
     name := "currexx"
   )
-  .aggregate(core, calculations, domain)
+  .aggregate(core, calculations, domain, clients)
