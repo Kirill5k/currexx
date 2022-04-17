@@ -57,5 +57,9 @@ object MovingAverageCalculator {
       fastLength: Int = 12,
       slowLength: Int = 26,
       signalSmoothing: Int = 9
-  ): (List[BigDecimal], List[BigDecimal]) = ???
+  ): (List[BigDecimal], List[BigDecimal]) = {
+    val macdLine = macd(values, fastLength, slowLength)
+    val signalLine = sma(macdLine, signalSmoothing)
+    (macdLine, signalLine)
+  }
 }
