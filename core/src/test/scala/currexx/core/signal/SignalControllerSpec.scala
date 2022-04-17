@@ -22,7 +22,7 @@ class SignalControllerSpec extends ControllerSpec {
         val reqBody = parseJson(s"""{
              |"currencyPair":"GBP/EUR",
              |"indicator": "macd",
-             |"condition": {"kind":"crossing-up","value":0.05}
+             |"condition": {"kind":"crossing-up"}
              |}""".stripMargin)
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
@@ -66,7 +66,7 @@ class SignalControllerSpec extends ControllerSpec {
         val reqBody = parseJson(s"""{
              |"currencyPair":"FOO/BAR",
              |"indicator": "macd",
-             |"condition": {"kind":"crossing-up","value":0.05}
+             |"condition": {"kind":"crossing-up"}
              |}""".stripMargin)
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
@@ -87,7 +87,7 @@ class SignalControllerSpec extends ControllerSpec {
         val reqBody = parseJson(s"""{
                |"currencyPair":"FOO-BAR",
                |"indicator": "macd",
-               |"condition": {"kind":"crossing-up","value":0.05}
+               |"condition": {"kind":"crossing-up"}
                |}""".stripMargin)
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
@@ -109,7 +109,7 @@ class SignalControllerSpec extends ControllerSpec {
                |"currencyPair":"GBP/EUR",
                |"time": "${Signals.ts}",
                |"indicator": "macd",
-               |"condition": {"kind":"crossing-up","value":0.05}
+               |"condition": {"kind":"crossing-up"}
                |}]""".stripMargin
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
         verify(svc).getAll(Users.uid)

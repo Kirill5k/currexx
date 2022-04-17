@@ -60,7 +60,7 @@ val clients = project
 val core = project
   .in(file("core"))
   .enablePlugins(JavaAppPackaging, JavaAgent, DockerPlugin)
-  .dependsOn(domain % "compile->compile;test->test", clients)
+  .dependsOn(domain % "compile->compile;test->test", clients, calculations)
   .settings(docker)
   .settings(
     name       := "currexx-core",

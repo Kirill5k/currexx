@@ -5,8 +5,8 @@ import io.circe.syntax.*
 
 sealed trait Condition(val kind: String)
 object Condition {
-  final case class CrossingUp(value: BigDecimal)                extends Condition("crossing-up") derives Codec.AsObject
-  final case class CrossingDown(value: BigDecimal)              extends Condition("crossing-down") derives Codec.AsObject
+  final case class CrossingUp()                                 extends Condition("crossing-up") derives Codec.AsObject
+  final case class CrossingDown()                               extends Condition("crossing-down") derives Codec.AsObject
   final case class TrendDirectionChange(from: Trend, to: Trend) extends Condition("trend-direction-change") derives Codec.AsObject
 
   private val discriminatorField: String               = "kind"
