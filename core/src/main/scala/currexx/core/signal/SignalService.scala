@@ -12,6 +12,7 @@ import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.signal.db.SignalRepository
 import currexx.domain.errors.AppError
 import currexx.domain.market.{Condition, Indicator, MarketTimeSeriesData}
+import fs2.Stream
 
 import scala.util.Try
 
@@ -33,22 +34,17 @@ final private class LiveSignalService[F[_]](
     repository.getAll(uid)
 
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
-    F.fromEither(detectMacdCrossing(uid, data)).flatMap {
-      case Some(signal) => submit(signal)
-      case None         => ().pure[F]
-    }
+    Stream(detectMacdCrossing(uid, data)).unNone.evalMap(submit).compile.drain
 
-  private def detectMacdCrossing(uid: UserId, data: MarketTimeSeriesData): Either[AppError, Option[Signal]] =
-    Try {
-      val closingPrices                = data.prices.map(_.close)
-      val (macdLine, signalLine)       = MovingAverageCalculator.macdWithSignal(closingPrices.toList)
-      val List(macdCurr, macdPrev)     = macdLine.take(2)
-      val List(signalCurr, signalPrev) = signalLine.take(2)
-      Condition
-        .lineCrossing(macdCurr, signalCurr, macdPrev, signalPrev)
-        .map(c => Signal(uid, data.currencyPair, Indicator.MACD, c, data.prices.head.time))
-    }.toEither
-      .leftMap(e => AppError.FailedCalculation(s"Error during macd crossing detection for ${data.currencyPair}: ${e.getMessage}"))
+  private def detectMacdCrossing(uid: UserId, data: MarketTimeSeriesData): Option[Signal] = {
+    val closingPrices                = data.prices.map(_.close)
+    val (macdLine, signalLine)       = MovingAverageCalculator.macdWithSignal(closingPrices.toList)
+    val List(macdCurr, macdPrev)     = macdLine.take(2)
+    val List(signalCurr, signalPrev) = signalLine.take(2)
+    Condition
+      .lineCrossing(macdCurr, signalCurr, macdPrev, signalPrev)
+      .map(c => Signal(uid, data.currencyPair, Indicator.MACD, c, data.prices.head.time))
+  }
 }
 
 object SignalService:
