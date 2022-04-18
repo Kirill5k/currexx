@@ -29,9 +29,6 @@ trait Repository[F[_]] {
   protected def userIdEq(uid: Option[UserId]): Filter              = idEqFilter(Field.UId, uid.map(_.value))
   protected def userIdEq(uid: UserId): Filter                      = idEqFilter(Field.UId, uid.value.some)
 
-  protected def errorIfNull[A](error: Throwable)(res: A)(using F: MonadError[F, Throwable]): F[A] =
-    F.fromOption(Option(res), error)
-
   protected def errorIfNotDeleted(error: Throwable)(res: DeleteResult)(using F: MonadError[F, Throwable]): F[Unit] =
     F.raiseWhen(res.getDeletedCount == 0)(error)
 

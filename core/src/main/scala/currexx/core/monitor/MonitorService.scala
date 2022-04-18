@@ -55,7 +55,7 @@ final private class LiveMonitorService[F[_]](
   override def rescheduleAll: F[Unit] =
     F.realTimeInstant.flatMap { now =>
       repository.stream
-        .evalMap { mon =>
+        .mapAsync(Int.MaxValue) { mon =>
           mon.lastQueriedAt
             .map(now.durationBetween)
             .filter(_ <= mon.period)

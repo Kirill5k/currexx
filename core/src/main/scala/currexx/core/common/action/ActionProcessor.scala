@@ -25,7 +25,7 @@ final private class LiveActionProcessor[F[_]](
 ) extends ActionProcessor[F] {
 
   override def run: Stream[F, Unit] =
-    dispatcher.stream.map(a => Stream.eval(handleAction(a))).parJoinUnbounded
+    dispatcher.actions.map(a => Stream.eval(handleAction(a))).parJoinUnbounded
 
   private def handleAction(action: Action): F[Unit] =
     (action match

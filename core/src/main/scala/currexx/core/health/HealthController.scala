@@ -3,7 +3,6 @@ package currexx.core.health
 import cats.effect.Async
 import cats.effect.Ref
 import cats.effect.Temporal
-import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.auth.Authenticator
@@ -23,7 +22,7 @@ final class HealthController[F[_]: Async](
   private val statusEndpoint: ServerEndpoint[Any, F] = infallibleEndpoint.get
     .in("health" / "status")
     .out(jsonBody[HealthController.AppStatus])
-    .serverLogicSuccess(req => startupTime.get.map(t => HealthController.AppStatus(t)))
+    .serverLogicSuccess(_ => startupTime.get.map(HealthController.AppStatus(_)))
 
   def routes(using auth: Authenticator[F]): HttpRoutes[F] = Http4sServerInterpreter[F]().toRoutes(statusEndpoint)
 }
