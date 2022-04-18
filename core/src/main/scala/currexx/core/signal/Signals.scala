@@ -8,7 +8,6 @@ import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.Controller
 import currexx.core.signal.db.SignalRepository
 import mongo4cats.database.MongoDatabase
-import org.typelevel.log4cats.Logger
 
 final class Signals[F[_]] private (
     val service: SignalService[F],
@@ -16,7 +15,7 @@ final class Signals[F[_]] private (
 )
 
 object Signals:
-  def make[F[_]: Async: Logger](database: MongoDatabase[F], dispatcher: ActionDispatcher[F]): F[Signals[F]] =
+  def make[F[_]: Async](database: MongoDatabase[F], dispatcher: ActionDispatcher[F]): F[Signals[F]] =
     for
       repo <- SignalRepository.make[F](database)
       svc  <- SignalService.make[F](repo, dispatcher)

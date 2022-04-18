@@ -8,7 +8,6 @@ import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.Controller
 import currexx.core.monitor.db.MonitorRepository
 import mongo4cats.database.MongoDatabase
-import org.typelevel.log4cats.Logger
 
 final class Monitors[F[_]] private (
     val service: MonitorService[F],
@@ -16,7 +15,7 @@ final class Monitors[F[_]] private (
 )
 
 object Monitors:
-  def make[F[_]: Async: Logger](
+  def make[F[_]: Async](
       database: MongoDatabase[F],
       clients: Clients[F],
       dispatcher: ActionDispatcher[F]

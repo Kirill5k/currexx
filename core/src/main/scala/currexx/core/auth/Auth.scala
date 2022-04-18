@@ -14,7 +14,6 @@ import currexx.core.common.http.Controller
 import jwt.JwtEncoder
 import mongo4cats.database.MongoDatabase
 import org.http4s.HttpRoutes
-import org.typelevel.log4cats.Logger
 
 final class Auth[F[_]] private (
     val authenticator: Authenticator[F],
@@ -22,7 +21,7 @@ final class Auth[F[_]] private (
 )
 
 object Auth:
-  def make[F[_]: Async: Logger](config: AuthConfig, database: MongoDatabase[F]): F[Auth[F]] =
+  def make[F[_]: Async](config: AuthConfig, database: MongoDatabase[F]): F[Auth[F]] =
     for
       sessRepo <- SessionRepository.make[F](database)
       jwtEnc   <- JwtEncoder.circeJwtEncoder[F](config.jwt)
