@@ -1,9 +1,7 @@
-package currexx.domain
+package currexx.core.common
 
-import cats.Monad
-import cats.effect.kernel.Temporal
+import cats.effect.{Async, Temporal}
 import cats.effect.std.Queue
-import cats.effect.{Async, Deferred}
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -28,7 +26,7 @@ object logging {
       private val logger: Logger4Cats[F],
       private val loggedErrors: Queue[F, LoggedError]
   )(using
-    F: Temporal[F]
+      F: Temporal[F]
   ) extends Logger[F] {
 
     private def enqueue(t: Throwable, message: => String): F[Unit] =

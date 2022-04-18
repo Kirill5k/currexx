@@ -81,19 +81,20 @@ object Dependencies {
   val domain = Seq(
     Libraries.squants,
     Libraries.mongo4cats.core,
-    Libraries.mongo4cats.circe,
-    Libraries.pureconfig.core
+    Libraries.mongo4cats.circe
   ) ++
-    Libraries.logging.all ++
     Libraries.circe.all ++
     Libraries.refined.all
 
-  val clients = Libraries.sttp.all
+  val clients = Libraries.sttp.all ++
+    Libraries.logging.all
 
   val core = Seq(
+    Libraries.pureconfig.core,
     Libraries.jwt,
     Libraries.bcrypt.cross(CrossVersion.for3Use2_13)
   ) ++
+    Libraries.logging.all ++
     Libraries.tapir.all ++
     Libraries.http4s.all
 
