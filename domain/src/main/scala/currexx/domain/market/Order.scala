@@ -5,20 +5,21 @@ import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder, Json}
 
 import scala.util.Try
 
-enum Position:
-  case Buy, Sell
-
-object PositionKind:
-  inline given Encoder[Position] = Encoder.encodeString.contramap(_.toString.toLowerCase)
-  inline given Decoder[Position] = Decoder.decodeString.emap { p =>
-    Try(Position.valueOf(p.toLowerCase.capitalize)).toOption
-      .toRight(s"$p is not valid position kind. Accepted values: ${Position.values.map(_.toString.toLowerCase).mkString(", ")}")
-  }
-
 sealed trait Order(val kind: String):
   def currencyPair: CurrencyPair
 
 object Order {
+  enum Position:
+    case Buy, Sell
+
+  object Position:
+    inline given Encoder[Position] = Encoder.encodeString.contramap(_.toString.toLowerCase)
+    inline given Decoder[Position] = Decoder.decodeString.emap { p =>
+      Try(Position.valueOf(p.toLowerCase.capitalize)).toOption
+        .toRight(s"$p is not valid position kind. Accepted values: ${Position.values.map(_.toString.toLowerCase).mkString(", ")}")
+    }
+
+
   final case class MarketOrder(
       currencyPair: CurrencyPair,
       position: Position,
