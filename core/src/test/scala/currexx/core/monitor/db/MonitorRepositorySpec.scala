@@ -155,6 +155,34 @@ class MonitorRepositorySpec extends MongoSpec {
         }
       }
     }
+
+    "update" should {
+      "update monitor in db" in withEmbeddedMongoDb { client =>
+        val result = for
+          repo <- MonitorRepository.make(client)
+          mid  <- repo.create(Monitors.create())
+          _    <- repo.update(Monitors.monitor.copy(id = mid, interval = Interval.M1))
+          mon  <- repo.find(Users.uid, mid)
+        yield mon
+
+        result.map { mon =>
+          mon.interval mustBe Interval.M1
+        }
+      }
+
+      "not allow to update currency pair" in withEmbeddedMongoDb { client =>
+        val result = for
+          repo <- MonitorRepository.make(client)
+          mid  <- repo.create(Monitors.create())
+          _    <- repo.update(Monitors.monitor.copy(id = mid, currencyPair = Markets.gbpusd))
+          mon  <- repo.find(Users.uid, mid)
+        yield mon
+
+        result.attempt.map { res =>
+          res mustBe Left(AppError.FieldCannotBeChanged("currencyPair"))
+        }
+      }
+    }
   }
 
   def withEmbeddedMongoDb[A](test: MongoDatabase[IO] => IO[A]): Future[A] =
