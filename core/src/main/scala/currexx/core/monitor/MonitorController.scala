@@ -68,7 +68,7 @@ final private class MonitorController[F[_]](
   private def updateMonitor(using authenticator: Authenticator[F]) =
     updateMonitorEndpoint.withAuthenticatedSession
       .serverLogic { session => (mid, mon) =>
-        F.ensure(mid.value.pure[F])(AppError.IdMismatch)(_ == mon.id) >>
+        F.raiseWhen(mid.value != mon.id)(AppError.IdMismatch) >>
           service
             .update(mon.toDomain(session.userId))
             .voidResponse

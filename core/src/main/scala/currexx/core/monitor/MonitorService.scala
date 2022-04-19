@@ -36,7 +36,7 @@ final private class LiveMonitorService[F[_]](
   override def delete(uid: UserId, id: MonitorId): F[Unit] = repository.delete(uid, id)
   override def pause(uid: UserId, id: MonitorId): F[Unit]  = repository.activate(uid, id, false)
   override def resume(uid: UserId, id: MonitorId): F[Unit] = repository.activate(uid, id, true)
-  override def update(mon: Monitor): F[Unit]               = ???
+  override def update(mon: Monitor): F[Unit]               = repository.update(mon)
 
   override def create(cm: CreateMonitor): F[MonitorId] =
     repository.create(cm).flatTap(mid => actionDispatcher.dispatch(Action.QueryMonitor(cm.userId, mid)))

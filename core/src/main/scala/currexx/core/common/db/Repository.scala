@@ -18,6 +18,7 @@ trait Repository[F[_]] {
     val UId            = "userId"
     val Email          = "email"
     val LastQueriedAt  = "lastQueriedAt"
+    val LastUpdatedAt  = "lastUpdatedAt"
     val Status         = "status"
     val LastAccessedAt = "lastAccessedAt"
     val Active         = "active"

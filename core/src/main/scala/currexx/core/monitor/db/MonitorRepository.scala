@@ -7,14 +7,17 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.common.db.Repository
 import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId}
+import currexx.domain.JsonCodecs
 import currexx.domain.errors.AppError
-import currexx.domain.market.CurrencyPair
+import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.user.UserId
 import fs2.Stream
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
 import mongo4cats.collection.operations.{Filter, Update}
 import mongo4cats.database.MongoDatabase
+
+import scala.concurrent.duration.FiniteDuration
 
 trait MonitorRepository[F[_]] extends Repository[F]:
   def stream: Stream[F, Monitor]
@@ -23,6 +26,7 @@ trait MonitorRepository[F[_]] extends Repository[F]:
   def getAll(uid: UserId): F[List[Monitor]]
   def create(monitor: CreateMonitor): F[MonitorId]
   def activate(uid: UserId, id: MonitorId, active: Boolean): F[Unit]
+  def update(mon: Monitor): F[Unit]
   def updateQueriedTimestamp(uid: UserId, id: MonitorId): F[Unit]
 
 final private class LiveMonitorRepository[F[_]](
@@ -54,24 +58,36 @@ final private class LiveMonitorRepository[F[_]](
   }
 
   override def activate(uid: UserId, id: MonitorId, active: Boolean): F[Unit] =
-    runUpdate(uid, id, Update.set(Field.Active, active))
+    runUpdate(uid, id)(Update.set(Field.Active, active))
 
   override def updateQueriedTimestamp(uid: UserId, id: MonitorId): F[Unit] =
-    runUpdate(uid, id, Update.currentDate(Field.LastQueriedAt))
+    runUpdate(uid, id)(Update.currentDate(Field.LastQueriedAt))
 
-  private def runUpdate(uid: UserId, id: MonitorId, update: Update): F[Unit] =
+  private def runUpdate(uid: UserId, id: MonitorId)(update: Update): F[Unit] =
     collection
-      .updateOne(idEq(id.value) && userIdEq(uid), update)
+      .updateOne(idEq(id.value) && userIdEq(uid), update.currentDate(Field.LastUpdatedAt))
       .flatMap(errorIfNoMatches(AppError.EntityDoesNotExist("Monitor", id.value)))
 
   override def delete(uid: UserId, id: MonitorId): F[Unit] =
     collection
       .deleteOne(idEq(id.value) && userIdEq(uid))
       .flatMap(errorIfNotDeleted(AppError.EntityDoesNotExist("Monitor", id.value)))
+
+  override def update(mon: Monitor): F[Unit] =
+    find(mon.userId, mon.id)
+      .flatMap(res => F.raiseWhen(res.currencyPair != mon.currencyPair)(AppError.FieldCannotBeChanged(Field.CurrencyPair)))
+      .flatMap { _ =>
+        runUpdate(mon.userId, mon.id) {
+          Update
+            .set(Field.Active, mon.active)
+            .set("interval", mon.interval)
+            .set("period", mon.period)
+        }
+      }
 }
 
-object MonitorRepository extends MongoJsonCodecs:
+object MonitorRepository extends MongoJsonCodecs with JsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[MonitorRepository[F]] =
     db.getCollectionWithCodec[MonitorEntity]("monitors")
-      .map(_.withAddedCodec[CurrencyPair])
+      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[Interval].withAddedCodec[FiniteDuration])
       .map(coll => LiveMonitorRepository[F](coll))
