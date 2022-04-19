@@ -176,5 +176,52 @@ class MonitorControllerSpec extends ControllerSpec {
         verify(svc).get(Users.uid, Monitors.mid)
       }
     }
+
+    "PUT /monitors/:id" should {
+      "update monitor" in {
+        val svc = mock[MonitorService[IO]]
+        when(svc.update(any[Monitor])).thenReturn(IO.unit)
+
+        given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
+
+        val requestBody =
+          s"""{
+             |"id": "${Monitors.mid}",
+             |"active": true,
+             |"currencyPair": "${Markets.gbpeur}",
+             |"interval": "H1",
+             |"period": "3 hours",
+             |"lastQueriedAt": "${Monitors.queriedAt}"
+             |}""".stripMargin
+
+        val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT).withEntity(parseJson(requestBody))
+        val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        verifyJsonResponse(res, Status.NoContent, None)
+        verify(svc).update(Monitors.monitor)
+      }
+
+      "return error when id in path is different from id in requesst" in {
+        val svc = mock[MonitorService[IO]]
+
+        given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
+
+        val requestBody =
+          s"""{
+             |"id": "foo",
+             |"active": true,
+             |"currencyPair": "${Markets.gbpeur}",
+             |"interval": "H1",
+             |"period": "3 hours",
+             |"lastQueriedAt": "${Monitors.queriedAt}"
+             |}""".stripMargin
+
+        val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT).withEntity(parseJson(requestBody))
+        val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        verifyJsonResponse(res, Status.BadRequest, Some("""{"message":"The id supplied in the path does not match with the id in the request body"}"""))
+        verifyNoInteractions(svc)
+      }
+    }
   }
 }

@@ -2,8 +2,11 @@ package currexx.core.monitor
 
 import cats.Monad
 import cats.effect.Async
+import cats.syntax.applicative.*
+import cats.syntax.flatMap.*
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
+import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.user.UserId
 import io.circe.Codec
@@ -62,6 +65,15 @@ final private class MonitorController[F[_]](
           .mapResponse(MonitorView.from)
       }
 
+  private def updateMonitor(using authenticator: Authenticator[F]) =
+    updateMonitorEndpoint.withAuthenticatedSession
+      .serverLogic { session => (mid, mon) =>
+        F.ensure(mid.value.pure[F])(AppError.IdMismatch)(_ == mon.id) >>
+          service
+            .update(mon.toDomain(session.userId))
+            .voidResponse
+      }
+
   private def getAllMonitors(using authenticator: Authenticator[F]) =
     getAllMonitorsEndpoint.withAuthenticatedSession
       .serverLogic { session => _ =>
@@ -78,6 +90,7 @@ final private class MonitorController[F[_]](
         resumeMonitor,
         deleteMonitor,
         getMonitorById,
+        updateMonitor,
         getAllMonitors
       )
     )
@@ -101,7 +114,8 @@ object MonitorController extends TapirSchema with TapirJson {
       interval: Interval,
       period: FiniteDuration,
       lastQueriedAt: Option[Instant]
-  ) derives Codec.AsObject
+  ) derives Codec.AsObject:
+    def toDomain(uid: UserId): Monitor = Monitor(MonitorId(id), uid, active, currencyPair, interval, period, lastQueriedAt)
 
   object MonitorView:
     def from(m: Monitor): MonitorView = MonitorView(m.id.value, m.active, m.currencyPair, m.interval, m.period, m.lastQueriedAt)
@@ -142,6 +156,12 @@ object MonitorController extends TapirSchema with TapirJson {
     .in(monitorIdPath)
     .out(jsonBody[MonitorView])
     .description("Find monitor by id")
+
+  val updateMonitorEndpoint = Controller.securedEndpoint.put
+    .in(monitorIdPath)
+    .in(jsonBody[MonitorView])
+    .out(statusCode(StatusCode.NoContent))
+    .description("Update monitor")
 
   def make[F[_]: Async](monitorService: MonitorService[F]): F[Controller[F]] =
     Monad[F].pure(MonitorController[F](monitorService))
