@@ -34,8 +34,8 @@ class MonitorRepositorySpec extends MongoSpec {
       "return error when creating monitor for an existing currency pair" in withEmbeddedMongoDb { client =>
         val result = for
           repo <- MonitorRepository.make(client)
-          _ <- repo.create(Monitors.create())
-          _ <- repo.create(Monitors.create())
+          _    <- repo.create(Monitors.create())
+          _    <- repo.create(Monitors.create())
         yield ()
 
         result.attempt.map { res =>
@@ -138,7 +138,7 @@ class MonitorRepositorySpec extends MongoSpec {
           repo <- MonitorRepository.make(client)
           mid  <- repo.create(Monitors.create())
           _    <- repo.delete(Users.uid, mid)
-          mons  <- repo.getAll(Users.uid)
+          mons <- repo.getAll(Users.uid)
         yield mons
 
         result.map(_ mustBe Nil)
@@ -170,16 +170,17 @@ class MonitorRepositorySpec extends MongoSpec {
         }
       }
 
-      "not allow to update currency pair" in withEmbeddedMongoDb { client =>
+      "not allow to update currency pair to the one that's already being monitored" in withEmbeddedMongoDb { client =>
         val result = for
           repo <- MonitorRepository.make(client)
           mid  <- repo.create(Monitors.create())
+          _    <- repo.create(Monitors.create(pair = Markets.gbpusd))
           _    <- repo.update(Monitors.monitor.copy(id = mid, currencyPair = Markets.gbpusd))
           mon  <- repo.find(Users.uid, mid)
         yield mon
 
         result.attempt.map { res =>
-          res mustBe Left(AppError.FieldCannotBeChanged("currencyPair"))
+          res mustBe Left(AppError.AlreadyBeingMonitored(Markets.gbpusd))
         }
       }
     }

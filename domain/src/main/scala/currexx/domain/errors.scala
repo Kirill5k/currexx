@@ -62,9 +62,6 @@ object errors {
 
     final case class SessionDoesNotExist(id: SessionId) extends Forbidden:
       override val message: String = s"Session with id $id does not exist"
-
-    final case class FieldCannotBeChanged(field: String) extends BadReq:
-      override val message: String = s"Field $field cannot be changed"
     
     case object IdMismatch extends BadReq:
       override val message: String = "The id supplied in the path does not match with the id in the request body"

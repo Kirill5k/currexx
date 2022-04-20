@@ -74,15 +74,19 @@ final private class LiveMonitorRepository[F[_]](
       .flatMap(errorIfNotDeleted(AppError.EntityDoesNotExist("Monitor", id.value)))
 
   override def update(mon: Monitor): F[Unit] =
-    find(mon.userId, mon.id)
-      .flatMap(res => F.raiseWhen(res.currencyPair != mon.currencyPair)(AppError.FieldCannotBeChanged(Field.CurrencyPair)))
-      .flatMap { _ =>
-        runUpdate(mon.userId, mon.id) {
-          Update
-            .set(Field.Active, mon.active)
-            .set("interval", mon.interval)
-            .set("period", mon.period)
-        }
+    collection
+      .count(idEq(mon.id.value).not && userIdEq(mon.userId) && Filter.eq(Field.CurrencyPair, mon.currencyPair))
+      .flatMap {
+        case 0 =>
+          runUpdate(mon.userId, mon.id) {
+            Update
+              .set(Field.Active, mon.active)
+              .set(Field.CurrencyPair, mon.currencyPair)
+              .set("interval", mon.interval)
+              .set("period", mon.period)
+          }
+        case _ =>
+          AppError.AlreadyBeingMonitored(mon.currencyPair).raiseError[F, Unit]
       }
 }
 
