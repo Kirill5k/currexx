@@ -120,7 +120,7 @@ class SignalControllerSpec extends ControllerSpec {
     "GET /signal-settings/:base/:quote" should {
       "return signal settings for currency pair" in {
         val svc = mock[SignalService[IO]]
-        when(svc.getSettings(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Signals.settings))
+        when(svc.getSettings(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Signals.settings)))
 
         val req = requestWithAuthHeader(uri"/signal-settings/GBP/USD", Method.GET)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
@@ -147,6 +147,17 @@ class SignalControllerSpec extends ControllerSpec {
                               |}""".stripMargin
         verifyJsonResponse(res, Status.BadRequest, Some(responseBody))
         verifyNoInteractions(svc)
+      }
+
+      "return error when signals are not configured for a given currency pair" in {
+        val svc = mock[SignalService[IO]]
+        when(svc.getSettings(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(None))
+
+        val req = requestWithAuthHeader(uri"/signal-settings/GBP/USD", Method.GET)
+        val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        verifyJsonResponse(res, Status.NotFound, Some("""{"message":"Missing Signal-settings for currency pair GBP/USD"}"""))
+        verify(svc).getSettings(Users.uid, Markets.gbpusd)
       }
     }
 

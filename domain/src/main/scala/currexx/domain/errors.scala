@@ -39,6 +39,9 @@ object errors {
     final case class EntityDoesNotExist(entityName: String, id: String) extends NotFound:
       override val message: String = s"$entityName with id $id does not exist"
 
+    final case class NotSetup(entityName: String, currencyPair: CurrencyPair) extends NotFound:
+      override val message: String = s"Missing $entityName-settings for currency pair $currencyPair"
+
     case object InvalidEmailOrPassword extends Unauth:
       override val message: String = "Invalid email or password"
 

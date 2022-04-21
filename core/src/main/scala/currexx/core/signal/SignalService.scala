@@ -15,7 +15,7 @@ import scala.util.Try
 trait SignalService[F[_]]:
   def submit(signal: Signal): F[Unit]
   def getAll(uid: UserId): F[List[Signal]]
-  def getSettings(uid: UserId, pair: CurrencyPair): F[SignalSettings]
+  def getSettings(uid: UserId, pair: CurrencyPair): F[Option[SignalSettings]]
   def updateSettings(settings: SignalSettings): F[Unit]
   def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit]
 
@@ -31,8 +31,8 @@ final private class LiveSignalService[F[_]](
   override def getAll(uid: UserId): F[List[Signal]] =
     repository.getAll(uid)
 
-  override def getSettings(uid: UserId, pair: CurrencyPair): F[SignalSettings] = ???
-  override def updateSettings(settings: SignalSettings): F[Unit]               = ???
+  override def getSettings(uid: UserId, pair: CurrencyPair): F[Option[SignalSettings]] = ???
+  override def updateSettings(settings: SignalSettings): F[Unit]                       = ???
 
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
     Stream(detectMacdCrossing(uid, data)).unNone.evalMap(submit).compile.drain

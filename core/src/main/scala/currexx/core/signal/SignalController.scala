@@ -6,6 +6,7 @@ import cats.syntax.functor.*
 import cats.effect.Async
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema}
+import currexx.domain.errors.AppError
 import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorParameters}
 import io.circe.Codec
 import org.http4s.HttpRoutes
@@ -44,8 +45,10 @@ final private class SignalController[F[_]](
   private def getSignalSettings(using auth: Authenticator[F]) =
     getSignalSettingsForCurrencyPairEndpoint.withAuthenticatedSession
       .serverLogic { session => (base, quote) =>
+        val pair = CurrencyPair(base, quote)
         service
-          .getSettings(session.userId, CurrencyPair(base, quote))
+          .getSettings(session.userId, pair)
+          .flatMap(settings => F.fromOption(settings, AppError.NotSetup("Signal", pair)))
           .mapResponse(_.indicators)
       }
 
