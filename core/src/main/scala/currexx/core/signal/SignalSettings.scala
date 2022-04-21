@@ -8,3 +8,7 @@ final case class SignalSettings(
     currencyPair: CurrencyPair,
     indicators: List[IndicatorParameters]
 )
+
+object SignalSettings:
+  def default(userId: UserId, currencyPair: CurrencyPair): SignalSettings =
+    SignalSettings(userId, currencyPair, List(IndicatorParameters.MACD()))

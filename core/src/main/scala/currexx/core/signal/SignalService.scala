@@ -2,12 +2,14 @@ package currexx.core.signal
 
 import cats.Monad
 import cats.effect.Concurrent
+import cats.syntax.applicative.*
+import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.domain.user.UserId
 import currexx.calculations.MovingAverageCalculator
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, MarketTimeSeriesData}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorParameters, MarketTimeSeriesData}
 import fs2.Stream
 
 import scala.util.Try
@@ -33,10 +35,34 @@ final private class LiveSignalService[F[_]](
     signalRepo.save(signal) >> dispatcher.dispatch(Action.SignalSubmitted(signal))
 
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
-    Stream(detectMacdCrossing(uid, data)).unNone.evalMap(submit).compile.drain
+    Stream
+      .eval(getSettings(uid, data.currencyPair))
+      .evalMap {
+        case Some(settings) =>
+          settings.pure[F]
+        case None =>
+          val defaultSettings = SignalSettings.default(uid, data.currencyPair)
+          settingsRepo.update(defaultSettings).as(defaultSettings)
+      }
+      .flatMap { settings =>
+        Stream.emits(
+          settings.indicators.flatMap {
+            case macd: IndicatorParameters.MACD => detectMacdCrossing(uid, data, macd)
+            case rsi: IndicatorParameters.RSI   => None
+          }
+        )
+      }
+      .evalMap(submit)
+      .compile
+      .drain
 
-  private def detectMacdCrossing(uid: UserId, data: MarketTimeSeriesData): Option[Signal] = {
-    val (macdLine, signalLine) = MovingAverageCalculator.macdWithSignal(data.prices.map(_.close).toList)
+  private def detectMacdCrossing(uid: UserId, data: MarketTimeSeriesData, macd: IndicatorParameters.MACD): Option[Signal] = {
+    val (macdLine, signalLine) = MovingAverageCalculator.macdWithSignal(
+      values = data.prices.map(_.close).toList,
+      fastLength = macd.fastLength,
+      slowLength = macd.slowLength,
+      signalSmoothing = macd.signalSmoothing
+    )
     Condition
       .lineCrossing(macdLine.head, signalLine.head, macdLine.drop(1).head, signalLine.drop(1).head)
       .map(c => Signal(uid, data.currencyPair, Indicator.MACD, c, data.prices.head.time))

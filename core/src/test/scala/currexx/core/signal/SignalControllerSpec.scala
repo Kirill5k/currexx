@@ -173,7 +173,7 @@ class SignalControllerSpec extends ControllerSpec {
                               |"signalSmoothing" : 9
                               |}]""".stripMargin
 
-        val req = requestWithAuthHeader(uri"/signal-settings/GBP/USD", Method.PUT).withEntity(parseJson(requestBody))
+        val req = requestWithAuthHeader(uri"/signal-settings/GBP/EUR", Method.PUT).withEntity(parseJson(requestBody))
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.NoContent, None)

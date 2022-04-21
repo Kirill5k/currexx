@@ -89,6 +89,7 @@ class SignalServiceSpec extends CatsSpec {
     "processMarketData" should {
       "not do anything when there are no changes in market data since last point" in {
         val (signRepo, settRepo, disp) = mocks
+        when(settRepo.get(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Signals.settings)))
 
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
@@ -96,13 +97,33 @@ class SignalServiceSpec extends CatsSpec {
         yield res
 
         result.unsafeToFuture().map { res =>
-          verifyNoInteractions(settRepo, disp, signRepo)
+          verify(settRepo).get(Users.uid, Markets.gbpeur)
+          verifyNoInteractions(disp, signRepo)
+          res mustBe ()
+        }
+      }
+
+      "insert default signal settings when these are missing" in {
+        val (signRepo, settRepo, disp) = mocks
+        when(settRepo.get(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(None))
+        when(settRepo.update(any[SignalSettings])).thenReturn(IO.unit)
+
+        val result = for
+          svc <- SignalService.make[IO](signRepo, settRepo, disp)
+          res <- svc.processMarketData(Users.uid, Markets.timeSeriesData.copy(prices = Markets.priceRanges))
+        yield res
+
+        result.unsafeToFuture().map { res =>
+          verify(settRepo).get(Users.uid, Markets.gbpeur)
+          verify(settRepo).update(Signals.settings)
+          verifyNoInteractions(disp, signRepo)
           res mustBe ()
         }
       }
 
       "detect MACD line crossing up" in {
         val (signRepo, settRepo, disp) = mocks
+        when(settRepo.get(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Signals.settings)))
         when(signRepo.save(any[Signal])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
@@ -114,6 +135,7 @@ class SignalServiceSpec extends CatsSpec {
 
         result.unsafeToFuture().map { res =>
           val expectedSignal = Signal(Users.uid, Markets.gbpeur, Indicator.MACD, Condition.CrossingUp, timeSeriesData.prices.head.time)
+          verify(settRepo).get(Users.uid, Markets.gbpeur)
           verify(signRepo).save(expectedSignal)
           verify(disp).dispatch(Action.SignalSubmitted(expectedSignal))
           res mustBe ()
@@ -122,6 +144,7 @@ class SignalServiceSpec extends CatsSpec {
 
       "detect MACD line crossing down" in {
         val (signRepo, settRepo, disp) = mocks
+        when(settRepo.get(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Signals.settings)))
         when(signRepo.save(any[Signal])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
@@ -133,6 +156,7 @@ class SignalServiceSpec extends CatsSpec {
 
         result.unsafeToFuture().map { res =>
           val expectedSignal = Signal(Users.uid, Markets.gbpeur, Indicator.MACD, Condition.CrossingDown, timeSeriesData.prices.head.time)
+          verify(settRepo).get(Users.uid, Markets.gbpeur)
           verify(signRepo).save(expectedSignal)
           verify(disp).dispatch(Action.SignalSubmitted(expectedSignal))
           res mustBe ()
