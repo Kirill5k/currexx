@@ -17,7 +17,7 @@ class SignalRepositorySpec extends MongoSpec {
       "store signal in a repository" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- SignalRepository.make(db)
-          sid  <- repo.save(Signals.macd)
+          _    <- repo.save(Signals.macd)
           res  <- repo.getAll(Users.uid)
         yield res
 
@@ -29,7 +29,7 @@ class SignalRepositorySpec extends MongoSpec {
       "not return anything when there are no signals for provided user-id" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- SignalRepository.make(db)
-          sid  <- repo.save(Signals.macd)
+          _    <- repo.save(Signals.macd)
           res  <- repo.getAll(Users.uid2)
         yield res
 
@@ -44,8 +44,8 @@ class SignalRepositorySpec extends MongoSpec {
         .fromConnectionString[IO](s"mongodb://$mongoHost:$mongoPort")
         .use { client =>
           for
-            db   <- client.getDatabase("currexx")
-            res  <- test(db)
+            db  <- client.getDatabase("currexx")
+            res <- test(db)
           yield res
         }
     }.unsafeToFuture()(IORuntime.global)

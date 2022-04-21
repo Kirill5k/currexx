@@ -5,13 +5,15 @@ import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.core.common.db.Repository
-import currexx.domain.market.CurrencyPair
+import currexx.domain.market.{CurrencyPair, IndicatorParameters}
 import currexx.domain.user.UserId
 import currexx.core.signal.SignalSettings
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
 import mongo4cats.collection.operations.{Filter, Update}
 import mongo4cats.database.MongoDatabase
+
+import scala.jdk.CollectionConverters.*
 
 trait SignalSettingsRepository[F[_]] extends Repository[F]:
   def update(settings: SignalSettings): F[Unit]
@@ -25,7 +27,7 @@ final private class LiveSignalSettingsRepository[F[_]: Async](
     collection
       .updateOne(
         userIdEq(settings.userId) && Filter.eq(Field.CurrencyPair, settings.currencyPair),
-        Update.set("indicators", settings.indicators)
+        Update.set("indicators", settings.indicators.asJava)
       )
       .map(_.getMatchedCount)
       .flatMap {
@@ -44,4 +46,4 @@ object SignalSettingsRepository extends MongoJsonCodecs:
 
   def make[F[_]: Async](db: MongoDatabase[F]): F[SignalSettingsRepository[F]] =
     db.getCollectionWithCodec[SignalSettingsEntity]("signal-settings")
-      .map(coll => LiveSignalSettingsRepository[F](coll.withAddedCodec[CurrencyPair]))
+      .map(coll => LiveSignalSettingsRepository[F](coll.withAddedCodec[CurrencyPair].withAddedCodec[IndicatorParameters]))
