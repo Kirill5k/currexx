@@ -4,7 +4,8 @@ import cats.effect.IO
 import currexx.core.ControllerSpec
 import currexx.core.auth.Authenticator
 import currexx.domain.user.UserId
-import currexx.core.fixtures.{Sessions, Signals, Users}
+import currexx.core.fixtures.{Markets, Sessions, Signals, Users}
+import currexx.domain.market.CurrencyPair
 import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.implicits.*
 import org.http4s.{Method, Request, Status, Uri}
@@ -113,6 +114,59 @@ class SignalControllerSpec extends ControllerSpec {
                |}]""".stripMargin
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
         verify(svc).getAll(Users.uid)
+      }
+    }
+
+    "GET /signal-settings/:base/:quote" should {
+      "return signal settings for currency pair" in {
+        val svc = mock[SignalService[IO]]
+        when(svc.getSettings(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Signals.settings))
+
+        val req = requestWithAuthHeader(uri"/signal-settings/GBP/USD", Method.GET)
+        val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        val responseBody = s"""[{
+                              |"indicator" : "macd",
+                              |"fastLength" : 12,
+                              |"slowLength" : 26,
+                              |"signalSmoothing" : 9
+                              |}]""".stripMargin
+        verifyJsonResponse(res, Status.Ok, Some(responseBody))
+        verify(svc).getSettings(Users.uid, Markets.gbpusd)
+      }
+
+      "return error when currency pair is invalid" in {
+        val svc = mock[SignalService[IO]]
+        when(svc.getSettings(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Signals.settings))
+
+        val req = requestWithAuthHeader(uri"/signal-settings/FOO/USD", Method.GET)
+        val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        val responseBody = s"""{
+                              |"message" : "Code FOO cannot be matched against any context defined Currency. Available Currencies are CAD, CZK, GBP, MXN, CHF, CNY, RUB, NZD, HKD, AUD, SEK, TRY, BRL, KRW, ETH, CLP, INR, LTC, BTC, DKK, XAU, XAG, JPY, ARS, MYR, USD, NOK, NAD, EUR, ZAR"
+                              |}""".stripMargin
+        verifyJsonResponse(res, Status.BadRequest, Some(responseBody))
+        verifyNoInteractions(svc)
+      }
+    }
+
+    "PUT /signal-settings/:base/:quote" should {
+      "update signal settings for currency pair" in {
+        val svc = mock[SignalService[IO]]
+        when(svc.updateSettings(any[SignalSettings])).thenReturn(IO.unit)
+
+        val requestBody = s"""[{
+                              |"indicator" : "macd",
+                              |"fastLength" : 12,
+                              |"slowLength" : 26,
+                              |"signalSmoothing" : 9
+                              |}]""".stripMargin
+
+        val req = requestWithAuthHeader(uri"/signal-settings/GBP/USD", Method.PUT).withEntity(parseJson(requestBody))
+        val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        verifyJsonResponse(res, Status.NoContent, None)
+        verify(svc).updateSettings(Signals.settings)
       }
     }
   }

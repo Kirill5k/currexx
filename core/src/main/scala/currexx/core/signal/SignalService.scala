@@ -16,7 +16,7 @@ trait SignalService[F[_]]:
   def submit(signal: Signal): F[Unit]
   def getAll(uid: UserId): F[List[Signal]]
   def getSettings(uid: UserId, pair: CurrencyPair): F[SignalSettings]
-  def update(settings: SignalSettings): F[Unit]
+  def updateSettings(settings: SignalSettings): F[Unit]
   def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit]
 
 final private class LiveSignalService[F[_]](
@@ -32,7 +32,7 @@ final private class LiveSignalService[F[_]](
     repository.getAll(uid)
 
   override def getSettings(uid: UserId, pair: CurrencyPair): F[SignalSettings] = ???
-  override def update(settings: SignalSettings): F[Unit]                       = ???
+  override def updateSettings(settings: SignalSettings): F[Unit]               = ???
 
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
     Stream(detectMacdCrossing(uid, data)).unNone.evalMap(submit).compile.drain

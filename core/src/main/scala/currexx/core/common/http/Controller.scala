@@ -24,7 +24,7 @@ import sttp.tapir.server.http4s.Http4sServerOptions
 import sttp.tapir.server.interceptor.DecodeFailureContext
 import sttp.tapir.server.interceptor.exception.{ExceptionContext, ExceptionHandler}
 import sttp.tapir.server.model.ValuedEndpointOutput
-import squants.market.defaultMoneyContext
+import squants.market.NoSuchCurrencyException
 
 final case class ErrorResponse(message: String) derives Codec.AsObject
 
@@ -119,6 +119,8 @@ object Controller extends TapirSchema with TapirJson {
         (StatusCode.UnprocessableEntity, ErrorResponse(err.getMessage))
       case err: JsonDecodeException =>
         (StatusCode.UnprocessableEntity, ErrorResponse(formatJsonError(err)))
+      case err: NoSuchCurrencyException =>
+        (StatusCode.BadRequest, ErrorResponse(err.getMessage))
       case err =>
         (StatusCode.InternalServerError, ErrorResponse(err.getMessage))
     }

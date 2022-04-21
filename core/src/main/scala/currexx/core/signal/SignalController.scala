@@ -53,7 +53,7 @@ final private class SignalController[F[_]](
     updateSignalSettingsForCurrencyPairEndpoint.withAuthenticatedSession
       .serverLogic { session => (base, quote, indicators) =>
         service
-          .update(SignalSettings(session.userId, CurrencyPair(base, quote), indicators))
+          .updateSettings(SignalSettings(session.userId, CurrencyPair(base, quote), indicators))
           .voidResponse
       }
 
@@ -88,8 +88,7 @@ object SignalController extends TapirSchema with TapirJson with TapirCodecs {
       SignalView(signal.currencyPair, signal.indicator, signal.condition, signal.time)
 
   private val basePath                   = "signals"
-  private val settingsPath               = basePath / "settings"
-  private val settingsByCurrencyPairPath = settingsPath / path[Currency]("base") / path[Currency]("quote")
+  private val settingsByCurrencyPairPath = "signal-settings" / path[Currency]("base") / path[Currency]("quote")
 
   val submitSignalEndpoint = Controller.securedEndpoint.post
     .in(basePath)
