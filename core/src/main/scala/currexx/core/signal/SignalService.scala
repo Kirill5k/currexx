@@ -6,7 +6,7 @@ import cats.syntax.flatMap.*
 import currexx.domain.user.UserId
 import currexx.calculations.MovingAverageCalculator
 import currexx.core.common.action.{Action, ActionDispatcher}
-import currexx.core.signal.db.SignalRepository
+import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.market.{Condition, CurrencyPair, Indicator, MarketTimeSeriesData}
 import fs2.Stream
 
@@ -20,16 +20,17 @@ trait SignalService[F[_]]:
   def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit]
 
 final private class LiveSignalService[F[_]](
-    private val repository: SignalRepository[F],
+    private val signalRepo: SignalRepository[F],
+    private val settingsRepo: SignalSettingsRepository[F],
     private val dispatcher: ActionDispatcher[F]
 )(using
     F: Concurrent[F]
 ) extends SignalService[F] {
   override def submit(signal: Signal): F[Unit] =
-    repository.save(signal) >> dispatcher.dispatch(Action.SignalSubmitted(signal))
+    signalRepo.save(signal) >> dispatcher.dispatch(Action.SignalSubmitted(signal))
 
   override def getAll(uid: UserId): F[List[Signal]] =
-    repository.getAll(uid)
+    signalRepo.getAll(uid)
 
   override def getSettings(uid: UserId, pair: CurrencyPair): F[Option[SignalSettings]] = ???
   override def updateSettings(settings: SignalSettings): F[Unit]                       = ???
@@ -46,5 +47,9 @@ final private class LiveSignalService[F[_]](
 }
 
 object SignalService:
-  def make[F[_]: Concurrent](repository: SignalRepository[F], dispatcher: ActionDispatcher[F]): F[SignalService[F]] =
-    Monad[F].pure(LiveSignalService[F](repository, dispatcher))
+  def make[F[_]: Concurrent](
+      signalRepo: SignalRepository[F],
+      settingsRepo: SignalSettingsRepository[F],
+      dispatcher: ActionDispatcher[F]
+  ): F[SignalService[F]] =
+    Monad[F].pure(LiveSignalService[F](signalRepo, settingsRepo, dispatcher))
