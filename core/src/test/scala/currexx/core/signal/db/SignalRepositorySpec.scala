@@ -45,7 +45,6 @@ class SignalRepositorySpec extends MongoSpec {
         .use { client =>
           for
             db   <- client.getDatabase("currexx")
-            accs <- db.getCollection("signals")
             res  <- test(db)
           yield res
         }
