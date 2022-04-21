@@ -26,14 +26,11 @@ final private class LiveSignalService[F[_]](
 )(using
     F: Concurrent[F]
 ) extends SignalService[F] {
+  override def getSettings(uid: UserId, pair: CurrencyPair): F[Option[SignalSettings]] = settingsRepo.get(uid, pair)
+  override def updateSettings(settings: SignalSettings): F[Unit]                       = settingsRepo.update(settings)
+  override def getAll(uid: UserId): F[List[Signal]]                                    = signalRepo.getAll(uid)
   override def submit(signal: Signal): F[Unit] =
     signalRepo.save(signal) >> dispatcher.dispatch(Action.SignalSubmitted(signal))
-
-  override def getAll(uid: UserId): F[List[Signal]] =
-    signalRepo.getAll(uid)
-
-  override def getSettings(uid: UserId, pair: CurrencyPair): F[Option[SignalSettings]] = ???
-  override def updateSettings(settings: SignalSettings): F[Unit]                       = ???
 
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
     Stream(detectMacdCrossing(uid, data)).unNone.evalMap(submit).compile.drain
