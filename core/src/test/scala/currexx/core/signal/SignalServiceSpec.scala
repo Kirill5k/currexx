@@ -93,7 +93,7 @@ class SignalServiceSpec extends CatsSpec {
 
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
-          res <- svc.processMarketData(Users.uid, Markets.timeSeriesData.copy(prices = Markets.priceRanges))
+          res <- svc.processMarketData(Users.uid, Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(1)))
         yield res
 
         result.unsafeToFuture().map { res =>
@@ -110,7 +110,7 @@ class SignalServiceSpec extends CatsSpec {
 
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
-          res <- svc.processMarketData(Users.uid, Markets.timeSeriesData.copy(prices = Markets.priceRanges))
+          res <- svc.processMarketData(Users.uid, Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(1)))
         yield res
 
         result.unsafeToFuture().map { res =>
@@ -127,7 +127,7 @@ class SignalServiceSpec extends CatsSpec {
         when(signRepo.save(any[Signal])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
-        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(7))
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
           res <- svc.processMarketData(Users.uid, timeSeriesData)
@@ -148,7 +148,7 @@ class SignalServiceSpec extends CatsSpec {
         when(signRepo.save(any[Signal])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
-        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(5))
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
           res <- svc.processMarketData(Users.uid, timeSeriesData)

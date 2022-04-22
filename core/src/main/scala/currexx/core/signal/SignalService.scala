@@ -47,7 +47,7 @@ final private class LiveSignalService[F[_]](
       .flatMap { settings =>
         Stream.emits(
           settings.indicators.flatMap {
-            case macd: IndicatorParameters.MACD => detectMacdCrossing(uid, data, macd)
+            case macd: IndicatorParameters.MACD => SignalService.detectMacdCrossing(uid, data, macd)
             case rsi: IndicatorParameters.RSI   => None
           }
         )
@@ -55,8 +55,11 @@ final private class LiveSignalService[F[_]](
       .evalMap(submit)
       .compile
       .drain
+}
 
-  private def detectMacdCrossing(uid: UserId, data: MarketTimeSeriesData, macd: IndicatorParameters.MACD): Option[Signal] = {
+object SignalService:
+
+  def detectMacdCrossing(uid: UserId, data: MarketTimeSeriesData, macd: IndicatorParameters.MACD): Option[Signal] = {
     val (macdLine, signalLine) = MovingAverageCalculator.macdWithSignal(
       values = data.prices.map(_.close).toList,
       fastLength = macd.fastLength,
@@ -65,11 +68,9 @@ final private class LiveSignalService[F[_]](
     )
     Condition
       .lineCrossing(macdLine.head, signalLine.head, macdLine.drop(1).head, signalLine.drop(1).head)
-      .map(c => Signal(uid, data.currencyPair, Indicator.MACD, c, data.prices.head.time))
+      .map(c => Signal(uid, data.currencyPair, macd.indicator, c, data.prices.head.time))
   }
-}
-
-object SignalService:
+  
   def make[F[_]: Concurrent](
       signalRepo: SignalRepository[F],
       settingsRepo: SignalSettingsRepository[F],

@@ -29,11 +29,16 @@ final private class LiveActionProcessor[F[_]](
 
   private def handleAction(action: Action): F[Unit] =
     (action match
-      case Action.RescheduleAllMonitors             => monitorService.rescheduleAll
-      case Action.ScheduleMonitor(uid, mid, period) => F.sleep(period) *> dispatcher.dispatch(Action.QueryMonitor(uid, mid))
-      case Action.QueryMonitor(uid, mid)            => monitorService.query(uid, mid)
-      case Action.ProcessMarketData(uid, data)      => signalService.processMarketData(uid, data)
-      case Action.SignalSubmitted(signal)           => logger.info(s"received signal submitted action $signal")
+      case Action.RescheduleAllMonitors =>
+        logger.info("rescheduling all monitors") *> monitorService.rescheduleAll
+      case Action.ScheduleMonitor(uid, mid, period) =>
+        F.sleep(period) *> dispatcher.dispatch(Action.QueryMonitor(uid, mid))
+      case Action.QueryMonitor(uid, mid) =>
+        logger.info(s"querying monitor $mid") *> monitorService.query(uid, mid)
+      case Action.ProcessMarketData(uid, data) =>
+        logger.info(s"processing market data for ${data.currencyPair}") *>signalService.processMarketData(uid, data)
+      case Action.SignalSubmitted(signal) =>
+        logger.info(s"received signal submitted action $signal")
     ).handleErrorWith {
       case error: AppError =>
         logger.warn(error)(s"domain error while processing action $action")
