@@ -76,7 +76,7 @@ object SignalService:
     val currRsi = rsis.head
     val prevRsi = rsis.drop(1).head
     val crossUp = Option.when(currRsi >= rsi.upperLine && prevRsi < rsi.upperLine)(Condition.CrossingUp)
-    lazy val crossDown = Option.when(currRsi <= rsi.lowerLine && prevRsi > rsi.lowerLine)(Condition.CrossingUp)
+    lazy val crossDown = Option.when(currRsi <= rsi.lowerLine && prevRsi > rsi.lowerLine)(Condition.CrossingDown)
     crossUp
       .orElse(crossDown)
       .map(c => Signal(uid, data.currencyPair, rsi.indicator, c, data.prices.head.time))
