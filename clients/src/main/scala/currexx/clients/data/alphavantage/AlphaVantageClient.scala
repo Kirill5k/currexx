@@ -1,11 +1,12 @@
-package currexx.clients.alphavantage
+package currexx.clients.data.alphavantage
 
 import cats.data.NonEmptyList
 import cats.effect.Temporal
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import currexx.clients.{ClientConfig, MarketDataClient}
+import currexx.clients.data.MarketDataClient
+import currexx.clients.{ClientConfig}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import io.circe.{Codec, JsonObject}
@@ -113,6 +114,6 @@ private[clients] object AlphaVantageClient {
   def make[F[_]: Temporal: Logger](
       config: ClientConfig,
       backend: SttpBackend[F, Any]
-  ): F[AlphaVantageClient[F]] =
+  ): F[MarketDataClient[F]] =
     Temporal[F].pure(AlphaVantageClient(config, backend))
 }

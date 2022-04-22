@@ -1,7 +1,8 @@
-package currexx.clients.alphavantage
+package currexx.clients.data.alphavantage
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
+import currexx.clients.data.alphavantage.AlphaVantageClient
 import currexx.clients.{ApiClientSpec, ClientConfig}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval, PriceRange}

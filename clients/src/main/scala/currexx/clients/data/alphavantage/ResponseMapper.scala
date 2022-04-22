@@ -1,8 +1,8 @@
-package currexx.clients.alphavantage
+package currexx.clients.data.alphavantage
 
 import cats.data.NonEmptyList
 import cats.syntax.either.*
-import currexx.clients.alphavantage.AlphaVantageClient.{DailyResponseMetadata, IntradayResponseMetadata, OHLC}
+import currexx.clients.data.alphavantage.AlphaVantageClient.{DailyResponseMetadata, IntradayResponseMetadata, OHLC}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{MarketTimeSeriesData, PriceRange}
 import io.circe.JsonObject

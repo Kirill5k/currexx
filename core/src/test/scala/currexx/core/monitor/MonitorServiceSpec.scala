@@ -2,7 +2,7 @@ package currexx.core.monitor
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-import currexx.clients.MarketDataClient
+import currexx.clients.data.MarketDataClient
 import currexx.core.CatsSpec
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.fixtures.{Markets, Monitors, Users}

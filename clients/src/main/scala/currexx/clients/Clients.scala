@@ -2,7 +2,8 @@ package currexx.clients
 
 import cats.effect.Async
 import cats.syntax.functor.*
-import currexx.clients.alphavantage.AlphaVantageClient
+import currexx.clients.data.MarketDataClient
+import currexx.clients.data.alphavantage.AlphaVantageClient
 import org.typelevel.log4cats.Logger
 import sttp.client3.SttpBackend
 
@@ -16,7 +17,7 @@ final case class ClientsConfig(
 )
 
 final class Clients[F[_]] private (
-    private val alphaVantage: AlphaVantageClient[F]
+    private val alphaVantage: MarketDataClient[F]
 ):
   def marketData: MarketDataClient[F] = alphaVantage
 

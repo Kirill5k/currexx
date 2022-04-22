@@ -5,7 +5,7 @@ import cats.effect.Temporal
 import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import currexx.clients.MarketDataClient
+import currexx.clients.data.MarketDataClient
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.time.*
 import currexx.core.monitor.db.MonitorRepository

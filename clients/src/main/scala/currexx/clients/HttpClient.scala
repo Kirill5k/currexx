@@ -30,6 +30,3 @@ trait HttpClient[F[_]] {
           F.sleep(delayBetweenFailures) *> dispatchWithRetry(request, attempt + 1)
       }
 }
-
-trait MarketDataClient[F[_]] extends HttpClient[F]:
-  def timeSeriesData(currencyPair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData]
