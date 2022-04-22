@@ -4,7 +4,7 @@ import scala.annotation.tailrec
 
 object MomentumOscillatorCalculator {
 
-  private val zero = BigDecimal(0)
+  private val Zero: BigDecimal = BigDecimal(0)
 
   def rsi(values: List[BigDecimal], length: Int): List[BigDecimal] = {
     val rsis = Array.ofDim[BigDecimal](values.size)
@@ -13,8 +13,8 @@ object MomentumOscillatorCalculator {
       if (remainingValues.isEmpty) rsis
       else {
         val diff     = remainingValues.head - prevValue
-        val currGain = diff.max(zero)
-        val currLoss = diff.min(zero).abs
+        val currGain = diff.max(Zero)
+        val currLoss = diff.min(Zero).abs
         if (i < length) calc(remainingValues.tail, remainingValues.head, i + 1, gain + currGain, loss + currLoss)
         else {
           val (avgGain, avgLoss) =
@@ -26,6 +26,6 @@ object MomentumOscillatorCalculator {
         }
       }
     val allValues = values.reverse
-    calc(allValues.tail, allValues.head, 1, zero, zero).toList
+    calc(allValues.tail, allValues.head, 1, Zero, Zero).toList
   }
 }

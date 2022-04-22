@@ -6,7 +6,7 @@ import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.domain.user.UserId
-import currexx.calculations.MovingAverageCalculator
+import currexx.calculations.{MomentumOscillatorCalculator, MovingAverageCalculator}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorParameters, MarketTimeSeriesData}
@@ -48,7 +48,7 @@ final private class LiveSignalService[F[_]](
         Stream.emits(
           settings.indicators.flatMap {
             case macd: IndicatorParameters.MACD => SignalService.detectMacdCrossing(uid, data, macd)
-            case rsi: IndicatorParameters.RSI   => None
+            case rsi: IndicatorParameters.RSI   => SignalService.detectRsiCrossing(uid, data, rsi)
           }
         )
       }
@@ -70,7 +70,18 @@ object SignalService:
       .lineCrossing(macdLine.head, signalLine.head, macdLine.drop(1).head, signalLine.drop(1).head)
       .map(c => Signal(uid, data.currencyPair, macd.indicator, c, data.prices.head.time))
   }
-  
+
+  def detectRsiCrossing(uid: UserId, data: MarketTimeSeriesData, rsi: IndicatorParameters.RSI): Option[Signal] = {
+    val rsis = MomentumOscillatorCalculator.rsi(data.prices.map(_.close).toList, rsi.length)
+    val currRsi = rsis.head
+    val prevRsi = rsis.drop(1).head
+    val crossUp = Option.when(currRsi >= rsi.upperLine && prevRsi < rsi.upperLine)(Condition.CrossingUp)
+    lazy val crossDown = Option.when(currRsi <= rsi.lowerLine && prevRsi > rsi.lowerLine)(Condition.CrossingUp)
+    crossUp
+      .orElse(crossDown)
+      .map(c => Signal(uid, data.currencyPair, rsi.indicator, c, data.prices.head.time))
+  }
+
   def make[F[_]: Concurrent](
       signalRepo: SignalRepository[F],
       settingsRepo: SignalSettingsRepository[F],
