@@ -36,7 +36,7 @@ final private class LiveActionProcessor[F[_]](
       case Action.QueryMonitor(uid, mid) =>
         logger.info(s"querying monitor $mid") *> monitorService.query(uid, mid)
       case Action.ProcessMarketData(uid, data) =>
-        logger.info(s"processing market data for ${data.currencyPair}") *>signalService.processMarketData(uid, data)
+        logger.info(s"processing market data for ${data.currencyPair}") *> signalService.processMarketData(uid, data)
       case Action.SignalSubmitted(signal) =>
         logger.info(s"received signal submitted action $signal")
     ).handleErrorWith {
