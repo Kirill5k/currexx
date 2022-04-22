@@ -74,7 +74,7 @@ object SignalService:
   def detectRsiCrossing(uid: UserId, data: MarketTimeSeriesData, rsi: IndicatorParameters.RSI): Option[Signal] = {
     val rsis = MomentumOscillatorCalculator.rsi(data.prices.map(_.close).toList, rsi.length)
     val currRsi = rsis.head
-    val prevRsi = rsis.drop(1).head
+    val prevRsi = rsis.tail.head
     val crossUp = Option.when(currRsi >= rsi.upperLine && prevRsi < rsi.upperLine)(Condition.CrossingUp)
     lazy val crossDown = Option.when(currRsi <= rsi.lowerLine && prevRsi > rsi.lowerLine)(Condition.CrossingDown)
     crossUp
