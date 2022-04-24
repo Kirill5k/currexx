@@ -30,6 +30,7 @@ private[alphavantage] object ResponseMapper {
         priceRange.`2. high`,
         priceRange.`3. low`,
         priceRange.`4. close`,
+        BigDecimal(0),
         LocalDateTime.parse(dateTime).atZone(ZoneId.of(meta.`6. Time Zone`)).toInstant
       )
     }
@@ -52,6 +53,7 @@ private[alphavantage] object ResponseMapper {
         priceRange.`2. high`,
         priceRange.`3. low`,
         priceRange.`4. close`,
+        BigDecimal(0),
         LocalDateTime.parse(dateTime).atZone(ZoneId.of(meta.`7. Time Zone`)).toInstant
       )
     }

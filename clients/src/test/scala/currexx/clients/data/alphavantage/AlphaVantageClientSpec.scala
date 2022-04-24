@@ -47,6 +47,7 @@ class AlphaVantageClientSpec extends ApiClientSpec {
           BigDecimal(1.30505),
           BigDecimal(1.30320),
           BigDecimal(1.30438),
+          BigDecimal(0),
           Instant.parse("2022-04-14T15:00:00Z")
         )
 
@@ -55,6 +56,7 @@ class AlphaVantageClientSpec extends ApiClientSpec {
           BigDecimal(1.30522),
           BigDecimal(1.30360),
           BigDecimal(1.30418),
+          BigDecimal(0),
           Instant.parse("2022-04-08T11:00:00Z")
         )
       }
@@ -84,6 +86,7 @@ class AlphaVantageClientSpec extends ApiClientSpec {
           BigDecimal(1.31472),
           BigDecimal(1.30320),
           BigDecimal(1.30395),
+          BigDecimal(0),
           Instant.parse("2022-04-14T14:10:00Z")
         )
 
@@ -92,6 +95,7 @@ class AlphaVantageClientSpec extends ApiClientSpec {
           BigDecimal(1.33657),
           BigDecimal(1.32770),
           BigDecimal(1.33307),
+          BigDecimal(0),
           Instant.parse("2021-11-26T00:00:00Z")
         )
       }

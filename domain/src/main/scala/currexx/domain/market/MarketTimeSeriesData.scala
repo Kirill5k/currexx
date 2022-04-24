@@ -21,6 +21,7 @@ final case class PriceRange(
     high: BigDecimal,
     low: BigDecimal,
     close: BigDecimal,
+    volume: BigDecimal,
     time: Instant
 )
 

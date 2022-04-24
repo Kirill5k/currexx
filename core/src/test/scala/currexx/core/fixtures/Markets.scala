@@ -11,7 +11,7 @@ object Markets {
   lazy val gbpusd = CurrencyPair(GBP, USD)
 
   lazy val ts             = Instant.now
-  lazy val priceRange     = PriceRange(BigDecimal(2.0), BigDecimal(4.0), BigDecimal(1.0), BigDecimal(3.0), ts)
+  lazy val priceRange     = PriceRange(BigDecimal(2.0), BigDecimal(4.0), BigDecimal(1.0), BigDecimal(3.0), BigDecimal(1000), ts)
   lazy val timeSeriesData = MarketTimeSeriesData(gbpeur, Interval.H1, NonEmptyList.one(priceRange))
 
   lazy val priceRanges = NonEmptyList
@@ -119,6 +119,6 @@ object Markets {
     )
     .zipWithIndex
     .map { case (price, index) =>
-      PriceRange(price, price, price, price, ts.minusSeconds(index.toLong * 86400L))
+      PriceRange(price, price, price, price, BigDecimal(1000), ts.minusSeconds(index.toLong * 86400L))
     }
 }
