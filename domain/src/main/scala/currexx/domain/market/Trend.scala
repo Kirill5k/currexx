@@ -5,7 +5,7 @@ import io.circe.{Decoder, Encoder}
 import scala.util.Try
 
 enum Trend:
-  case Upward, Downward, Stale
+  case Upward, Downward, Consolidation
 
 object Trend:
   inline given Encoder[Trend] = Encoder.encodeString.contramap(_.toString.toLowerCase)
