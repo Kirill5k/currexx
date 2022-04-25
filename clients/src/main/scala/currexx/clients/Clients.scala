@@ -9,7 +9,7 @@ import sttp.client3.SttpBackend
 
 final case class ClientConfig(
     baseUri: String,
-    apiKey: String
+    apiKey: Option[String]
 )
 
 final case class ClientsConfig(

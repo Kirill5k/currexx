@@ -39,7 +39,7 @@ final private[clients] class AlphaVantageClient[F[_]](
       "function"    -> "FX_DAILY",
       "from_symbol" -> pair.base.code,
       "to_symbol"   -> pair.quote.code,
-      "apikey"      -> config.apiKey
+      "apikey"      -> config.apiKey.get
     )
     sendRequest(uri"${config.baseUri}/query?$params", ResponseMapper.mapDailyTimeSeriesData)
       .map(prs => MarketTimeSeriesData(pair, Interval.D1, prs))
@@ -115,5 +115,7 @@ private[clients] object AlphaVantageClient {
       config: ClientConfig,
       backend: SttpBackend[F, Any]
   ): F[MarketDataClient[F]] =
-    Temporal[F].pure(AlphaVantageClient(config, backend))
+    Temporal[F]
+      .raiseWhen(config.apiKey.isEmpty)(new RuntimeException("Cannot create alpha-vantage client without providing api-key"))
+      .as(AlphaVantageClient(config, backend))
 }
