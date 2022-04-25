@@ -4,8 +4,9 @@ import io.circe.{Codec, Decoder, Encoder, Json}
 import io.circe.syntax.*
 
 enum Indicator(val kind: String):
-  case MACD extends Indicator("macd")
-  case RSI  extends Indicator("rsi")
+  case MACD  extends Indicator("macd")
+  case RSI   extends Indicator("rsi")
+  case STOCH extends Indicator("stoch")
 
 object Indicator:
   def from(kind: String): Either[String, Indicator] =
@@ -30,17 +31,28 @@ object IndicatorParameters {
   ) extends IndicatorParameters(Indicator.RSI)
       derives Codec.AsObject
 
-  private val discriminatorField: String               = "indicator"
+  final case class STOCH(
+      length: Int = 14,
+      slowKLength: Int = 3,
+      fastKLength: Int = 3,
+      upperLine: Int = 20,
+      lowerLine: Int = 80
+  ) extends IndicatorParameters(Indicator.STOCH)
+      derives Codec.AsObject
+
+  private val discriminatorField: String                       = "indicator"
   private def discriminatorJson(ip: IndicatorParameters): Json = Map(discriminatorField -> ip.indicator).asJson
 
   inline given Decoder[IndicatorParameters] = Decoder.instance { ip =>
     ip.downField(discriminatorField).as[Indicator].flatMap {
-      case Indicator.MACD => ip.as[IndicatorParameters.MACD]
-      case Indicator.RSI  => ip.as[IndicatorParameters.RSI]
+      case Indicator.MACD  => ip.as[IndicatorParameters.MACD]
+      case Indicator.STOCH => ip.as[IndicatorParameters.STOCH]
+      case Indicator.RSI   => ip.as[IndicatorParameters.RSI]
     }
   }
   inline given Encoder[IndicatorParameters] = Encoder.instance {
-    case macd: IndicatorParameters.MACD => macd.asJson.deepMerge(discriminatorJson(macd))
-    case rsi: IndicatorParameters.RSI   => rsi.asJson.deepMerge(discriminatorJson(rsi))
+    case macd: IndicatorParameters.MACD   => macd.asJson.deepMerge(discriminatorJson(macd))
+    case rsi: IndicatorParameters.RSI     => rsi.asJson.deepMerge(discriminatorJson(rsi))
+    case stock: IndicatorParameters.STOCH => stock.asJson.deepMerge(discriminatorJson(stock))
   }
 }
