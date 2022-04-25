@@ -10,16 +10,14 @@ import mongo4cats.circe.given
 final case class SignalSettingsEntity(
     _id: ObjectId,
     userId: ObjectId,
-    currencyPair: CurrencyPair,
     indicators: Set[IndicatorParameters]
 ) derives Codec.AsObject:
-  def toDomain: SignalSettings = SignalSettings(UserId(userId), currencyPair, indicators.toList)
+  def toDomain: SignalSettings = SignalSettings(UserId(userId), indicators.toList)
 
 object SignalSettingsEntity:
   def from(settings: SignalSettings): SignalSettingsEntity =
     SignalSettingsEntity(
       ObjectId.get,
       settings.userId.toObjectId,
-      settings.currencyPair,
       settings.indicators.toSet
     )

@@ -11,5 +11,5 @@ object Signals {
   lazy val ts   = Instant.now.`with`(ChronoField.MILLI_OF_SECOND, 0)
   lazy val macd = Signal(Users.uid, Markets.gbpeur, Indicator.MACD, Condition.CrossingUp, ts)
   
-  lazy val settings = SignalSettings(Users.uid, Markets.gbpeur, List(IndicatorParameters.MACD()))
+  lazy val settings = SignalSettings(Users.uid, List(IndicatorParameters.MACD(), IndicatorParameters.RSI()))
 }

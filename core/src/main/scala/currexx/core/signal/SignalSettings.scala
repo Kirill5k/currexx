@@ -5,10 +5,9 @@ import currexx.domain.user.UserId
 
 final case class SignalSettings(
     userId: UserId,
-    currencyPair: CurrencyPair,
     indicators: List[IndicatorParameters]
 )
 
 object SignalSettings:
-  def default(userId: UserId, currencyPair: CurrencyPair): SignalSettings =
-    SignalSettings(userId, currencyPair, List(IndicatorParameters.MACD()))
+  def default(userId: UserId): SignalSettings = 
+    SignalSettings(userId, List(IndicatorParameters.MACD(), IndicatorParameters.RSI()))

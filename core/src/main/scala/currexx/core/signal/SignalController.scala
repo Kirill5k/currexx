@@ -7,6 +7,7 @@ import cats.effect.Async
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema}
 import currexx.domain.errors.AppError
+import currexx.domain.user.UserId
 import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorParameters}
 import io.circe.Codec
 import org.http4s.HttpRoutes
@@ -44,19 +45,18 @@ final private class SignalController[F[_]](
 
   private def getSignalSettings(using auth: Authenticator[F]) =
     getSignalSettingsForCurrencyPairEndpoint.withAuthenticatedSession
-      .serverLogic { session => (base, quote) =>
-        val pair = CurrencyPair(base, quote)
+      .serverLogic { session => _ =>
         service
-          .getSettings(session.userId, pair)
-          .flatMap(settings => F.fromOption(settings, AppError.NotSetup("Signal", pair)))
-          .mapResponse(_.indicators)
+          .getSettings(session.userId)
+          .flatMap(settings => F.fromOption(settings, AppError.NotSetup("Signal")))
+          .mapResponse(s => SignalSettingsView(s.indicators))
       }
 
   private def updateSignalSettings(using auth: Authenticator[F]) =
     updateSignalSettingsForCurrencyPairEndpoint.withAuthenticatedSession
-      .serverLogic { session => (base, quote, indicators) =>
+      .serverLogic { session => settings =>
         service
-          .updateSettings(SignalSettings(session.userId, CurrencyPair(base, quote), indicators))
+          .updateSettings(settings.toDomain(session.userId))
           .voidResponse
       }
 
@@ -86,12 +86,17 @@ object SignalController extends TapirSchema with TapirJson with TapirCodecs {
       time: Instant
   ) derives Codec.AsObject
 
+  final case class SignalSettingsView(
+      indicators: List[IndicatorParameters]
+  ) derives Codec.AsObject:
+    def toDomain(userId: UserId): SignalSettings = SignalSettings(userId, indicators)
+
   object SignalView:
     def from(signal: Signal): SignalView =
       SignalView(signal.currencyPair, signal.indicator, signal.condition, signal.time)
 
-  private val basePath                   = "signals"
-  private val settingsByCurrencyPairPath = "signal-settings" / path[Currency]("base") / path[Currency]("quote")
+  private val basePath     = "signals"
+  private val settingsPath = "signal-settings"
 
   val submitSignalEndpoint = Controller.securedEndpoint.post
     .in(basePath)
@@ -105,15 +110,15 @@ object SignalController extends TapirSchema with TapirJson with TapirCodecs {
     .description("Retrieve all submitted signals")
 
   val getSignalSettingsForCurrencyPairEndpoint = Controller.securedEndpoint.get
-    .in(settingsByCurrencyPairPath)
-    .out(jsonBody[List[IndicatorParameters]])
-    .description("Retrieve signal settings for a given currency pair")
+    .in(settingsPath)
+    .out(jsonBody[SignalSettingsView])
+    .description("Retrieve settings for active indicator")
 
   val updateSignalSettingsForCurrencyPairEndpoint = Controller.securedEndpoint.put
-    .in(settingsByCurrencyPairPath)
-    .in(jsonBody[List[IndicatorParameters]])
+    .in(settingsPath)
+    .in(jsonBody[SignalSettingsView])
     .out(statusCode(StatusCode.NoContent))
-    .description("Update signal settings for a given currency pair")
+    .description("Update settings for active indicator")
 
   def make[F[_]: Async](service: SignalService[F]): F[Controller[F]] =
     Monad[F].pure(SignalController[F](service))

@@ -19,7 +19,7 @@ class SignalSettingsRepositorySpec extends MongoSpec {
         val result = for
           repo <- SignalSettingsRepository.make(db)
           _    <- repo.update(Signals.settings)
-          res  <- repo.get(Users.uid, Markets.gbpeur)
+          res  <- repo.get(Users.uid)
         yield res
 
         result.map(_ mustBe Some(Signals.settings))
@@ -30,7 +30,7 @@ class SignalSettingsRepositorySpec extends MongoSpec {
           repo <- SignalSettingsRepository.make(db)
           _    <- repo.update(Signals.settings)
           _    <- repo.update(Signals.settings.copy(indicators = List(IndicatorParameters.RSI())))
-          res  <- repo.get(Users.uid, Markets.gbpeur)
+          res  <- repo.get(Users.uid)
         yield res
 
         result.map(_ mustBe Some(Signals.settings.copy(indicators = List(IndicatorParameters.RSI()))))

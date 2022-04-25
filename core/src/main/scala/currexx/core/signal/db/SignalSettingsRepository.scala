@@ -17,7 +17,7 @@ import scala.jdk.CollectionConverters.*
 
 trait SignalSettingsRepository[F[_]] extends Repository[F]:
   def update(settings: SignalSettings): F[Unit]
-  def get(uid: UserId, currencyPair: CurrencyPair): F[Option[SignalSettings]]
+  def get(uid: UserId): F[Option[SignalSettings]]
 
 final private class LiveSignalSettingsRepository[F[_]: Async](
     private val collection: MongoCollection[F, SignalSettingsEntity]
@@ -25,19 +25,16 @@ final private class LiveSignalSettingsRepository[F[_]: Async](
 
   override def update(settings: SignalSettings): F[Unit] =
     collection
-      .updateOne(
-        userIdEq(settings.userId) && Filter.eq(Field.CurrencyPair, settings.currencyPair),
-        Update.set("indicators", settings.indicators.asJava)
-      )
+      .updateOne(userIdEq(settings.userId), Update.set("indicators", settings.indicators.asJava))
       .map(_.getMatchedCount)
       .flatMap {
         case 0 => collection.insertOne(SignalSettingsEntity.from(settings)).void
         case _ => ().pure[F]
       }
 
-  override def get(uid: UserId, currencyPair: CurrencyPair): F[Option[SignalSettings]] =
+  override def get(uid: UserId): F[Option[SignalSettings]] =
     collection
-      .find(userIdEq(uid) && Filter.eq(Field.CurrencyPair, currencyPair))
+      .find(userIdEq(uid))
       .first
       .map(_.map(_.toDomain))
 }

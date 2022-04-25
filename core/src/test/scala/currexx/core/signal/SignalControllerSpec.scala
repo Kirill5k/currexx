@@ -117,63 +117,69 @@ class SignalControllerSpec extends ControllerSpec {
       }
     }
 
-    "GET /signal-settings/:base/:quote" should {
-      "return signal settings for currency pair" in {
+    "GET /signal-settings" should {
+      "return signal settings for configured indicators" in {
         val svc = mock[SignalService[IO]]
-        when(svc.getSettings(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Signals.settings)))
+        when(svc.getSettings(any[UserId])).thenReturn(IO.pure(Some(Signals.settings)))
 
-        val req = requestWithAuthHeader(uri"/signal-settings/GBP/USD", Method.GET)
+        val req = requestWithAuthHeader(uri"/signal-settings", Method.GET)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val responseBody = s"""[{
-                              |"indicator" : "macd",
-                              |"fastLength" : 12,
-                              |"slowLength" : 26,
-                              |"signalSmoothing" : 9
-                              |}]""".stripMargin
+        val responseBody =
+          s"""{
+              |"indicators": [
+              |{
+              |   "indicator" : "macd",
+              |   "fastLength" : 12,
+              |   "slowLength" : 26,
+              |   "signalSmoothing" : 9
+              |},
+              |{
+              |   "indicator" : "rsi",
+              |   "length" : 14,
+              |   "upperLine" : 70,
+              |   "lowerLine" : 30
+              |}
+              |]}""".stripMargin
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
-        verify(svc).getSettings(Users.uid, Markets.gbpusd)
+        verify(svc).getSettings(Users.uid)
       }
 
-      "return error when currency pair is invalid" in {
+      "return error when signals are not configured in the given accounts" in {
         val svc = mock[SignalService[IO]]
-        when(svc.getSettings(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Signals.settings))
+        when(svc.getSettings(any[UserId])).thenReturn(IO.pure(None))
 
-        val req = requestWithAuthHeader(uri"/signal-settings/FOO/USD", Method.GET)
+        val req = requestWithAuthHeader(uri"/signal-settings", Method.GET)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val responseBody = s"""{
-                              |"message" : "Code FOO cannot be matched against any context defined Currency. Available Currencies are CAD, CZK, GBP, MXN, CHF, CNY, RUB, NZD, HKD, AUD, SEK, TRY, BRL, KRW, ETH, CLP, INR, LTC, BTC, DKK, XAU, XAG, JPY, ARS, MYR, USD, NOK, NAD, EUR, ZAR"
-                              |}""".stripMargin
-        verifyJsonResponse(res, Status.BadRequest, Some(responseBody))
-        verifyNoInteractions(svc)
-      }
-
-      "return error when signals are not configured for a given currency pair" in {
-        val svc = mock[SignalService[IO]]
-        when(svc.getSettings(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(None))
-
-        val req = requestWithAuthHeader(uri"/signal-settings/GBP/USD", Method.GET)
-        val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
-
-        verifyJsonResponse(res, Status.NotFound, Some("""{"message":"Missing Signal-settings for currency pair GBP/USD"}"""))
-        verify(svc).getSettings(Users.uid, Markets.gbpusd)
+        verifyJsonResponse(res, Status.NotFound, Some("""{"message":"Current account doesn't have Signal-settings set up"}"""))
+        verify(svc).getSettings(Users.uid)
       }
     }
 
     "PUT /signal-settings/:base/:quote" should {
-      "update signal settings for currency pair" in {
+      "update signal settings" in {
         val svc = mock[SignalService[IO]]
         when(svc.updateSettings(any[SignalSettings])).thenReturn(IO.unit)
 
-        val requestBody = s"""[{
-                              |"indicator" : "macd",
-                              |"fastLength" : 12,
-                              |"slowLength" : 26,
-                              |"signalSmoothing" : 9
-                              |}]""".stripMargin
+        val requestBody =
+          s"""{
+             |"indicators": [
+             |{
+             |   "indicator" : "macd",
+             |   "fastLength" : 12,
+             |   "slowLength" : 26,
+             |   "signalSmoothing" : 9
+             |},
+             |{
+             |   "indicator" : "rsi",
+             |   "length" : 14,
+             |   "upperLine" : 70,
+             |   "lowerLine" : 30
+             |}
+             |]}""".stripMargin
 
-        val req = requestWithAuthHeader(uri"/signal-settings/GBP/EUR", Method.PUT).withEntity(parseJson(requestBody))
+        val req = requestWithAuthHeader(uri"/signal-settings", Method.PUT).withEntity(parseJson(requestBody))
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.NoContent, None)
