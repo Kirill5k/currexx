@@ -1,6 +1,7 @@
 package currexx.calculations
 
 import scala.annotation.tailrec
+import scala.collection.mutable.Queue
 
 object MomentumOscillatorCalculator {
 
@@ -26,6 +27,39 @@ object MomentumOscillatorCalculator {
         }
       }
     val allValues = values.reverse
-    calc(allValues.tail, allValues.head, 1, Zero, Zero).toList
+    calc(allValues.tail, allValues.head, 1, Zero, Zero).take(rsis.length - length).toList
+  }
+
+  def stoch(
+      closings: List[BigDecimal],
+      highs: List[BigDecimal],
+      lows: List[BigDecimal],
+      length: Int,
+      slowKLength: Int,
+      slowDLength: Int
+  ): (List[BigDecimal], List[BigDecimal]) = {
+    val highsArr    = highs.reverse.toArray
+    val lowsArr     = lows.reverse.toArray
+    val closingsArr = closings.reverse.toArray
+    val stochs      = Array.ofDim[BigDecimal](closings.size)
+    val lc: Queue[BigDecimal] = Queue.empty
+    val hh: Queue[BigDecimal] = Queue.empty
+    val ll: Queue[BigDecimal] = Queue.empty
+    var i = 0
+    while (i < closings.length) {
+      lc.enqueue(closingsArr(i))
+      hh.enqueue(highsArr(i))
+      ll.enqueue(lowsArr(i))
+      if (i >= length) {
+        stochs(i) = 100 * ((closingsArr(i) - lc.min) / (hh.max - ll.min))
+        lc.dequeue()
+        hh.dequeue()
+        ll.dequeue()
+      }
+      i += 1
+    }
+    val k = MovingAverageCalculator.sma(stochs.take(closings.length-length).reverse.toList, slowKLength)
+    val d = MovingAverageCalculator.sma(k, slowDLength)
+    (k, d)
   }
 }
