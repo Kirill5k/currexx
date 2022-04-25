@@ -9,9 +9,7 @@ enum Indicator(val kind: String):
   case STOCH extends Indicator("stoch")
 
 object Indicator:
-  def from(kind: String): Either[String, Indicator] =
-    Indicator.values.find(_.kind == kind).toRight(s"Unrecognized indicator $kind")
-  inline given Decoder[Indicator] = Decoder[String].emap(Indicator.from)
+  inline given Decoder[Indicator] = Decoder[String].emap(k => Indicator.values.find(_.kind == k).toRight(s"Unrecognized indicator $k"))
   inline given Encoder[Indicator] = Encoder[String].contramap(_.kind)
 
 sealed trait IndicatorParameters(val indicator: Indicator)
