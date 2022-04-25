@@ -38,27 +38,24 @@ object MomentumOscillatorCalculator {
       slowKLength: Int,
       slowDLength: Int
   ): (List[BigDecimal], List[BigDecimal]) = {
-    val highsArr    = highs.reverse.toArray
-    val lowsArr     = lows.reverse.toArray
-    val closingsArr = closings.reverse.toArray
-    val stochs      = Array.ofDim[BigDecimal](closings.size)
-    val lc: Queue[BigDecimal] = Queue.empty
+    val highsArr    = highs.toArray.reverse
+    val lowsArr     = lows.toArray.reverse
+    val closingsArr = closings.toArray.reverse
+    val stochs      = Array.ofDim[BigDecimal](closings.size-length)
     val hh: Queue[BigDecimal] = Queue.empty
     val ll: Queue[BigDecimal] = Queue.empty
     var i = 0
     while (i < closings.length) {
-      lc.enqueue(closingsArr(i))
       hh.enqueue(highsArr(i))
       ll.enqueue(lowsArr(i))
-      if (i >= length) {
-        stochs(i) = 100 * ((closingsArr(i) - lc.min) / (hh.max - ll.min))
-        lc.dequeue()
+      if (i > length) {
+        stochs(i-length) = BigDecimal(100) * ((closingsArr(i) - ll.min) / (hh.max - ll.min))
         hh.dequeue()
         ll.dequeue()
       }
       i += 1
     }
-    val k = MovingAverageCalculator.sma(stochs.take(closings.length-length).reverse.toList, slowKLength)
+    val k = MovingAverageCalculator.sma(stochs.reverse.toList, slowKLength)
     val d = MovingAverageCalculator.sma(k, slowDLength)
     (k, d)
   }

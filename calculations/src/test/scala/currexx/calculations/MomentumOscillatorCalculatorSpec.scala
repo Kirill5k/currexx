@@ -19,6 +19,33 @@ class MomentumOscillatorCalculatorSpec extends AnyWordSpec with Matchers {
         BigDecimal("38.3507")
       )
     }
+
+    "calculate stochastic oscillator values (smooth k and smooth d)" in {
+      val (smoothK, smoothD) = MomentumOscillatorCalculator.stoch(
+        closings = values.map(_._4),
+        highs = values.map(_._2),
+        lows = values.map(_._3),
+        length = 14,
+        slowKLength = 3,
+        slowDLength = 3
+      )
+
+      smoothK.take(5).map(rounded(4)) mustBe List(
+        BigDecimal("30.3457"),
+        BigDecimal("42.5122"),
+        BigDecimal("45.0495"),
+        BigDecimal("37.6063"),
+        BigDecimal("38.3507")
+      )
+
+      smoothD.take(5).map(rounded(4)) mustBe List(
+        BigDecimal("30.3457"),
+        BigDecimal("42.5122"),
+        BigDecimal("45.0495"),
+        BigDecimal("37.6063"),
+        BigDecimal("38.3507")
+      )
+    }
   }
 
   def rounded(scale: Int)(num: BigDecimal): BigDecimal =
