@@ -18,7 +18,7 @@ class AlphaVantageClientSpec extends ApiClientSpec {
 
   given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
-  val config = ClientConfig("http://alpha-vantage.com", "api-key")
+  val config = ClientConfig("http://alpha-vantage.com", Some("api-key"))
   val pair   = CurrencyPair(GBP, USD)
 
   "An AlphaVantageClient" should {

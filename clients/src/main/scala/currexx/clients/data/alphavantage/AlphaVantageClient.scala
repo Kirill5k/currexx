@@ -6,7 +6,7 @@ import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.clients.data.MarketDataClient
-import currexx.clients.{ClientConfig}
+import currexx.clients.{ClientConfig, HttpClient}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import io.circe.{Codec, JsonObject}
@@ -17,13 +17,16 @@ import sttp.model.{StatusCode, Uri}
 
 import scala.concurrent.duration.*
 
-final private[clients] class AlphaVantageClient[F[_]](
+private[clients] trait AlphaVantageClient[F[_]] extends HttpClient[F]:
+  def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData]
+
+final private class LiveAlphaVantageClient[F[_]](
     private val config: ClientConfig,
     override protected val backend: SttpBackend[F, Any]
 )(using
     F: Temporal[F],
     logger: Logger[F]
-) extends MarketDataClient[F]:
+) extends AlphaVantageClient[F]:
   import AlphaVantageClient.*
 
   override protected val name: String                         = "alpha-vantage"
@@ -114,8 +117,8 @@ private[clients] object AlphaVantageClient {
   def make[F[_]: Temporal: Logger](
       config: ClientConfig,
       backend: SttpBackend[F, Any]
-  ): F[MarketDataClient[F]] =
+  ): F[AlphaVantageClient[F]] =
     Temporal[F]
       .raiseWhen(config.apiKey.isEmpty)(new RuntimeException("Cannot create alpha-vantage client without providing api-key"))
-      .as(AlphaVantageClient(config, backend))
+      .as(LiveAlphaVantageClient(config, backend))
 }
