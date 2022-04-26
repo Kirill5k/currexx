@@ -18,7 +18,7 @@ class AppConfigSpec extends CatsSpec {
       AppConfig.load[IO].unsafeToFuture().map { config =>
         config.server.host mustBe "0.0.0.0"
         config.mongo.connectionUri mustBe "mongodb+srv://user:password@mongo/currexx"
-        config.clients.alphaVantage.apiKey mustBe "av-key"
+        config.clients.alphaVantage.apiKey mustBe Some("av-key")
       }
     }
   }
