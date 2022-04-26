@@ -1,6 +1,6 @@
 package currexx.clients
 
-import cats.effect.Async
+import cats.effect.Temporal
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.clients.broker.BrokerClient
@@ -26,7 +26,7 @@ final class Clients[F[_]] private (
 )
 
 object Clients:
-  def make[F[_]: Async: Logger](config: ClientsConfig, backend: SttpBackend[F, Any]): F[Clients[F]] =
+  def make[F[_]: Temporal: Logger](config: ClientsConfig, backend: SttpBackend[F, Any]): F[Clients[F]] =
     for
       alphavantage <- AlphaVantageClient.make[F](config.alphaVantage, backend)
       vindaloo     <- VindalooClient.make[F](config.vindaloo, backend)
