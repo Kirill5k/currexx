@@ -12,4 +12,4 @@ enum Action:
   case QueryMonitor(uid: UserId, mid: MonitorId)
   case ScheduleMonitor(uid: UserId, mid: MonitorId, period: FiniteDuration)
   case ProcessMarketData(uid: UserId, data: MarketTimeSeriesData)
-  case SignalSubmitted(signal: Signal)
+  case ProcessSignal(signal: Signal)

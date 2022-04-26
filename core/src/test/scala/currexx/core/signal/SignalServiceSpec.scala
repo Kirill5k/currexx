@@ -62,7 +62,7 @@ class SignalServiceSpec extends CatsSpec {
 
         result.unsafeToFuture().map { res =>
           verify(signRepo).save(Signals.macd)
-          verify(disp).dispatch(Action.SignalSubmitted(Signals.macd))
+          verify(disp).dispatch(Action.ProcessSignal(Signals.macd))
           res mustBe ()
         }
       }
@@ -137,7 +137,7 @@ class SignalServiceSpec extends CatsSpec {
           val expectedSignal = Signal(Users.uid, Markets.gbpeur, Indicator.MACD, Condition.CrossingUp, timeSeriesData.prices.head.time)
           verify(settRepo).get(Users.uid)
           verify(signRepo).save(expectedSignal)
-          verify(disp).dispatch(Action.SignalSubmitted(expectedSignal))
+          verify(disp).dispatch(Action.ProcessSignal(expectedSignal))
           res mustBe ()
         }
       }
@@ -158,7 +158,7 @@ class SignalServiceSpec extends CatsSpec {
           val expectedSignal = Signal(Users.uid, Markets.gbpeur, Indicator.MACD, Condition.CrossingDown, timeSeriesData.prices.head.time)
           verify(settRepo).get(Users.uid)
           verify(signRepo).save(expectedSignal)
-          verify(disp).dispatch(Action.SignalSubmitted(expectedSignal))
+          verify(disp).dispatch(Action.ProcessSignal(expectedSignal))
           res mustBe ()
         }
       }

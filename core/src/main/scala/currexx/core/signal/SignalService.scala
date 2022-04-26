@@ -32,7 +32,7 @@ final private class LiveSignalService[F[_]](
   override def updateSettings(settings: SignalSettings): F[Unit]   = settingsRepo.update(settings)
   override def getAll(uid: UserId): F[List[Signal]]                = signalRepo.getAll(uid)
   override def submit(signal: Signal): F[Unit] =
-    signalRepo.save(signal) >> dispatcher.dispatch(Action.SignalSubmitted(signal))
+    signalRepo.save(signal) >> dispatcher.dispatch(Action.ProcessSignal(signal))
 
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
     Stream

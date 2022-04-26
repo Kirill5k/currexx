@@ -5,10 +5,10 @@ import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder, Json}
 
 import scala.util.Try
 
-sealed trait Order(val kind: String):
+sealed trait MarketOrder(val kind: String):
   def currencyPair: CurrencyPair
 
-object Order {
+object MarketOrder {
   enum Position:
     case Buy, Sell
 
@@ -19,33 +19,33 @@ object Order {
         .toRight(s"$p is not valid position kind. Accepted values: ${Position.values.map(_.toString.toLowerCase).mkString(", ")}")
     }
 
-  final case class EnterMarket(
+  final case class Enter(
       currencyPair: CurrencyPair,
       position: Position,
       volume: BigDecimal,
       stopLoss: Option[BigDecimal],
       trailingStopLoss: Option[BigDecimal],
       takeProfit: Option[BigDecimal]
-  ) extends Order("enter")
+  ) extends MarketOrder("enter")
       derives Codec.AsObject
 
-  final case class ExitMarket(
+  final case class Exit(
       currencyPair: CurrencyPair
-  ) extends Order("exit")
+  ) extends MarketOrder("exit")
       derives Codec.AsObject
 
-  private val discriminatorField: String            = "kind"
-  private def discriminatorJson(order: Order): Json = Map(discriminatorField -> order.kind).asJson
+  private val discriminatorField: String                  = "kind"
+  private def discriminatorJson(order: MarketOrder): Json = Map(discriminatorField -> order.kind).asJson
 
-  inline given Decoder[Order] = Decoder.instance { c =>
+  inline given Decoder[MarketOrder] = Decoder.instance { c =>
     c.downField(discriminatorField).as[String].flatMap {
-      case "enter" => c.as[EnterMarket]
-      case "exit"  => c.as[ExitMarket]
+      case "enter" => c.as[Enter]
+      case "exit"  => c.as[Exit]
       case kind    => Left(DecodingFailure(s"Unexpected order kind $kind", List(CursorOp.Field(discriminatorField))))
     }
   }
-  inline given Encoder[Order] = Encoder.instance {
-    case enter: EnterMarket => enter.asJson.deepMerge(discriminatorJson(enter))
-    case exit: ExitMarket   => exit.asJson.deepMerge(discriminatorJson(exit))
+  inline given Encoder[MarketOrder] = Encoder.instance {
+    case enter: Enter => enter.asJson.deepMerge(discriminatorJson(enter))
+    case exit: Exit   => exit.asJson.deepMerge(discriminatorJson(exit))
   }
 }

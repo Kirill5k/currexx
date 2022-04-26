@@ -37,8 +37,8 @@ final private class LiveActionProcessor[F[_]](
         logger.info(s"querying monitor $mid") *> monitorService.query(uid, mid)
       case Action.ProcessMarketData(uid, data) =>
         logger.info(s"processing market data for ${data.currencyPair}") *> signalService.processMarketData(uid, data)
-      case Action.SignalSubmitted(signal) =>
-        logger.info(s"received signal submitted action $signal")
+      case Action.ProcessSignal(signal) =>
+        logger.info(s"processing submitted signal $signal")
     ).handleErrorWith {
       case error: AppError =>
         logger.warn(error)(s"domain error while processing action $action")

@@ -6,7 +6,7 @@ import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import currexx.clients.{ClientConfig, HttpClient}
 import currexx.clients.broker.{BrokerClient, BrokerParameters}
-import currexx.domain.market.Order
+import currexx.domain.market.MarketOrder
 import org.typelevel.log4cats.Logger
 import sttp.client3.*
 import sttp.model.Uri
@@ -14,7 +14,7 @@ import sttp.model.Uri
 import scala.concurrent.duration.*
 
 private[clients] trait VindalooClient[F[_]] extends HttpClient[F]:
-  def submit(externalId: String, order: Order): F[Unit]
+  def submit(externalId: String, order: MarketOrder): F[Unit]
 
 final private class LiveVindalooClient[F[_]](
     private val config: ClientConfig,
@@ -27,12 +27,12 @@ final private class LiveVindalooClient[F[_]](
   override protected val name: String                         = "vindaloo"
   override protected val delayBetweenFailures: FiniteDuration = 5.seconds
 
-  override def submit(externalId: String, order: Order): F[Unit] =
+  override def submit(externalId: String, order: MarketOrder): F[Unit] =
     order match
-      case enter: Order.EnterMarket => enterMarketOrder(externalId, enter)
-      case exit: Order.ExitMarket   => exitMarketOrder(externalId, exit)
+      case enter: MarketOrder.Enter => enterMarketOrder(externalId, enter)
+      case exit: MarketOrder.Exit   => exitMarketOrder(externalId, exit)
 
-  private def enterMarketOrder(externalId: String, order: Order.EnterMarket): F[Unit] = {
+  private def enterMarketOrder(externalId: String, order: MarketOrder.Enter): F[Unit] = {
     val stopLoss   = order.stopLoss.getOrElse(0)
     val trailingSL = order.trailingStopLoss.getOrElse(0)
     val takeProfit = order.takeProfit.getOrElse(0)
@@ -41,7 +41,7 @@ final private class LiveVindalooClient[F[_]](
     sendRequest(uri"${config.baseUri}/$externalId/$stopLoss/$trailingSL/$takeProfit/$pos/$pair/${order.volume}")
   }
 
-  private def exitMarketOrder(externalId: String, order: Order.ExitMarket): F[Unit] =
+  private def exitMarketOrder(externalId: String, order: MarketOrder.Exit): F[Unit] =
     sendRequest(uri"${config.baseUri}/close/$externalId/${order.currencyPair.base.code}${order.currencyPair.quote.code}")
 
   private def sendRequest(uri: Uri): F[Unit] =

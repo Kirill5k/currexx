@@ -3,7 +3,7 @@ package currexx.clients.broker.vindaloo
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import currexx.clients.{ApiClientSpec, ClientConfig}
-import currexx.domain.market.{CurrencyPair, Interval, Order}
+import currexx.domain.market.{CurrencyPair, Interval, MarketOrder}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import squants.market.{GBP, USD}
@@ -27,7 +27,7 @@ class VindalooClientSpec extends ApiClientSpec {
 
       val result = for
         client <- VindalooClient.make[IO](config, testingBackend)
-        res    <- client.submit("15", Order.EnterMarket(pair, Order.Position.Buy, BigDecimal(0.1), Some(BigDecimal(25)), None, None))
+        res    <- client.submit("15", MarketOrder.Enter(pair, MarketOrder.Position.Buy, BigDecimal(0.1), Some(BigDecimal(25)), None, None))
       yield res
 
       result.unsafeToFuture().map(_ mustBe ())
@@ -43,7 +43,7 @@ class VindalooClientSpec extends ApiClientSpec {
 
       val result = for
         client <- VindalooClient.make[IO](config, testingBackend)
-        res    <- client.submit("15", Order.ExitMarket(pair))
+        res    <- client.submit("15", MarketOrder.Exit(pair))
       yield res
 
       result.unsafeToFuture().map(_ mustBe ())
