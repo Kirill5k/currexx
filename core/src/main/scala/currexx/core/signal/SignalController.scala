@@ -96,7 +96,7 @@ object SignalController extends TapirSchema with TapirJson with TapirCodecs {
       SignalView(signal.currencyPair, signal.indicator, signal.condition, signal.time)
 
   private val basePath     = "signals"
-  private val settingsPath = "signal-settings"
+  private val settingsPath = basePath / "settings"
 
   val submitSignalEndpoint = Controller.securedEndpoint.post
     .in(basePath)

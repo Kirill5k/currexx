@@ -122,7 +122,7 @@ class SignalControllerSpec extends ControllerSpec {
         val svc = mock[SignalService[IO]]
         when(svc.getSettings(any[UserId])).thenReturn(IO.pure(Some(Signals.settings)))
 
-        val req = requestWithAuthHeader(uri"/signal-settings", Method.GET)
+        val req = requestWithAuthHeader(uri"/signals/settings", Method.GET)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody =
@@ -149,7 +149,7 @@ class SignalControllerSpec extends ControllerSpec {
         val svc = mock[SignalService[IO]]
         when(svc.getSettings(any[UserId])).thenReturn(IO.pure(None))
 
-        val req = requestWithAuthHeader(uri"/signal-settings", Method.GET)
+        val req = requestWithAuthHeader(uri"/signals/settings", Method.GET)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.NotFound, Some("""{"message":"Current account doesn't have Signal-settings set up"}"""))
@@ -157,7 +157,7 @@ class SignalControllerSpec extends ControllerSpec {
       }
     }
 
-    "PUT /signal-settings/:base/:quote" should {
+    "PUT /signals/settings/:base/:quote" should {
       "update signal settings" in {
         val svc = mock[SignalService[IO]]
         when(svc.updateSettings(any[SignalSettings])).thenReturn(IO.unit)
@@ -179,7 +179,7 @@ class SignalControllerSpec extends ControllerSpec {
              |}
              |]}""".stripMargin
 
-        val req = requestWithAuthHeader(uri"/signal-settings", Method.PUT).withEntity(parseJson(requestBody))
+        val req = requestWithAuthHeader(uri"/signals/settings", Method.PUT).withEntity(parseJson(requestBody))
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.NoContent, None)
