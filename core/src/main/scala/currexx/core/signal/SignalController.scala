@@ -44,7 +44,7 @@ final private class SignalController[F[_]](
       }
 
   private def getSignalSettings(using auth: Authenticator[F]) =
-    getSignalSettingsForCurrencyPairEndpoint.withAuthenticatedSession
+    getSignalSettingsEndpoint.withAuthenticatedSession
       .serverLogic { session => _ =>
         service
           .getSettings(session.userId)
@@ -53,7 +53,7 @@ final private class SignalController[F[_]](
       }
 
   private def updateSignalSettings(using auth: Authenticator[F]) =
-    updateSignalSettingsForCurrencyPairEndpoint.withAuthenticatedSession
+    updateSignalSettingsEndpoint.withAuthenticatedSession
       .serverLogic { session => settings =>
         service
           .updateSettings(settings.toDomain(session.userId))
@@ -109,16 +109,16 @@ object SignalController extends TapirSchema with TapirJson with TapirCodecs {
     .out(jsonBody[List[SignalView]])
     .description("Retrieve all submitted signals")
 
-  val getSignalSettingsForCurrencyPairEndpoint = Controller.securedEndpoint.get
+  val getSignalSettingsEndpoint = Controller.securedEndpoint.get
     .in(settingsPath)
     .out(jsonBody[SignalSettingsView])
-    .description("Retrieve settings for active indicator")
+    .description("Retrieve settings for active indicators and emitted signals")
 
-  val updateSignalSettingsForCurrencyPairEndpoint = Controller.securedEndpoint.put
+  val updateSignalSettingsEndpoint = Controller.securedEndpoint.put
     .in(settingsPath)
     .in(jsonBody[SignalSettingsView])
     .out(statusCode(StatusCode.NoContent))
-    .description("Update settings for active indicator")
+    .description("Update settings for active indicators")
 
   def make[F[_]: Async](service: SignalService[F]): F[Controller[F]] =
     Monad[F].pure(SignalController[F](service))
