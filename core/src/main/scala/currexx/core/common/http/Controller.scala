@@ -61,10 +61,10 @@ object Controller extends TapirSchema with TapirJson {
   val securedEndpoint: Endpoint[BearerToken, Unit, (StatusCode, ErrorResponse), Unit, Any] =
     publicEndpoint.securityIn(auth.bearer[String]().validate(Validator.nonEmptyString).map(BearerToken.apply)(_.value))
 
-  def serverOptions[F[_]](using F: Sync[F]): Http4sServerOptions[F, F] = {
+  def serverOptions[F[_]](using F: Sync[F]): Http4sServerOptions[F] = {
     val errorEndpointOut = (e: Throwable) => Some(ValuedEndpointOutput(error, Controller.mapError(e)))
     Http4sServerOptions
-      .customInterceptors[F, F]
+      .customiseInterceptors
       .exceptionHandler(ExceptionHandler.pure((ctx: ExceptionContext) => errorEndpointOut(ctx.e)))
       .decodeFailureHandler { (ctx: DecodeFailureContext) =>
         if (ctx.failingInput.toString.matches("Header.Authorization.*")) {

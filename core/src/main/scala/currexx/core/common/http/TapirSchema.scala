@@ -8,7 +8,7 @@ import squants.market.Currency
 import currexx.domain.validations.{EmailString, IdString}
 import currexx.domain.user.UserId
 import currexx.core.monitor.MonitorId
-import sttp.tapir.generic.SchemaDerivation
+import sttp.tapir.generic.auto.SchemaDerivation
 import sttp.tapir.{FieldName, Schema}
 import sttp.tapir.Schema.SName
 import sttp.tapir.SchemaType.{SProduct, SProductField}
