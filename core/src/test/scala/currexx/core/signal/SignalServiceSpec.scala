@@ -23,7 +23,7 @@ class SignalServiceSpec extends CatsSpec {
           _   <- svc.getSettings(Users.uid)
         yield ()
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verify(settRepo).get(Users.uid)
           verifyNoInteractions(signRepo, disp)
           res mustBe ()
@@ -41,7 +41,7 @@ class SignalServiceSpec extends CatsSpec {
           _   <- svc.updateSettings(Signals.settings)
         yield ()
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verify(settRepo).update(Signals.settings)
           verifyNoInteractions(signRepo, disp)
           res mustBe ()
@@ -60,7 +60,7 @@ class SignalServiceSpec extends CatsSpec {
           _   <- svc.submit(Signals.macd)
         yield ()
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verify(signRepo).save(Signals.macd)
           verify(disp).dispatch(Action.ProcessSignal(Signals.macd))
           res mustBe ()
@@ -78,7 +78,7 @@ class SignalServiceSpec extends CatsSpec {
           res <- svc.getAll(Users.uid)
         yield res
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verifyNoInteractions(settRepo, disp)
           verify(signRepo).getAll(Users.uid)
           res mustBe List(Signals.macd)
@@ -96,7 +96,7 @@ class SignalServiceSpec extends CatsSpec {
           res <- svc.processMarketData(Users.uid, Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(1)))
         yield res
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verify(settRepo).get(Users.uid)
           verifyNoInteractions(disp, signRepo)
           res mustBe ()
@@ -113,7 +113,7 @@ class SignalServiceSpec extends CatsSpec {
           res <- svc.processMarketData(Users.uid, Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(1)))
         yield res
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verify(settRepo).get(Users.uid)
           verify(settRepo).update(Signals.settings)
           verifyNoInteractions(disp, signRepo)
@@ -133,7 +133,7 @@ class SignalServiceSpec extends CatsSpec {
           res <- svc.processMarketData(Users.uid, timeSeriesData)
         yield res
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           val expectedSignal = Signal(Users.uid, Markets.gbpeur, Indicator.MACD, Condition.CrossingUp, timeSeriesData.prices.head.time)
           verify(settRepo).get(Users.uid)
           verify(signRepo).save(expectedSignal)
@@ -154,7 +154,7 @@ class SignalServiceSpec extends CatsSpec {
           res <- svc.processMarketData(Users.uid, timeSeriesData)
         yield res
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           val expectedSignal = Signal(Users.uid, Markets.gbpeur, Indicator.MACD, Condition.CrossingDown, timeSeriesData.prices.head.time)
           verify(settRepo).get(Users.uid)
           verify(signRepo).save(expectedSignal)

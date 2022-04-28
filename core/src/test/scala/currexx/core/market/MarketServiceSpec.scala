@@ -1,7 +1,6 @@
 package currexx.core.market
 
 import cats.effect.IO
-import cats.effect.unsafe.implicits.global
 import currexx.core.CatsSpec
 import currexx.domain.user.UserId
 import currexx.core.common.action.ActionDispatcher
@@ -19,13 +18,13 @@ class MarketServiceSpec extends CatsSpec {
 
         val result = for
           svc <- MarketService.make[IO](settRepo, disp)
-          _ <- svc.getSettings(Users.uid)
+          _   <- svc.getSettings(Users.uid)
         yield ()
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verify(settRepo).get(Users.uid)
           verifyNoInteractions(disp)
-          res mustBe()
+          res mustBe ()
         }
       }
 
@@ -35,10 +34,10 @@ class MarketServiceSpec extends CatsSpec {
 
         val result = for
           svc <- MarketService.make[IO](settRepo, disp)
-          _ <- svc.getSettings(Users.uid)
+          _   <- svc.getSettings(Users.uid)
         yield ()
 
-        result.attempt.unsafeToFuture().map { res =>
+        result.attempt.asserting { res =>
           verify(settRepo).get(Users.uid)
           verifyNoInteractions(disp)
           res mustBe Left(AppError.NotSetup("Market"))
@@ -53,19 +52,18 @@ class MarketServiceSpec extends CatsSpec {
 
         val result = for
           svc <- MarketService.make[IO](settRepo, disp)
-          _ <- svc.updateSettings(Markets.settings)
+          _   <- svc.updateSettings(Markets.settings)
         yield ()
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verify(settRepo).update(Markets.settings)
           verifyNoInteractions(disp)
-          res mustBe()
+          res mustBe ()
         }
       }
     }
-
-    def mocks: (MarketSettingsRepository[IO], ActionDispatcher[IO]) =
-      (mock[MarketSettingsRepository[IO]], mock[ActionDispatcher[IO]])
-
   }
+
+  def mocks: (MarketSettingsRepository[IO], ActionDispatcher[IO]) =
+    (mock[MarketSettingsRepository[IO]], mock[ActionDispatcher[IO]])
 }

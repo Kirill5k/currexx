@@ -1,7 +1,6 @@
 package currexx.core.monitor
 
 import cats.effect.IO
-import cats.effect.unsafe.implicits.global
 import currexx.clients.data.MarketDataClient
 import currexx.core.CatsSpec
 import currexx.core.common.action.{Action, ActionDispatcher}
@@ -26,7 +25,7 @@ class MonitorServiceSpec extends CatsSpec {
           res <- svc.resume(Users.uid, Monitors.mid)
         yield res
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verifyNoInteractions(client, disp)
           verify(repo).activate(Users.uid, Monitors.mid, true)
           res mustBe ()
@@ -44,7 +43,7 @@ class MonitorServiceSpec extends CatsSpec {
           res <- svc.pause(Users.uid, Monitors.mid)
         yield res
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verifyNoInteractions(client, disp)
           verify(repo).activate(Users.uid, Monitors.mid, false)
           res mustBe ()
@@ -63,7 +62,7 @@ class MonitorServiceSpec extends CatsSpec {
           mid <- svc.create(Monitors.create())
         yield mid
 
-        result.unsafeToFuture().map { mid =>
+        result.asserting { mid =>
           verifyNoInteractions(client)
           verify(repo).create(Monitors.create())
           verify(disp).dispatch(Action.QueryMonitor(Users.uid, Monitors.mid))
@@ -83,7 +82,7 @@ class MonitorServiceSpec extends CatsSpec {
           res <- svc.rescheduleAll
         yield res
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verify(repo).stream
           verify(disp).dispatch(Action.QueryMonitor(Users.uid, Monitors.mid))
           verifyNoInteractions(client)
@@ -101,7 +100,7 @@ class MonitorServiceSpec extends CatsSpec {
           res <- svc.rescheduleAll
         yield res
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verify(repo).stream
           verify(disp).dispatch(Action.QueryMonitor(Users.uid, Monitors.mid))
           verifyNoInteractions(client)
@@ -119,7 +118,7 @@ class MonitorServiceSpec extends CatsSpec {
           res <- svc.rescheduleAll
         yield res
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verify(repo).stream
           verify(disp).dispatch(any[Action.ScheduleMonitor])
           verifyNoInteractions(client)
@@ -141,7 +140,7 @@ class MonitorServiceSpec extends CatsSpec {
           res <- svc.query(Users.uid, Monitors.mid)
         yield res
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verify(repo).find(Users.uid, Monitors.mid)
           verify(client).timeSeriesData(Markets.gbpeur, Interval.H1)
           verify(disp).dispatch(Action.ProcessMarketData(Users.uid, Markets.timeSeriesData))
@@ -162,7 +161,7 @@ class MonitorServiceSpec extends CatsSpec {
           res <- svc.query(Users.uid, Monitors.mid)
         yield res
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verify(repo).find(Users.uid, Monitors.mid)
           verify(disp).dispatch(Action.ScheduleMonitor(Users.uid, Monitors.mid, Monitors.period))
           verifyNoInteractions(client)
