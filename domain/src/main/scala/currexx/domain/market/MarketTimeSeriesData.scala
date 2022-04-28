@@ -23,7 +23,7 @@ final case class PriceRange(
     close: BigDecimal,
     volume: BigDecimal,
     time: Instant
-)
+) derives Codec.AsObject
 
 final case class MarketTimeSeriesData(
     currencyPair: CurrencyPair,

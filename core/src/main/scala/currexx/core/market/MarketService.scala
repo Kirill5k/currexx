@@ -9,6 +9,7 @@ import currexx.domain.user.UserId
 trait MarketService[F[_]]:
   def getSettings(uid: UserId): F[MarketSettings]
   def updateSettings(settings: MarketSettings): F[Unit]
+  def getState(uid: UserId): F[List[MarketState]]
   def processSignal(signal: Signal): F[Unit]
 
 final private class LiveMarketService[F[_]](
@@ -17,6 +18,7 @@ final private class LiveMarketService[F[_]](
 ) extends MarketService[F]:
   override def getSettings(uid: UserId): F[MarketSettings]       = settingsRepository.get(uid)
   override def updateSettings(settings: MarketSettings): F[Unit] = settingsRepository.update(settings)
+  override def getState(uid: UserId): F[List[MarketState]]       = ???
 
   override def processSignal(signal: Signal): F[Unit] = ???
 
