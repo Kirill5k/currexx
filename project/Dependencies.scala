@@ -5,17 +5,17 @@ object Dependencies {
     val mongo4cats = "0.4.7"
     val pureConfig = "0.17.1"
     val circe      = "0.14.1"
-    val sttp       = "3.5.1"
+    val sttp       = "3.5.2"
     val http4s     = "0.23.11"
     val logback    = "1.2.11"
     val log4cats   = "2.2.0"
     val squants    = "1.8.3"
     val bcrypt     = "4.3.0"
     val refined    = "0.9.28"
-    val tapir      = "1.0.0-M6"
+    val tapir      = "1.0.0-M8"
     val jwt        = "9.0.5"
 
-    val scalaTest = "3.2.11"
+    val scalaTest = "3.2.12"
     val mockito   = "3.2.10.0"
   }
 
