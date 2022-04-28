@@ -7,6 +7,7 @@ import currexx.core.common.action.ActionDispatcher
 import currexx.core.market.db.{MarketSettingsRepository, MarketStateRepository}
 import currexx.core.fixtures.{Markets, Signals, Users}
 import currexx.domain.errors.AppError
+import currexx.domain.market.{CurrencyPair, PriceRange}
 
 class MarketServiceSpec extends CatsSpec {
 
@@ -58,6 +59,42 @@ class MarketServiceSpec extends CatsSpec {
         result.asserting { res =>
           verify(settRepo).update(Markets.settings)
           verifyNoInteractions(stateRepo, disp)
+          res mustBe ()
+        }
+      }
+    }
+
+    "getState" should {
+      "return state of all traded currencies" in {
+        val (settRepo, stateRepo, disp) = mocks
+        when(stateRepo.getAll(any[UserId])).thenReturn(IO.pure(List(Markets.state)))
+
+        val result = for
+          svc   <- MarketService.make[IO](settRepo, stateRepo, disp)
+          state <- svc.getState(Users.uid)
+        yield state
+
+        result.asserting { res =>
+          verify(stateRepo).getAll(Users.uid)
+          verifyNoInteractions(settRepo, disp)
+          res mustBe List(Markets.state)
+        }
+      }
+    }
+
+    "processMarketData" should {
+      "update state with latest received priced" in {
+        val (settRepo, stateRepo, disp) = mocks
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[PriceRange])).thenReturn(IO.unit)
+
+        val result = for
+          svc   <- MarketService.make[IO](settRepo, stateRepo, disp)
+          state <- svc.processMarketData(Users.uid, Markets.timeSeriesData)
+        yield state
+
+        result.asserting { res =>
+          verify(stateRepo).update(Users.uid, Markets.gbpeur, Markets.priceRange)
+          verifyNoInteractions(settRepo, disp)
           res mustBe ()
         }
       }
