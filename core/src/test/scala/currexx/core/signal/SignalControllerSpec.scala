@@ -117,7 +117,7 @@ class SignalControllerSpec extends ControllerSpec {
       }
     }
 
-    "GET /signal-settings" should {
+    "GET /signals/settings" should {
       "return signal settings for configured indicators" in {
         val svc = mock[SignalService[IO]]
         when(svc.getSettings(any[UserId])).thenReturn(IO.pure(Some(Signals.settings)))
@@ -157,7 +157,7 @@ class SignalControllerSpec extends ControllerSpec {
       }
     }
 
-    "PUT /signals/settings/:base/:quote" should {
+    "PUT /signals/settings" should {
       "update signal settings" in {
         val svc = mock[SignalService[IO]]
         when(svc.updateSettings(any[SignalSettings])).thenReturn(IO.unit)
