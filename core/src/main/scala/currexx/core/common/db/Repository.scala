@@ -3,6 +3,7 @@ package currexx.core.common.db
 import cats.MonadError
 import cats.syntax.option.*
 import com.mongodb.client.result.{DeleteResult, UpdateResult}
+import currexx.domain.market.CurrencyPair
 import currexx.domain.types.IdType
 import currexx.domain.user.UserId
 import mongo4cats.bson.ObjectId
@@ -30,6 +31,9 @@ trait Repository[F[_]] {
   protected def userIdEq(uid: Option[UserId]): Filter              = idEqFilter(Field.UId, uid.map(_.value))
   protected def userIdEq(uid: UserId): Filter                      = idEqFilter(Field.UId, uid.value.some)
 
+  protected def userIdAndCurrencyPairEq(uid: UserId, pair: CurrencyPair): Filter =
+    userIdEq(uid) && Filter.eq(Field.CurrencyPair, pair)
+  
   protected def errorIfNotDeleted(error: Throwable)(res: DeleteResult)(using F: MonadError[F, Throwable]): F[Unit] =
     F.raiseWhen(res.getDeletedCount == 0)(error)
 
