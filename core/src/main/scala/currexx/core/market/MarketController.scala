@@ -27,7 +27,6 @@ final private class MarketController[F[_]](
       .serverLogic { session => _ =>
         service
           .getSettings(session.userId)
-          .flatMap(settings => F.fromOption(settings, AppError.NotSetup("Market")))
           .mapResponse(s => MarketSettingsView(s.broker, s.trading))
       }
 
