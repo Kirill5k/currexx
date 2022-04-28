@@ -14,6 +14,29 @@ class MarketStateRepositorySpec extends MongoSpec {
   override protected val mongoPort: Int = 12351
 
   "A MarketStateRepository" when {
+    "update" should {
+      "create new state if it doesn't exist" in withEmbeddedMongoDb { db =>
+        val result = for
+          repo <- MarketStateRepository.make(db)
+          _    <- repo.update(Users.uid, Markets.gbpeur, Markets.priceRange)
+          res  <- repo.find(Users.uid, Markets.gbpeur)
+        yield res
+
+        result.map(_ mustBe Some(MarketState(Users.uid, Markets.gbpeur, None, Some(Markets.priceRange), None)))
+      }
+
+      "update existing state if it exists" in withEmbeddedMongoDb { db =>
+        val result = for
+          repo <- MarketStateRepository.make(db)
+          _    <- repo.update(Users.uid, Markets.gbpeur, Markets.priceRange)
+          _    <- repo.update(Users.uid, Markets.gbpeur, Markets.priceRange)
+          res  <- repo.getAll(Users.uid)
+        yield res
+
+        result.map(_ must have size 1)
+      }
+    }
+
     "find" should {
       "return empty option when state does not exist" in withEmbeddedMongoDb { db =>
         val result = for
@@ -22,16 +45,6 @@ class MarketStateRepositorySpec extends MongoSpec {
         yield res
 
         result.map(_ mustBe None)
-      }
-
-      "return state by currency" in withEmbeddedMongoDb { db =>
-        val result = for
-          repo <- MarketStateRepository.make(db)
-          _    <- repo.update(Users.uid, Markets.gbpeur, Markets.priceRange)
-          res  <- repo.find(Users.uid, Markets.gbpeur)
-        yield res
-
-        result.map(_ mustBe Some(MarketState(Users.uid, Markets.gbpeur, None, Some(Markets.priceRange), None)))
       }
     }
 

@@ -29,7 +29,7 @@ final private class LiveMarketStateRepository[F[_]](
     collection
       .updateOne(
         userIdAndCurrencyPairEq(uid, pair),
-        Update.set("latestPrice", price).currentTimestamp(Field.LastUpdatedAt)
+        Update.set("latestPrice", price).currentDate(Field.LastUpdatedAt)
       )
       .map(_.getMatchedCount)
       .flatMap {
