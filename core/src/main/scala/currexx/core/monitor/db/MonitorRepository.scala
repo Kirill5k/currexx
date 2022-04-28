@@ -50,7 +50,7 @@ final private class LiveMonitorRepository[F[_]](
   override def create(mon: CreateMonitor): F[MonitorId] = {
     val entity = MonitorEntity.from(mon)
     collection
-      .count(userIdEq(mon.userId) && Filter.eq(Field.CurrencyPair, mon.currencyPair))
+      .count(userIdAndCurrencyPairEq(mon.userId, mon.currencyPair))
       .flatMap {
         case 0 => collection.insertOne(entity).as(MonitorId(entity._id))
         case _ => AppError.AlreadyBeingMonitored(mon.currencyPair).raiseError[F, MonitorId]

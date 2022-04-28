@@ -53,10 +53,7 @@ class MarketSettingsRepositorySpec extends MongoSpec {
       MongoClient
         .fromConnectionString[IO](s"mongodb://$mongoHost:$mongoPort")
         .use { client =>
-          for
-            db  <- client.getDatabase("currexx")
-            res <- test(db)
-          yield res
+          client.getDatabase("currexx").flatMap(test)
         }
     }.unsafeToFuture()(IORuntime.global)
 }

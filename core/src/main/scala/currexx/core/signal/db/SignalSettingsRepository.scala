@@ -33,10 +33,7 @@ final private class LiveSignalSettingsRepository[F[_]: Async](
       }
 
   override def get(uid: UserId): F[Option[SignalSettings]] =
-    collection
-      .find(userIdEq(uid))
-      .first
-      .map(_.map(_.toDomain))
+    collection.find(userIdEq(uid)).first.map(_.map(_.toDomain))
 }
 
 object SignalSettingsRepository extends MongoJsonCodecs:
