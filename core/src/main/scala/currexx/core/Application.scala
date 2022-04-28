@@ -8,6 +8,7 @@ import currexx.core.common.config.AppConfig
 import currexx.core.common.http.Http
 import currexx.core.common.logging.Logger
 import currexx.core.health.Health
+import currexx.core.market.Markets
 import currexx.core.signal.Signals
 import currexx.core.monitor.Monitors
 
@@ -24,8 +25,9 @@ object Application extends IOApp.Simple:
             auth       <- Auth.make(config.auth, res.mongo)
             signals    <- Signals.make(res.mongo, dispatcher)
             monitors   <- Monitors.make(res.mongo, clients, dispatcher)
-            http       <- Http.make[IO](health, auth, signals, monitors)
-            processor  <- ActionProcessor.make[IO](dispatcher, monitors.service, signals.service)
+            markets    <- Markets.make(res.mongo, clients, dispatcher)
+            http       <- Http.make[IO](health, auth, signals, monitors, markets)
+            processor  <- ActionProcessor.make[IO](dispatcher, monitors.service, signals.service, markets.service)
             _ <- Server
               .serve[IO](config.server, http.app, runtime.compute)
               .concurrently(processor.run)

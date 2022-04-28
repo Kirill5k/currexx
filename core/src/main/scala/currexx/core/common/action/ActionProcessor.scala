@@ -5,6 +5,7 @@ import cats.effect.Temporal
 import cats.syntax.apply.*
 import cats.syntax.applicativeError.*
 import currexx.core.monitor.MonitorService
+import currexx.core.market.MarketService
 import currexx.core.signal.SignalService
 import currexx.domain.errors.AppError
 import fs2.Stream
@@ -18,7 +19,8 @@ trait ActionProcessor[F[_]]:
 final private class LiveActionProcessor[F[_]](
     private val dispatcher: ActionDispatcher[F],
     private val monitorService: MonitorService[F],
-    private val signalService: SignalService[F]
+    private val signalService: SignalService[F],
+    private val marketService: MarketService[F]
 )(using
     F: Temporal[F],
     logger: Logger[F]
@@ -36,7 +38,8 @@ final private class LiveActionProcessor[F[_]](
       case Action.QueryMonitor(uid, mid) =>
         logger.info(s"querying monitor $mid") *> monitorService.query(uid, mid)
       case Action.ProcessMarketData(uid, data) =>
-        logger.info(s"processing market data for ${data.currencyPair}") *> signalService.processMarketData(uid, data)
+        logger.info(s"processing market data for ${data.currencyPair}") *> 
+          marketService.processMarketData(uid, data) *> signalService.processMarketData(uid, data)
       case Action.ProcessSignal(signal) =>
         logger.info(s"processing submitted signal $signal")
     ).handleErrorWith {
@@ -53,6 +56,7 @@ object ActionProcessor:
   def make[F[_]: Temporal: Logger](
       dispatcher: ActionDispatcher[F],
       monitorService: MonitorService[F],
-      signalService: SignalService[F]
+      signalService: SignalService[F],
+      marketService: MarketService[F]
   ): F[ActionProcessor[F]] =
-    Monad[F].pure(LiveActionProcessor[F](dispatcher, monitorService, signalService))
+    Monad[F].pure(LiveActionProcessor[F](dispatcher, monitorService, signalService, marketService))
