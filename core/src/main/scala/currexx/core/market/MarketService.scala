@@ -39,7 +39,7 @@ final private class LiveMarketService[F[_]](
         stateRepo
           .update(signal.userId, signal.currencyPair, signals + (signal.indicator -> updatedIndicatorStates.take(10)))
       }
-      .flatMap(state => dispatcher.dispatch(Action.ProcessMarketState(state)))
+      .flatMap(state => dispatcher.dispatch(Action.ProcessMarketState(state, signal.indicator)))
 
 }
 
