@@ -1,7 +1,7 @@
 package currexx.core.market.db
 
 import currexx.core.market.{IndicatorState, MarketState}
-import currexx.domain.market.{CurrencyPair, Indicator, MarketOrder, PriceRange}
+import currexx.domain.market.{CurrencyPair, Indicator, PriceRange, TradeOrder}
 import currexx.domain.user.UserId
 import io.circe.Codec
 import mongo4cats.bson.ObjectId
@@ -13,7 +13,7 @@ final case class MarketStateEntity(
     _id: ObjectId,
     userId: ObjectId,
     currencyPair: CurrencyPair,
-    currentPosition: Option[MarketOrder.Position],
+    currentPosition: Option[TradeOrder.Position],
     latestPrice: Option[PriceRange],
     signals: Map[Indicator, List[IndicatorState]],
     lastUpdatedAt: Option[Instant]
@@ -24,7 +24,7 @@ object MarketStateEntity:
   def make(
       userId: UserId,
       currencyPair: CurrencyPair,
-      currentPosition: Option[MarketOrder.Position] = None,
+      currentPosition: Option[TradeOrder.Position] = None,
       latestPrice: Option[PriceRange] = None,
       signals: Map[Indicator, List[IndicatorState]] = Map.empty,
       lastUpdatedAt: Option[Instant] = None

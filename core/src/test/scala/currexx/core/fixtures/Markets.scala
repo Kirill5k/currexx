@@ -2,9 +2,9 @@ package currexx.core.fixtures
 
 import cats.data.NonEmptyList
 import currexx.clients.broker.BrokerParameters
-import currexx.core.market.MarketState
+import currexx.core.market.{IndicatorState, MarketState}
 import squants.market.{EUR, GBP, USD}
-import currexx.domain.market.{CurrencyPair, Interval, MarketOrder, MarketTimeSeriesData, PriceRange}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, Interval, TradeOrder, MarketTimeSeriesData, PriceRange}
 
 import java.time.Instant
 
@@ -15,8 +15,9 @@ object Markets {
   lazy val ts             = Instant.now
   lazy val priceRange     = PriceRange(BigDecimal(2.0), BigDecimal(4.0), BigDecimal(1.0), BigDecimal(3.0), BigDecimal(1000), ts)
   lazy val timeSeriesData = MarketTimeSeriesData(gbpeur, Interval.H1, NonEmptyList.one(priceRange))
-  
-  lazy val state    = MarketState(Users.uid, gbpeur, Some(MarketOrder.Position.Buy), Some(priceRange), Map.empty, Some(ts))
+
+  lazy val state           = MarketState(Users.uid, gbpeur, Some(TradeOrder.Position.Buy), Some(priceRange), Map.empty, Some(ts))
+  lazy val stateWithSignal = state.copy(signals = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, ts))))
 
   lazy val priceRanges = NonEmptyList
     .of(

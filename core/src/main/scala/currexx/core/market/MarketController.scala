@@ -7,7 +7,7 @@ import currexx.clients.broker.BrokerParameters
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{MarketOrder, PriceRange}
+import currexx.domain.market.{Indicator, PriceRange, TradeOrder}
 import currexx.domain.user.UserId
 import io.circe.Codec
 import org.http4s.HttpRoutes
@@ -23,7 +23,7 @@ final private class MarketController[F[_]](
     F: Async[F]
 ) extends Controller[F] {
   import MarketController.*
-  
+
   private def getMarketState(using auth: Authenticator[F]) =
     getMarketStateEndpoint.withAuthenticatedSession
       .serverLogic { session => _ =>
@@ -43,16 +43,23 @@ final private class MarketController[F[_]](
 object MarketController extends TapirSchema with TapirJson with TapirCodecs {
 
   final case class MarketStateView(
-      currentPosition: Option[MarketOrder.Position],
+      currentPosition: Option[TradeOrder.Position],
       latestPrice: Option[PriceRange],
+      signals: Map[String, List[IndicatorState]],
       lastUpdatedAt: Option[Instant]
   ) derives Codec.AsObject
 
   object MarketStateView:
-    def from(ms: MarketState): MarketStateView = MarketStateView(ms.currentPosition, ms.latestPrice, ms.lastUpdatedAt)
+    def from(ms: MarketState): MarketStateView =
+      MarketStateView(
+        ms.currentPosition,
+        ms.latestPrice,
+        ms.signals.map((ind, st) => ind.kind -> st),
+        ms.lastUpdatedAt
+      )
 
-  private val basePath     = "market"
-  private val statePath    = basePath / "state"
+  private val basePath  = "market"
+  private val statePath = basePath / "state"
 
   val getMarketStateEndpoint = Controller.securedEndpoint.get
     .in(statePath)

@@ -14,11 +14,11 @@ class MarketControllerSpec extends ControllerSpec {
 
   "A MarketController" when {
     given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
-    
+
     "GET /market/state" should {
       "return state of the traded currencies" in {
         val svc = mock[MarketService[IO]]
-        when(svc.getState(any[UserId])).thenReturn(IO.pure(List(Markets.state)))
+        when(svc.getState(any[UserId])).thenReturn(IO.pure(List(Markets.stateWithSignal)))
 
         val req = requestWithAuthHeader(uri"/market/state", Method.GET)
         val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
@@ -34,6 +34,16 @@ class MarketControllerSpec extends ControllerSpec {
              |    "close" : 3.0,
              |    "volume" : 1000,
              |    "time" : "${Markets.ts}"
+             |  },
+             |  "signals" : {
+             |    "macd" : [
+             |      {
+             |        "condition" : {
+             |          "kind" : "crossing-up"
+             |        },
+             |        "time" : "${Markets.ts}"
+             |      }
+             |    ]
              |  },
              |  "lastUpdatedAt" : "${Markets.ts}"
              |}
