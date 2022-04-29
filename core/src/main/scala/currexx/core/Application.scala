@@ -10,6 +10,7 @@ import currexx.core.common.logging.Logger
 import currexx.core.health.Health
 import currexx.core.market.Markets
 import currexx.core.signal.Signals
+import currexx.core.trade.Trades
 import currexx.core.monitor.Monitors
 
 object Application extends IOApp.Simple:
@@ -25,8 +26,9 @@ object Application extends IOApp.Simple:
             auth       <- Auth.make(config.auth, res.mongo)
             signals    <- Signals.make(res.mongo, dispatcher)
             monitors   <- Monitors.make(res.mongo, clients, dispatcher)
-            markets    <- Markets.make(res.mongo, clients, dispatcher)
-            http       <- Http.make[IO](health, auth, signals, monitors, markets)
+            markets    <- Markets.make(res.mongo, dispatcher)
+            trades     <- Trades.make(res.mongo, clients, dispatcher)
+            http       <- Http.make[IO](health, auth, signals, monitors, markets, trades)
             processor  <- ActionProcessor.make[IO](dispatcher, monitors.service, signals.service, markets.service)
             _ <- Server
               .serve[IO](config.server, http.app, runtime.compute)

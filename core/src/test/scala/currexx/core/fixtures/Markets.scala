@@ -2,7 +2,7 @@ package currexx.core.fixtures
 
 import cats.data.NonEmptyList
 import currexx.clients.broker.BrokerParameters
-import currexx.core.market.{MarketSettings, MarketState, TradingParameters}
+import currexx.core.market.MarketState
 import squants.market.{EUR, GBP, USD}
 import currexx.domain.market.{CurrencyPair, Interval, MarketOrder, MarketTimeSeriesData, PriceRange}
 
@@ -15,8 +15,7 @@ object Markets {
   lazy val ts             = Instant.now
   lazy val priceRange     = PriceRange(BigDecimal(2.0), BigDecimal(4.0), BigDecimal(1.0), BigDecimal(3.0), BigDecimal(1000), ts)
   lazy val timeSeriesData = MarketTimeSeriesData(gbpeur, Interval.H1, NonEmptyList.one(priceRange))
-
-  lazy val settings = MarketSettings(Users.uid, BrokerParameters.Vindaloo("1"), TradingParameters(BigDecimal(0.1), None, None, None))
+  
   lazy val state    = MarketState(Users.uid, gbpeur, Some(MarketOrder.Position.Buy), Some(priceRange), Some(ts))
 
   lazy val priceRanges = NonEmptyList

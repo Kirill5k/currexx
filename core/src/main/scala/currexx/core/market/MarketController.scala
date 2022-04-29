@@ -6,7 +6,6 @@ import cats.syntax.flatMap.*
 import currexx.clients.broker.BrokerParameters
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema}
-import currexx.core.signal.SignalController.{SignalSettingsView, jsonBody, settingsPath}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{MarketOrder, PriceRange}
 import currexx.domain.user.UserId
@@ -24,23 +23,7 @@ final private class MarketController[F[_]](
     F: Async[F]
 ) extends Controller[F] {
   import MarketController.*
-
-  private def getMarketSettings(using auth: Authenticator[F]) =
-    getMarketSettingsEndpoint.withAuthenticatedSession
-      .serverLogic { session => _ =>
-        service
-          .getSettings(session.userId)
-          .mapResponse(s => MarketSettingsView(s.broker, s.trading))
-      }
-
-  private def updateMarketSettings(using auth: Authenticator[F]) =
-    updateMarketSettingsEndpoint.withAuthenticatedSession
-      .serverLogic { session => settings =>
-        service
-          .updateSettings(settings.toDomain(session.userId))
-          .voidResponse
-      }
-
+  
   private def getMarketState(using auth: Authenticator[F]) =
     getMarketStateEndpoint.withAuthenticatedSession
       .serverLogic { session => _ =>
@@ -52,20 +35,12 @@ final private class MarketController[F[_]](
   def routes(using authenticator: Authenticator[F]): HttpRoutes[F] =
     Http4sServerInterpreter[F](Controller.serverOptions).toRoutes(
       List(
-        getMarketSettings,
-        updateMarketSettings,
         getMarketState
       )
     )
 }
 
 object MarketController extends TapirSchema with TapirJson with TapirCodecs {
-
-  final case class MarketSettingsView(
-      broker: BrokerParameters,
-      trading: TradingParameters
-  ) derives Codec.AsObject:
-    def toDomain(userId: UserId): MarketSettings = MarketSettings(userId, broker, trading)
 
   final case class MarketStateView(
       currentPosition: Option[MarketOrder.Position],
@@ -77,19 +52,7 @@ object MarketController extends TapirSchema with TapirJson with TapirCodecs {
     def from(ms: MarketState): MarketStateView = MarketStateView(ms.currentPosition, ms.latestPrice, ms.lastUpdatedAt)
 
   private val basePath     = "market"
-  private val settingsPath = basePath / "settings"
   private val statePath    = basePath / "state"
-
-  val getMarketSettingsEndpoint = Controller.securedEndpoint.get
-    .in(settingsPath)
-    .out(jsonBody[MarketSettingsView])
-    .description("Retrieve settings for broker and trading")
-
-  val updateMarketSettingsEndpoint = Controller.securedEndpoint.put
-    .in(settingsPath)
-    .in(jsonBody[MarketSettingsView])
-    .out(statusCode(StatusCode.NoContent))
-    .description("Update settings for broker and trading")
 
   val getMarketStateEndpoint = Controller.securedEndpoint.get
     .in(statePath)

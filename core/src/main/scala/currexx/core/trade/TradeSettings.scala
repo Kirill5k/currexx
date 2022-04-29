@@ -1,4 +1,4 @@
-package currexx.core.market
+package currexx.core.trade
 
 import currexx.clients.broker.BrokerParameters
 import currexx.domain.user.UserId
@@ -11,7 +11,7 @@ final case class TradingParameters(
     takeProfit: Option[BigDecimal]
 ) derives Codec.AsObject
 
-final case class MarketSettings(
+final case class TradeSettings(
     userId: UserId,
     broker: BrokerParameters,
     trading: TradingParameters
