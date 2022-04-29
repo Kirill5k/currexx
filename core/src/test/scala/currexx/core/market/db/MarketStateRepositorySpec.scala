@@ -18,11 +18,10 @@ class MarketStateRepositorySpec extends MongoSpec {
       "create new state if it doesn't exist" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- MarketStateRepository.make(db)
-          _    <- repo.update(Users.uid, Markets.gbpeur, Markets.priceRange)
-          res  <- repo.find(Users.uid, Markets.gbpeur)
+          res  <- repo.update(Users.uid, Markets.gbpeur, Markets.priceRange)
         yield res
 
-        result.map(_ mustBe Some(MarketState(Users.uid, Markets.gbpeur, None, Some(Markets.priceRange), None)))
+        result.map(_ mustBe MarketState(Users.uid, Markets.gbpeur, None, Some(Markets.priceRange), Map.empty, None))
       }
 
       "update existing state if it exists" in withEmbeddedMongoDb { db =>
@@ -59,8 +58,8 @@ class MarketStateRepositorySpec extends MongoSpec {
 
         result.map {
           _ mustBe List(
-            MarketState(Users.uid, Markets.gbpeur, None, Some(Markets.priceRange), None),
-            MarketState(Users.uid, Markets.gbpusd, None, Some(Markets.priceRange), None)
+            MarketState(Users.uid, Markets.gbpeur, None, Some(Markets.priceRange), Map.empty, None),
+            MarketState(Users.uid, Markets.gbpusd, None, Some(Markets.priceRange), Map.empty, None)
           )
         }
       }

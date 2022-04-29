@@ -1,6 +1,6 @@
 package currexx.domain.market
 
-import io.circe.{Codec, Decoder, Encoder, Json}
+import io.circe.{Codec, Decoder, Encoder, Json, KeyDecoder, KeyEncoder}
 import io.circe.syntax.*
 
 enum Indicator(val kind: String):
@@ -9,8 +9,10 @@ enum Indicator(val kind: String):
   case STOCH extends Indicator("stoch")
 
 object Indicator:
-  inline given Decoder[Indicator] = Decoder[String].emap(k => Indicator.values.find(_.kind == k).toRight(s"Unrecognized indicator $k"))
-  inline given Encoder[Indicator] = Encoder[String].contramap(_.kind)
+  inline given Decoder[Indicator]    = Decoder[String].emap(i => Indicator.values.find(_.kind == i).toRight(s"Unrecognized indicator $i"))
+  inline given Encoder[Indicator]    = Encoder[String].contramap(_.kind)
+  inline given KeyDecoder[Indicator] = KeyDecoder.instance(i => Indicator.values.find(_.kind == i))
+  inline given KeyEncoder[Indicator] = KeyEncoder.instance(_.kind)
 
 sealed trait IndicatorParameters(val indicator: Indicator)
 

@@ -16,7 +16,7 @@ object Markets {
   lazy val priceRange     = PriceRange(BigDecimal(2.0), BigDecimal(4.0), BigDecimal(1.0), BigDecimal(3.0), BigDecimal(1000), ts)
   lazy val timeSeriesData = MarketTimeSeriesData(gbpeur, Interval.H1, NonEmptyList.one(priceRange))
   
-  lazy val state    = MarketState(Users.uid, gbpeur, Some(MarketOrder.Position.Buy), Some(priceRange), Some(ts))
+  lazy val state    = MarketState(Users.uid, gbpeur, Some(MarketOrder.Position.Buy), Some(priceRange), Map.empty, Some(ts))
 
   lazy val priceRanges = NonEmptyList
     .of(

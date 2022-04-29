@@ -1,5 +1,6 @@
 package currexx.core.common.action
 
+import currexx.core.market.MarketState
 import currexx.core.signal.Signal
 import currexx.core.monitor.MonitorId
 import currexx.domain.market.MarketTimeSeriesData
@@ -13,3 +14,4 @@ enum Action:
   case ScheduleMonitor(uid: UserId, mid: MonitorId, period: FiniteDuration)
   case ProcessMarketData(uid: UserId, data: MarketTimeSeriesData)
   case ProcessSignal(signal: Signal)
+  case ProcessMarketState(state: MarketState)

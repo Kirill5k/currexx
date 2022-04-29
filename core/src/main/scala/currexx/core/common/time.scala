@@ -8,6 +8,8 @@ object time:
   extension (ts: Instant)
     def durationBetween(otherTs: Instant): FiniteDuration =
       math.abs(ts.toEpochMilli - otherTs.toEpochMilli).millis
+    def hasSameDateAs(otherTs: Instant): Boolean =
+      ts.toString.slice(0, 10) == otherTs.toString.slice(0, 10)
 
   extension (fd: FiniteDuration)
     def toReadableString: String = {
