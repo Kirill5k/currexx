@@ -4,7 +4,8 @@ import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
 import currexx.core.fixtures.{Markets, Users}
-import currexx.core.market.MarketState
+import currexx.core.market.{IndicatorState, MarketState}
+import currexx.domain.market.{Condition, Indicator}
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
 
@@ -14,8 +15,8 @@ class MarketStateRepositorySpec extends MongoSpec {
   override protected val mongoPort: Int = 12351
 
   "A MarketStateRepository" when {
-    "update" should {
-      "create new state if it doesn't exist" in withEmbeddedMongoDb { db =>
+    "update price" should {
+      "create new state with price if it doesn't exist" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- MarketStateRepository.make(db)
           res  <- repo.update(Users.uid, Markets.gbpeur, Markets.priceRange)
@@ -33,6 +34,18 @@ class MarketStateRepositorySpec extends MongoSpec {
         yield res
 
         result.map(_ must have size 1)
+      }
+    }
+
+    "update signals" should {
+      "create new state with signals if it doesn't exist" in withEmbeddedMongoDb { db =>
+        val signals = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, Markets.ts)))
+        val result = for
+          repo <- MarketStateRepository.make(db)
+          res  <- repo.update(Users.uid, Markets.gbpeur, signals)
+        yield res
+
+        result.map(_ mustBe MarketState(Users.uid, Markets.gbpeur, None, None, signals, None))
       }
     }
 

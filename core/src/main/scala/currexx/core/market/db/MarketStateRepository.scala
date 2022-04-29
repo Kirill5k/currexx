@@ -4,6 +4,7 @@ import cats.effect.Async
 import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
+import io.circe.syntax.*
 import com.mongodb.client.model.ReturnDocument
 import currexx.domain.market.{CurrencyPair, Indicator, PriceRange}
 import currexx.domain.user.UserId
@@ -14,8 +15,7 @@ import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.{FindOneAndUpdateOptions, MongoCollection}
 import mongo4cats.collection.operations.{Filter, Update}
 import mongo4cats.database.MongoDatabase
-
-import scala.jdk.CollectionConverters.*
+import mongo4cats.bson.Document
 
 trait MarketStateRepository[F[_]] extends Repository[F]:
   def update(uid: UserId, pair: CurrencyPair, signals: Map[Indicator, List[IndicatorState]]): F[MarketState]
@@ -34,7 +34,7 @@ final private class LiveMarketStateRepository[F[_]](
   override def update(uid: UserId, pair: CurrencyPair, signals: Map[Indicator, List[IndicatorState]]): F[MarketState] =
     runUpdate(
       userIdAndCurrencyPairEq(uid, pair),
-      Update.set("signals", signals.map((k, v) => k.toString -> v).asJava),
+      Update.set("signals", Document.from(signals.asJson.noSpaces)),
       MarketStateEntity.make(uid, pair, signals = signals)
     )
 
@@ -54,7 +54,7 @@ final private class LiveMarketStateRepository[F[_]](
       .findOneAndUpdate(filter, update.currentDate(Field.LastUpdatedAt), updateOptions)
       .flatMap {
         case Some(state) => state.toDomain.pure[F]
-        case None => collection.insertOne(default).as(default.toDomain)
+        case None        => collection.insertOne(default).as(default.toDomain)
       }
 
   override def getAll(uid: UserId): F[List[MarketState]] =
@@ -67,4 +67,5 @@ final private class LiveMarketStateRepository[F[_]](
 object MarketStateRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[MarketStateRepository[F]] =
     db.getCollectionWithCodec[MarketStateEntity]("market-state")
-      .map(coll => LiveMarketStateRepository[F](coll.withAddedCodec[CurrencyPair].withAddedCodec[PriceRange]))
+      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[PriceRange].withAddedCodec[IndicatorState])
+      .map(coll => LiveMarketStateRepository[F](coll))
