@@ -68,7 +68,7 @@ class MarketServiceSpec extends CatsSpec {
           val finalSignalState = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, Signals.ts)))
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
-          verify(disp).dispatch(Action.ProcessMarketState(Markets.state))
+          verify(disp).dispatch(Action.ProcessMarketState(Markets.state, Indicator.MACD))
           res mustBe ()
         }
       }
@@ -93,7 +93,7 @@ class MarketServiceSpec extends CatsSpec {
           ))
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
-          verify(disp).dispatch(Action.ProcessMarketState(Markets.state))
+          verify(disp).dispatch(Action.ProcessMarketState(Markets.state, Indicator.MACD))
           res mustBe ()
         }
       }
@@ -114,7 +114,7 @@ class MarketServiceSpec extends CatsSpec {
           val finalSignalState = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, Signals.ts)))
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
-          verify(disp).dispatch(Action.ProcessMarketState(Markets.state))
+          verify(disp).dispatch(Action.ProcessMarketState(Markets.state, Indicator.MACD))
           res mustBe ()
         }
       }
