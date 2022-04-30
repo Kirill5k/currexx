@@ -49,7 +49,7 @@ trait Controller[F[_]] extends TapirJson with TapirSchema {
 
 object Controller extends TapirSchema with TapirJson {
   val validId: Validator[String] = Validator.custom { id =>
-    lazy val error = ValidationError.Custom(id, s"Invalid hexadecimal representation of an id: $id", Nil)
+    def error = ValidationError.Custom(id, s"Invalid hexadecimal representation of an id: $id", Nil)
     Option.when(!ObjectId.isValid(id))(error).toList
   }
 

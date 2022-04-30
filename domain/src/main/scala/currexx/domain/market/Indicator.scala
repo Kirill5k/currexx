@@ -34,7 +34,7 @@ object IndicatorParameters {
   final case class STOCH(
       length: Int = 14,
       slowKLength: Int = 3,
-      fastKLength: Int = 3,
+      slowDLength: Int = 3,
       upperLine: Int = 20,
       lowerLine: Int = 80
   ) extends IndicatorParameters(Indicator.STOCH)

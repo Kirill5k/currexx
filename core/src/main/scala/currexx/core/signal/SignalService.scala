@@ -47,9 +47,9 @@ final private class LiveSignalService[F[_]](
       .flatMap { settings =>
         Stream.emits(
           settings.indicators.flatMap {
-            case macd: IndicatorParameters.MACD   => SignalService.detectMacdCrossing(uid, data, macd)
-            case rsi: IndicatorParameters.RSI     => SignalService.detectRsiCrossing(uid, data, rsi)
-            case stoch: IndicatorParameters.STOCH => None
+            case macd: IndicatorParameters.MACD   => SignalService.detectMacd(uid, data, macd)
+            case rsi: IndicatorParameters.RSI     => SignalService.detectRsi(uid, data, rsi)
+            case stoch: IndicatorParameters.STOCH => SignalService.detectStoch(uid, data, stoch)
           }
         )
       }
@@ -60,7 +60,7 @@ final private class LiveSignalService[F[_]](
 
 object SignalService:
 
-  def detectMacdCrossing(uid: UserId, data: MarketTimeSeriesData, macd: IndicatorParameters.MACD): Option[Signal] = {
+  def detectMacd(uid: UserId, data: MarketTimeSeriesData, macd: IndicatorParameters.MACD): Option[Signal] = {
     val (macdLine, signalLine) = MovingAverageCalculator.macdWithSignal(
       values = data.prices.map(_.close).toList,
       fastLength = macd.fastLength,
@@ -72,14 +72,31 @@ object SignalService:
       .map(c => Signal(uid, data.currencyPair, macd.indicator, c, data.prices.head.time))
   }
 
-  def detectRsiCrossing(uid: UserId, data: MarketTimeSeriesData, rsi: IndicatorParameters.RSI): Option[Signal] = {
-    val rsis       = MomentumOscillatorCalculator.rsi(data.prices.map(_.close).toList, rsi.length)
-    val currRsi    = rsis.head
-    val below      = Option.when(currRsi > rsi.upperLine)(Condition.AboveThreshold(BigDecimal(rsi.upperLine), currRsi))
-    lazy val above = Option.when(currRsi < rsi.lowerLine)(Condition.BelowThreshold(BigDecimal(rsi.lowerLine), currRsi))
+  def detectRsi(uid: UserId, data: MarketTimeSeriesData, rsi: IndicatorParameters.RSI): Option[Signal] = {
+    val rsis    = MomentumOscillatorCalculator.rsi(data.prices.map(_.close).toList, rsi.length)
+    val currRsi = rsis.head
+    def above   = Option.when(currRsi > rsi.upperLine)(Condition.AboveThreshold(BigDecimal(rsi.upperLine), currRsi))
+    def below   = Option.when(currRsi < rsi.lowerLine)(Condition.BelowThreshold(BigDecimal(rsi.lowerLine), currRsi))
     below
       .orElse(above)
       .map(c => Signal(uid, data.currencyPair, rsi.indicator, c, data.prices.head.time))
+  }
+
+  def detectStoch(uid: UserId, data: MarketTimeSeriesData, stoch: IndicatorParameters.STOCH): Option[Signal] = {
+    val (k, d) = MomentumOscillatorCalculator.stoch(
+      closings = data.prices.map(_.close).toList,
+      highs = data.prices.map(_.high).toList,
+      lows = data.prices.map(_.low).toList,
+      length = stoch.length,
+      slowKLength = stoch.slowKLength,
+      slowDLength = stoch.slowDLength
+    )
+    val (currK, currD) = (k.head, d.head)
+    def above = Option.when(currK.min(currD) > stoch.upperLine)(Condition.AboveThreshold(BigDecimal(stoch.upperLine), currK.min(currD)))
+    def below = Option.when(currK.max(currD) < stoch.lowerLine)(Condition.BelowThreshold(BigDecimal(stoch.lowerLine), currK.max(currD)))
+    below
+      .orElse(above)
+      .map(c => Signal(uid, data.currencyPair, stoch.indicator, c, data.prices.head.time))
   }
 
   def make[F[_]: Concurrent](
