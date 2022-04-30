@@ -1,7 +1,7 @@
 package currexx.core.trade.db
 
 import currexx.clients.broker.BrokerParameters
-import currexx.core.trade.{TradeSettings, TradingParameters}
+import currexx.core.trade.{TradeSettings, TradeStrategy, TradingParameters}
 import currexx.domain.user.UserId
 import io.circe.Codec
 import mongo4cats.bson.ObjectId
@@ -10,11 +10,12 @@ import mongo4cats.circe.given
 final case class TradeSettingsEntity(
     _id: ObjectId,
     userId: ObjectId,
+    strategy: TradeStrategy,
     broker: BrokerParameters,
     trading: TradingParameters
 ) derives Codec.AsObject:
-  def toDomain: TradeSettings = TradeSettings(UserId(userId), broker, trading)
+  def toDomain: TradeSettings = TradeSettings(UserId(userId), strategy, broker, trading)
 
 object TradeSettingsEntity:
-  def from(ms: TradeSettings): TradeSettingsEntity =
-    TradeSettingsEntity(ObjectId(), ms.userId.toObjectId, ms.broker, ms.trading)
+  def from(ts: TradeSettings): TradeSettingsEntity =
+    TradeSettingsEntity(ObjectId(), ts.userId.toObjectId, ts.strategy, ts.broker, ts.trading)

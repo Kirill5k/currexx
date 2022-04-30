@@ -13,6 +13,7 @@ final case class TradingParameters(
 
 final case class TradeSettings(
     userId: UserId,
+    strategy: TradeStrategy,
     broker: BrokerParameters,
     trading: TradingParameters
 )
