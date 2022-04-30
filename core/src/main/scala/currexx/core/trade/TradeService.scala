@@ -6,6 +6,7 @@ import cats.syntax.apply.*
 import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
+import currexx.clients.broker.BrokerClient
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.market.MarketState
 import currexx.core.trade.TradeStrategyExecutor.Outcome
@@ -20,6 +21,7 @@ trait TradeService[F[_]]:
 
 final private class LiveTradeService[F[_]](
     private val settingsRepository: TradeSettingsRepository[F],
+    private val brokerClient: BrokerClient[F],
     private val dispatcher: ActionDispatcher[F]
 )(using
     F: Temporal[F]
@@ -39,7 +41,7 @@ final private class LiveTradeService[F[_]](
           TradeOrderPlacement(state.userId, order, price, time)
         }
       }
-      .flatMap { //TODO: send request to broker, save order in repo, emit event to update state
+      .flatMap { // TODO: send request to broker, save order in repo, emit event to update state
         case Some(order) => ().pure[F]
         case None        => ().pure[F]
       }
@@ -54,6 +56,7 @@ final private class LiveTradeService[F[_]](
 object TradeService:
   def make[F[_]: Temporal](
       settingsRepo: TradeSettingsRepository[F],
+      brokerClient: BrokerClient[F],
       dispatcher: ActionDispatcher[F]
   ): F[TradeService[F]] =
-    Monad[F].pure(LiveTradeService[F](settingsRepo, dispatcher))
+    Monad[F].pure(LiveTradeService[F](settingsRepo, brokerClient, dispatcher))

@@ -22,6 +22,6 @@ object Trades:
   ): F[Trades[F]] =
     for
       settingsRepo <- TradeSettingsRepository.make[F](database)
-      svc          <- TradeService.make[F](settingsRepo, dispatcher)
+      svc          <- TradeService.make[F](settingsRepo, clients.broker, dispatcher)
       ctrl         <- TradeController.make[F](svc)
     yield Trades[F](svc, ctrl)
