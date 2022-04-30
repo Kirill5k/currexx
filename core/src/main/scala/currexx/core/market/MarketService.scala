@@ -1,6 +1,7 @@
 package currexx.core.market
 
 import cats.Monad
+import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.common.action.{Action, ActionDispatcher}
@@ -30,16 +31,21 @@ final private class LiveMarketService[F[_]](
     stateRepo
       .find(signal.userId, signal.currencyPair)
       .flatMap { state =>
-        val signals        = state.fold(Map.empty[Indicator, List[IndicatorState]])(_.signals)
-        val indicatorState = signals.getOrElse(signal.indicator, Nil)
+        val signals         = state.fold(Map.empty[Indicator, List[IndicatorState]])(_.signals)
+        val indicatorStates = signals.getOrElse(signal.indicator, Nil)
         val updatedIndicatorStates =
-          if (indicatorState.isEmpty) List(IndicatorState(signal.condition, signal.time))
-          else if (indicatorState.head.time.hasSameDateAs(signal.time)) IndicatorState(signal.condition, signal.time) :: indicatorState.tail
-          else IndicatorState(signal.condition, signal.time) :: indicatorState
+          if (indicatorStates.isEmpty) List(IndicatorState(signal.condition, signal.time))
+          else if (indicatorStates.head.time.hasSameDateAs(signal.time))
+            IndicatorState(signal.condition, signal.time) :: indicatorStates.tail
+          else IndicatorState(signal.condition, signal.time) :: indicatorStates
         stateRepo
           .update(signal.userId, signal.currencyPair, signals + (signal.indicator -> updatedIndicatorStates.take(10)))
+          .map(s => Option.when(updatedIndicatorStates != indicatorStates)(s))
       }
-      .flatMap(state => dispatcher.dispatch(Action.ProcessMarketState(state, signal.indicator)))
+      .flatMap {
+        case Some(state) => dispatcher.dispatch(Action.ProcessMarketState(state, signal.indicator))
+        case None        => ().pure[F]
+      }
 
 }
 

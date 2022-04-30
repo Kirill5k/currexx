@@ -118,6 +118,26 @@ class MarketServiceSpec extends CatsSpec {
           res mustBe ()
         }
       }
+
+      "not emit update when indicator state hans't changed" in {
+        val (stateRepo, disp) = mocks
+        val signalState = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, Signals.ts)))
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state.copy(signals = signalState))))
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[Indicator, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
+
+        val result = for
+          svc   <- MarketService.make[IO](stateRepo, disp)
+          state <- svc.processSignal(Signals.macd)
+        yield state
+
+        result.asserting { res =>
+          val finalSignalState = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, Signals.ts)))
+          verify(stateRepo).find(Users.uid, Markets.gbpeur)
+          verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
+          verifyNoInteractions(disp)
+          res mustBe ()
+        }
+      }
     }
   }
 
