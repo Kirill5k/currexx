@@ -67,5 +67,5 @@ final private class LiveMarketStateRepository[F[_]](
 object MarketStateRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[MarketStateRepository[F]] =
     db.getCollectionWithCodec[MarketStateEntity]("market-state")
-      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[PriceRange].withAddedCodec[IndicatorState])
+      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[PriceRange])
       .map(coll => LiveMarketStateRepository[F](coll))

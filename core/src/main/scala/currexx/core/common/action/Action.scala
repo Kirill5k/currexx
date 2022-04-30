@@ -14,4 +14,4 @@ enum Action:
   case ScheduleMonitor(uid: UserId, mid: MonitorId, period: FiniteDuration)
   case ProcessMarketData(uid: UserId, data: MarketTimeSeriesData)
   case ProcessSignal(signal: Signal)
-  case ProcessMarketState(state: MarketState, triggeredBy: Indicator)
+  case ProcessMarketState(state: MarketState, trigger: Indicator)
