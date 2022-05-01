@@ -5,8 +5,7 @@ import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder, Json}
 
 import scala.util.Try
 
-sealed trait TradeOrder(val kind: String):
-  def currencyPair: CurrencyPair
+sealed trait TradeOrder(val kind: String)
 
 object TradeOrder {
   enum Position:
@@ -20,7 +19,6 @@ object TradeOrder {
     }
 
   final case class Enter(
-      currencyPair: CurrencyPair,
       position: Position,
       volume: BigDecimal,
       stopLoss: Option[BigDecimal],
@@ -29,23 +27,20 @@ object TradeOrder {
   ) extends TradeOrder("enter")
       derives Codec.AsObject
 
-  final case class Exit(
-      currencyPair: CurrencyPair
-  ) extends TradeOrder("exit")
-      derives Codec.AsObject
+  case object Exit extends TradeOrder("exit")
 
-  private val discriminatorField: String                  = "kind"
+  private val discriminatorField: String                 = "kind"
   private def discriminatorJson(order: TradeOrder): Json = Map(discriminatorField -> order.kind).asJson
 
   inline given Decoder[TradeOrder] = Decoder.instance { c =>
     c.downField(discriminatorField).as[String].flatMap {
       case "enter" => c.as[Enter]
-      case "exit"  => c.as[Exit]
+      case "exit"  => Right(Exit)
       case kind    => Left(DecodingFailure(s"Unexpected order kind $kind", List(CursorOp.Field(discriminatorField))))
     }
   }
   inline given Encoder[TradeOrder] = Encoder.instance {
     case enter: Enter => enter.asJson.deepMerge(discriminatorJson(enter))
-    case exit: Exit   => exit.asJson.deepMerge(discriminatorJson(exit))
+    case exit @ Exit  => discriminatorJson(exit)
   }
 }

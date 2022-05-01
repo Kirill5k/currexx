@@ -27,7 +27,7 @@ class VindalooClientSpec extends ApiClientSpec {
 
       val result = for
         client <- VindalooClient.make[IO](config, testingBackend)
-        res    <- client.submit("15", TradeOrder.Enter(pair, TradeOrder.Position.Buy, BigDecimal(0.1), Some(BigDecimal(25)), None, None))
+        res    <- client.submit("15", pair, TradeOrder.Enter(TradeOrder.Position.Buy, BigDecimal(0.1), Some(BigDecimal(25)), None, None))
       yield res
 
       result.unsafeToFuture().map(_ mustBe ())
@@ -43,7 +43,7 @@ class VindalooClientSpec extends ApiClientSpec {
 
       val result = for
         client <- VindalooClient.make[IO](config, testingBackend)
-        res    <- client.submit("15", TradeOrder.Exit(pair))
+        res    <- client.submit("15", pair, TradeOrder.Exit)
       yield res
 
       result.unsafeToFuture().map(_ mustBe ())
