@@ -1,7 +1,6 @@
 package currexx.core.market
 
 import cats.Monad
-import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.common.action.{Action, ActionDispatcher}
@@ -44,7 +43,7 @@ final private class LiveMarketService[F[_]](
       }
       .flatMap {
         case Some(state) => dispatcher.dispatch(Action.ProcessMarketState(state, signal.indicator))
-        case None        => ().pure[F]
+        case None        => F.unit
       }
 
 }

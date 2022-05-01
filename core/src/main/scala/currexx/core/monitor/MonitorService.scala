@@ -2,7 +2,6 @@ package currexx.core.monitor
 
 import cats.Monad
 import cats.effect.Temporal
-import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.clients.data.MarketDataClient
@@ -50,7 +49,7 @@ final private class LiveMonitorService[F[_]](
             .timeSeriesData(mon.currencyPair, mon.interval)
             .flatMap(tsd => actionDispatcher.dispatch(Action.ProcessMarketData(uid, tsd)))
             .flatTap(_ => repository.updateQueriedTimestamp(uid, id))
-        else ().pure[F]
+        else F.unit
       _ <- actionDispatcher.dispatch(Action.ScheduleMonitor(uid, id, mon.period))
     yield ()
 

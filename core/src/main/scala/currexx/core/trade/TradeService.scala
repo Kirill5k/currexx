@@ -3,7 +3,6 @@ package currexx.core.trade
 import cats.Monad
 import cats.effect.kernel.Temporal
 import cats.syntax.apply.*
-import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.clients.broker.BrokerClient
@@ -34,13 +33,13 @@ final private class LiveTradeService[F[_]](
 
   override def processMarketState(state: MarketState, trigger: Indicator): F[Unit] =
     (settingsRepository.get(state.userId), F.realTimeInstant)
-      .mapN { (sett, time) =>
-        (state.latestPrice, TradeStrategyExecutor.get(sett.strategy).analyze(state, trigger)).mapN { (price, result) =>
+      .mapN { (settings, time) =>
+        (state.latestPrice, TradeStrategyExecutor.get(settings.strategy).analyze(state, trigger)).mapN { (price, result) =>
           val order = result match
-            case Outcome.Buy   => sett.trading.toOrder(TradeOrder.Position.Buy)
-            case Outcome.Sell  => sett.trading.toOrder(TradeOrder.Position.Sell)
+            case Outcome.Buy   => settings.trading.toOrder(TradeOrder.Position.Buy)
+            case Outcome.Sell  => settings.trading.toOrder(TradeOrder.Position.Sell)
             case Outcome.Close => TradeOrder.Exit
-          TradeOrderPlacement(state.userId, state.currencyPair, order, sett.broker, price, time)
+          TradeOrderPlacement(state.userId, state.currencyPair, order, settings.broker, price, time)
         }
       }
       .flatMap {
@@ -49,7 +48,7 @@ final private class LiveTradeService[F[_]](
             orderRepository.save(placement) *>
             dispatcher.dispatch(Action.ProcessTradeOrderPlacement(placement))
         case None =>
-          ().pure[F]
+          F.unit
       }
 }
 
