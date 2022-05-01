@@ -7,6 +7,7 @@ enum Indicator(val kind: String):
   case MACD  extends Indicator("macd")
   case RSI   extends Indicator("rsi")
   case STOCH extends Indicator("stoch")
+  case HMA   extends Indicator("hma")
 
 object Indicator:
   inline given Decoder[Indicator]    = Decoder[String].emap(i => Indicator.values.find(_.kind == i).toRight(s"Unrecognized indicator $i"))
@@ -40,6 +41,11 @@ object IndicatorParameters {
   ) extends IndicatorParameters(Indicator.STOCH)
       derives Codec.AsObject
 
+  final case class HMA(
+      length: Int = 16
+  ) extends IndicatorParameters(Indicator.HMA)
+      derives Codec.AsObject
+
   private val discriminatorField: String                       = "indicator"
   private def discriminatorJson(ip: IndicatorParameters): Json = Map(discriminatorField -> ip.indicator).asJson
 
@@ -48,11 +54,13 @@ object IndicatorParameters {
       case Indicator.MACD  => ip.as[IndicatorParameters.MACD]
       case Indicator.STOCH => ip.as[IndicatorParameters.STOCH]
       case Indicator.RSI   => ip.as[IndicatorParameters.RSI]
+      case Indicator.HMA   => ip.as[IndicatorParameters.HMA]
     }
   }
   inline given Encoder[IndicatorParameters] = Encoder.instance {
     case macd: IndicatorParameters.MACD   => macd.asJson.deepMerge(discriminatorJson(macd))
     case rsi: IndicatorParameters.RSI     => rsi.asJson.deepMerge(discriminatorJson(rsi))
     case stock: IndicatorParameters.STOCH => stock.asJson.deepMerge(discriminatorJson(stock))
+    case hma: IndicatorParameters.HMA     => hma.asJson.deepMerge(discriminatorJson(hma))
   }
 }

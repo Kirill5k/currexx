@@ -50,6 +50,7 @@ final private class LiveSignalService[F[_]](
             case macd: IndicatorParameters.MACD   => SignalService.detectMacd(uid, data, macd)
             case rsi: IndicatorParameters.RSI     => SignalService.detectRsi(uid, data, rsi)
             case stoch: IndicatorParameters.STOCH => SignalService.detectStoch(uid, data, stoch)
+            case hma: IndicatorParameters.HMA     => None
           }
         )
       }
