@@ -34,8 +34,8 @@ final private class LiveTradeService[F[_]](
       .mapN { (sett, time) =>
         (state.latestPrice, TradeStrategyExecutor.get(sett.strategy).analyze(state, trigger)).mapN { (price, result) =>
           val order = result match
-            case Outcome.Buy   => buy(state.currencyPair, sett.trading)
-            case Outcome.Sell  => sell(state.currencyPair, sett.trading)
+            case Outcome.Buy   => sett.trading.toOrder(TradeOrder.Position.Buy)
+            case Outcome.Sell  => sett.trading.toOrder(TradeOrder.Position.Sell)
             case Outcome.Close => TradeOrder.Exit
           TradeOrderPlacement(state.userId, state.currencyPair, order, sett.broker, price, time)
         }
@@ -44,12 +44,6 @@ final private class LiveTradeService[F[_]](
         case None        => ().pure[F]
         case Some(order) => ().pure[F]
       }
-
-  private def buy(pair: CurrencyPair, params: TradingParameters): TradeOrder =
-    TradeOrder.Enter(TradeOrder.Position.Buy, params.volume, params.stopLoss, params.trailingStopLoss, params.takeProfit)
-
-  private def sell(pair: CurrencyPair, params: TradingParameters): TradeOrder =
-    TradeOrder.Enter(TradeOrder.Position.Sell, params.volume, params.stopLoss, params.trailingStopLoss, params.takeProfit)
 }
 
 object TradeService:

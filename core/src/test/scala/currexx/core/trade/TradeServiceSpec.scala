@@ -4,10 +4,11 @@ import cats.effect.IO
 import currexx.clients.broker.BrokerClient
 import currexx.core.CatsSpec
 import currexx.core.common.action.ActionDispatcher
-import currexx.core.fixtures.{Trades, Users}
+import currexx.core.fixtures.{Markets, Trades, Users}
 import currexx.core.trade.db.TradeSettingsRepository
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
+import currexx.domain.market.Indicator
 
 class TradeServiceSpec extends CatsSpec {
 
@@ -58,6 +59,24 @@ class TradeServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(settRepo).update(Trades.settings)
+          verifyNoInteractions(client, disp)
+          res mustBe ()
+        }
+      }
+    }
+
+    "processMarketState" should {
+      "not do anything when trading strategy is disabled" in {
+        val (settRepo, client, disp) = mocks
+        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings.copy(strategy = TradeStrategy.Disabled)))
+
+        val result = for
+          svc <- TradeService.make[IO](settRepo, client, disp)
+          _   <- svc.processMarketState(Markets.state, Indicator.RSI)
+        yield ()
+
+        result.asserting { res =>
+          verify(settRepo).get(Users.uid)
           verifyNoInteractions(client, disp)
           res mustBe ()
         }
