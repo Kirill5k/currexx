@@ -8,7 +8,7 @@ import cats.syntax.flatMap.*
 import currexx.clients.broker.BrokerClient
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.market.MarketState
-import currexx.core.trade.TradeStrategyExecutor.Outcome
+import currexx.core.trade.TradeStrategyExecutor.Decision
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.market.{CurrencyPair, Indicator, TradeOrder}
 import currexx.domain.user.UserId
@@ -36,9 +36,9 @@ final private class LiveTradeService[F[_]](
       .mapN { (settings, time) =>
         (state.latestPrice, TradeStrategyExecutor.get(settings.strategy).analyze(state, trigger)).mapN { (price, result) =>
           val order = result match
-            case Outcome.Buy   => settings.trading.toOrder(TradeOrder.Position.Buy)
-            case Outcome.Sell  => settings.trading.toOrder(TradeOrder.Position.Sell)
-            case Outcome.Close => TradeOrder.Exit
+            case Decision.Buy   => settings.trading.toOrder(TradeOrder.Position.Buy)
+            case Decision.Sell  => settings.trading.toOrder(TradeOrder.Position.Sell)
+            case Decision.Close => TradeOrder.Exit
           TradeOrderPlacement(state.userId, state.currencyPair, order, settings.broker, price, time)
         }
       }

@@ -165,12 +165,20 @@ class SignalServiceSpec extends CatsSpec {
     }
 
     "detectHma" should {
-      "signal when trend direction changes" in {
+      "create signal when trend direction changes" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val signal = SignalService.detectHma(Users.uid, timeSeriesData, IndicatorParameters.HMA(length = 16))
 
         val expectedCondition = Condition.TrendDirectionChange(Trend.Consolidation, Trend.Downward)
         signal mustBe Some(Signal(Users.uid, Markets.gbpeur, Indicator.HMA, expectedCondition, timeSeriesData.prices.head.time))
+      }
+
+      "not do anything when trend hasn't changed" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(1))
+        val signal = SignalService.detectHma(Users.uid, timeSeriesData, IndicatorParameters.HMA(length = 16))
+
+        val expectedCondition = Condition.TrendDirectionChange(Trend.Consolidation, Trend.Downward)
+        signal mustBe None
       }
     }
   }
