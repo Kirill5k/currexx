@@ -9,7 +9,7 @@ object Condition {
   case object CrossingDown                                                  extends Condition("crossing-down")
   final case class AboveThreshold(threshold: BigDecimal, value: BigDecimal) extends Condition("above-threshold") derives Codec.AsObject
   final case class BelowThreshold(threshold: BigDecimal, value: BigDecimal) extends Condition("below-threshold") derives Codec.AsObject
-  final case class TrendDirectionChange(trend: Trend) extends Condition("trend-direction-change") derives Codec.AsObject
+  final case class TrendDirectionChange(from: Trend, to: Trend) extends Condition("trend-direction-change") derives Codec.AsObject
 
   private val discriminatorField: String               = "kind"
   private def discriminatorJson(cond: Condition): Json = Map(discriminatorField -> cond.kind).asJson

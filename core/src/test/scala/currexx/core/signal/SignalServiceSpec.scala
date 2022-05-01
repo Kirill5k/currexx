@@ -5,7 +5,7 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import currexx.core.CatsSpec
 import currexx.domain.user.UserId
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorParameters}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorParameters, Trend}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.fixtures.{Markets, Signals, Users}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
@@ -165,11 +165,12 @@ class SignalServiceSpec extends CatsSpec {
     }
 
     "detectHma" should {
-      "generate downtredn signal" in {
+      "signal when trend direction changes" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
-        val signal = SignalService.detectHma(Users.uid, timeSeriesData, IndicatorParameters.HMA())
+        val signal = SignalService.detectHma(Users.uid, timeSeriesData, IndicatorParameters.HMA(length = 16))
 
-        signal mustBe defined
+        val expectedCondition = Condition.TrendDirectionChange(Trend.Consolidation, Trend.Downward)
+        signal mustBe Some(Signal(Users.uid, Markets.gbpeur, Indicator.HMA, expectedCondition, timeSeriesData.prices.head.time))
       }
     }
   }

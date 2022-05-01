@@ -9,7 +9,7 @@ import currexx.domain.user.UserId
 import currexx.calculations.{MomentumOscillatorCalculator, MovingAverageCalculator}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorParameters, MarketTimeSeriesData}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorParameters, MarketTimeSeriesData, Trend}
 import fs2.Stream
 
 import scala.util.Try
@@ -101,8 +101,23 @@ object SignalService:
   }
 
   def detectHma(uid: UserId, data: MarketTimeSeriesData, hma: IndicatorParameters.HMA): Option[Signal] = {
-    val hmas = MovingAverageCalculator.hma(data.prices.toList.map(_.close), hma.length)
-    ???
+    val hmas  = MovingAverageCalculator.hma(data.prices.toList.map(_.close), hma.length)
+    val hmas2 = hmas.tail
+    val hmas3 = hmas.zip(hmas.map(_ * -1)).map(_ - _)
+    val hmas4 = hmas.zip(hmas).map(_ + _)
+
+    val diff  = hmas.tail.zip(hmas3).map(_ - _).toArray
+    val diff3 = hmas4.zip(hmas.tail).map(_ - _).toArray
+
+    val isNotUp: Int => Boolean   = i => diff(i) > diff(i + 1) && diff(i + 1) > diff(i + 2)
+    val isNotDown: Int => Boolean = i => diff3(i) > diff3(i + 1) && diff3(i + 1) > diff3(i + 2)
+
+    val trend = hmas.zip(hmas2).map((v1, v2) => if (v1 > v2) Trend.Upward else Trend.Downward)
+    val consolidation = (0 until diff3.length - 3).map(i => Option.when(isNotUp(i) == isNotDown(i))(Trend.Consolidation))
+    val res = consolidation.zip(trend).map(_.getOrElse(_))
+    Option
+      .when(res.head != res.drop(1).head)(Condition.TrendDirectionChange(res.drop(1).head, res.head))
+      .map(c => Signal(uid, data.currencyPair, hma.indicator, c, data.prices.head.time))
   }
 
   def make[F[_]: Concurrent](
