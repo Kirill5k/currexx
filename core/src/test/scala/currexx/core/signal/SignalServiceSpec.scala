@@ -5,7 +5,7 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import currexx.core.CatsSpec
 import currexx.domain.user.UserId
-import currexx.domain.market.{Condition, CurrencyPair, Indicator}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorParameters}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.fixtures.{Markets, Signals, Users}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
@@ -161,6 +161,15 @@ class SignalServiceSpec extends CatsSpec {
           verify(disp).dispatch(Action.ProcessSignal(expectedSignal))
           res mustBe ()
         }
+      }
+    }
+
+    "detectHma" should {
+      "generate downtredn signal" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
+        val signal = SignalService.detectHma(Users.uid, timeSeriesData, IndicatorParameters.HMA())
+
+        signal mustBe defined
       }
     }
   }

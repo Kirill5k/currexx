@@ -9,24 +9,27 @@ object Condition {
   case object CrossingDown                                                  extends Condition("crossing-down")
   final case class AboveThreshold(threshold: BigDecimal, value: BigDecimal) extends Condition("above-threshold") derives Codec.AsObject
   final case class BelowThreshold(threshold: BigDecimal, value: BigDecimal) extends Condition("below-threshold") derives Codec.AsObject
+  final case class TrendDirectionChange(trend: Trend) extends Condition("trend-direction-change") derives Codec.AsObject
 
   private val discriminatorField: String               = "kind"
   private def discriminatorJson(cond: Condition): Json = Map(discriminatorField -> cond.kind).asJson
 
   inline given Decoder[Condition] = Decoder.instance { c =>
     c.downField(discriminatorField).as[String].flatMap {
-      case "crossing-up"     => Right(CrossingUp)
-      case "crossing-down"   => Right(CrossingDown)
-      case "above-threshold" => c.as[AboveThreshold]
-      case "below-threshold" => c.as[BelowThreshold]
-      case kind              => Left(DecodingFailure(s"Unexpected condition kind $kind", List(CursorOp.Field(discriminatorField))))
+      case "crossing-up"            => Right(CrossingUp)
+      case "crossing-down"          => Right(CrossingDown)
+      case "above-threshold"        => c.as[AboveThreshold]
+      case "below-threshold"        => c.as[BelowThreshold]
+      case "trend-direction-change" => c.as[TrendDirectionChange]
+      case kind                     => Left(DecodingFailure(s"Unexpected condition kind $kind", List(CursorOp.Field(discriminatorField))))
     }
   }
   inline given Encoder[Condition] = Encoder.instance {
-    case crossUp @ CrossingUp           => discriminatorJson(crossUp)
-    case crossDown @ CrossingDown       => discriminatorJson(crossDown)
-    case aboveThreshold: AboveThreshold => aboveThreshold.asJson.deepMerge(discriminatorJson(aboveThreshold))
-    case belowThreshold: BelowThreshold => belowThreshold.asJson.deepMerge(discriminatorJson(belowThreshold))
+    case crossUp @ CrossingUp                       => discriminatorJson(crossUp)
+    case crossDown @ CrossingDown                   => discriminatorJson(crossDown)
+    case aboveThreshold: AboveThreshold             => aboveThreshold.asJson.deepMerge(discriminatorJson(aboveThreshold))
+    case belowThreshold: BelowThreshold             => belowThreshold.asJson.deepMerge(discriminatorJson(belowThreshold))
+    case trendDirectionChange: TrendDirectionChange => trendDirectionChange.asJson.deepMerge(discriminatorJson(trendDirectionChange))
   }
 
   def lineCrossing(line1Curr: BigDecimal, line2Curr: BigDecimal, line1Prev: BigDecimal, line2Prev: BigDecimal): Option[Condition] =

@@ -100,6 +100,11 @@ object SignalService:
       .map(c => Signal(uid, data.currencyPair, stoch.indicator, c, data.prices.head.time))
   }
 
+  def detectHma(uid: UserId, data: MarketTimeSeriesData, hma: IndicatorParameters.HMA): Option[Signal] = {
+    val hmas = MovingAverageCalculator.hma(data.prices.toList.map(_.close), hma.length)
+    ???
+  }
+
   def make[F[_]: Concurrent](
       signalRepo: SignalRepository[F],
       settingsRepo: SignalSettingsRepository[F],

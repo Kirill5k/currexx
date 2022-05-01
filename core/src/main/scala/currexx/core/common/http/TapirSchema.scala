@@ -23,6 +23,7 @@ transparent trait TapirSchema extends SchemaDerivation {
   inline given Schema[EmailString]    = Schema.string
   inline given Schema[Currency]       = Schema.string
   inline given Schema[FiniteDuration] = Schema.string
+  inline given Schema[Trend]          = Schema.string
 
   inline given (using currencySchema: Schema[Currency]): Schema[Money] = Schema(
     SProduct(

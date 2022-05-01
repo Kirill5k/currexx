@@ -22,7 +22,7 @@ object Markets {
   lazy val priceRanges = NonEmptyList
     .of(
       BigDecimal("1.29123"),
-      BigDecimal("1.30320"),
+      BigDecimal("1.30320"), // 2022-04-21
       BigDecimal("1.30615"),
       BigDecimal("1.29980"),
       BigDecimal("1.30078"),
