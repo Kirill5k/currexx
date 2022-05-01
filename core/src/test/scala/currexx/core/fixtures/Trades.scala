@@ -6,7 +6,7 @@ import currexx.core.trade.{TradeSettings, TradingParameters, TradeStrategy}
 object Trades {
   lazy val settings = TradeSettings(
     Users.uid,
-    TradeStrategy.Simple,
+    TradeStrategy.Disabled,
     BrokerParameters.Vindaloo("1"),
     TradingParameters(BigDecimal(0.1), None, None, None)
   )

@@ -5,7 +5,7 @@ import currexx.domain.market.Indicator
 import io.circe.{Decoder, Encoder}
 
 enum TradeStrategy(val name: String):
-  case Simple extends TradeStrategy("simple")
+  case Disabled extends TradeStrategy("disabled")
 
 object TradeStrategy:
   inline given Encoder[TradeStrategy] = Encoder[String].contramap(_.name)
@@ -19,7 +19,10 @@ object TradeStrategyExecutor {
   enum Outcome:
     case Buy, Sell, Close
 
+  private case object Disabled extends TradeStrategyExecutor:
+    def analyze(state: MarketState, trigger: Indicator): Option[TradeStrategyExecutor.Outcome] = None
+
   def get(strategy: TradeStrategy): TradeStrategyExecutor =
-    new TradeStrategyExecutor:
-      override def analyze(state: MarketState, trigger: Indicator): Option[Outcome] = None
+    strategy match
+      case TradeStrategy.Disabled => Disabled
 }

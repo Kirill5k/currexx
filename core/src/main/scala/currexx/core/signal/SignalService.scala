@@ -106,8 +106,8 @@ object SignalService:
     val hmas3 = hmas.zip(hmas.map(_ * -1)).map(_ - _)
     val hmas4 = hmas.zip(hmas).map(_ + _)
 
-    val diff  = hmas.tail.zip(hmas3).map(_ - _).toArray
-    val diff3 = hmas4.zip(hmas.tail).map(_ - _).toArray
+    val diff  = hmas2.zip(hmas3).map(_ - _).toArray
+    val diff3 = hmas4.zip(hmas2).map(_ - _).toArray
 
     val isNotUp: Int => Boolean   = i => diff(i) > diff(i + 1) && diff(i + 1) > diff(i + 2)
     val isNotDown: Int => Boolean = i => diff3(i) > diff3(i + 1) && diff3(i + 1) > diff3(i + 2)
