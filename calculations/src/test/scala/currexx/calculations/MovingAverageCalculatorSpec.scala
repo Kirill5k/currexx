@@ -31,6 +31,11 @@ class MovingAverageCalculatorSpec extends AnyWordSpec with Matchers {
       val wma = MovingAverageCalculator.wma(values, 9)
       wma.take(5).map(rounded(4)) mustBe List(1.2650, 1.2697, 1.2780, 1.2859, 1.2943)
     }
+
+    "calculate Hull Moving Average" in {
+      val hma = MovingAverageCalculator.hma(values, 9)
+      hma.take(5).map(rounded(4)) mustBe List(1.2455, 1.2508, 1.2632, 1.2766, 1.2896)
+    }
   }
 
   def rounded(scale: Int)(num: BigDecimal): BigDecimal =

@@ -65,7 +65,7 @@ object MovingAverageCalculator {
   }
 
   def wmaAsArray(values: List[BigDecimal], n: Int): Array[BigDecimal] = {
-    val wmas = Array.ofDim[BigDecimal](values.size)
+    val wmas    = Array.ofDim[BigDecimal](values.size)
     val divider = (n * (n + 1)) / 2
     @tailrec
     def calc(queue: Queue[BigDecimal], remaining: List[BigDecimal], i: Int): Array[BigDecimal] =
@@ -81,4 +81,13 @@ object MovingAverageCalculator {
 
   def wma(values: List[BigDecimal], n: Int): List[BigDecimal] =
     wmaAsArray(values, n).toList
+
+  def hma(values: List[BigDecimal], n: Int): List[BigDecimal] = {
+    val n2    = math.round(n.toDouble / 2).toInt
+    val nwma  = wmaAsArray(values, n)
+    val n2wma = wmaAsArray(values, n2).take(nwma.length).map(_ * 2)
+    val diff  = n2wma.zip(nwma).map(_ - _)
+    val sqn   = math.round(math.sqrt(n.toDouble)).toInt
+    wma(diff.toList, sqn)
+  }
 }
