@@ -3,7 +3,7 @@ package currexx.core.trade
 import cats.effect.IO
 import currexx.core.auth.Authenticator
 import currexx.core.{CatsSpec, ControllerSpec}
-import currexx.core.fixtures.{Trades, Sessions, Users}
+import currexx.core.fixtures.{Markets, Sessions, Trades, Users}
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
 import org.http4s.circe.CirceEntityCodec.*
@@ -14,6 +14,46 @@ class TradeControllerSpec extends ControllerSpec {
 
   "A TradeController" when {
     given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
+
+    "GET /trade/orders" should {
+      "return placed orders" in {
+        val svc = mock[TradeService[IO]]
+        when(svc.getAllOrders(any[UserId])).thenReturn(IO.pure(List(Trades.order)))
+
+        val req = requestWithAuthHeader(uri"/trade/orders", Method.GET)
+        val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        val responseBody =
+          s"""[
+             |{
+             |  "currencyPair" : "GBP/EUR",
+             |  "order" : {
+             |    "kind" : "enter",
+             |    "position" : "buy",
+             |    "volume" : 0.1,
+             |    "stopLoss" : 25,
+             |    "trailingStopLoss" : null,
+             |    "takeProfit" : null
+             |  },
+             |  "broker" : {
+             |    "broker" : "vindaloo",
+             |    "externalId" : "1"
+             |  },
+             |  "currentPrice" : {
+             |    "open" : 2.0,
+             |    "high" : 4.0,
+             |    "low" : 1.0,
+             |    "close" : 3.0,
+             |    "volume" : 1000,
+             |    "time" : "${Markets.ts}"
+             |  },
+             |  "time" : "${Trades.ts}"
+             |}
+             |]""".stripMargin
+        verifyJsonResponse(res, Status.Ok, Some(responseBody))
+        verify(svc).getAllOrders(Users.uid)
+      }
+    }
 
     "GET /trade/settings" should {
       "return trade settings with broker and trading parameters" in {
