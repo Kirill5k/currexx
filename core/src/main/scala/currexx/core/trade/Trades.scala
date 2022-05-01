@@ -6,7 +6,7 @@ import cats.syntax.functor.*
 import currexx.clients.Clients
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.Controller
-import currexx.core.trade.db.TradeSettingsRepository
+import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import mongo4cats.database.MongoDatabase
 
 final class Trades[F[_]] private (
@@ -22,6 +22,7 @@ object Trades:
   ): F[Trades[F]] =
     for
       settingsRepo <- TradeSettingsRepository.make[F](database)
-      svc          <- TradeService.make[F](settingsRepo, clients.broker, dispatcher)
+      orderRepo    <- TradeOrderRepository.make[F](database)
+      svc          <- TradeService.make[F](settingsRepo, orderRepo, clients.broker, dispatcher)
       ctrl         <- TradeController.make[F](svc)
     yield Trades[F](svc, ctrl)

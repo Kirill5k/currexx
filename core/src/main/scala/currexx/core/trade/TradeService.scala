@@ -10,24 +10,27 @@ import currexx.clients.broker.BrokerClient
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.market.MarketState
 import currexx.core.trade.TradeStrategyExecutor.Outcome
-import currexx.core.trade.db.TradeSettingsRepository
+import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.market.{CurrencyPair, Indicator, TradeOrder}
 import currexx.domain.user.UserId
 
 trait TradeService[F[_]]:
   def getSettings(uid: UserId): F[TradeSettings]
   def updateSettings(settings: TradeSettings): F[Unit]
+  def getAllOrders(uid: UserId): F[List[TradeOrderPlacement]]
   def processMarketState(state: MarketState, trigger: Indicator): F[Unit]
 
 final private class LiveTradeService[F[_]](
     private val settingsRepository: TradeSettingsRepository[F],
+    private val orderRepository: TradeOrderRepository[F],
     private val brokerClient: BrokerClient[F],
     private val dispatcher: ActionDispatcher[F]
 )(using
     F: Temporal[F]
 ) extends TradeService[F] {
-  override def getSettings(uid: UserId): F[TradeSettings]       = settingsRepository.get(uid)
-  override def updateSettings(settings: TradeSettings): F[Unit] = settingsRepository.update(settings)
+  override def getSettings(uid: UserId): F[TradeSettings]              = settingsRepository.get(uid)
+  override def updateSettings(settings: TradeSettings): F[Unit]        = settingsRepository.update(settings)
+  override def getAllOrders(uid: UserId): F[List[TradeOrderPlacement]] = orderRepository.getAll(uid)
 
   override def processMarketState(state: MarketState, trigger: Indicator): F[Unit] =
     (settingsRepository.get(state.userId), F.realTimeInstant)
@@ -49,7 +52,8 @@ final private class LiveTradeService[F[_]](
 object TradeService:
   def make[F[_]: Temporal](
       settingsRepo: TradeSettingsRepository[F],
+      orderRepository: TradeOrderRepository[F],
       brokerClient: BrokerClient[F],
       dispatcher: ActionDispatcher[F]
   ): F[TradeService[F]] =
-    Monad[F].pure(LiveTradeService[F](settingsRepo, brokerClient, dispatcher))
+    Monad[F].pure(LiveTradeService[F](settingsRepo, orderRepository, brokerClient, dispatcher))
