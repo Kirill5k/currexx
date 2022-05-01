@@ -13,6 +13,24 @@ import currexx.domain.market.Indicator
 class TradeServiceSpec extends CatsSpec {
 
   "A TradeService" should {
+    "getAllOrders" should {
+      "return all orders from the repository" in {
+        val (settRepo, orderRepo, client, disp) = mocks
+        when(orderRepo.getAll(any[UserId])).thenReturn(IO.pure(List(Trades.order)))
+
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, client, disp)
+          orders   <- svc.getAllOrders(Users.uid)
+        yield orders
+
+        result.asserting { res =>
+          verify(orderRepo).getAll(Users.uid)
+          verifyNoInteractions(settRepo, client, disp)
+          res mustBe List(Trades.order)
+        }
+      }
+    }
+
     "getSettings" should {
       "store trade-settings in the repository" in {
         val (settRepo, orderRepo, client, disp) = mocks
