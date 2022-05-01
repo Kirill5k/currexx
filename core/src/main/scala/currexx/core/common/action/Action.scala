@@ -3,6 +3,7 @@ package currexx.core.common.action
 import currexx.core.market.MarketState
 import currexx.core.signal.Signal
 import currexx.core.monitor.MonitorId
+import currexx.core.trade.TradeOrderPlacement
 import currexx.domain.market.{Indicator, MarketTimeSeriesData}
 import currexx.domain.user.UserId
 
@@ -15,3 +16,4 @@ enum Action:
   case ProcessMarketData(uid: UserId, data: MarketTimeSeriesData)
   case ProcessSignal(signal: Signal)
   case ProcessMarketState(state: MarketState, trigger: Indicator)
+  case ProcessTradeOrderPlacement(order: TradeOrderPlacement)

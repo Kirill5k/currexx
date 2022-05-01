@@ -7,7 +7,7 @@ import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.clients.broker.BrokerClient
-import currexx.core.common.action.ActionDispatcher
+import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.market.MarketState
 import currexx.core.trade.TradeStrategyExecutor.Outcome
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
@@ -43,9 +43,13 @@ final private class LiveTradeService[F[_]](
           TradeOrderPlacement(state.userId, state.currencyPair, order, sett.broker, price, time)
         }
       }
-      .flatMap { // TODO: send request to broker, save order in repo, emit event to update state
-        case None        => ().pure[F]
-        case Some(order) => ().pure[F]
+      .flatMap {
+        case Some(placement) =>
+          brokerClient.submit(placement.currencyPair, placement.broker, placement.order) *>
+            orderRepository.save(placement) *>
+            dispatcher.dispatch(Action.ProcessTradeOrderPlacement(placement))
+        case None =>
+          ().pure[F]
       }
 }
 
