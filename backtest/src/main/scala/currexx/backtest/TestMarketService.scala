@@ -1,5 +1,6 @@
 package currexx.backtest
 
+import cats.Monad
 import cats.effect.{Async, Ref}
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
@@ -9,10 +10,8 @@ import currexx.core.market.{IndicatorState, MarketService, MarketState}
 import currexx.core.market.db.MarketStateRepository
 import currexx.domain.market.{CurrencyPair, Indicator, MarketTimeSeriesData, PriceRange, TradeOrder}
 
-final private class TestMarketStateRepository[F[_]](
+final private class TestMarketStateRepository[F[_]: Monad](
     private val state: Ref[F, MarketState]
-)(using
-    F: Async[F]
 ) extends MarketStateRepository[F]:
 
   override def update(uid: UserId, pair: CurrencyPair, signals: Map[Indicator, List[IndicatorState]]): F[MarketState] =
@@ -24,7 +23,7 @@ final private class TestMarketStateRepository[F[_]](
   override def getAll(uid: UserId): F[List[MarketState]] =
     state.get.map(List(_))
   override def find(uid: UserId, pair: CurrencyPair): F[Option[MarketState]] =
-    state.get.map(Some.apply)
+    state.get.map(Some(_))
 
 object TestMarketService:
   def make[F[_]: Async](initialState: MarketState, dispatcher: ActionDispatcher[F]): F[MarketService[F]] =
