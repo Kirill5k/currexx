@@ -29,7 +29,7 @@ object Application extends IOApp.Simple:
             markets    <- Markets.make(res.mongo, dispatcher)
             trades     <- Trades.make(res.mongo, clients, dispatcher)
             http       <- Http.make[IO](health, auth, signals, monitors, markets, trades)
-            processor  <- ActionProcessor.make[IO](dispatcher, monitors.service, signals.service, markets.service)
+            processor  <- ActionProcessor.make[IO](dispatcher, monitors.service, signals.service, markets.service, trades.service)
             _ <- Server
               .serve[IO](config.server, http.app, runtime.compute)
               .concurrently(processor.run)
