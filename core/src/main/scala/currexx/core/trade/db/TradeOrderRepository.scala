@@ -20,8 +20,10 @@ trait TradeOrderRepository[F[_]] extends Repository[F]:
 final private class LiveTradeOrderRepository[F[_]: Async](
     private val collection: MongoCollection[F, TradeOrderEntity]
 ) extends TradeOrderRepository[F]:
-  def save(top: TradeOrderPlacement): F[Unit]           = collection.insertOne(TradeOrderEntity.from(top)).void
-  def getAll(uid: UserId): F[List[TradeOrderPlacement]] = collection.find(userIdEq(uid)).all.map(_.map(_.toDomain).toList)
+  def save(top: TradeOrderPlacement): F[Unit] =
+    collection.insertOne(TradeOrderEntity.from(top)).void
+  def getAll(uid: UserId): F[List[TradeOrderPlacement]] =
+    collection.find(userIdEq(uid)).sortByDesc("time").all.map(_.map(_.toDomain).toList)
 
 object TradeOrderRepository extends MongoJsonCodecs:
   private val collectionName    = "trade-orders"

@@ -18,10 +18,11 @@ class TradeOrderRepositorySpec extends MongoSpec {
         val result = for
           repo <- TradeOrderRepository.make(db)
           _    <- repo.save(Trades.order)
+          _    <- repo.save(Trades.order.copy(time = Trades.ts.minusSeconds(100)))
           res  <- repo.getAll(Users.uid)
         yield res
 
-        result.map(_ mustBe List(Trades.order))
+        result.map(_ mustBe List(Trades.order, Trades.order.copy(time = Trades.ts.minusSeconds(100))))
       }
     }
 

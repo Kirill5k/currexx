@@ -9,10 +9,8 @@ import java.nio.file.Paths
 import java.time.{Instant, LocalDate, ZoneOffset}
 import java.time.format.DateTimeFormatter
 
-object TestDataProvider {
-
+object TestDataProvider:
   private val timePattern = DateTimeFormatter.ofPattern( "dd.MM.yyyy")
-
   def read[F[_]: Sync: Files](
       currencyPair: CurrencyPair,
       interval: Interval,
@@ -37,4 +35,3 @@ object TestDataProvider {
       .sliding(100)
       .map(_.toNel.map(prices => MarketTimeSeriesData(currencyPair, interval, prices.reverse)))
       .unNone
-}
