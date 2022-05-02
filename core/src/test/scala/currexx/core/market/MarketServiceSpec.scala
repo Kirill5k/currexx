@@ -5,9 +5,9 @@ import currexx.core.CatsSpec
 import currexx.domain.user.UserId
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.market.db.MarketStateRepository
-import currexx.core.fixtures.{Markets, Signals, Users}
+import currexx.core.fixtures.{Markets, Signals, Trades, Users}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{CurrencyPair, PriceRange, Indicator, Condition}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, PriceRange, TradeOrder}
 
 import java.time.Instant
 import scala.concurrent.duration.*
@@ -45,6 +45,24 @@ class MarketServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(stateRepo).update(Users.uid, Markets.gbpeur, Markets.priceRange)
+          verifyNoInteractions(disp)
+          res mustBe ()
+        }
+      }
+    }
+
+    "processTradeOrderPlacement" should {
+      "update state with current position" in {
+        val (stateRepo, disp) = mocks
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Option[TradeOrder.Position]])).thenReturn(IO.unit)
+
+        val result = for
+          svc   <- MarketService.make[IO](stateRepo, disp)
+          state <- svc.processTradeOrderPlacement(Trades.order)
+        yield state
+
+        result.asserting { res =>
+          verify(stateRepo).update(Users.uid, Markets.gbpeur, Some(TradeOrder.Position.Buy))
           verifyNoInteractions(disp)
           res mustBe ()
         }

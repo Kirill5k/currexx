@@ -7,13 +7,15 @@ import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.time.*
 import currexx.core.signal.Signal
 import currexx.core.market.db.MarketStateRepository
-import currexx.domain.market.{Indicator, MarketTimeSeriesData}
+import currexx.core.trade.TradeOrderPlacement
+import currexx.domain.market.{Indicator, MarketTimeSeriesData, TradeOrder}
 import currexx.domain.user.UserId
 
 trait MarketService[F[_]]:
   def getState(uid: UserId): F[List[MarketState]]
   def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit]
   def processSignal(signal: Signal): F[Unit]
+  def processTradeOrderPlacement(top: TradeOrderPlacement): F[Unit]
 
 final private class LiveMarketService[F[_]](
     private val stateRepo: MarketStateRepository[F],
@@ -25,6 +27,13 @@ final private class LiveMarketService[F[_]](
 
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
     stateRepo.update(uid, data.currencyPair, data.prices.head).void
+
+  override def processTradeOrderPlacement(top: TradeOrderPlacement): F[Unit] = {
+    val position = top.order match
+      case TradeOrder.Enter(position, _, _, _, _) => Some(position)
+      case TradeOrder.Exit                        => None
+    stateRepo.update(top.userId, top.currencyPair, position).void
+  }
 
   override def processSignal(signal: Signal): F[Unit] =
     stateRepo

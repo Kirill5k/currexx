@@ -5,7 +5,7 @@ import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
 import currexx.core.fixtures.{Markets, Users}
 import currexx.core.market.{IndicatorState, MarketState}
-import currexx.domain.market.{Condition, Indicator}
+import currexx.domain.market.{Condition, Indicator, TradeOrder}
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
 
@@ -46,6 +46,19 @@ class MarketStateRepositorySpec extends MongoSpec {
         yield res
 
         result.map(_ mustBe MarketState(Users.uid, Markets.gbpeur, None, None, signals, None))
+      }
+    }
+
+    "update current position" should {
+      "update position field in the state" in withEmbeddedMongoDb { db =>
+        val signals = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, Markets.ts)))
+        val result = for
+          repo <- MarketStateRepository.make(db)
+          _    <- repo.update(Users.uid, Markets.gbpeur, signals)
+          res  <- repo.update(Users.uid, Markets.gbpeur, Some(TradeOrder.Position.Buy))
+        yield res
+
+        result.map(_.currentPosition mustBe Some(TradeOrder.Position.Buy))
       }
     }
 
