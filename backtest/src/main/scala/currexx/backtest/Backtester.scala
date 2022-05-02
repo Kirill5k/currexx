@@ -10,13 +10,13 @@ import currexx.domain.user.UserId
 import mongo4cats.bson.ObjectId
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import squants.market.{GBP, USD}
+import squants.market.{EUR, GBP}
 
 object Backtester extends IOApp.Simple {
   inline given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
   val userId       = UserId(ObjectId.get)
-  val currencyPair = CurrencyPair(GBP, USD)
+  val currencyPair = CurrencyPair(EUR, GBP)
 
   val initialMarketState = MarketState(userId, currencyPair, None, None, Map.empty, None)
 
