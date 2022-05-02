@@ -1,7 +1,7 @@
 package currexx.core.trade
 
 import currexx.core.market.MarketState
-import currexx.domain.market.{Condition, Indicator, Trend}
+import currexx.domain.market.{Condition, Indicator, TradeOrder, Trend}
 import io.circe.{Decoder, Encoder}
 
 enum TradeStrategy(val name: String):
@@ -28,9 +28,9 @@ object TradeStrategyExecutor {
       trigger match
         case Indicator.HMA =>
           state.signals.getOrElse(trigger, Nil).headOption.map(_.condition).collect {
-            case Condition.TrendDirectionChange(_, Trend.Consolidation) => Decision.Close
-            case Condition.TrendDirectionChange(_, Trend.Upward)        => Decision.Buy
-            case Condition.TrendDirectionChange(_, Trend.Downward)      => Decision.Sell
+            case Condition.TrendDirectionChange(_, Trend.Consolidation)              => Decision.Close
+            case Condition.TrendDirectionChange(_, Trend.Upward) if !state.buying    => Decision.Buy
+            case Condition.TrendDirectionChange(_, Trend.Downward) if !state.selling => Decision.Sell
           }
         case _ => None
 
@@ -38,4 +38,8 @@ object TradeStrategyExecutor {
     strategy match
       case TradeStrategy.Disabled => Disabled
       case TradeStrategy.HMABasic => HMABasic
+
+  extension (state: MarketState)
+    def buying: Boolean  = state.currentPosition.contains(TradeOrder.Position.Buy)
+    def selling: Boolean = state.currentPosition.contains(TradeOrder.Position.Sell)
 }
