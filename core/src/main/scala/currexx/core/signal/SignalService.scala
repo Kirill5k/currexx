@@ -50,7 +50,7 @@ final private class LiveSignalService[F[_]](
             case macd: IndicatorParameters.MACD   => SignalService.detectMacd(uid, data, macd)
             case rsi: IndicatorParameters.RSI     => SignalService.detectRsi(uid, data, rsi)
             case stoch: IndicatorParameters.STOCH => SignalService.detectStoch(uid, data, stoch)
-            case hma: IndicatorParameters.HMA     => None
+            case hma: IndicatorParameters.HMA     => SignalService.detectHma(uid, data, hma)
           }
         )
       }
@@ -112,9 +112,9 @@ object SignalService:
     val isNotUp: Int => Boolean   = i => diff(i) > diff(i + 1) && diff(i + 1) > diff(i + 2)
     val isNotDown: Int => Boolean = i => diff3(i) > diff3(i + 1) && diff3(i + 1) > diff3(i + 2)
 
-    val trend = hmas.zip(hmas2).map((v1, v2) => if (v1 > v2) Trend.Upward else Trend.Downward)
+    val trend         = hmas.zip(hmas2).map((v1, v2) => if (v1 > v2) Trend.Upward else Trend.Downward)
     val consolidation = (0 until diff3.length - 3).map(i => Option.when(isNotUp(i) == isNotDown(i))(Trend.Consolidation))
-    val res = consolidation.zip(trend).map(_.getOrElse(_))
+    val res           = consolidation.zip(trend).map(_.getOrElse(_))
     Option
       .when(res.head != res.drop(1).head)(Condition.TrendDirectionChange(res.drop(1).head, res.head))
       .map(c => Signal(uid, data.currencyPair, hma.indicator, c, data.prices.head.time))
