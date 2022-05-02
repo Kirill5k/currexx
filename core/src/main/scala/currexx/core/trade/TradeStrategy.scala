@@ -28,9 +28,9 @@ object TradeStrategyExecutor {
       trigger match
         case Indicator.HMA =>
           state.signals.getOrElse(trigger, Nil).headOption.map(_.condition).collect {
-            case Condition.TrendDirectionChange(_, Trend.Consolidation)              => Decision.Close
-            case Condition.TrendDirectionChange(_, Trend.Upward) if !state.buying    => Decision.Buy
-            case Condition.TrendDirectionChange(_, Trend.Downward) if !state.selling => Decision.Sell
+            case Condition.TrendDirectionChange(_, Trend.Consolidation) if state.hasPosition => Decision.Close
+            case Condition.TrendDirectionChange(_, Trend.Upward) if !state.buying            => Decision.Buy
+            case Condition.TrendDirectionChange(_, Trend.Downward) if !state.selling         => Decision.Sell
           }
         case _ => None
 
@@ -40,6 +40,7 @@ object TradeStrategyExecutor {
       case TradeStrategy.HMABasic => HMABasic
 
   extension (state: MarketState)
-    def buying: Boolean  = state.currentPosition.contains(TradeOrder.Position.Buy)
-    def selling: Boolean = state.currentPosition.contains(TradeOrder.Position.Sell)
+    def hasPosition: Boolean = state.currentPosition.isDefined
+    def buying: Boolean      = state.currentPosition.contains(TradeOrder.Position.Buy)
+    def selling: Boolean     = state.currentPosition.contains(TradeOrder.Position.Sell)
 }
