@@ -5,7 +5,7 @@ import currexx.clients.broker.BrokerParameters
 import currexx.core.market.MarketState
 import currexx.core.signal.SignalSettings
 import currexx.core.trade.{TradeSettings, TradeStrategy, TradingParameters}
-import currexx.domain.market.{CurrencyPair, IndicatorParameters}
+import currexx.domain.market.{CurrencyPair, IndicatorParameters, Interval}
 import currexx.domain.user.UserId
 import mongo4cats.bson.ObjectId
 import org.typelevel.log4cats.Logger

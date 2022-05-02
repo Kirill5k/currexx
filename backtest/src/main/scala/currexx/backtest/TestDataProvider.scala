@@ -5,13 +5,13 @@ import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, Pric
 import fs2.{Stream, text}
 import fs2.io.file.{Files, Path}
 
-import java.time.{Instant, ZonedDateTime}
+import java.nio.file.Paths
+import java.time.{Instant, LocalDate, ZoneOffset}
 import java.time.format.DateTimeFormatter
-import java.util.Date
 
 object TestDataProvider {
 
-  private val timePattern = DateTimeFormatter.ofPattern( "dd.MM.yyyy hh:mm:ss")
+  private val timePattern = DateTimeFormatter.ofPattern( "dd.MM.yyyy")
 
   def read[F[_]: Sync: Files](
       currencyPair: CurrencyPair,
@@ -19,7 +19,7 @@ object TestDataProvider {
       filePath: String
   ): Stream[F, MarketTimeSeriesData] =
     Files[F]
-      .readAll(Path(filePath))
+      .readAll(Path(getClass.getClassLoader.getResource(filePath).getPath))
       .through(text.utf8.decode)
       .through(text.lines)
       .drop(1)
@@ -31,7 +31,7 @@ object TestDataProvider {
           BigDecimal(vals(3)),
           BigDecimal(vals(4)),
           BigDecimal(vals(5)),
-          ZonedDateTime.parse(vals(0).subSequence(0, 18), timePattern).toInstant
+          LocalDate.parse(vals(0).subSequence(0, 10), timePattern).atStartOfDay().atOffset(ZoneOffset.UTC).toInstant
         )
       }
       .sliding(100)
