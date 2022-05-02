@@ -7,7 +7,7 @@ import cats.syntax.functor.*
 import currexx.clients.broker.BrokerParameters
 import currexx.core.common.db.Repository
 import currexx.core.trade.db.{TradeSettingsEntity, TradeSettingsRepository}
-import currexx.core.trade.{TradeSettings, TradingParameters}
+import currexx.core.trade.{TradeSettings, TradeStrategy, TradingParameters}
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
 import mongo4cats.circe.MongoJsonCodecs
@@ -27,7 +27,7 @@ final private class LiveTradeSettingsRepository[F[_]: Async](
     collection
       .updateOne(
         userIdEq(settings.userId),
-        Update.set("broker", settings.broker).set("trading", settings.trading)
+        Update.set("broker", settings.broker).set("trading", settings.trading).set("strategy", settings.strategy)
       )
       .map(_.getMatchedCount)
       .flatMap {
@@ -45,4 +45,5 @@ final private class LiveTradeSettingsRepository[F[_]: Async](
 object TradeSettingsRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[TradeSettingsRepository[F]] =
     db.getCollectionWithCodec[TradeSettingsEntity]("trade-settings")
-      .map(coll => LiveTradeSettingsRepository[F](coll.withAddedCodec[TradingParameters].withAddedCodec[BrokerParameters]))
+      .map(_.withAddedCodec[TradingParameters].withAddedCodec[BrokerParameters].withAddedCodec[TradeStrategy])
+      .map(coll => LiveTradeSettingsRepository[F](coll))

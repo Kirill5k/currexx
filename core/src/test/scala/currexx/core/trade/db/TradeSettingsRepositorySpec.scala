@@ -6,6 +6,7 @@ import currexx.clients.broker.BrokerParameters
 import currexx.core.MongoSpec
 import currexx.core.fixtures.{Trades, Users}
 import currexx.core.trade.db.TradeSettingsRepository
+import currexx.core.trade.TradeStrategy
 import currexx.domain.errors.AppError
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
@@ -40,11 +41,11 @@ class TradeSettingsRepositorySpec extends MongoSpec {
         val result = for
           repo <- TradeSettingsRepository.make(db)
           _    <- repo.update(Trades.settings)
-          _    <- repo.update(Trades.settings.copy(broker = BrokerParameters.Vindaloo("2")))
+          _    <- repo.update(Trades.settings.copy(broker = BrokerParameters.Vindaloo("2"), strategy = TradeStrategy.HMABasic))
           res  <- repo.get(Users.uid)
         yield res
 
-        result.map(_ mustBe Trades.settings.copy(broker = BrokerParameters.Vindaloo("2")))
+        result.map(_ mustBe Trades.settings.copy(broker = BrokerParameters.Vindaloo("2"), strategy = TradeStrategy.HMABasic))
       }
     }
   }
