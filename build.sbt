@@ -68,6 +68,14 @@ val core = project
     libraryDependencies ++= Dependencies.core
   )
 
+val backtest = project
+  .in(file("backtest"))
+  .dependsOn(core)
+  .settings(
+    name       := "currexx-backtest",
+    moduleName := "currexx-backtest",
+  )
+
 val root = project
   .in(file("."))
   .settings(noPublish)
