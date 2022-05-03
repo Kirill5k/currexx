@@ -9,11 +9,14 @@ import fs2.Stream
 trait ActionDispatcher[F[_]]:
   def dispatch(action: Action): F[Unit]
   def actions: Stream[F, Action]
+  def numberOfPendingActions: F[Int]
 
 final private class LiveActionDispatcher[F[_]: Functor](
     private val submittedActions: Queue[F, Action]
 ) extends ActionDispatcher[F] {
 
+  override def numberOfPendingActions: F[Int] = submittedActions.size
+  
   override def dispatch(action: Action): F[Unit] =
     submittedActions.offer(action)
 

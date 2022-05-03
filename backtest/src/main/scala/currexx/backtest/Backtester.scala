@@ -1,6 +1,7 @@
 package currexx.backtest
 
 import cats.effect.{IO, IOApp}
+import cats.syntax.flatMap.*
 import currexx.clients.broker.BrokerParameters
 import currexx.core.common.action.{Action, ActionDispatcher, ActionProcessor}
 import currexx.core.market.MarketState
@@ -12,6 +13,7 @@ import mongo4cats.bson.ObjectId
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import squants.market.{EUR, GBP}
+import fs2.Stream
 
 import scala.concurrent.duration.*
 
@@ -45,8 +47,10 @@ object Backtester extends IOApp.Simple {
       processor  <- ActionProcessor.make[IO](dispatcher, monitor, signal, market, trade)
       _ <- MarketDataProvider
         .read[IO](currencyPair, Interval.D1, "eur-gbp-1d-2021-2022.csv")
-        .evalMap(data => dispatcher.dispatch(Action.ProcessMarketData(userId, data)))
-        .metered(50.millis)
+        .flatMap { data =>
+          Stream.eval(dispatcher.dispatch(Action.ProcessMarketData(userId, data))) >>
+            Stream.eval(dispatcher.numberOfPendingActions).delayBy(10.milli).repeat.takeWhile(_ > 0)
+        }
         .concurrently(processor.run)
         .compile
         .drain

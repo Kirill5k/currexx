@@ -55,7 +55,7 @@ final private class LiveTradeService[F[_]](
   extension (top: TradeOrderPlacement)
     def isReverse(currentPosition: TradeOrder.Position): Boolean =
       top.order match
-        case TradeOrder.Enter(position, _, _, _, _) => position != currentPosition
+        case order: TradeOrder.Enter => order.position != currentPosition
         case TradeOrder.Exit                        => false
 }
 
