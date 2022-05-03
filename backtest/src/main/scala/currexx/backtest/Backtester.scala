@@ -26,7 +26,7 @@ object Backtester extends IOApp.Simple {
   val signalSettings = SignalSettings(
     userId,
     List(
-      IndicatorParameters.HMA(22),
+      IndicatorParameters.HMA(6),
       // IndicatorParameters.MACD(fastLength = 12, slowLength = 26, signalSmoothing = 9),
       // IndicatorParameters.RSI(length = 14, upperLine = 70, lowerLine = 30)
     )
