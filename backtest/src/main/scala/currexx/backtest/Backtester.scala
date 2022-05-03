@@ -26,9 +26,9 @@ object Backtester extends IOApp.Simple {
   val signalSettings = SignalSettings(
     userId,
     List(
-      IndicatorParameters.HMA(16),
-      IndicatorParameters.MACD(fastLength = 12, slowLength = 26, signalSmoothing = 9),
-      IndicatorParameters.RSI(length = 14, upperLine = 70, lowerLine = 30)
+      IndicatorParameters.HMA(6),
+      // IndicatorParameters.MACD(fastLength = 12, slowLength = 26, signalSmoothing = 9),
+      // IndicatorParameters.RSI(length = 14, upperLine = 70, lowerLine = 30)
     )
   )
 
@@ -45,7 +45,7 @@ object Backtester extends IOApp.Simple {
       processor  <- ActionProcessor.make[IO](dispatcher, monitor, signal, market, trade)
       _ <- MarketDataProvider
         .read[IO](currencyPair, Interval.D1, "eur-gbp-1d.csv")
-        .metered(3.millis)
+        .metered(25.millis)
         .evalMap(data => dispatcher.dispatch(Action.ProcessMarketData(userId, data)))
         .concurrently(processor.run)
         .compile

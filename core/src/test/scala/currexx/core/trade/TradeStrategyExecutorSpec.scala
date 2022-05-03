@@ -45,15 +45,5 @@ class TradeStrategyExecutorSpec extends AnyWordSpec with Matchers {
     "not do anything when there are no relevant signals in state" in {
       TradeStrategyExecutor.get(TradeStrategy.HMABasic).analyze(Markets.stateWithSignal, Indicator.HMA) mustBe None
     }
-
-    "not do anything if state already has opened position" in {
-      val condition = Condition.TrendDirectionChange(Trend.Consolidation, Trend.Downward)
-      val state     = Markets.state.copy(
-        signals = Map(Indicator.HMA -> List(IndicatorState(condition, Markets.ts))),
-        currentPosition = Some(TradeOrder.Position.Sell)
-      )
-
-      TradeStrategyExecutor.get(TradeStrategy.HMABasic).analyze(state, Indicator.HMA) mustBe None
-    }
   }
 }
