@@ -43,7 +43,7 @@ object Backtester extends IOApp.Simple {
       trade      <- TestTradeService.make[IO](tradeSettings, dispatcher)
       signal     <- TestSignalService.make[IO](signalSettings, dispatcher)
       processor  <- ActionProcessor.make[IO](dispatcher, monitor, signal, market, trade)
-      _ <- TestDataProvider
+      _ <- MarketDataProvider
         .read[IO](currencyPair, Interval.D1, "eur-gbp-1d.csv")
         .metered(3.millis)
         .evalMap(data => dispatcher.dispatch(Action.ProcessMarketData(userId, data)))

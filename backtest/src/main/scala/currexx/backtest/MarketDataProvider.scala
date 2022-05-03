@@ -9,7 +9,7 @@ import java.nio.file.Paths
 import java.time.{Instant, LocalDate, ZoneOffset}
 import java.time.format.DateTimeFormatter
 
-object TestDataProvider:
+object MarketDataProvider:
   private val timePattern = DateTimeFormatter.ofPattern( "dd.MM.yyyy")
   def read[F[_]: Sync: Files](
       currencyPair: CurrencyPair,
