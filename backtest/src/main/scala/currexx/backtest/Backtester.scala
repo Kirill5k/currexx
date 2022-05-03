@@ -51,6 +51,6 @@ object Backtester extends IOApp.Simple {
         .compile
         .drain
       placedOrders <- trade.getAllOrders(userId)
-      _            <- IO.println(s"placed ${placedOrders.size} orders")
+      _            <- logger.info(s"placed orders stats ${OrderStatsCollector.collect(placedOrders)}")
     yield ()
 }
