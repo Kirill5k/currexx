@@ -43,13 +43,20 @@ final private class LiveTradeService[F[_]](
         }
       }
       .flatMap {
-        case Some(placement) =>
-          brokerClient.submit(placement.currencyPair, placement.broker, placement.order) *>
-            orderRepository.save(placement) *>
-            dispatcher.dispatch(Action.ProcessTradeOrderPlacement(placement))
+        case Some(order) =>
+          F.whenA(state.currentPosition.exists(order.isReverse))(brokerClient.submit(order.currencyPair, order.broker, TradeOrder.Exit)) *>
+            brokerClient.submit(order.currencyPair, order.broker, order.order) *>
+            orderRepository.save(order) *>
+            dispatcher.dispatch(Action.ProcessTradeOrderPlacement(order))
         case None =>
           F.unit
       }
+
+  extension (top: TradeOrderPlacement)
+    def isReverse(currentPosition: TradeOrder.Position): Boolean =
+      top.order match
+        case TradeOrder.Enter(position, _, _, _, _) => position != currentPosition
+        case TradeOrder.Exit                        => false
 }
 
 object TradeService:

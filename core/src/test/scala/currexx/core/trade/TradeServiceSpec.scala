@@ -1,14 +1,14 @@
 package currexx.core.trade
 
 import cats.effect.IO
-import currexx.clients.broker.BrokerClient
+import currexx.clients.broker.{BrokerClient, BrokerParameters}
 import currexx.core.CatsSpec
-import currexx.core.common.action.ActionDispatcher
+import currexx.core.common.action.{ActionDispatcher, Action}
 import currexx.core.fixtures.{Markets, Trades, Users}
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
-import currexx.domain.market.Indicator
+import currexx.domain.market.{CurrencyPair, Indicator, TradeOrder}
 
 class TradeServiceSpec extends CatsSpec {
 
@@ -19,8 +19,8 @@ class TradeServiceSpec extends CatsSpec {
         when(orderRepo.getAll(any[UserId])).thenReturn(IO.pure(List(Trades.order)))
 
         val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, client, disp)
-          orders   <- svc.getAllOrders(Users.uid)
+          svc    <- TradeService.make[IO](settRepo, orderRepo, client, disp)
+          orders <- svc.getAllOrders(Users.uid)
         yield orders
 
         result.asserting { res =>
@@ -96,6 +96,28 @@ class TradeServiceSpec extends CatsSpec {
         result.asserting { res =>
           verify(settRepo).get(Users.uid)
           verifyNoInteractions(orderRepo, client, disp)
+          res mustBe ()
+        }
+      }
+
+      "close existing order if new order has reverse position" in {
+        val (settRepo, orderRepo, client, disp) = mocks
+        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings.copy(strategy = TradeStrategy.HMABasic)))
+        when(client.submit(any[CurrencyPair], any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
+        when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
+        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, client, disp)
+          _   <- svc.processMarketState(Markets.stateWithHmaSignal.copy(currentPosition = Some(TradeOrder.Position.Sell)), Indicator.HMA)
+        yield ()
+
+        result.asserting { res =>
+          verify(settRepo).get(Users.uid)
+          verify(client).submit(Markets.gbpeur, Trades.broker, TradeOrder.Exit)
+          verify(client).submit(Markets.gbpeur, Trades.broker, Trades.settings.trading.toOrder(TradeOrder.Position.Buy))
+          verify(orderRepo).save(any[TradeOrderPlacement])
+          verify(disp).dispatch(any[Action])
           res mustBe ()
         }
       }

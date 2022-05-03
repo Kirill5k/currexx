@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import currexx.clients.broker.BrokerParameters
 import currexx.core.market.{IndicatorState, MarketState}
 import squants.market.{EUR, GBP, USD}
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, Interval, TradeOrder, MarketTimeSeriesData, PriceRange}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, Interval, MarketTimeSeriesData, PriceRange, TradeOrder}
 
 import java.time.Instant
 
@@ -16,8 +16,9 @@ object Markets {
   lazy val priceRange     = PriceRange(BigDecimal(2.0), BigDecimal(4.0), BigDecimal(1.0), BigDecimal(3.0), BigDecimal(1000), ts)
   lazy val timeSeriesData = MarketTimeSeriesData(gbpeur, Interval.H1, NonEmptyList.one(priceRange))
 
-  lazy val state           = MarketState(Users.uid, gbpeur, Some(TradeOrder.Position.Buy), Some(priceRange), Map.empty, Some(ts))
-  lazy val stateWithSignal = state.copy(signals = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, ts))))
+  lazy val state              = MarketState(Users.uid, gbpeur, Some(TradeOrder.Position.Buy), Some(priceRange), Map.empty, Some(ts))
+  lazy val stateWithSignal    = state.copy(signals = Map(Indicator.MACD -> List(IndicatorState(Signals.macd.condition, ts))))
+  lazy val stateWithHmaSignal = state.copy(signals = Map(Indicator.HMA -> List(IndicatorState(Signals.hma.condition, ts))))
 
   lazy val priceRanges = NonEmptyList
     .of(
