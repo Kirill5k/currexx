@@ -33,7 +33,7 @@ object OrderStatsCollector {
             (stats.incBuy, Some(curr))
           case (Some(prev), curr) if prev.isClose && curr.isSell =>
             (stats.incSell, Some(curr))
-          case (Some(prev), curr) if (prev.isSell && curr.isSell) || (prev.isSell && curr.isSell) =>
+          case (Some(prev), curr) if (prev.isSell && curr.isSell) || (prev.isBuy && curr.isBuy) =>
             (stats, Some(prev))
           case (Some(_), curr) =>
             (stats, Some(curr))
