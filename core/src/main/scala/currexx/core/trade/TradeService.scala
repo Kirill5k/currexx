@@ -18,6 +18,7 @@ trait TradeService[F[_]]:
   def updateSettings(settings: TradeSettings): F[Unit]
   def getAllOrders(uid: UserId): F[List[TradeOrderPlacement]]
   def processMarketState(state: MarketState, trigger: Indicator): F[Unit]
+  def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
 
 final private class LiveTradeService[F[_]](
     private val settingsRepository: TradeSettingsRepository[F],
@@ -31,6 +32,15 @@ final private class LiveTradeService[F[_]](
   override def updateSettings(settings: TradeSettings): F[Unit]        = settingsRepository.update(settings)
   override def getAllOrders(uid: UserId): F[List[TradeOrderPlacement]] = orderRepository.getAll(uid)
 
+  override def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit] =
+    orderRepository
+      .findLatestBy(uid, cp)
+      .flatMap {
+        case None                                                      => F.unit
+        case Some(TradeOrderPlacement(_, _, TradeOrder.Exit, _, _, _)) => F.unit
+        case Some(top) => F.realTimeInstant.map(t => top.copy(time = t, order = TradeOrder.Exit)).flatMap(submitOrderPlacement)
+      }
+
   override def processMarketState(state: MarketState, trigger: Indicator): F[Unit] =
     (settingsRepository.get(state.userId), F.realTimeInstant)
       .mapN { (settings, time) =>
@@ -43,20 +53,23 @@ final private class LiveTradeService[F[_]](
         }
       }
       .flatMap {
-        case Some(order) =>
-          F.whenA(state.currentPosition.exists(order.isReverse))(brokerClient.submit(order.currencyPair, order.broker, TradeOrder.Exit)) *>
-            brokerClient.submit(order.currencyPair, order.broker, order.order) *>
-            orderRepository.save(order) *>
-            dispatcher.dispatch(Action.ProcessTradeOrderPlacement(order))
+        case Some(top) =>
+          F.whenA(state.currentPosition.exists(top.isReverse))(brokerClient.submit(top.currencyPair, top.broker, TradeOrder.Exit)) *>
+            submitOrderPlacement(top)
         case None =>
           F.unit
       }
+
+  private def submitOrderPlacement(top: TradeOrderPlacement): F[Unit] =
+    brokerClient.submit(top.currencyPair, top.broker, top.order) *>
+      orderRepository.save(top) *>
+      dispatcher.dispatch(Action.ProcessTradeOrderPlacement(top))
 
   extension (top: TradeOrderPlacement)
     def isReverse(currentPosition: TradeOrder.Position): Boolean =
       top.order match
         case order: TradeOrder.Enter => order.position != currentPosition
-        case TradeOrder.Exit                        => false
+        case TradeOrder.Exit         => false
 }
 
 object TradeService:

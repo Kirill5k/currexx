@@ -83,6 +83,62 @@ class TradeServiceSpec extends CatsSpec {
       }
     }
 
+    "closeOpenOrders" should {
+      "not do anything when there are no orders" in {
+        val (settRepo, orderRepo, client, disp) = mocks
+        when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturn(IO.none)
+
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, client, disp)
+          _   <- svc.closeOpenOrders(Users.uid, Markets.gbpeur)
+        yield ()
+
+        result.asserting { res =>
+          verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
+          verifyNoInteractions(settRepo, client, disp)
+          res mustBe ()
+        }
+      }
+
+      "not do anything when latest order is exit" in {
+        val (settRepo, orderRepo, client, disp) = mocks
+        when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturn(IO.some(Trades.order.copy(order = TradeOrder.Exit)))
+
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, client, disp)
+          _   <- svc.closeOpenOrders(Users.uid, Markets.gbpeur)
+        yield ()
+
+        result.asserting { res =>
+          verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
+          verifyNoInteractions(settRepo, client, disp)
+          res mustBe ()
+        }
+      }
+
+      "close existing order" in {
+        val (settRepo, orderRepo, client, disp) = mocks
+        when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturn(IO.some(Trades.order))
+        when(client.submit(any[CurrencyPair], any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
+        when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
+        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, client, disp)
+          _   <- svc.closeOpenOrders(Users.uid, Markets.gbpeur)
+        yield ()
+
+        result.asserting { res =>
+          verifyNoInteractions(settRepo)
+          verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
+          verify(client).submit(Markets.gbpeur, Trades.broker, TradeOrder.Exit)
+          verify(orderRepo).save(any[TradeOrderPlacement])
+          verify(disp).dispatch(any[Action])
+          res mustBe ()
+        }
+      }
+    }
+
     "processMarketState" should {
       "not do anything when trading strategy is disabled" in {
         val (settRepo, orderRepo, client, disp) = mocks

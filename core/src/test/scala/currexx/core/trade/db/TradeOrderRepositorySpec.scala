@@ -3,7 +3,7 @@ package currexx.core.trade.db
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
-import currexx.core.fixtures.{Trades, Users}
+import currexx.core.fixtures.{Markets, Trades, Users}
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
 
@@ -35,6 +35,28 @@ class TradeOrderRepositorySpec extends MongoSpec {
         yield res
 
         result.map(_ mustBe Nil)
+      }
+    }
+
+    "findLatestBy" should {
+      "return latest order" in withEmbeddedMongoDb { db =>
+        val result = for
+          repo <- TradeOrderRepository.make(db)
+          _    <- repo.save(Trades.order)
+          _    <- repo.save(Trades.order.copy(time = Trades.ts.minusSeconds(100)))
+          res  <- repo.findLatestBy(Users.uid, Markets.gbpeur)
+        yield res
+
+        result.map(_ mustBe Some(Trades.order))
+      }
+
+      "return empty option when there are no orders" in withEmbeddedMongoDb { db =>
+        val result = for
+          repo <- TradeOrderRepository.make(db)
+          res  <- repo.findLatestBy(Users.uid, Markets.gbpeur)
+        yield res
+
+        result.map(_ mustBe None)
       }
     }
   }

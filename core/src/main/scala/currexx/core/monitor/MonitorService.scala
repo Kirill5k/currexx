@@ -8,6 +8,7 @@ import currexx.clients.data.MarketDataClient
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.time.*
 import currexx.core.monitor.db.MonitorRepository
+import currexx.domain.market.CurrencyPair
 import currexx.domain.user.UserId
 
 import scala.concurrent.duration.Duration
@@ -30,25 +31,16 @@ final private class LiveMonitorService[F[_]](
 )(using
     F: Temporal[F]
 ) extends MonitorService[F] {
-  override def getAll(uid: UserId): F[List[Monitor]] =
-    repository.getAll(uid)
-
-  override def get(uid: UserId, id: MonitorId): F[Monitor] =
-    repository.find(uid, id)
-
-  override def delete(uid: UserId, id: MonitorId): F[Unit] =
-    repository.delete(uid, id).flatMap(mon => actionDispatcher.dispatch(Action.CloseOpenOrders(uid, mon.currencyPair)))
-
-  override def pause(uid: UserId, id: MonitorId): F[Unit] =
-    repository.activate(uid, id, false).flatMap(mon => actionDispatcher.dispatch(Action.CloseOpenOrders(uid, mon.currencyPair)))
-
-  override def resume(uid: UserId, id: MonitorId): F[Unit] =
-    repository.activate(uid, id, true).void
-
+  private def closeOpenOrdersAction(m: Monitor): F[Unit]   = actionDispatcher.dispatch(Action.CloseOpenOrders(m.userId, m.currencyPair))
+  override def getAll(uid: UserId): F[List[Monitor]]       = repository.getAll(uid)
+  override def get(uid: UserId, id: MonitorId): F[Monitor] = repository.find(uid, id)
+  override def delete(uid: UserId, id: MonitorId): F[Unit] = repository.delete(uid, id).flatMap(closeOpenOrdersAction)
+  override def pause(uid: UserId, id: MonitorId): F[Unit]  = repository.activate(uid, id, false).flatMap(closeOpenOrdersAction)
+  override def resume(uid: UserId, id: MonitorId): F[Unit] = repository.activate(uid, id, true).void
   override def update(mon: Monitor): F[Unit] =
     repository.update(mon).flatMap { oldMon =>
       val deactivatedOrNewCurrency = oldMon.currencyPair != mon.currencyPair || (oldMon.active && !mon.active)
-      F.whenA(deactivatedOrNewCurrency)(actionDispatcher.dispatch(Action.CloseOpenOrders(mon.userId, oldMon.currencyPair)))
+      F.whenA(deactivatedOrNewCurrency)(closeOpenOrdersAction(oldMon))
     }
 
   override def create(cm: CreateMonitor): F[MonitorId] =

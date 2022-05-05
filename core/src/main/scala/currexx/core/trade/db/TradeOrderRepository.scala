@@ -16,6 +16,7 @@ import mongo4cats.database.{CreateCollectionOptions, MongoDatabase}
 trait TradeOrderRepository[F[_]] extends Repository[F]:
   def save(top: TradeOrderPlacement): F[Unit]
   def getAll(uid: UserId): F[List[TradeOrderPlacement]]
+  def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]]
 
 final private class LiveTradeOrderRepository[F[_]: Async](
     private val collection: MongoCollection[F, TradeOrderEntity]
@@ -24,6 +25,8 @@ final private class LiveTradeOrderRepository[F[_]: Async](
     collection.insertOne(TradeOrderEntity.from(top)).void
   def getAll(uid: UserId): F[List[TradeOrderPlacement]] =
     collection.find(userIdEq(uid)).sortByDesc("time").all.map(_.map(_.toDomain).toList)
+  def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]] =
+    collection.find(userIdAndCurrencyPairEq(uid, cp)).sortByDesc("time").first.map(_.map(_.toDomain))
 
 object TradeOrderRepository extends MongoJsonCodecs:
   private val collectionName    = "trade-orders"
