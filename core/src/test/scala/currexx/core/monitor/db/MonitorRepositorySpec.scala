@@ -133,15 +133,19 @@ class MonitorRepositorySpec extends MongoSpec {
     }
 
     "delete" should {
-      "delete monitor from db" in withEmbeddedMongoDb { client =>
+      "delete monitor from db and return deleted mon back" in withEmbeddedMongoDb { client =>
         val result = for
-          repo <- MonitorRepository.make(client)
-          mid  <- repo.create(Monitors.create())
-          _    <- repo.delete(Users.uid, mid)
-          mons <- repo.getAll(Users.uid)
-        yield mons
+          repo    <- MonitorRepository.make(client)
+          mid     <- repo.create(Monitors.create())
+          deleted <- repo.delete(Users.uid, mid)
+          mons    <- repo.getAll(Users.uid)
+        yield (deleted, mons)
 
-        result.map(_ mustBe Nil)
+        result.map { case (deleted, mons) =>
+          mons mustBe Nil
+          deleted.userId mustBe Users.uid
+          deleted.currencyPair mustBe Markets.gbpeur
+        }
       }
 
       "return error when monitor does not exist" in withEmbeddedMongoDb { client =>
@@ -157,16 +161,19 @@ class MonitorRepositorySpec extends MongoSpec {
     }
 
     "update" should {
-      "update monitor in db" in withEmbeddedMongoDb { client =>
+      "update monitor in db and return previous monitor" in withEmbeddedMongoDb { client =>
         val result = for
-          repo <- MonitorRepository.make(client)
-          mid  <- repo.create(Monitors.create())
-          _    <- repo.update(Monitors.monitor.copy(id = mid, interval = Interval.M1))
-          mon  <- repo.find(Users.uid, mid)
-        yield mon
+          repo   <- MonitorRepository.make(client)
+          mid    <- repo.create(Monitors.create())
+          oldMon <- repo.update(Monitors.monitor.copy(id = mid, interval = Interval.M1, currencyPair = Markets.gbpusd))
+          updMon <- repo.find(Users.uid, mid)
+        yield (oldMon, updMon)
 
-        result.map { mon =>
-          mon.interval mustBe Interval.M1
+        result.map { case (oldMon, updMon) =>
+          updMon.interval mustBe Interval.M1
+          updMon.currencyPair mustBe Markets.gbpusd
+
+          oldMon.currencyPair mustBe Markets.gbpeur
         }
       }
 

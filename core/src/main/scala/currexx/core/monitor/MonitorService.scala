@@ -32,10 +32,10 @@ final private class LiveMonitorService[F[_]](
 ) extends MonitorService[F] {
   override def getAll(uid: UserId): F[List[Monitor]]       = repository.getAll(uid)
   override def get(uid: UserId, id: MonitorId): F[Monitor] = repository.find(uid, id)
-  override def delete(uid: UserId, id: MonitorId): F[Unit] = repository.delete(uid, id)
-  override def pause(uid: UserId, id: MonitorId): F[Unit]  = repository.activate(uid, id, false)
-  override def resume(uid: UserId, id: MonitorId): F[Unit] = repository.activate(uid, id, true)
-  override def update(mon: Monitor): F[Unit]               = repository.update(mon)
+  override def delete(uid: UserId, id: MonitorId): F[Unit] = repository.delete(uid, id).void
+  override def pause(uid: UserId, id: MonitorId): F[Unit]  = repository.activate(uid, id, false).void
+  override def resume(uid: UserId, id: MonitorId): F[Unit] = repository.activate(uid, id, true).void
+  override def update(mon: Monitor): F[Unit]               = repository.update(mon).void
 
   override def create(cm: CreateMonitor): F[MonitorId] =
     repository.create(cm).flatTap(mid => actionDispatcher.dispatch(Action.QueryMonitor(cm.userId, mid)))

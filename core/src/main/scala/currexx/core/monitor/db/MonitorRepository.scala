@@ -22,12 +22,12 @@ import scala.concurrent.duration.FiniteDuration
 trait MonitorRepository[F[_]] extends Repository[F]:
   def stream: Stream[F, Monitor]
   def find(uid: UserId, id: MonitorId): F[Monitor]
-  def delete(uid: UserId, id: MonitorId): F[Unit]
+  def delete(uid: UserId, id: MonitorId): F[Monitor]
   def getAll(uid: UserId): F[List[Monitor]]
   def create(monitor: CreateMonitor): F[MonitorId]
-  def activate(uid: UserId, id: MonitorId, active: Boolean): F[Unit]
-  def update(mon: Monitor): F[Unit]
-  def updateQueriedTimestamp(uid: UserId, id: MonitorId): F[Unit]
+  def activate(uid: UserId, id: MonitorId, active: Boolean): F[Monitor]
+  def update(mon: Monitor): F[Monitor]
+  def updateQueriedTimestamp(uid: UserId, id: MonitorId): F[Monitor]
 
 final private class LiveMonitorRepository[F[_]](
     private val collection: MongoCollection[F, MonitorEntity]
@@ -57,23 +57,23 @@ final private class LiveMonitorRepository[F[_]](
       }
   }
 
-  override def activate(uid: UserId, id: MonitorId, active: Boolean): F[Unit] =
+  override def activate(uid: UserId, id: MonitorId, active: Boolean): F[Monitor] =
     runUpdate(uid, id)(Update.set(Field.Active, active))
 
-  override def updateQueriedTimestamp(uid: UserId, id: MonitorId): F[Unit] =
+  override def updateQueriedTimestamp(uid: UserId, id: MonitorId): F[Monitor] =
     runUpdate(uid, id)(Update.currentDate(Field.LastQueriedAt))
 
-  private def runUpdate(uid: UserId, id: MonitorId)(update: Update): F[Unit] =
+  private def runUpdate(uid: UserId, id: MonitorId)(update: Update): F[Monitor] =
     collection
-      .updateOne(idEq(id.value) && userIdEq(uid), update.currentDate(Field.LastUpdatedAt))
-      .flatMap(errorIfNoMatches(AppError.EntityDoesNotExist("Monitor", id.value)))
+      .findOneAndUpdate(idEq(id.value) && userIdEq(uid), update.currentDate(Field.LastUpdatedAt))
+      .flatMap(maybeMon => F.fromOption(maybeMon.map(_.toDomain), AppError.EntityDoesNotExist("Monitor", id.value)))
 
-  override def delete(uid: UserId, id: MonitorId): F[Unit] =
+  override def delete(uid: UserId, id: MonitorId): F[Monitor] =
     collection
-      .deleteOne(idEq(id.value) && userIdEq(uid))
-      .flatMap(errorIfNotDeleted(AppError.EntityDoesNotExist("Monitor", id.value)))
+      .findOneAndDelete(idEq(id.value) && userIdEq(uid))
+      .flatMap(maybeMon => F.fromOption(maybeMon.map(_.toDomain), AppError.EntityDoesNotExist("Monitor", id.value)))
 
-  override def update(mon: Monitor): F[Unit] =
+  override def update(mon: Monitor): F[Monitor] =
     collection
       .count(idEq(mon.id.value).not && userIdEq(mon.userId) && Filter.eq(Field.CurrencyPair, mon.currencyPair))
       .flatMap {
@@ -86,7 +86,7 @@ final private class LiveMonitorRepository[F[_]](
               .set("period", mon.period)
           }
         case _ =>
-          AppError.AlreadyBeingMonitored(mon.currencyPair).raiseError[F, Unit]
+          AppError.AlreadyBeingMonitored(mon.currencyPair).raiseError[F, Monitor]
       }
 }
 

@@ -4,7 +4,7 @@ import currexx.core.market.MarketState
 import currexx.core.signal.Signal
 import currexx.core.monitor.MonitorId
 import currexx.core.trade.TradeOrderPlacement
-import currexx.domain.market.{Indicator, MarketTimeSeriesData}
+import currexx.domain.market.{CurrencyPair, Indicator, MarketTimeSeriesData}
 import currexx.domain.user.UserId
 
 import scala.concurrent.duration.FiniteDuration
@@ -17,3 +17,4 @@ enum Action:
   case ProcessSignal(signal: Signal)
   case ProcessMarketState(state: MarketState, trigger: Indicator)
   case ProcessTradeOrderPlacement(order: TradeOrderPlacement)
+  case CloseOpenOrders(uid: UserId, currencyPair: CurrencyPair)
