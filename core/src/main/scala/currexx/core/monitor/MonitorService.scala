@@ -30,12 +30,26 @@ final private class LiveMonitorService[F[_]](
 )(using
     F: Temporal[F]
 ) extends MonitorService[F] {
-  override def getAll(uid: UserId): F[List[Monitor]]       = repository.getAll(uid)
-  override def get(uid: UserId, id: MonitorId): F[Monitor] = repository.find(uid, id)
-  override def delete(uid: UserId, id: MonitorId): F[Unit] = repository.delete(uid, id).void
-  override def pause(uid: UserId, id: MonitorId): F[Unit]  = repository.activate(uid, id, false).void
-  override def resume(uid: UserId, id: MonitorId): F[Unit] = repository.activate(uid, id, true).void
-  override def update(mon: Monitor): F[Unit]               = repository.update(mon).void
+  override def getAll(uid: UserId): F[List[Monitor]] =
+    repository.getAll(uid)
+
+  override def get(uid: UserId, id: MonitorId): F[Monitor] =
+    repository.find(uid, id)
+
+  override def delete(uid: UserId, id: MonitorId): F[Unit] =
+    repository.delete(uid, id).flatMap(mon => actionDispatcher.dispatch(Action.CloseOpenOrders(uid, mon.currencyPair)))
+
+  override def pause(uid: UserId, id: MonitorId): F[Unit] =
+    repository.activate(uid, id, false).flatMap(mon => actionDispatcher.dispatch(Action.CloseOpenOrders(uid, mon.currencyPair)))
+
+  override def resume(uid: UserId, id: MonitorId): F[Unit] =
+    repository.activate(uid, id, true).void
+
+  override def update(mon: Monitor): F[Unit] =
+    repository.update(mon).flatMap { oldMon =>
+      val deactivatedOrNewCurrency = oldMon.currencyPair != mon.currencyPair || (oldMon.active && !mon.active)
+      F.whenA(deactivatedOrNewCurrency)(actionDispatcher.dispatch(Action.CloseOpenOrders(mon.userId, oldMon.currencyPair)))
+    }
 
   override def create(cm: CreateMonitor): F[MonitorId] =
     repository.create(cm).flatTap(mid => actionDispatcher.dispatch(Action.QueryMonitor(cm.userId, mid)))

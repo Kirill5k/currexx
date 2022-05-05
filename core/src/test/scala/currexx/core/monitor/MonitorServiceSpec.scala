@@ -15,6 +15,62 @@ import java.time.Instant
 class MonitorServiceSpec extends CatsSpec {
 
   "A MonitorService" when {
+    "update" should {
+      "update monitor properties in the db" in {
+        val (repo, disp, client) = mocks
+        when(repo.update(any[Monitor])).thenReturn(IO.pure(Monitors.monitor))
+
+        val result = for
+          svc <- MonitorService.make[IO](repo, disp, client)
+          res <- svc.update(Monitors.monitor)
+        yield res
+
+        result.asserting { res =>
+          verifyNoInteractions(client, disp)
+          verify(repo).update(Monitors.monitor)
+          res mustBe ()
+        }
+      }
+
+      "close open orders when currency pair has changed" in {
+        val (repo, disp, client) = mocks
+        when(repo.update(any[Monitor])).thenReturn(IO.pure(Monitors.monitor))
+        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+
+        val updated = Monitors.monitor.copy(currencyPair = Markets.gbpusd)
+        val result = for
+          svc <- MonitorService.make[IO](repo, disp, client)
+          res <- svc.update(updated)
+        yield res
+
+        result.asserting { res =>
+          verifyNoInteractions(client)
+          verify(disp).dispatch(Action.CloseOpenOrders(Users.uid, Markets.gbpeur))
+          verify(repo).update(updated)
+          res mustBe ()
+        }
+      }
+
+      "close open orders when monitor has been deactivated" in {
+        val (repo, disp, client) = mocks
+        when(repo.update(any[Monitor])).thenReturn(IO.pure(Monitors.monitor))
+        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+
+        val updated = Monitors.monitor.copy(active = false)
+        val result = for
+          svc <- MonitorService.make[IO](repo, disp, client)
+          res <- svc.update(updated)
+        yield res
+
+        result.asserting { res =>
+          verifyNoInteractions(client)
+          verify(disp).dispatch(Action.CloseOpenOrders(Users.uid, Markets.gbpeur))
+          verify(repo).update(updated)
+          res mustBe ()
+        }
+      }
+    }
+
     "resume" should {
       "set active to true" in {
         val (repo, disp, client) = mocks
@@ -36,7 +92,8 @@ class MonitorServiceSpec extends CatsSpec {
     "pause" should {
       "set active to false" in {
         val (repo, disp, client) = mocks
-        when(repo.activate(any[UserId], any[MonitorId], any[Boolean])).thenReturn(IO.unit)
+        when(repo.activate(any[UserId], any[MonitorId], any[Boolean])).thenReturn(IO.pure(Monitors.monitor))
+        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp, client)
@@ -44,8 +101,9 @@ class MonitorServiceSpec extends CatsSpec {
         yield res
 
         result.asserting { res =>
-          verifyNoInteractions(client, disp)
+          verifyNoInteractions(client)
           verify(repo).activate(Users.uid, Monitors.mid, false)
+          verify(disp).dispatch(Action.CloseOpenOrders(Users.uid, Markets.gbpeur))
           res mustBe ()
         }
       }
