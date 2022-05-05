@@ -127,7 +127,7 @@ class SignalServiceSpec extends CatsSpec {
         when(signRepo.save(any[Signal])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
-        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(7))
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(16))
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
           res <- svc.processMarketData(Users.uid, timeSeriesData)
@@ -148,7 +148,7 @@ class SignalServiceSpec extends CatsSpec {
         when(signRepo.save(any[Signal])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
-        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(9))
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
           res <- svc.processMarketData(Users.uid, timeSeriesData)
@@ -169,15 +169,14 @@ class SignalServiceSpec extends CatsSpec {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val signal = SignalService.detectHma(Users.uid, timeSeriesData, IndicatorParameters.HMA(length = 16))
 
-        val expectedCondition = Condition.TrendDirectionChange(Trend.Consolidation, Trend.Downward)
+        val expectedCondition = Condition.TrendDirectionChange(Trend.Consolidation, Trend.Upward)
         signal mustBe Some(Signal(Users.uid, Markets.gbpeur, Indicator.HMA, expectedCondition, timeSeriesData.prices.head.time))
       }
 
       "not do anything when trend hasn't changed" in {
-        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(1))
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
         val signal = SignalService.detectHma(Users.uid, timeSeriesData, IndicatorParameters.HMA(length = 16))
 
-        val expectedCondition = Condition.TrendDirectionChange(Trend.Consolidation, Trend.Downward)
         signal mustBe None
       }
     }
