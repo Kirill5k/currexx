@@ -13,5 +13,5 @@ object Signals {
   lazy val rsi  = Signal(Users.uid, Markets.gbpeur, Indicator.RSI, Condition.AboveThreshold(BigDecimal(80), BigDecimal(85)), ts)
   lazy val hma  = Signal(Users.uid, Markets.gbpeur, Indicator.HMA, Condition.TrendDirectionChange(Trend.Downward, Trend.Upward), ts)
 
-  lazy val settings = SignalSettings(Users.uid, List(IndicatorParameters.MACD(), IndicatorParameters.RSI()))
+  lazy val settings = SignalSettings(Users.uid, TriggerFrequency.OncePerDay, List(IndicatorParameters.MACD(), IndicatorParameters.RSI()))
 }

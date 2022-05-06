@@ -49,7 +49,7 @@ final private class SignalController[F[_]](
         service
           .getSettings(session.userId)
           .flatMap(settings => F.fromOption(settings, AppError.NotSetup("Signal")))
-          .mapResponse(s => SignalSettingsView(s.indicators))
+          .mapResponse(s => SignalSettingsView(s.triggerFrequency, s.indicators))
       }
 
   private def updateSignalSettings(using auth: Authenticator[F]) =
@@ -87,9 +87,10 @@ object SignalController extends TapirSchema with TapirJson with TapirCodecs {
   ) derives Codec.AsObject
 
   final case class SignalSettingsView(
+      triggerFrequency: TriggerFrequency,
       indicators: List[IndicatorParameters]
   ) derives Codec.AsObject:
-    def toDomain(userId: UserId): SignalSettings = SignalSettings(userId, indicators)
+    def toDomain(userId: UserId): SignalSettings = SignalSettings(userId, triggerFrequency, indicators)
 
   object SignalView:
     def from(signal: Signal): SignalView =

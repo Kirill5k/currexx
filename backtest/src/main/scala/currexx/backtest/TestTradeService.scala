@@ -20,8 +20,8 @@ final private class TestTradeSettingsRepository[F[_]](
 final private class TestTradeOrderRepository[F[_]: Async](
     private val orders: Ref[F, List[TradeOrderPlacement]]
 ) extends TradeOrderRepository[F]:
-  override def save(top: TradeOrderPlacement): F[Unit]           = orders.update(top :: _)
-  override def getAll(uid: UserId): F[List[TradeOrderPlacement]] = orders.get
+  override def save(top: TradeOrderPlacement): F[Unit]                                     = orders.update(top :: _)
+  override def getAll(uid: UserId): F[List[TradeOrderPlacement]]                           = orders.get
   override def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]] = Async[F].pure(None)
 
 final private class TestBrokerClient[F[_]](using F: Monad[F]) extends BrokerClient[F]:

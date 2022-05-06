@@ -5,7 +5,7 @@ import cats.syntax.flatMap.*
 import currexx.clients.broker.BrokerParameters
 import currexx.core.common.action.{Action, ActionDispatcher, ActionProcessor}
 import currexx.core.market.MarketState
-import currexx.core.signal.SignalSettings
+import currexx.core.signal.{SignalSettings, TriggerFrequency}
 import currexx.core.trade.{TradeSettings, TradeStrategy, TradingParameters}
 import currexx.domain.market.{CurrencyPair, IndicatorParameters, Interval}
 import currexx.domain.user.UserId
@@ -27,8 +27,9 @@ object Backtester extends IOApp.Simple {
 
   val signalSettings = SignalSettings(
     userId,
+    TriggerFrequency.OncePerDay,
     List(
-      IndicatorParameters.HMA(6),
+      IndicatorParameters.HMA(6)
       // IndicatorParameters.MACD(fastLength = 12, slowLength = 26, signalSmoothing = 9),
       // IndicatorParameters.RSI(length = 14, upperLine = 70, lowerLine = 30)
     )
