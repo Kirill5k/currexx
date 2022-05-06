@@ -127,6 +127,7 @@ class SignalControllerSpec extends ControllerSpec {
 
         val responseBody =
           s"""{
+              |"triggerFrequency" : "once-per-day",
               |"indicators": [
               |{
               |   "indicator" : "macd",
@@ -164,6 +165,7 @@ class SignalControllerSpec extends ControllerSpec {
 
         val requestBody =
           s"""{
+             |"triggerFrequency" : "continuously",
              |"indicators": [
              |{
              |   "indicator" : "macd",
@@ -183,7 +185,7 @@ class SignalControllerSpec extends ControllerSpec {
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.NoContent, None)
-        verify(svc).updateSettings(Signals.settings)
+        verify(svc).updateSettings(Signals.settings.copy(triggerFrequency = TriggerFrequency.Continuously))
       }
     }
   }
