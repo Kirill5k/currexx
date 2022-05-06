@@ -52,7 +52,11 @@ final private class LiveSignalService[F[_]](
             case stoch: IndicatorParameters.STOCH => SignalService.detectStoch(uid, data, stoch)
             case hma: IndicatorParameters.HMA     => SignalService.detectHma(uid, data, hma)
           }
-        )
+        ).evalFilter { signal =>
+          settings.triggerFrequency match
+            case TriggerFrequency.Continuously => F.pure(true)
+            case TriggerFrequency.OncePerDay => signalRepo.isFirstOfItsKindForThatDate(signal)
+        }
       }
       .evalMap(submit)
       .compile
