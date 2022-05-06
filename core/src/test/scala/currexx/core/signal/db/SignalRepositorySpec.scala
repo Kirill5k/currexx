@@ -3,7 +3,7 @@ package currexx.core.signal.db
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
-import currexx.core.fixtures.{Signals, Users}
+import currexx.core.fixtures.{Markets, Signals, Users}
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
 
@@ -34,6 +34,28 @@ class SignalRepositorySpec extends MongoSpec {
         yield res
 
         result.map(_ mustBe Nil)
+      }
+    }
+
+    "isFirstOfItsKindForThatDate" should {
+      "return false if signal of such kind has been already submitted on the same date" in withEmbeddedMongoDb { db =>
+        val result = for
+          repo <- SignalRepository.make(db)
+          _    <- repo.save(Signals.macd)
+          res  <- repo.isFirstOfItsKindForThatDate(Signals.macd)
+        yield res
+
+        result.map(_ mustBe false)
+      }
+
+      "return true if it is a first signal of such kind" in withEmbeddedMongoDb { db =>
+        val result = for
+          repo <- SignalRepository.make(db)
+          _    <- repo.save(Signals.macd)
+          res  <- repo.isFirstOfItsKindForThatDate(Signals.macd.copy(currencyPair = Markets.gbpusd))
+        yield res
+
+        result.map(_ mustBe true)
       }
     }
   }

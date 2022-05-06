@@ -8,7 +8,7 @@ object time:
   extension (ts: Instant)
     def toLocalDate: LocalDate = LocalDate.parse(ts.toString.slice(0, 10))
     def atStartOfDay: Instant = toLocalDate.atStartOfDay().toInstant(ZoneOffset.UTC)
-    def atEndOfDay: Instant = toLocalDate.plusDays(1).atStartOfDay().minusSeconds(1)
+    def atEndOfDay: Instant = toLocalDate.plusDays(1).atStartOfDay().minusSeconds(1).toInstant(ZoneOffset.UTC)
     def durationBetween(otherTs: Instant): FiniteDuration =
       math.abs(ts.toEpochMilli - otherTs.toEpochMilli).millis
     def hasSameDateAs(otherTs: Instant): Boolean =
