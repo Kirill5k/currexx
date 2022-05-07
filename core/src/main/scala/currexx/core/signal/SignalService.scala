@@ -107,8 +107,8 @@ object SignalService:
   def detectHma(uid: UserId, data: MarketTimeSeriesData, hma: IndicatorParameters.HMA): Option[Signal] = {
     val hmas  = MovingAverageCalculator.hma(data.prices.toList.map(_.close), hma.length).toArray
     val hmas2 = hmas.tail
-    val hmas3 = hmas.zip(hmas.map(-_)).map(_ - _)
-    val hmas4 = hmas.zip(hmas).map(_ + _)
+    val hmas3 = hmas.lazyZip(hmas.map(-_)).map(_ - _).take(4)
+    val hmas4 = hmas.lazyZip(hmas).map(_ + _).take(4)
 
     val diff  = hmas2.zip(hmas3).map(_ - _)
     val diff3 = hmas4.zip(hmas2).map(_ - _)
@@ -116,9 +116,9 @@ object SignalService:
     val isNotUp: Int => Boolean   = i => diff(i) > diff(i + 1) && diff(i + 1) > diff(i + 2)
     val isNotDown: Int => Boolean = i => diff3(i) > diff3(i + 1) && diff3(i + 1) > diff3(i + 2)
 
-    val trend         = hmas.lazyZip(hmas2).map((v1, v2) => if (v1 > v2) Trend.Upward else Trend.Downward)
-    val consolidation = (0 until diff3.length - 3).map(i => Option.when(isNotUp(i) == isNotDown(i))(Trend.Consolidation))
-    val res           = consolidation.lazyZip(trend).map(_.getOrElse(_))
+    val trend         = hmas.take(4).zip(hmas2.take(4)).map((v1, v2) => if (v1 > v2) Trend.Upward else Trend.Downward)
+    val consolidation = (0 until 2).map(i => Option.when(isNotUp(i) == isNotDown(i))(Trend.Consolidation))
+    val res           = consolidation.zip(trend).map(_.getOrElse(_))
     Option
       .when(res.head != res(1))(Condition.TrendDirectionChange(res(1), res.head))
       .map(c => Signal(uid, data.currencyPair, hma.indicator, c, data.prices.head.time))
