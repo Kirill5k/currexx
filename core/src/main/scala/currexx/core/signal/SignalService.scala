@@ -6,7 +6,7 @@ import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.domain.user.UserId
-import currexx.calculations.{MomentumOscillatorCalculator, MovingAverageCalculator}
+import currexx.calculations.{MomentumOscillators, MovingAverages}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorParameters, MarketTimeSeriesData, Trend}
@@ -66,7 +66,7 @@ final private class LiveSignalService[F[_]](
 object SignalService:
 
   def detectMacd(uid: UserId, data: MarketTimeSeriesData, macd: IndicatorParameters.MACD): Option[Signal] = {
-    val (macdLine, signalLine) = MovingAverageCalculator.macdWithSignal(
+    val (macdLine, signalLine) = MovingAverages.macdWithSignal(
       values = data.prices.map(_.close).toList,
       fastLength = macd.fastLength,
       slowLength = macd.slowLength,
@@ -78,7 +78,7 @@ object SignalService:
   }
 
   def detectRsi(uid: UserId, data: MarketTimeSeriesData, rsi: IndicatorParameters.RSI): Option[Signal] = {
-    val rsis    = MomentumOscillatorCalculator.rsi(data.prices.map(_.close).toList, rsi.length)
+    val rsis    = MomentumOscillators.rsi(data.prices.map(_.close).toList, rsi.length)
     val currRsi = rsis.head
     def above   = Option.when(currRsi > rsi.upperLine)(Condition.AboveThreshold(BigDecimal(rsi.upperLine), currRsi))
     def below   = Option.when(currRsi < rsi.lowerLine)(Condition.BelowThreshold(BigDecimal(rsi.lowerLine), currRsi))
@@ -88,7 +88,7 @@ object SignalService:
   }
 
   def detectStoch(uid: UserId, data: MarketTimeSeriesData, stoch: IndicatorParameters.STOCH): Option[Signal] = {
-    val (k, d) = MomentumOscillatorCalculator.stoch(
+    val (k, d) = MomentumOscillators.stoch(
       closings = data.prices.map(_.close).toList,
       highs = data.prices.map(_.high).toList,
       lows = data.prices.map(_.low).toList,
@@ -105,7 +105,7 @@ object SignalService:
   }
 
   def detectHma(uid: UserId, data: MarketTimeSeriesData, hma: IndicatorParameters.HMA): Option[Signal] = {
-    val hmas  = MovingAverageCalculator.hma(data.prices.toList.map(_.close), hma.length).toArray.take(5)
+    val hmas  = MovingAverages.hma(data.prices.toList.map(_.close), hma.length).toArray.take(5)
     val hmas2 = hmas.tail
     val hmas3 = hmas.zip(hmas.map(-_)).map(_ - _)
     val hmas4 = hmas.zip(hmas).map(_ + _)

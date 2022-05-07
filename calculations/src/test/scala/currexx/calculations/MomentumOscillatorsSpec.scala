@@ -5,17 +5,17 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.math.BigDecimal.RoundingMode
 
-class MomentumOscillatorCalculatorSpec extends AnyWordSpec with Matchers {
+class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
 
-  "A MovingAverageCalculator" should {
+  "A MomentumOscillators" should {
     "calculate Relative Strength Index" in {
-      val rsi = MomentumOscillatorCalculator.rsi(values.map(_._4), 14)
+      val rsi = MomentumOscillators.rsi(values.map(_._4), 14)
 
       rsi.take(5).map(rounded(4)) mustBe List(25.9687, 30.3364, 42.5016, 45.0388, 37.5924)
     }
 
     "calculate stochastic oscillator values (smooth k and smooth d)" in {
-      val (smoothK, smoothD) = MomentumOscillatorCalculator.stoch(
+      val (smoothK, smoothD) = MomentumOscillators.stoch(
         closings = values.map(_._4),
         highs = values.map(_._2),
         lows = values.map(_._3),

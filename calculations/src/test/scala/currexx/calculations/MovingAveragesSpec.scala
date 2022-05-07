@@ -5,35 +5,35 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.math.BigDecimal.RoundingMode
 
-class MovingAverageCalculatorSpec extends AnyWordSpec with Matchers {
+class MovingAveragesSpec extends AnyWordSpec with Matchers {
 
-  "A MovingAverageCalculator" should {
+  "A MovingAverages" should {
     "calculate Simple Moving Average" in {
-      val sma9 = MovingAverageCalculator.sma(values, 9)
+      val sma9 = MovingAverages.sma(values, 9)
 
       sma9.take(5).map(rounded(4)) mustBe List(1.2756, 1.2805, 1.2872, 1.2931, 1.2991)
     }
 
     "calculate Exponential Moving Average" in {
-      val ema12 = MovingAverageCalculator.ema(values, 12)
+      val ema12 = MovingAverages.ema(values, 12)
       ema12.take(5).map(rounded(4)) mustBe List(1.2761, 1.2795, 1.2857, 1.2914, 1.2977)
 
-      val ema26 = MovingAverageCalculator.ema(values, 26)
+      val ema26 = MovingAverages.ema(values, 26)
       ema26.take(5).map(rounded(4)) mustBe List(1.2918, 1.2946, 1.2985, 1.3020, 1.3056)
     }
 
     "calculate Moving Average Convergence/Divergence" in {
-      val macd = MovingAverageCalculator.macd(values)
+      val macd = MovingAverages.macd(values)
       macd.take(5).map(rounded(4)) mustBe List(-0.0157, -0.0151, -0.0128, -0.0106, -0.0079)
     }
 
     "calculate Weighted Moving Average" in {
-      val wma = MovingAverageCalculator.wma(values, 9)
+      val wma = MovingAverages.wma(values, 9)
       wma.take(5).map(rounded(4)) mustBe List(1.2650, 1.2697, 1.2780, 1.2859, 1.2943)
     }
 
     "calculate Hull Moving Average" in {
-      val hma = MovingAverageCalculator.hma(values, 9)
+      val hma = MovingAverages.hma(values, 9)
       hma.take(5).map(rounded(4)) mustBe List(1.2455, 1.2508, 1.2632, 1.2766, 1.2896)
     }
   }

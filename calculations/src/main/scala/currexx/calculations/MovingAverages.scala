@@ -3,7 +3,7 @@ package currexx.calculations
 import scala.annotation.tailrec
 import scala.collection.mutable.Queue
 
-object MovingAverageCalculator {
+object MovingAverages {
 
   private val EmaSmoothing: BigDecimal = BigDecimal(2.0d)
   private val Zero: BigDecimal         = BigDecimal(0)

@@ -3,7 +3,7 @@ package currexx.calculations
 import scala.annotation.tailrec
 import scala.collection.mutable.Queue
 
-object MomentumOscillatorCalculator {
+object MomentumOscillators {
 
   private val Zero: BigDecimal    = BigDecimal(0)
   private val Hundred: BigDecimal = BigDecimal(100.0)
@@ -56,8 +56,8 @@ object MomentumOscillatorCalculator {
       }
       i += 1
     }
-    val k = MovingAverageCalculator.sma(stochs.reverse.toList, slowKLength)
-    val d = MovingAverageCalculator.sma(k, slowDLength)
+    val k = MovingAverages.sma(stochs.reverse.toList, slowKLength)
+    val d = MovingAverages.sma(k, slowDLength)
     (k, d)
   }
 }
