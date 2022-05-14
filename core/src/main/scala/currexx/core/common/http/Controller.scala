@@ -49,8 +49,7 @@ trait Controller[F[_]] extends TapirJson with TapirSchema {
 
 object Controller extends TapirSchema with TapirJson {
   val validId: Validator[String] = Validator.custom { id =>
-    def error = ValidationError.Custom(id, s"Invalid hexadecimal representation of an id: $id", Nil)
-    Option.when(!ObjectId.isValid(id))(error).toList
+    if ObjectId.isValid(id) then ValidationResult.Valid else ValidationResult.Invalid(s"Invalid hexadecimal representation of an id: $id")
   }
 
   private val error = statusCode.and(jsonBody[ErrorResponse])
@@ -63,8 +62,7 @@ object Controller extends TapirSchema with TapirJson {
 
   def serverOptions[F[_]](using F: Sync[F]): Http4sServerOptions[F] = {
     val errorEndpointOut = (e: Throwable) => Some(ValuedEndpointOutput(error, Controller.mapError(e)))
-    Http4sServerOptions
-      .customiseInterceptors
+    Http4sServerOptions.customiseInterceptors
       .exceptionHandler(ExceptionHandler.pure((ctx: ExceptionContext) => errorEndpointOut(ctx.e)))
       .decodeFailureHandler { (ctx: DecodeFailureContext) =>
         if (ctx.failingInput.toString.matches("Header.Authorization.*")) {
@@ -77,7 +75,7 @@ object Controller extends TapirSchema with TapirJson {
           ctx.failure match
             case DecodeResult.Error(_, e) => errorEndpointOut(e)
             case DecodeResult.InvalidValue(e) =>
-              val msgs = e.collect { case ValidationError.Custom(_, msg, _) => msg }
+              val msgs = e.collect { case ValidationError(_, _, _, Some(msg)) => msg }
               errorEndpointOut(AppError.FailedValidation(msgs.mkString(", ")))
             case _ => None
         }
