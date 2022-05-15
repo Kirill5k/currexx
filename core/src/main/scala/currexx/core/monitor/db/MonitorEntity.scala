@@ -18,7 +18,6 @@ final case class MonitorEntity(
     active: Boolean,
     currencyPair: CurrencyPair,
     interval: Interval,
-    period: FiniteDuration,
     schedule: Schedule,
     lastQueriedAt: Option[Instant]
 ) derives Codec.AsObject:
@@ -29,7 +28,6 @@ final case class MonitorEntity(
       active,
       currencyPair,
       interval,
-      period,
       schedule,
       lastQueriedAt
     )
@@ -42,7 +40,6 @@ object MonitorEntity {
       true,
       create.currencyPair,
       create.interval,
-      create.period,
       create.schedule,
       None
     )

@@ -27,7 +27,7 @@ class MonitorRepositorySpec extends MongoSpec {
         yield (mid, mon)
 
         result.map { (mid, mon) =>
-          mon mustBe Monitor(mid, Users.uid, true, Markets.gbpeur, Interval.H1, 3.hours, Monitors.schedule, None)
+          mon mustBe Monitor(mid, Users.uid, true, Markets.gbpeur, Interval.H1, Monitors.schedule, None)
         }
       }
 

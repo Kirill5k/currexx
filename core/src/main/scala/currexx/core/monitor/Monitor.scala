@@ -17,7 +17,6 @@ final case class Monitor(
     active: Boolean,
     currencyPair: CurrencyPair,
     interval: Interval,
-    period: FiniteDuration,
     schedule: Schedule,
     lastQueriedAt: Option[Instant]
 )
@@ -26,6 +25,5 @@ final case class CreateMonitor(
     userId: UserId,
     currencyPair: CurrencyPair,
     interval: Interval,
-    period: FiniteDuration,
     schedule: Schedule
 )

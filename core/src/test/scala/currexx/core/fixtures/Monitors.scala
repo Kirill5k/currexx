@@ -12,15 +12,13 @@ import scala.concurrent.duration.*
 object Monitors {
   lazy val mid: MonitorId         = MonitorId(ObjectId.get())
   lazy val queriedAt: Instant     = Instant.now
-  lazy val period: FiniteDuration = 3.hours
-  lazy val schedule: Schedule     = Schedule.Periodic(period)
-  lazy val monitor: Monitor       = Monitor(mid, Users.uid, true, Markets.gbpeur, Interval.H1, period, schedule, Some(queriedAt))
+  lazy val schedule: Schedule     = Schedule.Periodic(3.hours)
+  lazy val monitor: Monitor       = Monitor(mid, Users.uid, true, Markets.gbpeur, Interval.H1, schedule, Some(queriedAt))
 
   def create(
       uid: UserId = Users.uid,
       pair: CurrencyPair = Markets.gbpeur,
       interval: Interval = Interval.H1,
-      period: FiniteDuration = 3.hours,
       schedule: Schedule = schedule
-  ): CreateMonitor = CreateMonitor(uid, pair, interval, period, schedule)
+  ): CreateMonitor = CreateMonitor(uid, pair, interval, schedule)
 }

@@ -84,7 +84,6 @@ final private class LiveMonitorRepository[F[_]](
               .set(Field.Active, mon.active)
               .set(Field.CurrencyPair, mon.currencyPair)
               .set("interval", mon.interval)
-              .set("period", mon.period)
               .set("schedule", mon.schedule)
           }
         case _ =>
@@ -95,5 +94,5 @@ final private class LiveMonitorRepository[F[_]](
 object MonitorRepository extends MongoJsonCodecs with JsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[MonitorRepository[F]] =
     db.getCollectionWithCodec[MonitorEntity]("monitors")
-      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[Interval].withAddedCodec[FiniteDuration].withAddedCodec[Schedule])
+      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[Interval].withAddedCodec[Schedule])
       .map(coll => LiveMonitorRepository[F](coll))

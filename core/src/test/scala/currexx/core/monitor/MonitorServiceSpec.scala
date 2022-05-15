@@ -224,7 +224,7 @@ class MonitorServiceSpec extends CatsSpec {
           verify(client).timeSeriesData(Markets.gbpeur, Interval.H1)
           verify(disp).dispatch(Action.ProcessMarketData(Users.uid, Markets.timeSeriesData))
           verify(repo).updateQueriedTimestamp(Users.uid, Monitors.mid)
-          verify(disp).dispatch(Action.ScheduleMonitor(Users.uid, Monitors.mid, Monitors.period))
+          verify(disp).dispatch(Action.ScheduleMonitor(Users.uid, Monitors.mid, 3.hours))
           verifyNoMoreInteractions(repo, client, disp)
           res mustBe ()
         }
@@ -242,7 +242,7 @@ class MonitorServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(repo).find(Users.uid, Monitors.mid)
-          verify(disp).dispatch(Action.ScheduleMonitor(Users.uid, Monitors.mid, Monitors.period))
+          verify(disp).dispatch(Action.ScheduleMonitor(Users.uid, Monitors.mid, 3.hours))
           verifyNoInteractions(client)
           verifyNoMoreInteractions(repo, disp)
           res mustBe ()
