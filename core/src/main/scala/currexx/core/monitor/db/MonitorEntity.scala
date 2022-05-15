@@ -5,6 +5,7 @@ import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId}
 import currexx.domain.user.UserId
 import currexx.domain.json.given
+import currexx.domain.monitor.Schedule
 import mongo4cats.bson.ObjectId
 import mongo4cats.circe.given
 
@@ -18,6 +19,7 @@ final case class MonitorEntity(
     currencyPair: CurrencyPair,
     interval: Interval,
     period: FiniteDuration,
+    schedule: Schedule,
     lastQueriedAt: Option[Instant]
 ) derives Codec.AsObject:
   def toDomain: Monitor =
@@ -28,6 +30,7 @@ final case class MonitorEntity(
       currencyPair,
       interval,
       period,
+      schedule,
       lastQueriedAt
     )
 
@@ -40,6 +43,7 @@ object MonitorEntity {
       create.currencyPair,
       create.interval,
       create.period,
+      create.schedule,
       None
     )
 }

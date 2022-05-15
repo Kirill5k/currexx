@@ -2,6 +2,7 @@ package currexx.core.monitor
 
 import currexx.domain.user.UserId
 import currexx.domain.market.{CurrencyPair, Interval}
+import currexx.domain.monitor.Schedule
 import currexx.domain.types.IdType
 
 import java.time.Instant
@@ -17,6 +18,7 @@ final case class Monitor(
     currencyPair: CurrencyPair,
     interval: Interval,
     period: FiniteDuration,
+    schedule: Schedule,
     lastQueriedAt: Option[Instant]
 )
 
@@ -24,5 +26,6 @@ final case class CreateMonitor(
     userId: UserId,
     currencyPair: CurrencyPair,
     interval: Interval,
-    period: FiniteDuration
+    period: FiniteDuration,
+    schedule: Schedule
 )

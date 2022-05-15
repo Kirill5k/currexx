@@ -8,6 +8,7 @@ import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval}
+import currexx.domain.monitor.Schedule
 import currexx.domain.user.UserId
 import io.circe.Codec
 import org.http4s.HttpRoutes
@@ -101,9 +102,10 @@ object MonitorController extends TapirSchema with TapirJson {
   final case class CreateMonitorRequest(
       currencyPair: CurrencyPair,
       interval: Interval,
-      period: FiniteDuration
+      period: FiniteDuration,
+      schedule: Schedule
   ) derives Codec.AsObject:
-    def toDomain(uid: UserId): CreateMonitor = CreateMonitor(uid, currencyPair, interval, period)
+    def toDomain(uid: UserId): CreateMonitor = CreateMonitor(uid, currencyPair, interval, period, schedule)
 
   final case class CreateMonitorResponse(id: MonitorId) derives Codec.AsObject
 
@@ -113,12 +115,13 @@ object MonitorController extends TapirSchema with TapirJson {
       currencyPair: CurrencyPair,
       interval: Interval,
       period: FiniteDuration,
+      schedule: Schedule,
       lastQueriedAt: Option[Instant]
   ) derives Codec.AsObject:
-    def toDomain(uid: UserId): Monitor = Monitor(MonitorId(id), uid, active, currencyPair, interval, period, lastQueriedAt)
+    def toDomain(uid: UserId): Monitor = Monitor(MonitorId(id), uid, active, currencyPair, interval, period, schedule, lastQueriedAt)
 
   object MonitorView:
-    def from(m: Monitor): MonitorView = MonitorView(m.id.value, m.active, m.currencyPair, m.interval, m.period, m.lastQueriedAt)
+    def from(m: Monitor): MonitorView = MonitorView(m.id.value, m.active, m.currencyPair, m.interval, m.period, m.schedule, m.lastQueriedAt)
 
   private val basePath = "monitors"
   private val monitorIdPath = basePath / path[String]

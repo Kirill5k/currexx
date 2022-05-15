@@ -26,7 +26,8 @@ class MonitorControllerSpec extends ControllerSpec {
           s"""{
              |"currencyPair": "GBP/EUR",
              |"interval": "H1",
-             |"period": "3 hours"
+             |"period": "3 hours",
+             |"schedule": {"kind":"periodic","period":"3 hours"}
              |}""".stripMargin
         )
 
@@ -47,7 +48,8 @@ class MonitorControllerSpec extends ControllerSpec {
           s"""{
              |"currencyPair": "GBP/EUR",
              |"interval": "H1",
-             |"period": "3 hours"
+             |"period": "3 hours",
+             |"schedule": {"kind":"periodic","period":"3 hours"}
              |}""".stripMargin
         )
 
@@ -146,6 +148,7 @@ class MonitorControllerSpec extends ControllerSpec {
              |"currencyPair": "${Markets.gbpeur}",
              |"interval": "H1",
              |"period": "3 hours",
+             |"schedule": {"kind":"periodic","period":"3 hours"},
              |"lastQueriedAt": "${Monitors.queriedAt}"
              |}]""".stripMargin
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
@@ -170,6 +173,7 @@ class MonitorControllerSpec extends ControllerSpec {
              |"currencyPair": "${Markets.gbpeur}",
              |"interval": "H1",
              |"period": "3 hours",
+             |"schedule": {"kind":"periodic","period":"3 hours"},
              |"lastQueriedAt": "${Monitors.queriedAt}"
              |}""".stripMargin
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
@@ -191,6 +195,7 @@ class MonitorControllerSpec extends ControllerSpec {
              |"currencyPair": "${Markets.gbpeur}",
              |"interval": "H1",
              |"period": "3 hours",
+             |"schedule": {"kind":"periodic","period":"3 hours"},
              |"lastQueriedAt": "${Monitors.queriedAt}"
              |}""".stripMargin
 
@@ -213,6 +218,7 @@ class MonitorControllerSpec extends ControllerSpec {
              |"currencyPair": "${Markets.gbpeur}",
              |"interval": "H1",
              |"period": "3 hours",
+             |"schedule": {"kind":"periodic","period":"3 hours"},
              |"lastQueriedAt": "${Monitors.queriedAt}"
              |}""".stripMargin
 
