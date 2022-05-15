@@ -7,10 +7,12 @@ import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.fixtures.{Markets, Monitors, Users}
 import currexx.core.monitor.db.MonitorRepository
 import currexx.domain.market.{CurrencyPair, Interval}
+import currexx.domain.monitor.Schedule
 import currexx.domain.user.UserId
 import fs2.Stream
 
 import java.time.Instant
+import scala.concurrent.duration.*
 
 class MonitorServiceSpec extends CatsSpec {
 
@@ -110,7 +112,7 @@ class MonitorServiceSpec extends CatsSpec {
     }
 
     "create" should {
-      "store monitor in db and submit query monitor action" in {
+      "store monitor in db and submit query monitor action when schedule is periodic" in {
         val (repo, disp, client) = mocks
         when(repo.create(any[CreateMonitor])).thenReturn(IO.pure(Monitors.mid))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
@@ -124,6 +126,25 @@ class MonitorServiceSpec extends CatsSpec {
           verifyNoInteractions(client)
           verify(repo).create(Monitors.create())
           verify(disp).dispatch(Action.QueryMonitor(Users.uid, Monitors.mid))
+          mid mustBe Monitors.mid
+        }
+      }
+
+      "store monitor in db and reschedule when schedule is cron" in {
+        val (repo, disp, client) = mocks
+        when(repo.create(any[CreateMonitor])).thenReturn(IO.pure(Monitors.mid))
+        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+
+        val schedule = Schedule.Cron("0 7,20 * * 1-5").value
+        val result = for
+          svc <- MonitorService.make[IO](repo, disp, client)
+          mid <- svc.create(Monitors.create(schedule = schedule))
+        yield mid
+
+        result.asserting { mid =>
+          verifyNoInteractions(client)
+          verify(repo).create(Monitors.create(schedule = schedule))
+          verify(disp).dispatch(any[Action.ScheduleMonitor])
           mid mustBe Monitors.mid
         }
       }
@@ -178,7 +199,7 @@ class MonitorServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(repo).stream
-          verify(disp).dispatch(any[Action.ScheduleMonitor])
+          verify(disp).dispatch(Action.ScheduleMonitor(Users.uid, Monitors.mid, 10800000.milliseconds))
           verifyNoInteractions(client)
           res mustBe ()
         }

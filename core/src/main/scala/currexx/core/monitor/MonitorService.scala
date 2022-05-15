@@ -9,6 +9,7 @@ import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.time.*
 import currexx.core.monitor.db.MonitorRepository
 import currexx.domain.market.CurrencyPair
+import currexx.domain.monitor.Schedule
 import currexx.domain.user.UserId
 
 import scala.concurrent.duration.Duration
@@ -44,19 +45,29 @@ final private class LiveMonitorService[F[_]](
     }
 
   override def create(cm: CreateMonitor): F[MonitorId] =
-    repository.create(cm).flatTap(mid => actionDispatcher.dispatch(Action.QueryMonitor(cm.userId, mid)))
+    repository.create(cm).flatTap(scheduleNew(cm.schedule, cm.userId))
+
+  private def scheduleNew(schedule: Schedule, uid: UserId)(mid: MonitorId): F[Unit] =
+    schedule match
+      case _: Schedule.Periodic =>
+        actionDispatcher.dispatch(Action.QueryMonitor(uid, mid))
+      case c: Schedule.Cron =>
+        F.realTimeInstant.flatMap { now =>
+          actionDispatcher.dispatch(Action.ScheduleMonitor(uid, mid, now.durationBetween(c.nextExecutionTime(now))))
+        }
 
   override def query(uid: UserId, id: MonitorId): F[Unit] =
     for
       mon <- get(uid, id)
-      _ <-
-        if (mon.active)
-          marketDataClient
-            .timeSeriesData(mon.currencyPair, mon.interval)
-            .flatMap(tsd => actionDispatcher.dispatch(Action.ProcessMarketData(uid, tsd)))
-            .flatTap(_ => repository.updateQueriedTimestamp(uid, id))
-        else F.unit
-      _ <- actionDispatcher.dispatch(Action.ScheduleMonitor(uid, id, mon.period))
+      _ <- F.whenA(mon.active) {
+        marketDataClient
+          .timeSeriesData(mon.currencyPair, mon.interval)
+          .flatMap(tsd => actionDispatcher.dispatch(Action.ProcessMarketData(uid, tsd)))
+          .flatTap(_ => repository.updateQueriedTimestamp(uid, id))
+      }
+      now <- F.realTimeInstant
+      next = mon.schedule.nextExecutionTime(now)
+      _ <- actionDispatcher.dispatch(Action.ScheduleMonitor(uid, id, now.durationBetween(next)))
     yield ()
 
   override def rescheduleAll: F[Unit] =
@@ -64,10 +75,12 @@ final private class LiveMonitorService[F[_]](
       repository.stream
         .mapAsync(Int.MaxValue) { mon =>
           mon.lastQueriedAt
-            .map(now.durationBetween)
-            .filter(_ <= mon.period)
-            .map(db => actionDispatcher.dispatch(Action.ScheduleMonitor(mon.userId, mon.id, mon.period - db)))
-            .getOrElse(actionDispatcher.dispatch(Action.QueryMonitor(mon.userId, mon.id)))
+            .flatMap { prev =>
+              val next = mon.schedule.nextExecutionTime(prev)
+              Option.when(next.isAfter(now))(prev.durationBetween(next))
+            }
+            .map(db => actionDispatcher.dispatch(Action.ScheduleMonitor(mon.userId, mon.id, db)))
+            .getOrElse(scheduleNew(mon.schedule, mon.userId)(mon.id))
         }
         .compile
         .drain

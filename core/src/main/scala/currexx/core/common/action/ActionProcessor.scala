@@ -55,8 +55,7 @@ final private class LiveActionProcessor[F[_]](
         logger.warn(error)(s"domain error while processing action $action")
       case error =>
         logger.error(error)(s"unexpected error processing action $action") *>
-          Temporal[F].sleep(1.second) *>
-          dispatcher.dispatch(action)
+          F.sleep(1.second) *> dispatcher.dispatch(action)
     }
 }
 
