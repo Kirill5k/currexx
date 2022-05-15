@@ -37,7 +37,7 @@ final private class LiveSignalRepository[F[_]: Async](
       .map(_ == 0)
 
   override def getAll(userId: UserId): F[List[Signal]] =
-    collection.find(userIdEq(userId)).all.map(_.map(_.toDomain).toList)
+    collection.find(userIdEq(userId)).sortByDesc("time").all.map(_.map(_.toDomain).toList)
 }
 
 object SignalRepository extends MongoJsonCodecs:

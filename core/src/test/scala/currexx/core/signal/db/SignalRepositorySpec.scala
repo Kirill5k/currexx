@@ -26,6 +26,17 @@ class SignalRepositorySpec extends MongoSpec {
     }
 
     "getAll" should {
+      "return all signals sorted by time in descending order" in withEmbeddedMongoDb { db =>
+        val result = for
+          repo <- SignalRepository.make(db)
+          _    <- repo.save(Signals.macd)
+          _    <- repo.save(Signals.macd.copy(time = Signals.ts.minusSeconds(10)))
+          res  <- repo.getAll(Users.uid)
+        yield res
+
+        result.map(_.head mustBe Signals.macd)
+      }
+
       "not return anything when there are no signals for provided user-id" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- SignalRepository.make(db)
