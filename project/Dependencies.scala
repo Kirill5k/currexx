@@ -14,15 +14,17 @@ object Dependencies {
     val refined    = "0.9.28"
     val tapir      = "1.0.0-M9"
     val jwt        = "9.0.5"
+    val cronUtils  = "9.1.6"
 
     val scalaTest = "3.2.12"
     val mockito   = "3.2.10.0"
   }
 
   object Libraries {
-    val squants = "org.typelevel"        %% "squants"      % Versions.squants
-    val bcrypt  = "com.github.t3hnar"    %% "scala-bcrypt" % Versions.bcrypt
-    val jwt     = "com.github.jwt-scala" %% "jwt-circe"    % Versions.jwt
+    val squants   = "org.typelevel"        %% "squants"      % Versions.squants
+    val bcrypt    = "com.github.t3hnar"    %% "scala-bcrypt" % Versions.bcrypt
+    val jwt       = "com.github.jwt-scala" %% "jwt-circe"    % Versions.jwt
+    val cronUtils = "com.cronutils"         % "cron-utils"   % Versions.cronUtils
 
     object mongo4cats {
       val core     = "io.github.kirill5k" %% "mongo4cats-core"     % Versions.mongo4cats
@@ -80,6 +82,7 @@ object Dependencies {
 
   val domain = Seq(
     Libraries.squants,
+    Libraries.cronUtils,
     Libraries.mongo4cats.core,
     Libraries.mongo4cats.circe
   ) ++
