@@ -11,6 +11,7 @@ import currexx.core.monitor.db.MonitorRepository
 import currexx.domain.market.CurrencyPair
 import currexx.domain.monitor.Schedule
 import currexx.domain.user.UserId
+import fs2.Stream
 
 import scala.concurrent.duration.Duration
 
@@ -73,15 +74,16 @@ final private class LiveMonitorService[F[_]](
   override def rescheduleAll: F[Unit] =
     F.realTimeInstant.flatMap { now =>
       repository.stream
-        .mapAsync(Int.MaxValue) { mon =>
-          mon.lastQueriedAt
-            .flatMap { prev =>
-              val next = mon.schedule.nextExecutionTime(prev)
-              Option.when(next.isAfter(now))(prev.durationBetween(next))
-            }
-            .map(db => actionDispatcher.dispatch(Action.ScheduleMonitor(mon.userId, mon.id, db)))
-            .getOrElse(scheduleNew(mon.schedule, mon.userId)(mon.id))
+        .map { mon =>
+          val duration = mon.lastQueriedAt
+            .map(prev => prev -> mon.schedule.nextExecutionTime(prev))
+            .flatMap((prev, next) => Option.when(next.isAfter(now))(prev.durationBetween(next)))
+          duration match
+            case Some(db) => actionDispatcher.dispatch(Action.ScheduleMonitor(mon.userId, mon.id, db))
+            case None     => scheduleNew(mon.schedule, mon.userId)(mon.id)
         }
+        .map(Stream.eval)
+        .parJoinUnbounded
         .compile
         .drain
     }
