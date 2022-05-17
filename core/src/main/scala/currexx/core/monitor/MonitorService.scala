@@ -76,8 +76,9 @@ final private class LiveMonitorService[F[_]](
       repository.stream
         .map { mon =>
           val duration = mon.lastQueriedAt
-            .map(prev => prev -> mon.schedule.nextExecutionTime(prev))
-            .flatMap((prev, next) => Option.when(next.isAfter(now))(prev.durationBetween(next)))
+            .map(prev => mon.schedule.nextExecutionTime(prev))
+            .filter(_.isAfter(now))
+            .map(now.durationBetween(_))
           duration match
             case Some(db) => actionDispatcher.dispatch(Action.ScheduleMonitor(mon.userId, mon.id, db))
             case None     => scheduleNew(mon.schedule, mon.userId)(mon.id)

@@ -199,7 +199,7 @@ class MonitorServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(repo).stream
-          verify(disp).dispatch(Action.ScheduleMonitor(Users.uid, Monitors.mid, 10800000.milliseconds))
+          verify(disp).dispatch(any[Action.ScheduleMonitor])
           verifyNoInteractions(client)
           res mustBe ()
         }
