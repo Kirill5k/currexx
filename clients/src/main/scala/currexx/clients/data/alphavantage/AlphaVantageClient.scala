@@ -5,6 +5,7 @@ import cats.effect.Temporal
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import cats.syntax.applicativeError.*
 import currexx.clients.data.MarketDataClient
 import currexx.clients.{ClientConfig, HttpClient}
 import currexx.domain.errors.AppError
@@ -67,7 +68,11 @@ final private class LiveAlphaVantageClient[F[_]](
       .map(prs => MarketTimeSeriesData(pair, interval, prs))
   }
 
-  private def sendRequest(uri: Uri, mapper: JsonObject => Either[AppError, NonEmptyList[PriceRange]]): F[NonEmptyList[PriceRange]] =
+  private def sendRequest(
+      uri: Uri,
+      mapper: JsonObject => Either[AppError, NonEmptyList[PriceRange]],
+      attempt: Int = 0
+  ): F[NonEmptyList[PriceRange]] =
     dispatch(basicRequest.get(uri).response(asJson[JsonObject]))
       .flatMap { r =>
         r.body match {
@@ -83,6 +88,10 @@ final private class LiveAlphaVantageClient[F[_]](
             logger.error(s"$name-client/error\n$error") *>
               F.sleep(delayBetweenFailures) *> sendRequest(uri, mapper)
         }
+      }
+      .handleErrorWith { error =>
+        if (attempt < 5) sendRequest(uri, mapper, attempt + 1)
+        else F.raiseError(error)
       }
 
 private[clients] object AlphaVantageClient {
