@@ -12,7 +12,7 @@ object Dependencies {
     val squants    = "1.8.3"
     val bcrypt     = "4.3.0"
     val refined    = "0.9.28"
-    val tapir      = "1.0.0-M9"
+    val tapir      = "1.0.0-RC1"
     val jwt        = "9.0.5"
     val cronUtils  = "9.1.6"
 
