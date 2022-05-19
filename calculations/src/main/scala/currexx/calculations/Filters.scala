@@ -29,4 +29,29 @@ object Filters {
       }
     calc(values.reverse, initialGuess, math.pow(initializationEstimateError, 2) + noiseVariance, Nil)
   }
+
+  def kalmanWithVelocity(
+      values: List[Double],
+      initialGuess: Double,
+      initialVelocity: Double,
+      alpha: Double,
+      beta: Double,
+      time: Int
+  ): List[Double] = {
+    @tailrec
+    def calc(
+        measurements: List[Double],
+        prevEstimate: Double,
+        prevVelocity: Double,
+        predictions: List[Double]
+    ): List[Double] =
+      if (measurements.isEmpty) predictions
+      else {
+        val currentEstimate = prevEstimate + alpha * (measurements.head - prevEstimate)
+        val currentVelocity = prevVelocity + beta * ((measurements.head - prevEstimate) / time)
+        val nextEstimate    = currentEstimate + time * currentVelocity
+        calc(measurements.tail, nextEstimate, currentVelocity, currentEstimate :: predictions)
+      }
+    calc(values.reverse, initialGuess + time * initialVelocity, initialVelocity, Nil)
+  }
 }
