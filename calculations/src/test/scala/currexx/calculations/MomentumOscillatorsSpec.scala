@@ -29,11 +29,11 @@ class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
     }
   }
 
-  def rounded(scale: Int)(num: BigDecimal): BigDecimal =
-    num.setScale(scale, RoundingMode.HALF_UP)
+  def rounded(scale: Int)(num: Double): Double =
+    BigDecimal(num).setScale(scale, RoundingMode.HALF_UP).toDouble
 
   // OPEN, HIGH, LOW, CLOSE
-  val values = List(
+  val values: List[(Double, Double, Double, Double)] = List(
     (1.28271, 1.28305, 1.27040, 1.27306),
     (1.30328, 1.30350, 1.28200, 1.28370),
     (1.30620, 1.30902, 1.30210, 1.30320),
@@ -134,5 +134,5 @@ class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
     (1.32015, 1.32225, 1.31690, 1.32186),
     (1.32427, 1.32612, 1.31601, 1.32019),
     (1.32611, 1.32894, 1.32070, 1.32423)
-  ).map((o, h, l, c) => (BigDecimal(o), BigDecimal(h), BigDecimal(l), BigDecimal(c)))
+  )
 }

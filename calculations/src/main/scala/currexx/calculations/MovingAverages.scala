@@ -5,16 +5,15 @@ import scala.collection.mutable.Queue
 
 object MovingAverages {
 
-  private val EmaSmoothing: BigDecimal = BigDecimal(2.0d)
-  private val Zero: BigDecimal         = BigDecimal(0)
+  private val EmaSmoothing: Double = 2.0d
 
-  private def emaAsArray(values: List[BigDecimal], n: Int, smoothing: BigDecimal = EmaSmoothing): Array[BigDecimal] = {
+  private def emaAsArray(values: List[Double], n: Int, smoothing: Double = EmaSmoothing): Array[Double] = {
     val k         = smoothing / (1 + n)
     val allValues = values.reverse
-    val emas      = Array.ofDim[BigDecimal](allValues.size)
+    val emas      = Array.ofDim[Double](allValues.size)
     emas(allValues.size - 1) = allValues.head
     @tailrec
-    def calc(remainingValues: List[BigDecimal], i: Int): Array[BigDecimal] =
+    def calc(remainingValues: List[Double], i: Int): Array[Double] =
       if (remainingValues.isEmpty) emas
       else {
         val ema = remainingValues.head * k + emas(i) * (1 - k)
@@ -24,13 +23,13 @@ object MovingAverages {
     calc(allValues.tail, allValues.size - 1)
   }
 
-  def ema(values: List[BigDecimal], n: Int, smoothing: BigDecimal = EmaSmoothing): List[BigDecimal] =
+  def ema(values: List[Double], n: Int, smoothing: Double = EmaSmoothing): List[Double] =
     emaAsArray(values, n, smoothing).toList
 
-  def sma(values: List[BigDecimal], n: Int): List[BigDecimal] = {
-    val smas = Array.ofDim[BigDecimal](values.size)
+  def sma(values: List[Double], n: Int): List[Double] = {
+    val smas = Array.ofDim[Double](values.size)
     @tailrec
-    def calc(queue: Queue[BigDecimal], remaining: List[BigDecimal], i: Int): List[BigDecimal] =
+    def calc(queue: Queue[Double], remaining: List[Double], i: Int): List[Double] =
       if (remaining.isEmpty) smas.drop(i).toList
       else if (queue.size < n) calc(queue.addOne(remaining.head), remaining.tail, i)
       else {
@@ -41,10 +40,10 @@ object MovingAverages {
     calc(Queue.empty, values.reverse, values.size)
   }
 
-  def macd(values: List[BigDecimal], fastLength: Int = 12, slowLength: Int = 26): List[BigDecimal] = {
+  def macd(values: List[Double], fastLength: Int = 12, slowLength: Int = 26): List[Double] = {
     val fastMa = emaAsArray(values, fastLength)
     val slowMa = emaAsArray(values, slowLength)
-    val macd   = Array.ofDim[BigDecimal](values.size)
+    val macd   = Array.ofDim[Double](values.size)
     var i      = 0
     while (i < values.size) {
       macd(i) = fastMa(i) - slowMa(i)
@@ -54,35 +53,35 @@ object MovingAverages {
   }
 
   def macdWithSignal(
-      values: List[BigDecimal],
+      values: List[Double],
       fastLength: Int = 12,
       slowLength: Int = 26,
       signalSmoothing: Int = 9
-  ): (List[BigDecimal], List[BigDecimal]) = {
+  ): (List[Double], List[Double]) = {
     val macdLine   = macd(values, fastLength, slowLength)
     val signalLine = sma(macdLine, signalSmoothing)
     (macdLine, signalLine)
   }
 
-  def wmaAsArray(values: List[BigDecimal], n: Int): Array[BigDecimal] = {
-    val wmas    = Array.ofDim[BigDecimal](values.size)
+  def wmaAsArray(values: List[Double], n: Int): Array[Double] = {
+    val wmas    = Array.ofDim[Double](values.size)
     val divider = (n * (n + 1)) / 2
     @tailrec
-    def calc(queue: Queue[BigDecimal], remaining: List[BigDecimal], i: Int): Array[BigDecimal] =
+    def calc(queue: Queue[Double], remaining: List[Double], i: Int): Array[Double] =
       if (remaining.isEmpty) wmas.drop(i)
       else if (queue.size < n) calc(queue.addOne(remaining.head), remaining.tail, i)
       else {
         val updatedQueue = queue.drop(1).addOne(remaining.head)
-        wmas(i - 1) = updatedQueue.zipWithIndex.foldLeft(Zero) { case (sum, (v, i)) => (sum + (n + i + 1 - n) * v) } / divider
+        wmas(i - 1) = updatedQueue.zipWithIndex.foldLeft(0d) { case (sum, (v, i)) => (sum + (n + i + 1 - n) * v) } / divider
         calc(updatedQueue, remaining.tail, i - 1)
       }
     calc(Queue.empty, values.reverse, values.size)
   }
 
-  def wma(values: List[BigDecimal], n: Int): List[BigDecimal] =
+  def wma(values: List[Double], n: Int): List[Double] =
     wmaAsArray(values, n).toList
 
-  def hma(values: List[BigDecimal], n: Int): List[BigDecimal] = {
+  def hma(values: List[Double], n: Int): List[Double] = {
     val n2    = math.round(n.toDouble / 2).toInt
     val nwma  = wmaAsArray(values, n)
     val n2wma = wmaAsArray(values, n2).take(nwma.length).map(_ * 2)

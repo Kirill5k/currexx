@@ -38,10 +38,10 @@ class MovingAveragesSpec extends AnyWordSpec with Matchers {
     }
   }
 
-  def rounded(scale: Int)(num: BigDecimal): BigDecimal =
-    num.setScale(scale, RoundingMode.HALF_UP)
+  def rounded(scale: Int)(num: Double): Double =
+    BigDecimal(num).setScale(scale, RoundingMode.HALF_UP).toDouble
 
-  val values = List(
+  val values: List[Double] = List(
     "1.25710",
     "1.24554",
     "1.25396",
@@ -142,5 +142,5 @@ class MovingAveragesSpec extends AnyWordSpec with Matchers {
     "1.32603",
     "1.32310",
     "1.32131"
-  ).map(BigDecimal.apply)
+  ).map(_.toDouble)
 }
