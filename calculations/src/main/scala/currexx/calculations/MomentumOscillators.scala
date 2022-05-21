@@ -5,7 +5,7 @@ import scala.collection.mutable.Queue
 
 object MomentumOscillators {
 
-  def rsi(values: List[Double], length: Int): List[Double] = {
+  def relativeStrengthIndex(values: List[Double], length: Int): List[Double] = {
     val rsis = Array.ofDim[Double](values.size)
     @tailrec
     def calc(remainingValues: List[Double], prevValue: Double, i: Int, gain: Double, loss: Double): Array[Double] =
@@ -28,7 +28,7 @@ object MomentumOscillators {
     calc(allValues.tail, allValues.head, 1, 0d, 0d).take(rsis.length - length).toList
   }
 
-  def stoch(
+  def stochastic(
       closings: List[Double],
       highs: List[Double],
       lows: List[Double],
@@ -53,8 +53,8 @@ object MomentumOscillators {
       }
       i += 1
     }
-    val k = MovingAverages.sma(stochs.reverse.toList, slowKLength)
-    val d = MovingAverages.sma(k, slowDLength)
+    val k = MovingAverages.simple(stochs.reverse.toList, slowKLength)
+    val d = MovingAverages.simple(k, slowDLength)
     (k, d)
   }
 }

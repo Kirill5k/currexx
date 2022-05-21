@@ -78,7 +78,7 @@ object SignalService:
   }
 
   def detectRsi(uid: UserId, data: MarketTimeSeriesData, rsi: IndicatorParameters.RSI): Option[Signal] = {
-    val rsis    = MomentumOscillators.rsi(data.prices.map(_.close.toDouble).toList, rsi.length)
+    val rsis    = MomentumOscillators.relativeStrengthIndex(data.prices.map(_.close.toDouble).toList, rsi.length)
     val currRsi = rsis.head
     def above   = Option.when(currRsi > rsi.upperLine)(Condition.AboveThreshold(BigDecimal(rsi.upperLine), currRsi))
     def below   = Option.when(currRsi < rsi.lowerLine)(Condition.BelowThreshold(BigDecimal(rsi.lowerLine), currRsi))
@@ -88,7 +88,7 @@ object SignalService:
   }
 
   def detectStoch(uid: UserId, data: MarketTimeSeriesData, stoch: IndicatorParameters.STOCH): Option[Signal] = {
-    val (k, d) = MomentumOscillators.stoch(
+    val (k, d) = MomentumOscillators.stochastic(
       closings = data.prices.map(_.close.toDouble).toList,
       highs = data.prices.map(_.high.toDouble).toList,
       lows = data.prices.map(_.low.toDouble).toList,
@@ -105,7 +105,7 @@ object SignalService:
   }
 
   def detectHma(uid: UserId, data: MarketTimeSeriesData, hma: IndicatorParameters.HMA): Option[Signal] = {
-    val hmas  = MovingAverages.hma(data.prices.toList.map(_.close.toDouble), hma.length).toArray.take(5)
+    val hmas  = MovingAverages.hull(data.prices.toList.map(_.close.toDouble), hma.length).toArray.take(5)
     val hmas2 = hmas.tail
     val hmas3 = hmas.zip(hmas.map(-_)).map(_ - _)
     val hmas4 = hmas.zip(hmas).map(_ + _)

@@ -7,7 +7,7 @@ object MovingAverages {
 
   private val EmaSmoothing: Double = 2.0d
 
-  private def emaAsArray(values: List[Double], n: Int, smoothing: Double = EmaSmoothing): Array[Double] = {
+  private def exponentialAsArray(values: List[Double], n: Int, smoothing: Double = EmaSmoothing): Array[Double] = {
     val k         = smoothing / (1 + n)
     val allValues = values.reverse
     val emas      = Array.ofDim[Double](allValues.size)
@@ -23,10 +23,10 @@ object MovingAverages {
     calc(allValues.tail, allValues.size - 1)
   }
 
-  def ema(values: List[Double], n: Int, smoothing: Double = EmaSmoothing): List[Double] =
-    emaAsArray(values, n, smoothing).toList
+  def exponential(values: List[Double], n: Int, smoothing: Double = EmaSmoothing): List[Double] =
+    exponentialAsArray(values, n, smoothing).toList
 
-  def sma(values: List[Double], n: Int): List[Double] = {
+  def simple(values: List[Double], n: Int): List[Double] = {
     val smas = Array.ofDim[Double](values.size)
     @tailrec
     def calc(queue: Queue[Double], remaining: List[Double], i: Int): List[Double] =
@@ -41,8 +41,8 @@ object MovingAverages {
   }
 
   def macd(values: List[Double], fastLength: Int = 12, slowLength: Int = 26): List[Double] = {
-    val fastMa = emaAsArray(values, fastLength)
-    val slowMa = emaAsArray(values, slowLength)
+    val fastMa = exponentialAsArray(values, fastLength)
+    val slowMa = exponentialAsArray(values, slowLength)
     val macd   = Array.ofDim[Double](values.size)
     var i      = 0
     while (i < values.size) {
@@ -59,11 +59,11 @@ object MovingAverages {
       signalSmoothing: Int = 9
   ): (List[Double], List[Double]) = {
     val macdLine   = macd(values, fastLength, slowLength)
-    val signalLine = sma(macdLine, signalSmoothing)
+    val signalLine = simple(macdLine, signalSmoothing)
     (macdLine, signalLine)
   }
 
-  def wmaAsArray(values: List[Double], n: Int): Array[Double] = {
+  def weightedAsArray(values: List[Double], n: Int): Array[Double] = {
     val wmas    = Array.ofDim[Double](values.size)
     val divider = (n * (n + 1)) / 2
     @tailrec
@@ -78,15 +78,15 @@ object MovingAverages {
     calc(Queue.empty, values.reverse, values.size)
   }
 
-  def wma(values: List[Double], n: Int): List[Double] =
-    wmaAsArray(values, n).toList
+  def weighted(values: List[Double], n: Int): List[Double] =
+    weightedAsArray(values, n).toList
 
-  def hma(values: List[Double], n: Int): List[Double] = {
+  def hull(values: List[Double], n: Int): List[Double] = {
     val n2    = math.round(n.toDouble / 2).toInt
-    val nwma  = wmaAsArray(values, n)
-    val n2wma = wmaAsArray(values, n2).take(nwma.length).map(_ * 2)
+    val nwma  = weightedAsArray(values, n)
+    val n2wma = weightedAsArray(values, n2).take(nwma.length).map(_ * 2)
     val diff  = n2wma.zip(nwma).map(_ - _)
     val sqn   = math.round(math.sqrt(n.toDouble)).toInt
-    wma(diff.toList, sqn)
+    weighted(diff.toList, sqn)
   }
 }
