@@ -6,7 +6,7 @@ import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.domain.user.UserId
-import currexx.calculations.{MomentumOscillators, MovingAverages}
+import currexx.calculations.{Filters, MomentumOscillators, MovingAverages}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorParameters, MarketTimeSeriesData, Trend}
@@ -107,10 +107,12 @@ object SignalService:
   }
 
   def detectHma(uid: UserId, data: MarketTimeSeriesData, hma: IndicatorParameters.HMA): Option[Signal] = {
-    val hmas  = MovingAverages.hull(data.prices.toList.map(_.close.toDouble), hma.length).toArray.take(5)
-    val hmas2 = hmas.tail
-    val hmas3 = hmas.zip(hmas.map(-_)).map(_ - _)
-    val hmas4 = hmas.zip(hmas).map(_ + _)
+    val values = data.prices.toList.map(_.close.toDouble)
+    val kalman = hma.kalmanSmoothing.map(ks => Filters.ghkKalman(values, ks.alpha, ks.betta, ks.gamma, values.last, 0d, 0d, 1))
+    val hmas   = MovingAverages.hull(kalman.getOrElse(values), hma.length).toArray.take(5)
+    val hmas2  = hmas.tail
+    val hmas3  = hmas.zip(hmas.map(-_)).map(_ - _)
+    val hmas4  = hmas.zip(hmas).map(_ + _)
 
     val diff  = hmas2.zip(hmas3).map(_ - _)
     val diff3 = hmas4.zip(hmas2).map(_ - _)

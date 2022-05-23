@@ -6,11 +6,11 @@ object Filters {
 
   def ghKalman(
       values: List[Double],
+      alpha: Double,
+      beta: Double,
       initialGuess: Double,
       initialVelocity: Double,
-      time: Int,
-      alpha: Double,
-      beta: Double
+      time: Int
   ): List[Double] = {
     @tailrec
     def calc(
@@ -31,13 +31,13 @@ object Filters {
 
   def ghkKalman(
       values: List[Double],
+      alpha: Double,
+      beta: Double,
+      gamma: Double,
       initialGuess: Double,
       initialVelocity: Double,
       initialAcceleration: Double,
-      time: Int,
-      alpha: Double,
-      beta: Double,
-      gamma: Double
+      time: Int
   ): List[Double] = {
     @tailrec
     def calc(

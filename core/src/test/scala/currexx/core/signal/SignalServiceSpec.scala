@@ -2,7 +2,6 @@ package currexx.core.signal
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import cats.effect.unsafe.implicits.global
 import currexx.core.CatsSpec
 import currexx.domain.user.UserId
 import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorParameters, Trend}
