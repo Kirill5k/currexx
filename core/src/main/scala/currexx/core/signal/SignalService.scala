@@ -45,18 +45,20 @@ final private class LiveSignalService[F[_]](
           settingsRepo.update(defaultSettings).as(defaultSettings)
       }
       .flatMap { settings =>
-        Stream.emits(
-          settings.indicators.flatMap {
-            case macd: IndicatorParameters.MACD   => SignalService.detectMacd(uid, data, macd)
-            case rsi: IndicatorParameters.RSI     => SignalService.detectRsi(uid, data, rsi)
-            case stoch: IndicatorParameters.STOCH => SignalService.detectStoch(uid, data, stoch)
-            case hma: IndicatorParameters.HMA     => SignalService.detectHma(uid, data, hma)
+        Stream
+          .emits(
+            settings.indicators.flatMap {
+              case macd: IndicatorParameters.MACD        => SignalService.detectMacd(uid, data, macd)
+              case rsi: IndicatorParameters.RSI          => SignalService.detectRsi(uid, data, rsi)
+              case hma: IndicatorParameters.HMA          => SignalService.detectHma(uid, data, hma)
+              case stoch: IndicatorParameters.Stochastic => SignalService.detectStoch(uid, data, stoch)
+            }
+          )
+          .evalFilter { signal =>
+            settings.triggerFrequency match
+              case TriggerFrequency.Continuously => F.pure(true)
+              case TriggerFrequency.OncePerDay   => signalRepo.isFirstOfItsKindForThatDate(signal)
           }
-        ).evalFilter { signal =>
-          settings.triggerFrequency match
-            case TriggerFrequency.Continuously => F.pure(true)
-            case TriggerFrequency.OncePerDay => signalRepo.isFirstOfItsKindForThatDate(signal)
-        }
       }
       .evalMap(submit)
       .compile
@@ -87,7 +89,7 @@ object SignalService:
       .map(c => Signal(uid, data.currencyPair, rsi.indicator, c, data.prices.head.time))
   }
 
-  def detectStoch(uid: UserId, data: MarketTimeSeriesData, stoch: IndicatorParameters.STOCH): Option[Signal] = {
+  def detectStoch(uid: UserId, data: MarketTimeSeriesData, stoch: IndicatorParameters.Stochastic): Option[Signal] = {
     val (k, d) = MomentumOscillators.stochastic(
       closings = data.prices.map(_.close.toDouble).toList,
       highs = data.prices.map(_.high.toDouble).toList,
