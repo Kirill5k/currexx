@@ -30,7 +30,7 @@ object Backtester extends IOApp.Simple {
     userId,
     TriggerFrequency.OncePerDay,
     List(
-      IndicatorParameters.HMA(7, Some(KalmanSmoothing(0.6D, 0.6D, 0.6D)))
+      IndicatorParameters.HMA(12, Some(KalmanSmoothing(0.6D, 0.6D, 0.6D)))
       // IndicatorParameters.MACD(fastLength = 12, slowLength = 26, signalSmoothing = 9),
       // IndicatorParameters.RSI(length = 14, upperLine = 70, lowerLine = 30)
     )
