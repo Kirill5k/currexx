@@ -15,8 +15,21 @@ class MarketControllerSpec extends ControllerSpec {
   "A MarketController" when {
     given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
+    "DELETE /market/state" should {
+      "clear state of traded currencies" in {
+        val svc = mock[MarketService[IO]]
+        when(svc.clearState(any[UserId])).thenReturn(IO.unit)
+
+        val req = requestWithAuthHeader(uri"/market/state", Method.DELETE)
+        val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        verifyJsonResponse(res, Status.NoContent, None)
+        verify(svc).clearState(Users.uid)
+      }
+    }
+
     "GET /market/state" should {
-      "return state of the traded currencies" in {
+      "return state of traded currencies" in {
         val svc = mock[MarketService[IO]]
         when(svc.getState(any[UserId])).thenReturn(IO.pure(List(Markets.stateWithSignal)))
 

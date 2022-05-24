@@ -32,10 +32,19 @@ final private class MarketController[F[_]](
           .mapResponse(_.map(s => s.currencyPair.toString -> MarketStateView.from(s)).toMap)
       }
 
+  private def clearMarketState(using auth: Authenticator[F]) =
+    clearMarketStateEndpoint.withAuthenticatedSession
+      .serverLogic { session => _ =>
+        service
+          .clearState(session.userId)
+          .voidResponse
+      }
+
   def routes(using authenticator: Authenticator[F]): HttpRoutes[F] =
     Http4sServerInterpreter[F](Controller.serverOptions).toRoutes(
       List(
-        getMarketState
+        getMarketState,
+        clearMarketState
       )
     )
 }
@@ -64,7 +73,12 @@ object MarketController extends TapirSchema with TapirJson with TapirCodecs {
   val getMarketStateEndpoint = Controller.securedEndpoint.get
     .in(statePath)
     .out(jsonBody[Map[String, MarketStateView]])
-    .description("Retrieve latest state of the traded currencies")
+    .description("Retrieve latest state of traded currencies")
+
+  val clearMarketStateEndpoint = Controller.securedEndpoint.delete
+    .in(statePath)
+    .out(statusCode(StatusCode.NoContent))
+    .description("Clear all states of traded currencies")
 
   def make[F[_]: Async](service: MarketService[F]): F[Controller[F]] =
     Monad[F].pure(MarketController[F](service))
