@@ -22,7 +22,7 @@ object IndicatorParameters {
       alpha: Double,
       betta: Double,
       gamma: Double
-  )
+  ) derives Codec.AsObject
 
   final case class MACD(
       fastLength: Int = 12,
