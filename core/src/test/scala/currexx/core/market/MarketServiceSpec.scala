@@ -15,6 +15,24 @@ import scala.concurrent.duration.*
 class MarketServiceSpec extends CatsSpec {
 
   "A MarketService" when {
+    "clearState" should {
+      "delete all existing market states" in {
+        val (stateRepo, disp) = mocks
+        when(stateRepo.deleteAll(any[UserId])).thenReturn(IO.unit)
+
+        val result = for
+          svc   <- MarketService.make[IO](stateRepo, disp)
+          state <- svc.clearState(Users.uid)
+        yield state
+
+        result.asserting { res =>
+          verify(stateRepo).deleteAll(Users.uid)
+          verifyNoInteractions(disp)
+          res mustBe ()
+        }
+      }
+    }
+
     "getState" should {
       "return state of all traded currencies" in {
         val (stateRepo, disp) = mocks

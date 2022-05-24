@@ -22,6 +22,7 @@ trait MarketStateRepository[F[_]] extends Repository[F]:
   def update(uid: UserId, pair: CurrencyPair, price: PriceRange): F[MarketState]
   def update(uid: UserId, pair: CurrencyPair, position: Option[TradeOrder.Position]): F[MarketState]
   def getAll(uid: UserId): F[List[MarketState]]
+  def deleteAll(uid: UserId): F[Unit]
   def find(uid: UserId, pair: CurrencyPair): F[Option[MarketState]]
 
 final private class LiveMarketStateRepository[F[_]](
@@ -31,6 +32,9 @@ final private class LiveMarketStateRepository[F[_]](
 ) extends MarketStateRepository[F] {
 
   private val updateOptions = FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER)
+
+  override def deleteAll(uid: UserId): F[Unit] =
+    collection.deleteMany(userIdEq(uid)).void
 
   override def update(uid: UserId, pair: CurrencyPair, signals: Map[Indicator, List[IndicatorState]]): F[MarketState] =
     runUpdate(

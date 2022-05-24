@@ -25,7 +25,7 @@ final private class LiveMarketService[F[_]](
     F: Monad[F]
 ) extends MarketService[F] {
   override def getState(uid: UserId): F[List[MarketState]] = stateRepo.getAll(uid)
-  override def clearState(uid: UserId): F[Unit]            = ???
+  override def clearState(uid: UserId): F[Unit]            = stateRepo.deleteAll(uid)
 
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
     stateRepo.update(uid, data.currencyPair, data.prices.head).void

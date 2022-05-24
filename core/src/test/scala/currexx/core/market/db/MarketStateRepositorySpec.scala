@@ -90,6 +90,20 @@ class MarketStateRepositorySpec extends MongoSpec {
         }
       }
     }
+
+    "deleteAll" should {
+      "delete all market currency states" in withEmbeddedMongoDb { db =>
+        val result = for
+          repo <- MarketStateRepository.make(db)
+          _    <- repo.update(Users.uid, Markets.gbpeur, Markets.priceRange)
+          _    <- repo.update(Users.uid, Markets.gbpusd, Markets.priceRange)
+          _    <- repo.deleteAll(Users.uid)
+          res  <- repo.getAll(Users.uid)
+        yield res
+
+        result.map(_ mustBe Nil)
+      }
+    }
   }
 
   def withEmbeddedMongoDb[A](test: MongoDatabase[IO] => IO[A]): Future[A] =
