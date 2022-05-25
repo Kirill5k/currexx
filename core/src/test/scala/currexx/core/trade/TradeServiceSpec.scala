@@ -137,6 +137,25 @@ class TradeServiceSpec extends CatsSpec {
           res mustBe ()
         }
       }
+
+      "obtain traded currencies and close all open orders" in {
+        val (settRepo, orderRepo, client, disp) = mocks
+        when(orderRepo.getAllTradedCurrencies(any[UserId])).thenReturn(IO.pure(List(Markets.gbpeur, Markets.gbpusd)))
+        when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturn(IO.none)
+
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, client, disp)
+          _   <- svc.closeOpenOrders(Users.uid)
+        yield ()
+
+        result.asserting { res =>
+          verify(orderRepo).getAllTradedCurrencies(Users.uid)
+          verify(orderRepo).findLatestBy(Users.uid, Markets.gbpusd)
+          verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
+          verifyNoInteractions(settRepo, client, disp)
+          res mustBe ()
+        }
+      }
     }
 
     "processMarketState" should {

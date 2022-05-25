@@ -12,6 +12,7 @@ import currexx.core.trade.TradeStrategyExecutor.Decision
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.market.{CurrencyPair, Indicator, TradeOrder}
 import currexx.domain.user.UserId
+import fs2.Stream
 
 trait TradeService[F[_]]:
   def getSettings(uid: UserId): F[TradeSettings]
@@ -33,7 +34,13 @@ final private class LiveTradeService[F[_]](
   override def updateSettings(settings: TradeSettings): F[Unit]        = settingsRepository.update(settings)
   override def getAllOrders(uid: UserId): F[List[TradeOrderPlacement]] = orderRepository.getAll(uid)
 
-  override def closeOpenOrders(uid: UserId): F[Unit] = ???
+  override def closeOpenOrders(uid: UserId): F[Unit] =
+    Stream
+      .evalSeq(orderRepository.getAllTradedCurrencies(uid))
+      .map(cp => Stream.eval(closeOpenOrders(uid, cp)))
+      .parJoinUnbounded
+      .compile
+      .drain
 
   override def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit] =
     orderRepository
