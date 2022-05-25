@@ -19,6 +19,7 @@ class MarketServiceSpec extends CatsSpec {
       "delete all existing market states" in {
         val (stateRepo, disp) = mocks
         when(stateRepo.deleteAll(any[UserId])).thenReturn(IO.unit)
+        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc   <- MarketService.make[IO](stateRepo, disp)
@@ -27,7 +28,7 @@ class MarketServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(stateRepo).deleteAll(Users.uid)
-          verifyNoInteractions(disp)
+          verify(disp).dispatch(Action.CloseAllOpenOrders(Users.uid))
           res mustBe ()
         }
       }
@@ -111,8 +112,8 @@ class MarketServiceSpec extends CatsSpec {
 
       "update signal state with the latest received signal" in {
         val (stateRepo, disp) = mocks
-        val currentMacdState = IndicatorState(Condition.CrossingUp, Signals.ts.minusSeconds(3.days.toSeconds))
-        val signalState = Map(Indicator.MACD -> List(currentMacdState))
+        val currentMacdState  = IndicatorState(Condition.CrossingUp, Signals.ts.minusSeconds(3.days.toSeconds))
+        val signalState       = Map(Indicator.MACD -> List(currentMacdState))
         when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state.copy(signals = signalState))))
         when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[Indicator, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
@@ -123,10 +124,12 @@ class MarketServiceSpec extends CatsSpec {
         yield state
 
         result.asserting { res =>
-          val finalSignalState = Map(Indicator.MACD -> List(
-            IndicatorState(Condition.CrossingUp, Signals.ts),
-            currentMacdState
-          ))
+          val finalSignalState = Map(
+            Indicator.MACD -> List(
+              IndicatorState(Condition.CrossingUp, Signals.ts),
+              currentMacdState
+            )
+          )
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
           verify(disp).dispatch(Action.ProcessMarketState(Markets.state, Indicator.MACD))
@@ -136,7 +139,7 @@ class MarketServiceSpec extends CatsSpec {
 
       "replace latest indicator state if new signal has same date" in {
         val (stateRepo, disp) = mocks
-        val signalState = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, Signals.ts.minusSeconds(10))))
+        val signalState       = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, Signals.ts.minusSeconds(10))))
         when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state.copy(signals = signalState))))
         when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[Indicator, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
@@ -157,7 +160,7 @@ class MarketServiceSpec extends CatsSpec {
 
       "not emit update when indicator state hans't changed" in {
         val (stateRepo, disp) = mocks
-        val signalState = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, Signals.ts)))
+        val signalState       = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, Signals.ts)))
         when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state.copy(signals = signalState))))
         when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[Indicator, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
 

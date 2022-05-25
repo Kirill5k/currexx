@@ -18,3 +18,4 @@ enum Action:
   case ProcessMarketState(state: MarketState, trigger: Indicator)
   case ProcessTradeOrderPlacement(order: TradeOrderPlacement)
   case CloseOpenOrders(uid: UserId, currencyPair: CurrencyPair)
+  case CloseAllOpenOrders(uid: UserId)

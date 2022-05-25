@@ -30,7 +30,7 @@ object Backtester extends IOApp.Simple {
     userId,
     TriggerFrequency.OncePerDay,
     List(
-      IndicatorParameters.HMA(12, Some(KalmanSmoothing(0.6D, 0.6D, 0.6D)))
+      IndicatorParameters.HMA(6, Some(KalmanSmoothing(0.6D, 0.6D, 0.6D)))
       // IndicatorParameters.MACD(fastLength = 12, slowLength = 26, signalSmoothing = 9),
       // IndicatorParameters.RSI(length = 14, upperLine = 70, lowerLine = 30)
     )
@@ -48,7 +48,7 @@ object Backtester extends IOApp.Simple {
       signal     <- TestSignalService.make[IO](signalSettings, dispatcher)
       processor  <- ActionProcessor.make[IO](dispatcher, monitor, signal, market, trade)
       _ <- MarketDataProvider
-        .read[IO](currencyPair, Interval.D1, "eur-gbp-1d-2021-2022.csv")
+        .read[IO](currencyPair, Interval.D1, "usd-jpy-1d.csv")
         .flatMap { data =>
           Stream.eval(dispatcher.dispatch(Action.ProcessMarketData(userId, data))) >>
             Stream.eval(dispatcher.numberOfPendingActions).delayBy(10.milli).repeat.takeWhile(_ > 0)

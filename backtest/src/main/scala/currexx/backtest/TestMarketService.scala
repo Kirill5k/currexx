@@ -13,7 +13,7 @@ import currexx.domain.market.{CurrencyPair, Indicator, MarketTimeSeriesData, Pri
 final private class TestMarketStateRepository[F[_]: Monad](
     private val state: Ref[F, MarketState]
 ) extends MarketStateRepository[F]:
-
+  override def deleteAll(uid: UserId): F[Unit] = Monad[F].unit
   override def update(uid: UserId, pair: CurrencyPair, signals: Map[Indicator, List[IndicatorState]]): F[MarketState] =
     state.updateAndGet(_.copy(signals = signals))
   override def update(uid: UserId, pair: CurrencyPair, price: PriceRange): F[MarketState] =

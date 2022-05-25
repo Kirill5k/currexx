@@ -35,6 +35,8 @@ final private class LiveActionProcessor[F[_]](
     (action match
       case Action.RescheduleAllMonitors =>
         logger.info("rescheduling all monitors") *> monitorService.rescheduleAll
+      case Action.CloseAllOpenOrders(uid) =>
+        logger.info(s"closing all opened orders")
       case Action.CloseOpenOrders(uid, pair) =>
         logger.info(s"closing opened order for $pair currency pair") *> tradeService.closeOpenOrders(uid, pair)
       case Action.ScheduleMonitor(uid, mid, period) =>
