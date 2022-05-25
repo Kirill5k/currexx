@@ -2,12 +2,18 @@ package currexx.core.signal
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import currexx.core.CatsSpec
+import cats.syntax.traverse.*
+import currexx.core.{CatsSpec, FileReader}
 import currexx.domain.user.UserId
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorParameters, Trend}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorParameters, PriceRange, Trend}
 import currexx.core.common.action.{Action, ActionDispatcher}
+import currexx.core.common.time.*
 import currexx.core.fixtures.{Markets, Signals, Users}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
+import io.circe.JsonObject
+
+import java.time.LocalDate
+import scala.collection.immutable.ListMap
 
 class SignalServiceSpec extends CatsSpec {
 
@@ -190,7 +196,7 @@ class SignalServiceSpec extends CatsSpec {
     "detectHma" should {
       "create signal when trend direction changes" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
-        val signal = SignalService.detectHma(Users.uid, timeSeriesData, IndicatorParameters.HMA(length = 16))
+        val signal         = SignalService.detectHma(Users.uid, timeSeriesData, IndicatorParameters.HMA(length = 16))
 
         val expectedCondition = Condition.TrendDirectionChange(Trend.Consolidation, Trend.Upward)
         signal mustBe Some(Signal(Users.uid, Markets.gbpeur, Indicator.HMA, expectedCondition, timeSeriesData.prices.head.time))
@@ -198,7 +204,14 @@ class SignalServiceSpec extends CatsSpec {
 
       "not do anything when trend hasn't changed" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
-        val signal = SignalService.detectHma(Users.uid, timeSeriesData, IndicatorParameters.HMA(length = 16))
+        val signal         = SignalService.detectHma(Users.uid, timeSeriesData, IndicatorParameters.HMA(length = 16))
+
+        signal mustBe None
+      }
+
+      "do some magic" ignore {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = pricesFromResources("aud-usd-sell.json"))
+        val signal         = SignalService.detectHma(Users.uid, timeSeriesData, IndicatorParameters.HMA(length = 16))
 
         signal mustBe None
       }
@@ -211,4 +224,21 @@ class SignalServiceSpec extends CatsSpec {
   extension [A](nel: NonEmptyList[A])
     def drop(n: Int): NonEmptyList[A] =
       NonEmptyList.fromListUnsafe(nel.toList.drop(n))
+
+  def pricesFromResources(path: String): NonEmptyList[PriceRange] = {
+    val json = FileReader.parseFromResources[JsonObject](path)
+    for
+      prices    <- json("Time Series FX (Daily)").toRight(new RuntimeException("missing prices"))
+      priceList <- prices.as[ListMap[String, JsonObject]]
+      priceRange <- priceList.toList.traverse { (date, ohlc) =>
+        for
+          open <- ohlc("1. open").flatMap(_.asString).map(BigDecimal(_)).toRight(new RuntimeException("missing open"))
+          high <- ohlc("2. high").flatMap(_.asString).map(BigDecimal(_)).toRight(new RuntimeException("missing high"))
+          low <- ohlc("3. low").flatMap(_.asString).map(BigDecimal(_)).toRight(new RuntimeException("missing low"))
+          close <- ohlc("4. close").flatMap(_.asString).map(BigDecimal(_)).toRight(new RuntimeException("missing close"))
+        yield PriceRange(open, high, low, close, BigDecimal(0), LocalDate.parse(date).toInstantAtStartOfDay)
+      }
+      priceValues <- NonEmptyList.fromList(priceRange).toRight(new RuntimeException("empty price range list"))
+    yield priceValues
+  }.fold(e => throw e, identity)
 }
