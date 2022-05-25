@@ -59,6 +59,19 @@ class TradeOrderRepositorySpec extends MongoSpec {
         result.map(_ mustBe None)
       }
     }
+
+    "getAllTradedCurrencies" should {
+      "return all traded currencies" in withEmbeddedMongoDb { db =>
+        val result = for
+          repo <- TradeOrderRepository.make(db)
+          _    <- repo.save(Trades.order)
+          _    <- repo.save(Trades.order.copy(currencyPair = Markets.gbpusd))
+          res  <- repo.getAllTradedCurrencies(Users.uid)
+        yield res
+
+        result.map(_ mustBe List(Markets.gbpeur, Markets.gbpusd))
+      }
+    }
   }
 
   def withEmbeddedMongoDb[A](test: MongoDatabase[IO] => IO[A]): Future[A] =
@@ -66,10 +79,7 @@ class TradeOrderRepositorySpec extends MongoSpec {
       MongoClient
         .fromConnectionString[IO](s"mongodb://$mongoHost:$mongoPort")
         .use { client =>
-          for
-            db  <- client.getDatabase("currexx")
-            res <- test(db)
-          yield res
+          client.getDatabase("currexx").flatMap(test)
         }
     }.unsafeToFuture()(IORuntime.global)
 }

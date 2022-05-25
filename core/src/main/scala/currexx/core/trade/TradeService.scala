@@ -19,6 +19,7 @@ trait TradeService[F[_]]:
   def getAllOrders(uid: UserId): F[List[TradeOrderPlacement]]
   def processMarketState(state: MarketState, trigger: Indicator): F[Unit]
   def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
+  def closeOpenOrders(uid: UserId): F[Unit]
 
 final private class LiveTradeService[F[_]](
     private val settingsRepository: TradeSettingsRepository[F],
@@ -31,6 +32,8 @@ final private class LiveTradeService[F[_]](
   override def getSettings(uid: UserId): F[TradeSettings]              = settingsRepository.get(uid)
   override def updateSettings(settings: TradeSettings): F[Unit]        = settingsRepository.update(settings)
   override def getAllOrders(uid: UserId): F[List[TradeOrderPlacement]] = orderRepository.getAll(uid)
+
+  override def closeOpenOrders(uid: UserId): F[Unit] = ???
 
   override def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit] =
     orderRepository
