@@ -90,7 +90,7 @@ final private class LiveAlphaVantageClient[F[_]](
         }
       }
       .handleErrorWith { error =>
-        if (attempt < 5) sendRequest(uri, mapper, attempt + 1)
+        if (attempt < 5) F.sleep((attempt + 1).minutes) >> sendRequest(uri, mapper, attempt + 1)
         else F.raiseError(error)
       }
 
