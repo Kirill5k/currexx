@@ -26,7 +26,7 @@ object errors {
     final case class FailedCalculation(message: String) extends BadData
     
     final case class JsonParsingFailure(original: String, error: String) extends AppError:
-      override val message: String = s"Failed to parse json response: $error"
+      override val message: String = s"Failed to parse json response: $error\n$original"
 
     final case class AccessDenied(message: String) extends AppError
 
