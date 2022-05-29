@@ -30,7 +30,7 @@ object MovingAverages {
     val ema1 = exponential(values, n, smoothing)
     val ema2 = exponential(ema1, n, smoothing)
     val ema3 = exponential(ema2, n, smoothing)
-    ema1.zip(ema2).zip(ema3).map { case ((e1, e2), e3) => 3 * e1 - 3* e2 + e3 }
+    ema1.zip(ema2).zip(ema3).map { case ((e1, e2), e3) => (3 * e1) - (3 * e2) + e3 }
   }
 
   def simple(values: List[Double], n: Int): List[Double] = {
@@ -95,5 +95,12 @@ object MovingAverages {
     val diff  = n2wma.zip(nwma).map(_ - _)
     val sqn   = math.round(math.sqrt(n.toDouble)).toInt
     weighted(diff.toList, sqn)
+  }
+
+  def nyquist(values: List[Double], n1: Int, n2: Int, lambda: Int): List[Double] = {
+    val alpha = lambda * (n1 - 1) / (n1 - lambda)
+    val nwma1 = weighted(values, n1)
+    val nwma2 = weighted(nwma1, n2)
+    nwma1.zip(nwma2).map { case (v1, v2) => (1 + alpha) * v1 - alpha * v2 }
   }
 }
