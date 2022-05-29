@@ -7,25 +7,37 @@ import scala.math.BigDecimal.RoundingMode
 
 class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
 
-  "A MomentumOscillators" should {
-    "calculate Relative Strength Index" in {
-      val rsi = MomentumOscillators.relativeStrengthIndex(values.map(_._4), 14)
+  "A MomentumOscillators" when {
+    "relativeStrengthIndex" should {
+      "calculate Relative Strength Index" in {
+        val rsi = MomentumOscillators.relativeStrengthIndex(values.map(_._4), 14)
 
-      rsi.take(5).map(rounded(4)) mustBe List(25.9687, 30.3364, 42.5016, 45.0388, 37.5924)
+        rsi.take(5).map(rounded(4)) mustBe List(25.9687, 30.3364, 42.5016, 45.0388, 37.5924)
+      }
     }
 
-    "calculate stochastic oscillator values (smooth k and smooth d)" in {
-      val (smoothK, smoothD) = MomentumOscillators.stochastic(
-        closings = values.map(_._4),
-        highs = values.map(_._2),
-        lows = values.map(_._3),
-        length = 14,
-        slowKLength = 3,
-        slowDLength = 3
-      )
+    "stochastic" should {
+      "calculate stochastic oscillator values (smooth k and smooth d)" in {
+        val (smoothK, smoothD) = MomentumOscillators.stochastic(
+          closings = values.map(_._4),
+          highs = values.map(_._2),
+          lows = values.map(_._3),
+          length = 14,
+          slowKLength = 3,
+          slowDLength = 3
+        )
 
-      smoothK.take(5).map(rounded(4)) mustBe List(13.4791, 25.8260, 28.4469, 24.2533, 21.4209)
-      smoothD.take(5).map(rounded(4)) mustBe List(22.5840, 26.1754, 24.7070, 25.3131, 30.2807)
+        smoothK.take(5).map(rounded(4)) mustBe List(13.4791, 25.8260, 28.4469, 24.2533, 21.4209)
+        smoothD.take(5).map(rounded(4)) mustBe List(22.5840, 26.1754, 24.7070, 25.3131, 30.2807)
+      }
+    }
+
+    "aroon" should {
+      "detect changes in price" in {
+        val res = MomentumOscillators.aroon(values.map(_._4), 14)
+
+        res mustBe List(-50.0,-28.571428571428562,-28.57142857142857,-92.85714285714286,-57.142857142857146,-57.14285714285714,-57.14285714285714,-85.71428571428572,-85.71428571428571,-92.85714285714286,-92.85714285714286,-78.57142857142857,-78.57142857142857,-71.42857142857143,-28.571428571428577,35.71428571428571,42.857142857142854,42.85714285714286,42.85714285714286,42.85714285714286,42.857142857142854,42.857142857142854,42.85714285714286,-50.0,-57.142857142857146,-57.142857142857146,-71.42857142857143,-71.42857142857142,-71.42857142857143,-92.85714285714286,-92.85714285714286,-92.85714285714286,-78.57142857142857,-92.85714285714286,-85.71428571428571,-78.57142857142857,-57.14285714285714,-57.142857142857146,-57.142857142857146,-35.71428571428571,-35.714285714285715,-35.71428571428571,21.42857142857143,21.428571428571423,21.428571428571416,85.71428571428572,92.85714285714286,28.571428571428573,35.71428571428571,35.714285714285715,35.71428571428572,35.71428571428572,35.714285714285715,-35.71428571428571,-42.857142857142854,-42.85714285714286,-57.142857142857146,-64.28571428571429,-71.42857142857143,-71.42857142857142,-71.42857142857143,-71.42857142857143,-64.28571428571428,-50.00000000000001,-50.0,50.0,57.142857142857146,57.142857142857146,57.14285714285714,57.14285714285714,85.71428571428572,85.71428571428571,92.85714285714286,85.71428571428571,85.71428571428572,92.85714285714286,85.71428571428572,85.71428571428571,78.57142857142857,64.28571428571429,64.28571428571428,57.142857142857146,50.0,35.714285714285715,92.85714285714286,78.57142857142857)
+      }
     }
   }
 

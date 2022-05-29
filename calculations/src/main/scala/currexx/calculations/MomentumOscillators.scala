@@ -5,6 +5,22 @@ import scala.collection.mutable.Queue
 
 object MomentumOscillators {
 
+  def aroon(values: List[Double], length: Int): List[Double] = {
+    val res = Array.ofDim[Double](values.size)
+    def calc(remainingValues: List[Double], i: Int, window: Queue[Double]): List[Double] =
+      if (remainingValues.isEmpty) res.take(values.size - length).toList
+      else if (window.size < length) calc(remainingValues.tail, i - 1, window.enqueue(remainingValues.head))
+      else {
+        val max  = window.zipWithIndex.maxBy(_._1)
+        val min  = window.zipWithIndex.minBy(_._1)
+        val up   = 100.0 * (max._2 + 1) / length
+        val down = 100.0 * (min._2 + 1) / length
+        res(i) = up - down
+        calc(remainingValues.tail, i - 1, window.drop(1).enqueue(remainingValues.head))
+      }
+    calc(values.reverse, values.length - 1, Queue.empty)
+  }
+
   def relativeStrengthIndex(values: List[Double], length: Int): List[Double] = {
     val rsis = Array.ofDim[Double](values.size)
     @tailrec
