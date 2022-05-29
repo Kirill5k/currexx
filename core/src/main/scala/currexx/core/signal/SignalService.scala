@@ -108,8 +108,7 @@ object SignalService:
 
   def detectHma(uid: UserId, data: MarketTimeSeriesData, hma: IndicatorParameters.HMA): Option[Signal] = {
     val values = data.prices.toList.map(_.close.toDouble)
-    val kalman = hma.kalmanSmoothing.map(ks => Filters.ghkKalman(values, ks.alpha, ks.betta, ks.gamma, values.last, 0d, 0d, 1))
-    val hmas   = MovingAverages.hull(kalman.getOrElse(values), hma.length).toArray.take(5)
+    val hmas   = MovingAverages.hull(values, hma.length).toArray.take(5)
     val hmas2  = hmas.tail
     val hmas3  = hmas.zip(hmas.map(-_)).map(_ - _)
     val hmas4  = hmas.zip(hmas).map(_ + _)

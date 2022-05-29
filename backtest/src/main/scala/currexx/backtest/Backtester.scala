@@ -7,7 +7,6 @@ import currexx.core.common.action.{Action, ActionDispatcher, ActionProcessor}
 import currexx.core.market.MarketState
 import currexx.core.signal.{SignalSettings, TriggerFrequency}
 import currexx.core.trade.{TradeSettings, TradeStrategy, TradingParameters}
-import currexx.domain.market.IndicatorParameters.KalmanSmoothing
 import currexx.domain.market.{CurrencyPair, IndicatorParameters, Interval}
 import currexx.domain.user.UserId
 import mongo4cats.bson.ObjectId
@@ -30,7 +29,7 @@ object Backtester extends IOApp.Simple {
     userId,
     TriggerFrequency.OncePerDay,
     List(
-      IndicatorParameters.HMA(6, Some(KalmanSmoothing(0.6D, 0.6D, 0.6D)))
+      IndicatorParameters.HMA(6)
       // IndicatorParameters.MACD(fastLength = 12, slowLength = 26, signalSmoothing = 9),
       // IndicatorParameters.RSI(length = 14, upperLine = 70, lowerLine = 30)
     )

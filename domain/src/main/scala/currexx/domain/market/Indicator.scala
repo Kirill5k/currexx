@@ -18,12 +18,6 @@ object Indicator:
 sealed trait IndicatorParameters(val indicator: Indicator)
 
 object IndicatorParameters {
-  final case class KalmanSmoothing(
-      alpha: Double,
-      betta: Double,
-      gamma: Double
-  ) derives Codec.AsObject
-
   final case class MACD(
       fastLength: Int = 12,
       slowLength: Int = 26,
@@ -49,7 +43,6 @@ object IndicatorParameters {
 
   final case class HMA(
       length: Int = 16,
-      kalmanSmoothing: Option[KalmanSmoothing] = None
   ) extends IndicatorParameters(Indicator.HMA)
       derives Codec.AsObject
 
