@@ -26,13 +26,6 @@ object MovingAverages {
   def exponential(values: List[Double], n: Int, smoothing: Double = EmaSmoothing): List[Double] =
     exponentialAsArray(values, n, smoothing).toList
 
-  def tripleExponential(values: List[Double], n: Int, smoothing: Double = EmaSmoothing): List[Double] = {
-    val ema1 = exponential(values, n, smoothing)
-    val ema2 = exponential(ema1, n, smoothing)
-    val ema3 = exponential(ema2, n, smoothing)
-    ema1.zip(ema2).zip(ema3).map { case ((e1, e2), e3) => (3 * e1) - (3 * e2) + e3 }
-  }
-
   def simple(values: List[Double], n: Int): List[Double] = {
     val smas = Array.ofDim[Double](values.size)
     @tailrec
@@ -95,6 +88,17 @@ object MovingAverages {
     val diff  = n2wma.zip(nwma).map(_ - _)
     val sqn   = math.round(math.sqrt(n.toDouble)).toInt
     weighted(diff.toList, sqn)
+  }
+
+  def triple(
+      values: List[Double],
+      n: Int,
+      maCalc: (List[Double], Int) => List[Double] = (values, n) => exponential(values, n)
+  ): List[Double] = {
+    val ema1 = maCalc(values, n)
+    val ema2 = maCalc(ema1, n)
+    val ema3 = maCalc(ema2, n)
+    ema1.zip(ema2).zip(ema3).map { case ((e1, e2), e3) => (3 * e1) - (3 * e2) + e3 }
   }
 
   def nyquist(
