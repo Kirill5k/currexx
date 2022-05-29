@@ -29,14 +29,14 @@ object Backtester extends IOApp.Simple {
     userId,
     TriggerFrequency.OncePerDay,
     List(
-      IndicatorParameters.HMA(10)
+      IndicatorParameters.NMA(9, 3, 8)
       // IndicatorParameters.MACD(fastLength = 12, slowLength = 26, signalSmoothing = 9),
       // IndicatorParameters.RSI(length = 14, upperLine = 70, lowerLine = 30)
     )
   )
 
   val tradingParameters = TradingParameters(BigDecimal(0.1), None, None, None)
-  val tradeSettings     = TradeSettings(userId, TradeStrategy.HMABasic, BrokerParameters.Vindaloo("1"), tradingParameters)
+  val tradeSettings     = TradeSettings(userId, TradeStrategy.NMABasic, BrokerParameters.Vindaloo("1"), tradingParameters)
 
   override val run: IO[Unit] =
     for
