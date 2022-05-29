@@ -211,9 +211,26 @@ class SignalServiceSpec extends CatsSpec {
     }
 
     "detectNma" should {
+      "create signal when trend direction changes" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
+        val params         = IndicatorParameters.NMA(length = 16, signalLength = 8, lambda = 4.2)
+        val signal         = SignalService.detectNma(Users.uid, timeSeriesData, params)
+
+        val expectedCondition = Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation)
+        signal mustBe Some(Signal(Users.uid, Markets.gbpeur, Indicator.NMA, expectedCondition, timeSeriesData.prices.head.time))
+      }
+
+      "not do anything when trend hasn't changed" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
+        val params         = IndicatorParameters.NMA(length = 16, signalLength = 8, lambda = 4.2)
+        val signal         = SignalService.detectNma(Users.uid, timeSeriesData, params)
+
+        signal mustBe None
+      }
+
       "do some magic" ignore {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = pricesFromResources("aud-usd-sell.json"))
-        val params         = IndicatorParameters.NMA(length = 12, signalLength = 6, lambda = 4.2)
+        val params         = IndicatorParameters.NMA(length = 16, signalLength = 8, lambda = 4.2)
         val signal         = SignalService.detectNma(Users.uid, timeSeriesData, params)
 
         signal mustBe None

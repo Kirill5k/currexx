@@ -52,7 +52,7 @@ final private class LiveSignalService[F[_]](
               case stoch: IndicatorParameters.Stochastic => SignalService.detectStoch(uid, data, stoch)
               case macd: IndicatorParameters.MACD        => SignalService.detectMacd(uid, data, macd)
               case hma: IndicatorParameters.HMA          => SignalService.detectHma(uid, data, hma)
-              case _                                     => None
+              case nma: IndicatorParameters.NMA          => SignalService.detectNma(uid, data, nma)
             }
           )
           .evalFilter { signal =>
@@ -109,20 +109,8 @@ object SignalService:
 
   def detectHma(uid: UserId, data: MarketTimeSeriesData, hma: IndicatorParameters.HMA): Option[Signal] = {
     val values = data.prices.toList.map(_.close.toDouble)
-    val hmas   = MovingAverages.hull(values, hma.length).toArray.take(5)
-    val hmas2  = hmas.tail
-    val hmas3  = hmas.zip(hmas.map(-_)).map(_ - _)
-    val hmas4  = hmas.zip(hmas).map(_ + _)
-
-    val diff  = hmas2.zip(hmas3).map(_ - _)
-    val diff3 = hmas4.zip(hmas2).map(_ - _)
-
-    val isNotUp: Int => Boolean   = i => diff(i) > diff(i + 1) && diff(i + 1) > diff(i + 2)
-    val isNotDown: Int => Boolean = i => diff3(i) > diff3(i + 1) && diff3(i + 1) > diff3(i + 2)
-
-    val trend         = hmas.zip(hmas2).map((v1, v2) => if (v1 > v2) Trend.Upward else Trend.Downward)
-    val consolidation = (0 until 2).map(i => Option.when(isNotUp(i) == isNotDown(i))(Trend.Consolidation))
-    val res           = consolidation.zip(trend).map(_.getOrElse(_))
+    val hmas   = MovingAverages.hull(values, hma.length)
+    val res    = identifyTrends(hmas.take(5))
     Option
       .when(res.head != res(1))(Condition.TrendDirectionChange(res(1), res.head))
       .map(c => Signal(uid, data.currencyPair, hma.indicator, c, data.prices.head.time))
@@ -130,23 +118,28 @@ object SignalService:
 
   def detectNma(uid: UserId, data: MarketTimeSeriesData, nma: IndicatorParameters.NMA): Option[Signal] = {
     val values = data.prices.toList.map(_.close.toDouble)
-    val mas    = MovingAverages.nyquist(values, nma.length, nma.signalLength, nma.lambda).toArray
-    val mas2   = mas.tail
-    val mas3   = mas.zip(mas.map(-_)).map(_ - _)
-    val mas4   = mas.zip(mas).map(_ + _)
+    val mas    = MovingAverages.nyquist(values, nma.length, nma.signalLength, nma.lambda)
+    val res    = identifyTrends(mas)
+    Option
+      .when(res.head != res(1))(Condition.TrendDirectionChange(res(1), res.head))
+      .map(c => Signal(uid, data.currencyPair, nma.indicator, c, data.prices.head.time))
+  }
 
-    val diff  = mas2.zip(mas3).map(_ - _)
-    val diff3 = mas4.zip(mas2).map(_ - _)
+  private def identifyTrends(values: List[Double]): List[Trend] = {
+    val vals  = values.toArray
+    val vals2 = vals.tail
+    val vals3 = vals.zip(vals.map(-_)).map(_ - _)
+    val vals4 = vals.zip(vals).map(_ + _)
+
+    val diff  = vals2.zip(vals3).map(_ - _)
+    val diff3 = vals4.zip(vals2).map(_ - _)
 
     val isNotUp: Int => Boolean   = i => diff(i) > diff(i + 1) && diff(i + 1) > diff(i + 2)
     val isNotDown: Int => Boolean = i => diff3(i) > diff3(i + 1) && diff3(i + 1) > diff3(i + 2)
 
-    val trend         = mas.zip(mas2).map((v1, v2) => if (v1 > v2) Trend.Upward else Trend.Downward)
-    val consolidation = (0 until mas.length - 2).map(i => Option.when(isNotUp(i) == isNotDown(i))(Trend.Consolidation))
-    val res           = consolidation.zip(trend).map(_.getOrElse(_))
-    Option
-      .when(res.head != res(1))(Condition.TrendDirectionChange(res(1), res.head))
-      .map(c => Signal(uid, data.currencyPair, nma.indicator, c, data.prices.head.time))
+    val trend         = vals.zip(vals2).map((v1, v2) => if (v1 > v2) Trend.Upward else Trend.Downward)
+    val consolidation = (0 until vals.length - 3).map(i => Option.when(isNotUp(i) == isNotDown(i))(Trend.Consolidation))
+    consolidation.zip(trend).map(_.getOrElse(_)).toList
   }
 
   def make[F[_]: Concurrent](
