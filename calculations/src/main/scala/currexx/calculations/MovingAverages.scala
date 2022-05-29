@@ -97,10 +97,16 @@ object MovingAverages {
     weighted(diff.toList, sqn)
   }
 
-  def nyquist(values: List[Double], n1: Int, n2: Int, lambda: Int): List[Double] = {
+  def nyquist(
+      values: List[Double],
+      n1: Int,
+      n2: Int,
+      lambda: Double,
+      maCalc: (List[Double], Int) => List[Double] = (values, n) => weighted(values, n)
+  ): List[Double] = {
     val alpha = lambda * (n1 - 1) / (n1 - lambda)
-    val nwma1 = weighted(values, n1)
-    val nwma2 = weighted(nwma1, n2)
+    val nwma1 = maCalc(values, n1)
+    val nwma2 = maCalc(nwma1, n2)
     nwma1.zip(nwma2).map { case (v1, v2) => (1 + alpha) * v1 - alpha * v2 }
   }
 }

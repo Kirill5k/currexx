@@ -48,10 +48,11 @@ final private class LiveSignalService[F[_]](
         Stream
           .emits(
             settings.indicators.flatMap {
-              case macd: IndicatorParameters.MACD        => SignalService.detectMacd(uid, data, macd)
               case rsi: IndicatorParameters.RSI          => SignalService.detectRsi(uid, data, rsi)
-              case hma: IndicatorParameters.HMA          => SignalService.detectHma(uid, data, hma)
               case stoch: IndicatorParameters.Stochastic => SignalService.detectStoch(uid, data, stoch)
+              case macd: IndicatorParameters.MACD        => SignalService.detectMacd(uid, data, macd)
+              case hma: IndicatorParameters.HMA          => SignalService.detectHma(uid, data, hma)
+              case _                                     => None
             }
           )
           .evalFilter { signal =>

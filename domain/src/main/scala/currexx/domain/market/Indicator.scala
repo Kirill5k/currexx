@@ -7,6 +7,7 @@ enum Indicator(val kind: String):
   case MACD       extends Indicator("macd")
   case RSI        extends Indicator("rsi")
   case HMA        extends Indicator("hma")
+  case NMA        extends Indicator("nma")
   case Stochastic extends Indicator("stochastic")
 
 object Indicator:
@@ -42,8 +43,15 @@ object IndicatorParameters {
       derives Codec.AsObject
 
   final case class HMA(
-      length: Int = 16,
+      length: Int = 16
   ) extends IndicatorParameters(Indicator.HMA)
+      derives Codec.AsObject
+
+  final case class NMA(
+      length: Int = 12,
+      signalLength: Int = 6,
+      lambda: Double = 4.2
+  ) extends IndicatorParameters(Indicator.NMA)
       derives Codec.AsObject
 
   private val discriminatorField: String                       = "indicator"
@@ -54,6 +62,7 @@ object IndicatorParameters {
       case Indicator.MACD       => ip.as[IndicatorParameters.MACD]
       case Indicator.RSI        => ip.as[IndicatorParameters.RSI]
       case Indicator.HMA        => ip.as[IndicatorParameters.HMA]
+      case Indicator.NMA        => ip.as[IndicatorParameters.NMA]
       case Indicator.Stochastic => ip.as[IndicatorParameters.Stochastic]
     }
   }
@@ -61,6 +70,7 @@ object IndicatorParameters {
     case macd: IndicatorParameters.MACD        => macd.asJson.deepMerge(discriminatorJson(macd))
     case rsi: IndicatorParameters.RSI          => rsi.asJson.deepMerge(discriminatorJson(rsi))
     case hma: IndicatorParameters.HMA          => hma.asJson.deepMerge(discriminatorJson(hma))
+    case nma: IndicatorParameters.NMA          => nma.asJson.deepMerge(discriminatorJson(nma))
     case stock: IndicatorParameters.Stochastic => stock.asJson.deepMerge(discriminatorJson(stock))
   }
 }
