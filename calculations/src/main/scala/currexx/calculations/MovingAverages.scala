@@ -95,10 +95,10 @@ object MovingAverages {
       n: Int,
       maCalc: (List[Double], Int) => List[Double] = (values, n) => exponential(values, n)
   ): List[Double] = {
-    val ema1 = maCalc(values, n)
-    val ema2 = maCalc(ema1, n)
-    val ema3 = maCalc(ema2, n)
-    ema1.zip(ema2).zip(ema3).map { case ((e1, e2), e3) => (3 * e1) - (3 * e2) + e3 }
+    val ma1 = maCalc(values, n)
+    val ma2 = maCalc(ma1, n)
+    val me3 = maCalc(ma2, n)
+    ma1.zip(ma2).zip(me3).map { case ((v1, v2), v3) => (3 * v1) - (3 * v2) + v3 }
   }
 
   def nyquist(
