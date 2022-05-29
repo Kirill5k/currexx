@@ -26,6 +26,13 @@ object MovingAverages {
   def exponential(values: List[Double], n: Int, smoothing: Double = EmaSmoothing): List[Double] =
     exponentialAsArray(values, n, smoothing).toList
 
+  def tripleExponential(values: List[Double], n: Int, smoothing: Double = EmaSmoothing): List[Double] = {
+    val ema1 = exponential(values, n, smoothing)
+    val ema2 = exponential(ema1, n, smoothing)
+    val ema3 = exponential(ema2, n, smoothing)
+    ema1.zip(ema2).zip(ema3).map { case ((e1, e2), e3) => 3 * e1 - 3* e2 + e3 }
+  }
+
   def simple(values: List[Double], n: Int): List[Double] = {
     val smas = Array.ofDim[Double](values.size)
     @tailrec
