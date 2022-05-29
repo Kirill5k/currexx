@@ -25,7 +25,7 @@ final private class LiveSignalSettingsRepository[F[_]: Async](
 
   override def update(settings: SignalSettings): F[Unit] =
     collection
-      .updateOne(userIdEq(settings.userId), Update.set("indicators", settings.indicators.asJava))
+      .updateOne(userIdEq(settings.userId), Update.set(Field.Indicators, settings.indicators.asJava))
       .map(_.getMatchedCount)
       .flatMap {
         case 0 => collection.insertOne(SignalSettingsEntity.from(settings)).void

@@ -55,9 +55,10 @@ final private class SignalController[F[_]](
   private def updateSignalSettings(using auth: Authenticator[F]) =
     updateSignalSettingsEndpoint.withAuthenticatedSession
       .serverLogic { session => settings =>
-        service
-          .updateSettings(settings.toDomain(session.userId))
-          .voidResponse
+        F.raiseWhen(settings.hasDuplicates)(AppError.FailedValidation("Multiple indicators of the same kind are not allowed")) >>
+          service
+            .updateSettings(settings.toDomain(session.userId))
+            .voidResponse
       }
 
   def routes(using authenticator: Authenticator[F]): HttpRoutes[F] =
@@ -90,6 +91,7 @@ object SignalController extends TapirSchema with TapirJson with TapirCodecs {
       triggerFrequency: TriggerFrequency,
       indicators: List[IndicatorParameters]
   ) derives Codec.AsObject:
+    def hasDuplicates: Boolean                   = indicators.map(_.indicator).toSet.size != indicators.size
     def toDomain(userId: UserId): SignalSettings = SignalSettings(userId, triggerFrequency, indicators)
 
   object SignalView:

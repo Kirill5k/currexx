@@ -24,6 +24,7 @@ trait Repository[F[_]] {
     val LastAccessedAt = "lastAccessedAt"
     val Active         = "active"
     val CurrencyPair   = "currencyPair"
+    val Indicators     = "indicators"
   }
 
   private def idEqFilter(name: String, id: Option[String]): Filter = Filter.eq(name, id.map(ObjectId.apply).orNull)
@@ -33,7 +34,7 @@ trait Repository[F[_]] {
 
   protected def userIdAndCurrencyPairEq(uid: UserId, pair: CurrencyPair): Filter =
     userIdEq(uid) && Filter.eq(Field.CurrencyPair, pair)
-  
+
   protected def errorIfNotDeleted(error: Throwable)(res: DeleteResult)(using F: MonadError[F, Throwable]): F[Unit] =
     F.raiseWhen(res.getDeletedCount == 0)(error)
 

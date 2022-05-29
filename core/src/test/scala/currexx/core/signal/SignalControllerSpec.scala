@@ -187,6 +187,34 @@ class SignalControllerSpec extends ControllerSpec {
         verifyJsonResponse(res, Status.NoContent, None)
         verify(svc).updateSettings(Signals.settings.copy(triggerFrequency = TriggerFrequency.Continuously))
       }
+
+      "return error when request contains multiple indicators of the same kind" in {
+        val svc = mock[SignalService[IO]]
+
+        val requestBody =
+          s"""{
+             |"triggerFrequency" : "continuously",
+             |"indicators": [
+             |{
+             |   "indicator" : "rsi",
+             |   "length" : 20,
+             |   "upperLine" : 85,
+             |   "lowerLine" : 15
+             |},
+             |{
+             |   "indicator" : "rsi",
+             |   "length" : 14,
+             |   "upperLine" : 70,
+             |   "lowerLine" : 30
+             |}
+             |]}""".stripMargin
+
+        val req = requestWithAuthHeader(uri"/signals/settings", Method.PUT).withEntity(parseJson(requestBody))
+        val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        verifyJsonResponse(res, Status.UnprocessableEntity, Some("""{"message":"Multiple indicators of the same kind are not allowed"}"""))
+        verifyNoInteractions(svc)
+      }
     }
   }
 }
