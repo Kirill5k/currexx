@@ -128,6 +128,27 @@ object SignalService:
       .map(c => Signal(uid, data.currencyPair, hma.indicator, c, data.prices.head.time))
   }
 
+  def detectNma(uid: UserId, data: MarketTimeSeriesData, nma: IndicatorParameters.NMA): Option[Signal] = {
+    val values = data.prices.toList.map(_.close.toDouble)
+    val mas    = MovingAverages.nyquist(values, nma.length, nma.signalLength, nma.lambda).toArray
+    val mas2   = mas.tail
+    val mas3   = mas.zip(mas.map(-_)).map(_ - _)
+    val mas4   = mas.zip(mas).map(_ + _)
+
+    val diff  = mas2.zip(mas3).map(_ - _)
+    val diff3 = mas4.zip(mas2).map(_ - _)
+
+    val isNotUp: Int => Boolean   = i => diff(i) > diff(i + 1) && diff(i + 1) > diff(i + 2)
+    val isNotDown: Int => Boolean = i => diff3(i) > diff3(i + 1) && diff3(i + 1) > diff3(i + 2)
+
+    val trend         = mas.zip(mas2).map((v1, v2) => if (v1 > v2) Trend.Upward else Trend.Downward)
+    val consolidation = (0 until mas.length - 2).map(i => Option.when(isNotUp(i) == isNotDown(i))(Trend.Consolidation))
+    val res           = consolidation.zip(trend).map(_.getOrElse(_))
+    Option
+      .when(res.head != res(1))(Condition.TrendDirectionChange(res(1), res.head))
+      .map(c => Signal(uid, data.currencyPair, nma.indicator, c, data.prices.head.time))
+  }
+
   def make[F[_]: Concurrent](
       signalRepo: SignalRepository[F],
       settingsRepo: SignalSettingsRepository[F],
