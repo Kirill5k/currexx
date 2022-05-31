@@ -1,5 +1,9 @@
 package currexx.domain.market.v2
 
+import currexx.domain.market.v2
+import io.circe.{Codec, Decoder, Encoder, Json}
+import io.circe.syntax.*
+
 enum MovingAverage(val kind: String):
   case Weighted    extends MovingAverage("weighted")
   case Exponential extends MovingAverage("exponential")
@@ -11,9 +15,9 @@ object MovingAverage {
 }
 
 enum CompositeMovingAverage(val kind: String):
-  case Triple  extends MovingAverage("triple")
-  case Hull    extends MovingAverage("hull")
-  case Nyquist extends MovingAverage("nyquist")
+  case Triple  extends CompositeMovingAverage("triple")
+  case Hull    extends CompositeMovingAverage("hull")
+  case Nyquist extends CompositeMovingAverage("nyquist")
 object CompositeMovingAverage {
   inline given Encoder[CompositeMovingAverage] = Encoder[String].contramap(_.kind)
   inline given Decoder[CompositeMovingAverage] =
@@ -28,4 +32,26 @@ object ValueSource {
   inline given Encoder[ValueSource] = Encoder[String].contramap(_.kind)
   inline given Decoder[ValueSource] =
     Decoder[String].emap(s => ValueSource.values.find(_.kind == s).toRight(s"Unrecognized value source $s"))
+}
+
+sealed trait ValueTransformation[In, Out](val kind: String)
+object ValueTransformation {
+
+  final case class EMA(length: Int) extends ValueTransformation[List[Double], List[Double]]("ema")
+  final case class HMA(length: Int) extends ValueTransformation[List[Double], List[Double]]("hma")
+  final case class NMA(
+      length: Int,
+      signalLength: Int,
+      lambda: Double,
+      maCalc: MovingAverage
+  ) extends ValueTransformation[List[Double], List[Double]]("nma")
+
+  final case class Sequenced[In, Med, Out](
+      transformation1: ValueTransformation[In, Med],
+      transformation2: ValueTransformation[Med, Out]
+  ) extends ValueTransformation[In, Out]("nma")
+
+  extension [In, Med](transformation1: ValueTransformation[In, Med])
+    def ~>[Out](transformation2: ValueTransformation[Med, Out]): ValueTransformation[In, Out] =
+      Sequenced(transformation1, transformation2)
 }
