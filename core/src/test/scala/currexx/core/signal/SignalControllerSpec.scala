@@ -57,7 +57,7 @@ class SignalControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.UnprocessableEntity, Some("""{"message":"Unexpected condition kind foo"}"""))
+        verifyJsonResponse(res, Status.UnprocessableEntity, Some("""{"message":"Received unknown type: 'foo'. Exists only types: above-threshold, crossing-up, trend-direction-change, crossing-down, below-threshold."}"""))
         verifyNoInteractions(svc)
       }
 
