@@ -1,7 +1,7 @@
 package currexx.core.common.http
 
 import cats.syntax.option.*
-import currexx.domain.market.{Interval, Trend}
+import currexx.domain.market.{Interval, TradeOrder, Trend}
 import eu.timepit.refined.types.string.NonEmptyString
 import squants.Money
 import squants.market.Currency
@@ -17,7 +17,7 @@ import sttp.tapir.SchemaType.{SProduct, SProductField}
 import scala.concurrent.duration.FiniteDuration
 
 transparent trait TapirSchema extends SchemaDerivation {
-  //TODO: fix schemas
+  // TODO: fix schemas
   inline given Schema[UserId]         = Schema.string
   inline given Schema[MonitorId]      = Schema.string
   inline given Schema[IdString]       = Schema.string
@@ -27,6 +27,7 @@ transparent trait TapirSchema extends SchemaDerivation {
   inline given Schema[FiniteDuration] = Schema.string
   inline given Schema[Trend]          = Schema.string
   inline given Schema[Schedule]       = Schema.string
+  inline given Schema[TradeOrder]     = Schema.string
 
   inline given (using currencySchema: Schema[Currency]): Schema[Money] = Schema(
     SProduct(

@@ -2,29 +2,31 @@ import sbt._
 
 object Dependencies {
   object Versions {
-    val mongo4cats = "0.4.8"
-    val pureConfig = "0.17.1"
-    val circe      = "0.14.1"
-    val sttp       = "3.6.1"
-    val http4s     = "0.23.11"
-    val logback    = "1.2.11"
-    val log4cats   = "2.3.1"
-    val squants    = "1.8.3"
-    val bcrypt     = "4.3.0"
-    val refined    = "0.9.28"
-    val tapir      = "1.0.0-RC1"
-    val jwt        = "9.0.5"
-    val cronUtils  = "9.1.6"
+    val mongo4cats     = "0.4.8"
+    val pureConfig     = "0.17.1"
+    val circe          = "0.14.1"
+    val sttp           = "3.6.1"
+    val http4s         = "0.23.11"
+    val logback        = "1.2.11"
+    val log4cats       = "2.3.1"
+    val squants        = "1.8.3"
+    val bcrypt         = "4.3.0"
+    val refined        = "0.9.28"
+    val tapir          = "1.0.0-RC1"
+    val jwt            = "9.0.5"
+    val cronUtils      = "9.1.6"
+    val taggedAdtCodec = "0.10.1"
 
     val scalaTest = "3.2.12"
     val mockito   = "3.2.10.0"
   }
 
   object Libraries {
-    val squants   = "org.typelevel"        %% "squants"      % Versions.squants
-    val bcrypt    = "com.github.t3hnar"    %% "scala-bcrypt" % Versions.bcrypt
-    val jwt       = "com.github.jwt-scala" %% "jwt-circe"    % Versions.jwt
-    val cronUtils = "com.cronutils"         % "cron-utils"   % Versions.cronUtils
+    val squants        = "org.typelevel"        %% "squants"                % Versions.squants
+    val bcrypt         = "com.github.t3hnar"    %% "scala-bcrypt"           % Versions.bcrypt
+    val jwt            = "com.github.jwt-scala" %% "jwt-circe"              % Versions.jwt
+    val cronUtils      = "com.cronutils"         % "cron-utils"             % Versions.cronUtils
+    val taggedAdtCodec = "org.latestbit"        %% "circe-tagged-adt-codec" % Versions.taggedAdtCodec
 
     object mongo4cats {
       val core     = "io.github.kirill5k" %% "mongo4cats-core"     % Versions.mongo4cats
@@ -83,6 +85,7 @@ object Dependencies {
   val domain = Seq(
     Libraries.squants,
     Libraries.cronUtils,
+    Libraries.taggedAdtCodec,
     Libraries.mongo4cats.core,
     Libraries.mongo4cats.circe
   ) ++

@@ -1,36 +1,26 @@
 package currexx.domain.market
 
-import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder, Json}
-import io.circe.syntax.*
+import org.latestbit.circe.adt.codec.*
 
-sealed trait Condition(val kind: String)
+enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+  case CrossingUp
+  case CrossingDown
+  case AboveThreshold(threshold: BigDecimal, value: BigDecimal)
+  case BelowThreshold(threshold: BigDecimal, value: BigDecimal)
+  case TrendDirectionChange(from: Trend, to: Trend)
+
 object Condition {
-  case object CrossingUp                                                    extends Condition("crossing-up")
-  case object CrossingDown                                                  extends Condition("crossing-down")
-  final case class AboveThreshold(threshold: BigDecimal, value: BigDecimal) extends Condition("above-threshold") derives Codec.AsObject
-  final case class BelowThreshold(threshold: BigDecimal, value: BigDecimal) extends Condition("below-threshold") derives Codec.AsObject
-  final case class TrendDirectionChange(from: Trend, to: Trend) extends Condition("trend-direction-change") derives Codec.AsObject
-
-  private val discriminatorField: String               = "kind"
-  private def discriminatorJson(cond: Condition): Json = Map(discriminatorField -> cond.kind).asJson
-
-  inline given Decoder[Condition] = Decoder.instance { c =>
-    c.downField(discriminatorField).as[String].flatMap {
-      case "crossing-up"            => Right(CrossingUp)
-      case "crossing-down"          => Right(CrossingDown)
-      case "above-threshold"        => c.as[AboveThreshold]
-      case "below-threshold"        => c.as[BelowThreshold]
-      case "trend-direction-change" => c.as[TrendDirectionChange]
-      case kind                     => Left(DecodingFailure(s"Unexpected condition kind $kind", List(CursorOp.Field(discriminatorField))))
-    }
-  }
-  inline given Encoder[Condition] = Encoder.instance {
-    case crossUp @ CrossingUp                       => discriminatorJson(crossUp)
-    case crossDown @ CrossingDown                   => discriminatorJson(crossDown)
-    case aboveThreshold: AboveThreshold             => aboveThreshold.asJson.deepMerge(discriminatorJson(aboveThreshold))
-    case belowThreshold: BelowThreshold             => belowThreshold.asJson.deepMerge(discriminatorJson(belowThreshold))
-    case trendDirectionChange: TrendDirectionChange => trendDirectionChange.asJson.deepMerge(discriminatorJson(trendDirectionChange))
-  }
+  given JsonTaggedAdt.Config[Condition] = JsonTaggedAdt.Config.Values[Condition](
+    mappings = Map(
+      "crossing-up"            -> JsonTaggedAdt.tagged[Condition.CrossingUp.type],
+      "crossing-down"          -> JsonTaggedAdt.tagged[Condition.CrossingDown.type],
+      "above-threshold"        -> JsonTaggedAdt.tagged[Condition.AboveThreshold],
+      "below-threshold"        -> JsonTaggedAdt.tagged[Condition.BelowThreshold],
+      "trend-direction-change" -> JsonTaggedAdt.tagged[Condition.TrendDirectionChange]
+    ),
+    strict = true,
+    typeFieldName = "kind"
+  )
 
   def lineCrossing(line1Curr: BigDecimal, line2Curr: BigDecimal, line1Prev: BigDecimal, line2Prev: BigDecimal): Option[Condition] =
     (line1Curr, line2Curr, line1Prev, line2Prev) match

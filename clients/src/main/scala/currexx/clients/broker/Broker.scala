@@ -1,30 +1,26 @@
 package currexx.clients.broker
 
 import currexx.clients.broker
-import io.circe.{Codec, Decoder, Encoder, Json}
-import io.circe.syntax.*
+import org.latestbit.circe.adt.codec.*
 
-enum Broker(val kind: String):
+enum Broker(val kind: String) derives JsonTaggedAdt.PureEncoderWithConfig, JsonTaggedAdt.PureDecoderWithConfig:
   case Vindaloo extends Broker("vindaloo")
 
 object Broker:
-  inline given Decoder[Broker] = Decoder[String].emap(b => Broker.values.find(_.kind == b).toRight(s"Unrecognized broker $b"))
-  inline given Encoder[Broker] = Encoder[String].contramap(_.kind)
+  given JsonTaggedAdt.PureConfig[Broker] = JsonTaggedAdt.PureConfig.Values[Broker](
+    mappings = Map(
+      Broker.Vindaloo.kind -> JsonTaggedAdt.tagged[Broker.Vindaloo.type]
+    )
+  )
 
-sealed trait BrokerParameters(val broker: Broker)
+enum BrokerParameters(val broker: Broker) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+  case Vindaloo(externalId: String) extends BrokerParameters(Broker.Vindaloo)
 
-object BrokerParameters {
-  final case class Vindaloo(externalId: String) extends BrokerParameters(Broker.Vindaloo) derives Codec.AsObject
-
-  private val discriminatorField: String                    = "broker"
-  private def discriminatorJson(bp: BrokerParameters): Json = Map(discriminatorField -> bp.broker).asJson
-
-  inline given Decoder[BrokerParameters] = Decoder.instance { ip =>
-    ip.downField(discriminatorField).as[Broker].flatMap { case Broker.Vindaloo =>
-      ip.as[BrokerParameters.Vindaloo]
-    }
-  }
-  inline given Encoder[BrokerParameters] = Encoder.instance { case vindaloo: broker.BrokerParameters.Vindaloo =>
-    vindaloo.asJson.deepMerge(discriminatorJson(vindaloo))
-  }
-}
+object BrokerParameters:
+  given JsonTaggedAdt.Config[BrokerParameters] = JsonTaggedAdt.Config.Values[BrokerParameters](
+    mappings = Map(
+      Broker.Vindaloo.kind -> JsonTaggedAdt.tagged[BrokerParameters.Vindaloo]
+    ),
+    strict = true,
+    typeFieldName = "broker"
+  )

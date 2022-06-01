@@ -11,7 +11,7 @@ class IndicatorParametersSpec extends AnyWordSpec with Matchers{
     "decode indicator parameters from json" in {
       val params: IndicatorParameters = IndicatorParameters.MACD()
 
-      params.asJson.noSpaces mustBe """{"indicator":"macd","fastLength":12,"slowLength":26,"signalSmoothing":9}"""
+      params.asJson.noSpaces mustBe """{"fastLength":12,"slowLength":26,"signalSmoothing":9,"indicator":"macd"}"""
     }
 
     "encode indicator parameters to json" in {

@@ -1,46 +1,37 @@
 package currexx.domain.market
 
-import io.circe.syntax.*
-import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder, Json}
+import org.latestbit.circe.adt.codec.*
 
 import scala.util.Try
 
-sealed trait TradeOrder(val kind: String)
-
-object TradeOrder {
-  enum Position:
-    case Buy, Sell
-
-  object Position:
-    inline given Encoder[Position] = Encoder.encodeString.contramap(_.toString.toLowerCase)
-    inline given Decoder[Position] = Decoder.decodeString.emap { p =>
-      Try(Position.valueOf(p.toLowerCase.capitalize)).toOption
-        .toRight(s"$p is not valid position kind. Accepted values: ${Position.values.map(_.toString.toLowerCase).mkString(", ")}")
-    }
-
-  final case class Enter(
-      position: Position,
+enum TradeOrder derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+  case Exit
+  case Enter(
+      position: TradeOrder.Position,
       volume: BigDecimal,
       stopLoss: Option[BigDecimal],
       trailingStopLoss: Option[BigDecimal],
       takeProfit: Option[BigDecimal]
-  ) extends TradeOrder("enter")
-      derives Codec.AsObject
+  )
 
-  case object Exit extends TradeOrder("exit")
+object TradeOrder {
+  enum Position derives JsonTaggedAdt.PureEncoderWithConfig, JsonTaggedAdt.PureDecoderWithConfig:
+    case Buy, Sell
 
-  private val discriminatorField: String                 = "kind"
-  private def discriminatorJson(order: TradeOrder): Json = Map(discriminatorField -> order.kind).asJson
+  object Position:
+    given JsonTaggedAdt.PureConfig[Position] = JsonTaggedAdt.PureConfig.Values[Position](
+      mappings = Map(
+        "buy"  -> JsonTaggedAdt.tagged[Position.Buy.type],
+        "sell" -> JsonTaggedAdt.tagged[Position.Sell.type]
+      )
+    )
 
-  inline given Decoder[TradeOrder] = Decoder.instance { c =>
-    c.downField(discriminatorField).as[String].flatMap {
-      case "enter" => c.as[Enter]
-      case "exit"  => Right(Exit)
-      case kind    => Left(DecodingFailure(s"Unexpected order kind $kind", List(CursorOp.Field(discriminatorField))))
-    }
-  }
-  inline given Encoder[TradeOrder] = Encoder.instance {
-    case enter: Enter => enter.asJson.deepMerge(discriminatorJson(enter))
-    case exit @ Exit  => discriminatorJson(exit)
-  }
+  given JsonTaggedAdt.Config[TradeOrder] = JsonTaggedAdt.Config.Values[TradeOrder](
+    mappings = Map(
+      "exit"  -> JsonTaggedAdt.tagged[TradeOrder.Exit.type],
+      "enter" -> JsonTaggedAdt.tagged[TradeOrder.Enter]
+    ),
+    strict = true,
+    typeFieldName = "kind"
+  )
 }
