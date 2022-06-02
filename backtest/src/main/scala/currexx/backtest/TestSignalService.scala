@@ -17,8 +17,8 @@ final private class TestSignalRepository[F[_]](using F: Monad[F]) extends Signal
 final private class TestSignalSettingsRepository[F[_]: Async](
     private val settings: Ref[F, SignalSettings]
 ) extends SignalSettingsRepository[F]:
-  override def update(ss: SignalSettings): F[Unit]         = settings.update(_ => ss)
-  override def get(uid: UserId): F[Option[SignalSettings]] = settings.get.map(Some(_))
+  override def update(ss: SignalSettings): F[Unit] = settings.update(_ => ss)
+  override def get(uid: UserId): F[SignalSettings] = settings.get
 
 object TestSignalService:
   def make[F[_]: Async](initialSettings: SignalSettings, dispatcher: ActionDispatcher[F]): F[SignalService[F]] =

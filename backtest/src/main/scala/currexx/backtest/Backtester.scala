@@ -7,7 +7,7 @@ import currexx.core.common.action.{Action, ActionDispatcher, ActionProcessor}
 import currexx.core.market.MarketState
 import currexx.core.signal.{SignalSettings, TriggerFrequency}
 import currexx.core.trade.{TradeSettings, TradeStrategy, TradingParameters}
-import currexx.domain.market.{CurrencyPair, IndicatorParameters, Interval}
+import currexx.domain.market.{CurrencyPair, Indicator, Interval, ValueSource, ValueTransformation, MovingAverage}
 import currexx.domain.user.UserId
 import mongo4cats.bson.ObjectId
 import org.typelevel.log4cats.Logger
@@ -29,14 +29,15 @@ object Backtester extends IOApp.Simple {
     userId,
     TriggerFrequency.OncePerDay,
     List(
-      IndicatorParameters.NMA(9, 3, 8)
-      // IndicatorParameters.MACD(fastLength = 12, slowLength = 26, signalSmoothing = 9),
-      // IndicatorParameters.RSI(length = 14, upperLine = 70, lowerLine = 30)
+      Indicator.TrendChangeDetection(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.NMA(9, 3, 8D, MovingAverage.Weighted)
+      )
     )
   )
 
   val tradingParameters = TradingParameters(BigDecimal(0.1), None, None, None)
-  val tradeSettings     = TradeSettings(userId, TradeStrategy.NMABasic, BrokerParameters.Vindaloo("1"), tradingParameters)
+  val tradeSettings     = TradeSettings(userId, TradeStrategy.TrendChange, BrokerParameters.Vindaloo("1"), tradingParameters)
 
   override val run: IO[Unit] =
     for
