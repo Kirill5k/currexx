@@ -5,9 +5,9 @@ import io.circe.parser.*
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-class ConditionSpec extends AnyWordSpec with Matchers{
+class ConditionSpec extends AnyWordSpec with Matchers {
 
-  "A Condition codecs" should {
+  "Condition codecs" should {
     "decode condition from json" in {
       val condition: Condition = Condition.CrossingUp
 

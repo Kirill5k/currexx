@@ -7,7 +7,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class TradeOrderSpec extends AnyWordSpec with Matchers {
 
-  "A TradeOrder codecs" should {
+  "TradeOrder codecs" should {
     "decode order from json" in {
       val order: TradeOrder = TradeOrder.Exit
 

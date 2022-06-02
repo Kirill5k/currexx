@@ -1,0 +1,25 @@
+package currexx.domain.market
+
+import io.circe.parser.decode
+import io.circe.syntax.*
+import org.scalatest.matchers.must.Matchers
+import org.scalatest.wordspec.AnyWordSpec
+
+class IndicatorSpec extends AnyWordSpec with Matchers {
+
+  "Indicator codecs" should {
+    "encode and decode indicator from json" in {
+      val indicator = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.NMA(9, 3, 4.2d, MovingAverage.Weighted))
+
+      val json =
+        """{
+          |"source":"close",
+          |"transformation":{"length":9,"signalLength":3,"lambda":4.2,"maCalc":"weighted","kind":"nma"},
+          |"kind":"trend-change-detection"
+          |}""".stripMargin.replaceAll("\n", "")
+
+      indicator.asJson.noSpaces mustBe json
+      decode[Indicator](json) mustBe Right(indicator)
+    }
+  }
+}
