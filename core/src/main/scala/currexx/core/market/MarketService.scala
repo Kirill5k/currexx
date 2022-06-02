@@ -42,15 +42,15 @@ final private class LiveMarketService[F[_]](
     stateRepo
       .find(signal.userId, signal.currencyPair)
       .flatMap { state =>
-        val signals         = state.fold(Map.empty[String, List[IndicatorState]])(_.signals)
-        val indicatorStates = signals.getOrElse(signal.indicator.kind, Nil)
+        val signals           = state.fold(Map.empty[String, List[IndicatorState]])(_.signals)
+        val indicatorStates   = signals.getOrElse(signal.triggeredBy.kind, Nil)
+        val newIndicatorState = IndicatorState(signal.condition, signal.time, signal.triggeredBy)
         val updatedIndicatorStates =
-          if (indicatorStates.isEmpty) List(IndicatorState(signal.condition, signal.time))
-          else if (indicatorStates.head.time.hasSameDateAs(signal.time))
-            IndicatorState(signal.condition, signal.time) :: indicatorStates.tail
-          else IndicatorState(signal.condition, signal.time) :: indicatorStates
+          if (indicatorStates.isEmpty) List(newIndicatorState)
+          else if (indicatorStates.head.time.hasSameDateAs(signal.time)) newIndicatorState :: indicatorStates.tail
+          else newIndicatorState :: indicatorStates
         stateRepo
-          .update(signal.userId, signal.currencyPair, signals + (signal.indicator.kind -> updatedIndicatorStates.take(10)))
+          .update(signal.userId, signal.currencyPair, signals + (signal.triggeredBy.kind -> updatedIndicatorStates.take(10)))
           .map(s => Option.when(updatedIndicatorStates != indicatorStates)(s))
       }
       .flatMap {

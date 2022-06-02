@@ -8,6 +8,7 @@ import squants.market.Currency
 import currexx.domain.validations.{EmailString, IdString}
 import currexx.domain.user.UserId
 import currexx.core.monitor.MonitorId
+import currexx.domain.market.v2.Indicator
 import currexx.domain.monitor.Schedule
 import sttp.tapir.generic.auto.SchemaDerivation
 import sttp.tapir.{FieldName, Schema}
@@ -28,6 +29,7 @@ transparent trait TapirSchema extends SchemaDerivation {
   inline given Schema[Trend]          = Schema.string
   inline given Schema[Schedule]       = Schema.string
   inline given Schema[TradeOrder]     = Schema.string
+  inline given Schema[Indicator]     = Schema.string
 
   inline given (using currencySchema: Schema[Currency]): Schema[Money] = Schema(
     SProduct(

@@ -72,7 +72,7 @@ enum Indicator(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTa
 object Indicator:
   given JsonTaggedAdt.Config[Indicator] = JsonTaggedAdt.Config.Values[Indicator](
     mappings = Map(
-      "trend-change-detection" -> JsonTaggedAdt.tagged[Indicator.TrendDirectionChange]
+      "trend-change-detection" -> JsonTaggedAdt.tagged[Indicator.TrendChangeDetection]
     ),
     strict = true,
     typeFieldName = "kind"

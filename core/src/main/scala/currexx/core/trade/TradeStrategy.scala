@@ -27,14 +27,13 @@ object TradeStrategyExecutor {
   private case object TrendChange extends TradeStrategyExecutor:
     def analyze(state: MarketState, trigger: Indicator): Option[TradeStrategyExecutor.Decision] =
       trigger match
-        case Indicator.TrendChangeDetection =>
+        case _: Indicator.TrendChangeDetection =>
           state.signals.getOrElse(trigger.kind, Nil).headOption.map(_.condition).collect {
             case Condition.TrendDirectionChange(Trend.`Downward`, Trend.Consolidation) => Decision.Close
             case Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation)   => Decision.Close
             case Condition.TrendDirectionChange(_, Trend.Upward) if !state.buying    => Decision.Buy
             case Condition.TrendDirectionChange(_, Trend.Downward) if !state.selling => Decision.Sell
           }
-        case _ => None
 
   def get(strategy: TradeStrategy): TradeStrategyExecutor =
     strategy match

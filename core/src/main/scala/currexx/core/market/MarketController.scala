@@ -63,7 +63,7 @@ object MarketController extends TapirSchema with TapirJson with TapirCodecs {
       MarketStateView(
         ms.currentPosition,
         ms.latestPrice,
-        ms.signals.map((ind, st) => ind.kind -> st),
+        ms.signals,
         ms.lastUpdatedAt
       )
 
