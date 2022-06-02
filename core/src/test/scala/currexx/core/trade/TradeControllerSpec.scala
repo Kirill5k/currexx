@@ -100,7 +100,7 @@ class TradeControllerSpec extends ControllerSpec {
 
         val requestBody =
           s"""{
-             |"strategy": "hma-basic",
+             |"strategy": "trend-change",
              |"broker" : {
              |  "broker" : "vindaloo",
              |  "externalId" : "1"
@@ -117,7 +117,7 @@ class TradeControllerSpec extends ControllerSpec {
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.NoContent, None)
-        verify(svc).updateSettings(Trades.settings.copy(strategy = TradeStrategy.HMABasic))
+        verify(svc).updateSettings(Trades.settings.copy(strategy = TradeStrategy.TrendChange))
       }
     }
   }

@@ -19,7 +19,7 @@ class ActionProcessorSpec extends CatsSpec {
       val result = for {
         dispatcher <- ActionDispatcher.make[IO]
         processor  <- ActionProcessor.make[IO](dispatcher, monsvc, sigsvc, marksvc, tradesvc)
-        _          <- dispatcher.dispatch(Action.ProcessSignal(Signals.macd))
+        _          <- dispatcher.dispatch(Action.ProcessSignal(Signals.trendDirectionChanged))
         res        <- processor.run.interruptAfter(2.second).compile.drain
       } yield res
 

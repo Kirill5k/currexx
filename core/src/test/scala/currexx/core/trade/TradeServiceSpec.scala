@@ -158,14 +158,14 @@ class TradeServiceSpec extends CatsSpec {
       }
     }
 
-    "processMarketState" should {
+    "processMarketStateUpdate" should {
       "not do anything when trading strategy is disabled" in {
         val (settRepo, orderRepo, client, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings.copy(strategy = TradeStrategy.Disabled)))
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, client, disp)
-          _   <- svc.processMarketState(Markets.state, Indicator.RSI)
+          _   <- svc.processMarketStateUpdate(Markets.state, Markets.trendChangeDetection)
         yield ()
 
         result.asserting { res =>
@@ -177,14 +177,15 @@ class TradeServiceSpec extends CatsSpec {
 
       "close existing order if new order has reverse position" in {
         val (settRepo, orderRepo, client, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings.copy(strategy = TradeStrategy.HMABasic)))
+        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings.copy(strategy = TradeStrategy.TrendChange)))
         when(client.submit(any[CurrencyPair], any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, client, disp)
-          _   <- svc.processMarketState(Markets.stateWithHmaSignal.copy(currentPosition = Some(TradeOrder.Position.Sell)), Indicator.HMA)
+          currentState = Markets.stateWithSignal.copy(currentPosition = Some(Markets.positionState.copy(position = TradeOrder.Position.Sell)))
+          _   <- svc.processMarketStateUpdate(currentState, Markets.trendChangeDetection)
         yield ()
 
         result.asserting { res =>

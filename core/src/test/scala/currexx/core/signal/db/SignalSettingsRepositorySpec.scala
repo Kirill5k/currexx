@@ -4,7 +4,7 @@ import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
 import currexx.core.fixtures.{Markets, Signals, Users}
-import currexx.domain.market.IndicatorParameters
+import currexx.domain.market.v2.{Indicator, ValueSource, ValueTransformation}
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
 
@@ -26,14 +26,15 @@ class SignalSettingsRepositorySpec extends MongoSpec {
       }
 
       "update existing signal-settings" in withEmbeddedMongoDb { db =>
+        val ema = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.EMA(16))
         val result = for
           repo <- SignalSettingsRepository.make(db)
           _    <- repo.update(Signals.settings)
-          _    <- repo.update(Signals.settings.copy(indicators = List(IndicatorParameters.RSI())))
+          _    <- repo.update(Signals.settings.copy(indicators = List(ema)))
           res  <- repo.get(Users.uid)
         yield res
 
-        result.map(_ mustBe Some(Signals.settings.copy(indicators = List(IndicatorParameters.RSI()))))
+        result.map(_ mustBe Some(Signals.settings.copy(indicators = List(ema))))
       }
     }
   }

@@ -41,11 +41,11 @@ class TradeSettingsRepositorySpec extends MongoSpec {
         val result = for
           repo <- TradeSettingsRepository.make(db)
           _    <- repo.update(Trades.settings)
-          _    <- repo.update(Trades.settings.copy(broker = BrokerParameters.Vindaloo("2"), strategy = TradeStrategy.HMABasic))
+          _    <- repo.update(Trades.settings.copy(broker = BrokerParameters.Vindaloo("2"), strategy = TradeStrategy.TrendChange))
           res  <- repo.get(Users.uid)
         yield res
 
-        result.map(_ mustBe Trades.settings.copy(broker = BrokerParameters.Vindaloo("2"), strategy = TradeStrategy.HMABasic))
+        result.map(_ mustBe Trades.settings.copy(broker = BrokerParameters.Vindaloo("2"), strategy = TradeStrategy.TrendChange))
       }
     }
   }
