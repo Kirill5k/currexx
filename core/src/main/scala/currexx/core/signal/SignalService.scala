@@ -10,7 +10,16 @@ import currexx.calculations.{Filters, MomentumOscillators, MovingAverages}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, MarketTimeSeriesData, MovingAverage, Trend, ValueSource, ValueTransformation}
+import currexx.domain.market.{
+  Condition,
+  CurrencyPair,
+  Indicator,
+  MarketTimeSeriesData,
+  MovingAverage,
+  Trend,
+  ValueSource,
+  ValueTransformation
+}
 import fs2.Stream
 
 import scala.util.Try
@@ -63,6 +72,7 @@ object SignalService:
       vs match
         case ValueSource.Close => data.prices.map(_.close.toDouble).toList
         case ValueSource.Open  => data.prices.map(_.open.toDouble).toList
+        case ValueSource.HL2   => data.prices.map(_.high.toDouble).zip(data.prices.map(_.low.toDouble)).map((h, l) => (h + l) / 2).toList
 
   extension (vt: ValueTransformation)
     def transform(data: List[Double]): List[Double] =

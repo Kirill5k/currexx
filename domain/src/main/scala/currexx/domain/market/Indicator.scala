@@ -32,6 +32,7 @@ object CompositeMovingAverage:
 enum ValueSource(val kind: String) derives JsonTaggedAdt.PureEncoderWithConfig, JsonTaggedAdt.PureDecoderWithConfig:
   case Close extends ValueSource("close")
   case Open  extends ValueSource("open")
+  case HL2   extends ValueSource("hl2")
 object ValueSource:
   given JsonTaggedAdt.PureConfig[ValueSource] = JsonTaggedAdt.PureConfig.Values[ValueSource](
     mappings = Map(

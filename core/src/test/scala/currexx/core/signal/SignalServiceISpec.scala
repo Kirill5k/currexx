@@ -18,7 +18,7 @@ class SignalServiceISpec extends CatsSpec {
   "A SignalService" when {
     "detectTrendChange" should {
       "do some magic" ignore {
-        val timeSeriesData = Markets.timeSeriesData.copy(prices = FileReader.pricesFromResources("aud-usd-sell.json"))
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = FileReader.pricesFromResources("aud-jpy.json"))
         val indicator = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.NMA(9, 3, 8d, MovingAverage.Weighted))
         val signal = SignalService.detectTrendChange(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.TrendChangeDetection])
 
