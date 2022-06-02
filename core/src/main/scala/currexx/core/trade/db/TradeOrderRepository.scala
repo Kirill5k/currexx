@@ -27,7 +27,7 @@ final private class LiveTradeOrderRepository[F[_]: Async](
   def getAll(uid: UserId): F[List[TradeOrderPlacement]] =
     collection.find(userIdEq(uid)).sortByDesc("time").all.map(_.map(_.toDomain).toList)
   def getAllTradedCurrencies(uid: UserId): F[List[CurrencyPair]] =
-    collection.distinct[CurrencyPair](Field.CurrencyPair).all.map(_.toList)
+    collection.distinct[CurrencyPair](Field.CurrencyPair).filter(userIdEq(uid)).all.map(_.toList)
 
   def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]] =
     collection.find(userIdAndCurrencyPairEq(uid, cp)).sortByDesc("time").first.map(_.map(_.toDomain))
