@@ -6,7 +6,7 @@ import currexx.core.CatsSpec
 import currexx.core.fixtures.Signals
 import currexx.core.market.MarketService
 import currexx.core.monitor.MonitorService
-import currexx.core.signal.SignalService
+import currexx.core.signal.{Signal, SignalService}
 import currexx.core.trade.TradeService
 
 import scala.concurrent.duration.*
@@ -16,6 +16,9 @@ class ActionProcessorSpec extends CatsSpec {
   "An ActionProcessor" should {
     "process submitted signals" in {
       val (monsvc, sigsvc, marksvc, tradesvc) = mocks
+
+      when(marksvc.processSignal(any[Signal])).thenReturn(IO.unit)
+
       val result = for {
         dispatcher <- ActionDispatcher.make[IO]
         processor  <- ActionProcessor.make[IO](dispatcher, monsvc, sigsvc, marksvc, tradesvc)
@@ -24,6 +27,7 @@ class ActionProcessorSpec extends CatsSpec {
       } yield res
 
       result.unsafeToFuture().map { r =>
+        verify(marksvc).processSignal(Signals.trendDirectionChanged)
         r mustBe ()
       }
     }
