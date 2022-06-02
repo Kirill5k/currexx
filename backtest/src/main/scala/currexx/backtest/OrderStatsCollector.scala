@@ -23,16 +23,12 @@ object OrderStatsCollector {
         (prevOrder, currentOrder) match
           case (Some(prev), curr) if prev.isBuy && curr.isSell =>
             (stats.incSell.addProfit(curr.currentPrice.close - prev.currentPrice.close), Some(curr))
-          case (Some(prev), curr) if prev.isBuy && curr.isClose =>
-            (stats.incClose.addProfit(curr.currentPrice.close - prev.currentPrice.close), Some(curr))
-          case (Some(prev), curr) if prev.isSell && curr.isClose =>
-            (stats.incClose.addProfit(prev.currentPrice.close - curr.currentPrice.close), Some(curr))
           case (Some(prev), curr) if prev.isSell && curr.isBuy =>
             (stats.incClose.addProfit(prev.currentPrice.close - curr.currentPrice.close), Some(curr))
-          case (Some(prev), curr) if prev.isClose && curr.isBuy =>
-            (stats.incBuy, Some(curr))
-          case (Some(prev), curr) if prev.isClose && curr.isSell =>
-            (stats.incSell, Some(curr))
+          case (Some(prev), curr) if prev.isBuy && curr.isClose =>
+            (stats.incClose.addProfit(curr.currentPrice.close - prev.currentPrice.close), None)
+          case (Some(prev), curr) if prev.isSell && curr.isClose =>
+            (stats.incClose.addProfit(prev.currentPrice.close - curr.currentPrice.close), None)
           case (Some(prev), curr) if (prev.isSell && curr.isSell) || (prev.isBuy && curr.isBuy) =>
             (stats, Some(prev))
           case (Some(_), curr) =>
