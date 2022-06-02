@@ -2,12 +2,10 @@ package currexx.core.signal
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import cats.syntax.traverse.*
 import currexx.core.{CatsSpec, FileReader}
 import currexx.domain.user.UserId
 import currexx.domain.market.{Condition, CurrencyPair, Indicator, MovingAverage, PriceRange, Trend, ValueSource, ValueTransformation}
 import currexx.core.common.action.{Action, ActionDispatcher}
-import currexx.core.common.time.*
 import currexx.core.fixtures.{Markets, Signals, Users}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import io.circe.JsonObject
@@ -200,14 +198,6 @@ class SignalServiceSpec extends CatsSpec {
 
         signal mustBe None
       }
-
-      "do some magic" ignore {
-        val timeSeriesData = Markets.timeSeriesData.copy(prices = pricesFromResources("aud-usd-sell.json"))
-        val indicator      = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.NMA(16, 8, 4.2d, MovingAverage.Weighted))
-        val signal         = SignalService.detectTrendChange(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.TrendChangeDetection])
-
-        signal mustBe None
-      }
     }
   }
 
@@ -217,21 +207,4 @@ class SignalServiceSpec extends CatsSpec {
   extension [A](nel: NonEmptyList[A])
     def drop(n: Int): NonEmptyList[A] =
       NonEmptyList.fromListUnsafe(nel.toList.drop(n))
-
-  def pricesFromResources(path: String): NonEmptyList[PriceRange] = {
-    val json = FileReader.parseFromResources[JsonObject](path)
-    for
-      prices    <- json("Time Series FX (Daily)").toRight(new RuntimeException("missing prices"))
-      priceList <- prices.as[ListMap[String, JsonObject]]
-      priceRange <- priceList.toList.traverse { (date, ohlc) =>
-        for
-          open  <- ohlc("1. open").flatMap(_.asString).map(BigDecimal(_)).toRight(new RuntimeException("missing open"))
-          high  <- ohlc("2. high").flatMap(_.asString).map(BigDecimal(_)).toRight(new RuntimeException("missing high"))
-          low   <- ohlc("3. low").flatMap(_.asString).map(BigDecimal(_)).toRight(new RuntimeException("missing low"))
-          close <- ohlc("4. close").flatMap(_.asString).map(BigDecimal(_)).toRight(new RuntimeException("missing close"))
-        yield PriceRange(open, high, low, close, BigDecimal(0), LocalDate.parse(date).toInstantAtStartOfDay)
-      }
-      priceValues <- NonEmptyList.fromList(priceRange).toRight(new RuntimeException("empty price range list"))
-    yield priceValues
-  }.fold(e => throw e, identity)
 }
