@@ -7,7 +7,7 @@ import currexx.clients.broker.BrokerParameters
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{Indicator, PriceRange, TradeOrder}
+import currexx.domain.market.{Indicator, PriceRange}
 import currexx.domain.user.UserId
 import io.circe.Codec
 import org.http4s.HttpRoutes
@@ -52,7 +52,7 @@ final private class MarketController[F[_]](
 object MarketController extends TapirSchema with TapirJson with TapirCodecs {
 
   final case class MarketStateView(
-      currentPosition: Option[TradeOrder.Position],
+      currentPosition: Option[PositionState],
       latestPrice: Option[PriceRange],
       signals: Map[String, List[IndicatorState]],
       lastUpdatedAt: Option[Instant]

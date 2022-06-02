@@ -8,7 +8,8 @@ import currexx.core.common.time.*
 import currexx.core.signal.Signal
 import currexx.core.market.db.MarketStateRepository
 import currexx.core.trade.TradeOrderPlacement
-import currexx.domain.market.{Indicator, MarketTimeSeriesData, TradeOrder}
+import currexx.domain.market.{MarketTimeSeriesData, TradeOrder}
+import currexx.domain.market.v2.Indicator
 import currexx.domain.user.UserId
 
 trait MarketService[F[_]]:
@@ -32,28 +33,28 @@ final private class LiveMarketService[F[_]](
 
   override def processTradeOrderPlacement(top: TradeOrderPlacement): F[Unit] = {
     val position = top.order match
-      case TradeOrder.Enter(position, _, _, _, _) => Some(position)
-      case TradeOrder.Exit                        => None
-    stateRepo.update(top.userId, top.currencyPair, position).void
+      case enter: TradeOrder.Enter => Some(enter.position)
+      case TradeOrder.Exit         => None
+    stateRepo.update(top.userId, top.currencyPair, position.map(p => PositionState(p, top.time, top.currentPrice))).void
   }
 
   override def processSignal(signal: Signal): F[Unit] =
     stateRepo
       .find(signal.userId, signal.currencyPair)
       .flatMap { state =>
-        val signals         = state.fold(Map.empty[Indicator, List[IndicatorState]])(_.signals)
-        val indicatorStates = signals.getOrElse(signal.indicator, Nil)
+        val signals         = state.fold(Map.empty[String, List[IndicatorState]])(_.signals)
+        val indicatorStates = signals.getOrElse(signal.indicator.kind, Nil)
         val updatedIndicatorStates =
           if (indicatorStates.isEmpty) List(IndicatorState(signal.condition, signal.time))
           else if (indicatorStates.head.time.hasSameDateAs(signal.time))
             IndicatorState(signal.condition, signal.time) :: indicatorStates.tail
           else IndicatorState(signal.condition, signal.time) :: indicatorStates
         stateRepo
-          .update(signal.userId, signal.currencyPair, signals + (signal.indicator -> updatedIndicatorStates.take(10)))
+          .update(signal.userId, signal.currencyPair, signals + (signal.indicator.kind -> updatedIndicatorStates.take(10)))
           .map(s => Option.when(updatedIndicatorStates != indicatorStates)(s))
       }
       .flatMap {
-        case Some(state) => dispatcher.dispatch(Action.ProcessMarketState(state, signal.indicator))
+        case Some(state) => dispatcher.dispatch(Action.ProcessMarketStateUpdate(state, signal.triggeredBy))
         case None        => F.unit
       }
 

@@ -6,11 +6,11 @@ import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import io.circe.syntax.*
 import com.mongodb.client.model.ReturnDocument
-import currexx.domain.market.{CurrencyPair, Indicator, PriceRange, TradeOrder}
+import currexx.domain.market.{CurrencyPair, PriceRange}
 import currexx.domain.user.UserId
 import currexx.domain.errors.AppError
 import currexx.core.common.db.Repository
-import currexx.core.market.{IndicatorState, MarketState}
+import currexx.core.market.{IndicatorState, MarketState, PositionState}
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.{FindOneAndUpdateOptions, MongoCollection}
 import mongo4cats.collection.operations.{Filter, Update}
@@ -18,9 +18,9 @@ import mongo4cats.database.MongoDatabase
 import mongo4cats.bson.Document
 
 trait MarketStateRepository[F[_]] extends Repository[F]:
-  def update(uid: UserId, pair: CurrencyPair, signals: Map[Indicator, List[IndicatorState]]): F[MarketState]
+  def update(uid: UserId, pair: CurrencyPair, signals: Map[String, List[IndicatorState]]): F[MarketState]
   def update(uid: UserId, pair: CurrencyPair, price: PriceRange): F[MarketState]
-  def update(uid: UserId, pair: CurrencyPair, position: Option[TradeOrder.Position]): F[MarketState]
+  def update(uid: UserId, pair: CurrencyPair, position: Option[PositionState]): F[MarketState]
   def getAll(uid: UserId): F[List[MarketState]]
   def deleteAll(uid: UserId): F[Unit]
   def find(uid: UserId, pair: CurrencyPair): F[Option[MarketState]]
@@ -36,7 +36,7 @@ final private class LiveMarketStateRepository[F[_]](
   override def deleteAll(uid: UserId): F[Unit] =
     collection.deleteMany(userIdEq(uid)).void
 
-  override def update(uid: UserId, pair: CurrencyPair, signals: Map[Indicator, List[IndicatorState]]): F[MarketState] =
+  override def update(uid: UserId, pair: CurrencyPair, signals: Map[String, List[IndicatorState]]): F[MarketState] =
     runUpdate(
       userIdAndCurrencyPairEq(uid, pair),
       Update.set("signals", Document.from(signals.asJson.noSpaces)),
@@ -50,7 +50,7 @@ final private class LiveMarketStateRepository[F[_]](
       MarketStateEntity.make(uid, pair, latestPrice = Some(price))
     )
 
-  override def update(uid: UserId, pair: CurrencyPair, position: Option[TradeOrder.Position]): F[MarketState] =
+  override def update(uid: UserId, pair: CurrencyPair, position: Option[PositionState]): F[MarketState] =
     runUpdate(
       userIdAndCurrencyPairEq(uid, pair),
       Update.set("currentPosition", position.orNull),
@@ -79,5 +79,5 @@ final private class LiveMarketStateRepository[F[_]](
 object MarketStateRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[MarketStateRepository[F]] =
     db.getCollectionWithCodec[MarketStateEntity]("market-state")
-      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[PriceRange].withAddedCodec[TradeOrder.Position])
+      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[PriceRange].withAddedCodec[PositionState])
       .map(coll => LiveMarketStateRepository[F](coll))

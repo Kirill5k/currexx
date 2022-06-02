@@ -7,10 +7,11 @@ import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.clients.broker.BrokerClient
 import currexx.core.common.action.{Action, ActionDispatcher}
-import currexx.core.market.MarketState
+import currexx.core.market.{MarketState, PositionState}
 import currexx.core.trade.TradeStrategyExecutor.Decision
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
-import currexx.domain.market.{CurrencyPair, Indicator, TradeOrder}
+import currexx.domain.market.{CurrencyPair, TradeOrder}
+import currexx.domain.market.v2.Indicator
 import currexx.domain.user.UserId
 import fs2.Stream
 
@@ -76,9 +77,9 @@ final private class LiveTradeService[F[_]](
       dispatcher.dispatch(Action.ProcessTradeOrderPlacement(top))
 
   extension (top: TradeOrderPlacement)
-    def isReverse(currentPosition: TradeOrder.Position): Boolean =
+    def isReverse(currentPosition: PositionState): Boolean =
       top.order match
-        case order: TradeOrder.Enter => order.position != currentPosition
+        case order: TradeOrder.Enter => order.position != currentPosition.position
         case TradeOrder.Exit         => false
 }
 
