@@ -2,25 +2,40 @@ package currexx.core.fixtures
 
 import cats.data.NonEmptyList
 import currexx.clients.broker.BrokerParameters
-import currexx.core.market.{IndicatorState, MarketState}
+import currexx.core.market.{IndicatorState, MarketState, PositionState}
+import currexx.domain.market.v2.{Indicator, ValueSource, ValueTransformation}
 import squants.market.{EUR, GBP, USD}
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, Interval, MarketTimeSeriesData, PriceRange, TradeOrder}
+import currexx.domain.market.{Condition, CurrencyPair, Interval, MarketTimeSeriesData, PriceRange, TradeOrder, Trend}
 
 import java.time.Instant
 
 object Markets {
-  lazy val gbpeur = CurrencyPair(GBP, EUR)
-  lazy val gbpusd = CurrencyPair(GBP, USD)
+  lazy val trendChangeDetection: Indicator = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(16))
 
-  lazy val ts             = Instant.now
-  lazy val priceRange     = PriceRange(BigDecimal(2.0), BigDecimal(4.0), BigDecimal(1.0), BigDecimal(3.0), BigDecimal(1000), ts)
-  lazy val timeSeriesData = MarketTimeSeriesData(gbpeur, Interval.H1, NonEmptyList.one(priceRange))
+  lazy val gbpeur: CurrencyPair = CurrencyPair(GBP, EUR)
+  lazy val gbpusd: CurrencyPair = CurrencyPair(GBP, USD)
 
-  lazy val state              = MarketState(Users.uid, gbpeur, Some(TradeOrder.Position.Buy), Some(priceRange), Map.empty, Some(ts))
-  lazy val stateWithSignal    = state.copy(signals = Map(Indicator.MACD -> List(IndicatorState(Signals.macd.condition, ts))))
-  lazy val stateWithHmaSignal = state.copy(signals = Map(Indicator.HMA -> List(IndicatorState(Signals.hma.condition, ts))))
+  lazy val ts: Instant            = Instant.now
+  lazy val priceRange: PriceRange = PriceRange(BigDecimal(2.0), BigDecimal(4.0), BigDecimal(1.0), BigDecimal(3.0), BigDecimal(1000), ts)
+  lazy val timeSeriesData: MarketTimeSeriesData = MarketTimeSeriesData(gbpeur, Interval.H1, NonEmptyList.one(priceRange))
 
-  lazy val priceRanges = NonEmptyList
+  lazy val positionState: PositionState = PositionState(TradeOrder.Position.Buy, ts, priceRange)
+  
+  lazy val indicatorState: IndicatorState = IndicatorState(Condition.TrendDirectionChange(Trend.Downward, Trend.Upward), ts, trendChangeDetection)
+  lazy val indicatorStates: Map[String, List[IndicatorState]] = Map(trendChangeDetection.kind -> List(indicatorState))
+
+  lazy val state: MarketState = MarketState(
+    Users.uid,
+    gbpeur,
+    Some(positionState),
+    Some(priceRange),
+    Map.empty,
+    Some(ts)
+  )
+
+  lazy val stateWithSignal: MarketState = state.copy(signals = Map(trendChangeDetection.kind -> List(indicatorState)))
+
+  lazy val priceRanges: NonEmptyList[PriceRange] = NonEmptyList
     .of(
       ("1.26205", "1.26329", "1.25170", "1.25200"),
       ("1.24950", "1.26382", "1.24500", "1.26329"), // 04.05.2022

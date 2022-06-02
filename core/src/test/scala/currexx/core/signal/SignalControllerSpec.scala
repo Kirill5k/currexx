@@ -101,7 +101,7 @@ class SignalControllerSpec extends ControllerSpec {
     "GET /signals" should {
       "return all submitted signals" in {
         val svc = mock[SignalService[IO]]
-        when(svc.getAll(any[UserId])).thenReturn(IO.pure(List(Signals.macd)))
+        when(svc.getAll(any[UserId])).thenReturn(IO.pure(List(Signals.trendDirectionChanged)))
 
         val req = requestWithAuthHeader(uri"/signals", Method.GET)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))

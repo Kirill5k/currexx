@@ -73,7 +73,7 @@ class MarketServiceSpec extends CatsSpec {
     "processTradeOrderPlacement" should {
       "update state with current position" in {
         val (stateRepo, disp) = mocks
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Option[TradeOrder.Position]])).thenReturn(IO.unit)
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Option[PositionState]])).thenReturn(IO.unit)
 
         val result = for
           svc   <- MarketService.make[IO](stateRepo, disp)
@@ -81,7 +81,7 @@ class MarketServiceSpec extends CatsSpec {
         yield state
 
         result.asserting { res =>
-          verify(stateRepo).update(Users.uid, Markets.gbpeur, Some(TradeOrder.Position.Buy))
+          verify(stateRepo).update(Users.uid, Markets.gbpeur, Some(PositionState(TradeOrder.Position.Buy, Trades.ts, Markets.priceRange)))
           verifyNoInteractions(disp)
           res mustBe ()
         }
@@ -93,86 +93,89 @@ class MarketServiceSpec extends CatsSpec {
         val (stateRepo, disp) = mocks
 
         when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state.copy(signals = Map.empty))))
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[Indicator, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[String, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc   <- MarketService.make[IO](stateRepo, disp)
-          state <- svc.processSignal(Signals.macd)
+          state <- svc.processSignal(Signals.trendDirectionChanged)
         yield state
 
         result.asserting { res =>
-          val finalSignalState = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, Signals.ts)))
+          val indState = IndicatorState(Signals.trendDirectionChanged.condition, Signals.ts, Markets.trendChangeDetection)
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
-          verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
-          verify(disp).dispatch(Action.ProcessMarketState(Markets.state, Indicator.MACD))
+          verify(stateRepo).update(Users.uid, Markets.gbpeur, Map(Markets.trendChangeDetection.kind -> List(indState)))
+          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, Markets.trendChangeDetection))
           res mustBe ()
         }
       }
 
       "update signal state with the latest received signal" in {
         val (stateRepo, disp) = mocks
-        val currentMacdState  = IndicatorState(Condition.CrossingUp, Signals.ts.minusSeconds(3.days.toSeconds))
-        val signalState       = Map(Indicator.MACD -> List(currentMacdState))
+        val currentIndState =
+          IndicatorState(Signals.trendDirectionChanged.condition, Signals.ts.minusSeconds(3.days.toSeconds), Markets.trendChangeDetection)
+        val signalState = Map(Markets.trendChangeDetection.kind -> List(currentIndState))
         when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state.copy(signals = signalState))))
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[Indicator, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[String, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc   <- MarketService.make[IO](stateRepo, disp)
-          state <- svc.processSignal(Signals.macd)
+          state <- svc.processSignal(Signals.trendDirectionChanged)
         yield state
 
         result.asserting { res =>
           val finalSignalState = Map(
-            Indicator.MACD -> List(
-              IndicatorState(Condition.CrossingUp, Signals.ts),
-              currentMacdState
+            Markets.trendChangeDetection.kind -> List(
+              IndicatorState(Signals.trendDirectionChanged.condition, Signals.ts, Markets.trendChangeDetection),
+              currentIndState
             )
           )
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
-          verify(disp).dispatch(Action.ProcessMarketState(Markets.state, Indicator.MACD))
+          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, Markets.trendChangeDetection))
           res mustBe ()
         }
       }
 
       "replace latest indicator state if new signal has same date" in {
         val (stateRepo, disp) = mocks
-        val signalState       = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, Signals.ts.minusSeconds(10))))
+        val currentIndState =
+          IndicatorState(Signals.trendDirectionChanged.condition, Signals.ts.minusSeconds(10), Markets.trendChangeDetection)
+        val signalState = Map(Markets.trendChangeDetection.kind -> List(currentIndState))
+
         when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state.copy(signals = signalState))))
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[Indicator, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[String, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc   <- MarketService.make[IO](stateRepo, disp)
-          state <- svc.processSignal(Signals.macd)
+          state <- svc.processSignal(Signals.trendDirectionChanged)
         yield state
 
         result.asserting { res =>
-          val finalSignalState = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, Signals.ts)))
+          val finalSignalState = Map(Markets.trendChangeDetection.kind -> List(currentIndState.copy(time = Signals.ts)))
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
-          verify(disp).dispatch(Action.ProcessMarketState(Markets.state, Indicator.MACD))
+          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, Markets.trendChangeDetection))
           res mustBe ()
         }
       }
 
-      "not emit update when indicator state hans't changed" in {
+      "not emit update when indicator state hasn't changed" in {
         val (stateRepo, disp) = mocks
-        val signalState       = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, Signals.ts)))
-        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state.copy(signals = signalState))))
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[Indicator, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
+        
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.stateWithSignal)))
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[String, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
 
         val result = for
           svc   <- MarketService.make[IO](stateRepo, disp)
-          state <- svc.processSignal(Signals.macd)
+          state <- svc.processSignal(Signals.trendDirectionChanged)
         yield state
 
         result.asserting { res =>
-          val finalSignalState = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, Signals.ts)))
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
-          verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
+          verify(stateRepo).update(Users.uid, Markets.gbpeur, Markets.indicatorStates)
           verifyNoInteractions(disp)
           res mustBe ()
         }

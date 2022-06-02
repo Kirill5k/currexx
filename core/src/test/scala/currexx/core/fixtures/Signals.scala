@@ -1,17 +1,23 @@
 package currexx.core.fixtures
 
-import currexx.domain.market.*
+import currexx.domain.market.v2.{Indicator, ValueSource, ValueTransformation}
 import currexx.core.signal.*
+import currexx.domain.market.{Condition, Trend}
 import squants.market.{EUR, GBP}
 
 import java.time.Instant
 import java.time.temporal.ChronoField
 
 object Signals {
-  lazy val ts   = Instant.now.`with`(ChronoField.MILLI_OF_SECOND, 0)
-  lazy val macd = Signal(Users.uid, Markets.gbpeur, Indicator.MACD, Condition.CrossingUp, ts)
-  lazy val rsi  = Signal(Users.uid, Markets.gbpeur, Indicator.RSI, Condition.AboveThreshold(BigDecimal(80), BigDecimal(85)), ts)
-  lazy val hma  = Signal(Users.uid, Markets.gbpeur, Indicator.HMA, Condition.TrendDirectionChange(Trend.Downward, Trend.Upward), ts)
+  lazy val ts = Instant.now.`with`(ChronoField.MILLI_OF_SECOND, 0)
 
-  lazy val settings = SignalSettings(Users.uid, TriggerFrequency.OncePerDay, List(IndicatorParameters.MACD(), IndicatorParameters.RSI()))
+  lazy val trendDirectionChanged = Signal(
+    Users.uid,
+    Markets.gbpeur,
+    Condition.TrendDirectionChange(Trend.Downward, Trend.Upward),
+    Markets.trendChangeDetection,
+    ts
+  )
+
+  lazy val settings = SignalSettings(Users.uid, TriggerFrequency.OncePerDay, List(Markets.trendChangeDetection))
 }

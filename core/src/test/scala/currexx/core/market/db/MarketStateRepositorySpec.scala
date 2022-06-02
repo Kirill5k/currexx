@@ -39,26 +39,24 @@ class MarketStateRepositorySpec extends MongoSpec {
 
     "update signals" should {
       "create new state with signals if it doesn't exist" in withEmbeddedMongoDb { db =>
-        val signals = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, Markets.ts)))
         val result = for
           repo <- MarketStateRepository.make(db)
-          res  <- repo.update(Users.uid, Markets.gbpeur, signals)
+          res  <- repo.update(Users.uid, Markets.gbpeur, Markets.indicatorStates)
         yield res
 
-        result.map(_ mustBe MarketState(Users.uid, Markets.gbpeur, None, None, signals, None))
+        result.map(_ mustBe MarketState(Users.uid, Markets.gbpeur, None, None, Markets.indicatorStates, None))
       }
     }
 
     "update current position" should {
       "update position field in the state" in withEmbeddedMongoDb { db =>
-        val signals = Map(Indicator.MACD -> List(IndicatorState(Condition.CrossingUp, Markets.ts)))
         val result = for
           repo <- MarketStateRepository.make(db)
-          _    <- repo.update(Users.uid, Markets.gbpeur, signals)
-          res  <- repo.update(Users.uid, Markets.gbpeur, Some(TradeOrder.Position.Buy))
+          _    <- repo.update(Users.uid, Markets.gbpeur, Markets.indicatorStates)
+          res  <- repo.update(Users.uid, Markets.gbpeur, Some(Markets.positionState))
         yield res
 
-        result.map(_.currentPosition mustBe Some(TradeOrder.Position.Buy))
+        result.map(_.currentPosition mustBe Some(Markets.positionState))
       }
     }
 

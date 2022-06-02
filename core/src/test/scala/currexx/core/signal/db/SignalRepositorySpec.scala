@@ -17,11 +17,11 @@ class SignalRepositorySpec extends MongoSpec {
       "store signal in the repository" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- SignalRepository.make(db)
-          _    <- repo.save(Signals.macd)
+          _    <- repo.save(Signals.trendDirectionChanged)
           res  <- repo.getAll(Users.uid)
         yield res
 
-        result.map(_ mustBe List(Signals.macd))
+        result.map(_ mustBe List(Signals.trendDirectionChanged))
       }
     }
 
@@ -29,18 +29,18 @@ class SignalRepositorySpec extends MongoSpec {
       "return all signals sorted by time in descending order" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- SignalRepository.make(db)
-          _    <- repo.save(Signals.macd)
-          _    <- repo.save(Signals.macd.copy(time = Signals.ts.minusSeconds(10)))
+          _    <- repo.save(Signals.trendDirectionChanged)
+          _    <- repo.save(Signals.trendDirectionChanged.copy(time = Signals.ts.minusSeconds(10)))
           res  <- repo.getAll(Users.uid)
         yield res
 
-        result.map(_.head mustBe Signals.macd)
+        result.map(_.head mustBe Signals.trendDirectionChanged)
       }
 
       "not return anything when there are no signals for provided user-id" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- SignalRepository.make(db)
-          _    <- repo.save(Signals.macd)
+          _    <- repo.save(Signals.trendDirectionChanged)
           res  <- repo.getAll(Users.uid2)
         yield res
 
@@ -52,8 +52,8 @@ class SignalRepositorySpec extends MongoSpec {
       "return false if signal of such kind has been already submitted on the same date" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- SignalRepository.make(db)
-          _    <- repo.save(Signals.macd)
-          res  <- repo.isFirstOfItsKindForThatDate(Signals.macd)
+          _    <- repo.save(Signals.trendDirectionChanged)
+          res  <- repo.isFirstOfItsKindForThatDate(Signals.trendDirectionChanged)
         yield res
 
         result.map(_ mustBe false)
@@ -62,8 +62,8 @@ class SignalRepositorySpec extends MongoSpec {
       "return true if it is a first signal of such kind" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- SignalRepository.make(db)
-          _    <- repo.save(Signals.macd)
-          res  <- repo.isFirstOfItsKindForThatDate(Signals.macd.copy(currencyPair = Markets.gbpusd))
+          _    <- repo.save(Signals.trendDirectionChanged)
+          res  <- repo.isFirstOfItsKindForThatDate(Signals.trendDirectionChanged.copy(currencyPair = Markets.gbpusd))
         yield res
 
         result.map(_ mustBe true)
