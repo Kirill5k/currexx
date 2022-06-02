@@ -3,9 +3,8 @@ package currexx.core.fixtures
 import cats.data.NonEmptyList
 import currexx.clients.broker.BrokerParameters
 import currexx.core.market.{IndicatorState, MarketState, PositionState}
-import currexx.domain.market.v2.{Indicator, ValueSource, ValueTransformation}
 import squants.market.{EUR, GBP, USD}
-import currexx.domain.market.{Condition, CurrencyPair, Interval, MarketTimeSeriesData, PriceRange, TradeOrder, Trend}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, Interval, MarketTimeSeriesData, PriceRange, TradeOrder, Trend, ValueSource, ValueTransformation}
 
 import java.time.Instant
 

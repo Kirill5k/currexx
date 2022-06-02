@@ -3,8 +3,7 @@ package currexx.core.signal.db
 import io.circe.Codec
 import currexx.domain.user.UserId
 import currexx.core.signal.Signal
-import currexx.domain.market.{Condition, CurrencyPair}
-import currexx.domain.market.v2.Indicator
+import currexx.domain.market.{Condition, CurrencyPair, Indicator}
 import mongo4cats.bson.ObjectId
 import mongo4cats.circe.given
 

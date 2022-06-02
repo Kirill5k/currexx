@@ -5,7 +5,7 @@ import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
 import currexx.core.fixtures.{Markets, Signals, Users}
 import currexx.domain.errors.AppError
-import currexx.domain.market.v2.{Indicator, ValueSource, ValueTransformation}
+import currexx.domain.market.{Indicator, ValueSource, ValueTransformation}
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
 

@@ -1,8 +1,7 @@
 package currexx.core.signal
 
 import currexx.domain.user.UserId
-import currexx.domain.market.{Condition, CurrencyPair}
-import currexx.domain.market.v2.Indicator
+import currexx.domain.market.{Condition, CurrencyPair, Indicator}
 import io.circe.Codec
 
 import java.time.Instant

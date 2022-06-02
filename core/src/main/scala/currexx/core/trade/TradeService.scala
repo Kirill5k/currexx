@@ -10,8 +10,7 @@ import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.market.{MarketState, PositionState}
 import currexx.core.trade.TradeStrategyExecutor.Decision
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
-import currexx.domain.market.{CurrencyPair, TradeOrder}
-import currexx.domain.market.v2.Indicator
+import currexx.domain.market.{CurrencyPair, Indicator, TradeOrder}
 import currexx.domain.user.UserId
 import fs2.Stream
 

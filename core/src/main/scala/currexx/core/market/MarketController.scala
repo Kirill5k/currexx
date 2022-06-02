@@ -7,7 +7,7 @@ import currexx.clients.broker.BrokerParameters
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{Indicator, PriceRange}
+import currexx.domain.market.PriceRange
 import currexx.domain.user.UserId
 import io.circe.Codec
 import org.http4s.HttpRoutes

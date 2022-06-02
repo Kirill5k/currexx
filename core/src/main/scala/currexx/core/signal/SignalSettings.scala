@@ -1,7 +1,7 @@
 package currexx.core.signal
 
+import currexx.domain.market.Indicator
 import org.latestbit.circe.adt.codec.*
-import currexx.domain.market.v2.Indicator
 import currexx.domain.user.UserId
 
 enum TriggerFrequency derives JsonTaggedAdt.PureEncoderWithConfig, JsonTaggedAdt.PureDecoderWithConfig:

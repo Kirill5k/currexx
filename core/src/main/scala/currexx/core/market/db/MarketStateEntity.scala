@@ -1,7 +1,7 @@
 package currexx.core.market.db
 
 import currexx.core.market.{IndicatorState, MarketState, PositionState}
-import currexx.domain.market.{CurrencyPair, Indicator, PriceRange}
+import currexx.domain.market.{CurrencyPair, PriceRange}
 import currexx.domain.user.UserId
 import io.circe.Codec
 import mongo4cats.bson.ObjectId

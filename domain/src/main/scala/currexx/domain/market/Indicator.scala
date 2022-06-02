@@ -1,61 +1,79 @@
 package currexx.domain.market
 
-import io.circe.{Codec, Decoder, Encoder, Json, KeyDecoder, KeyEncoder}
+import currexx.domain.market.MarketTimeSeriesData
 import org.latestbit.circe.adt.codec.*
 
-enum Indicator(val kind: String):
-  case MACD       extends Indicator("macd")
-  case RSI        extends Indicator("rsi")
-  case HMA        extends Indicator("hma")
-  case NMA        extends Indicator("nma")
-  case Stochastic extends Indicator("stochastic")
-
-object Indicator:
-  inline given Decoder[Indicator]    = Decoder[String].emap(i => Indicator.values.find(_.kind == i).toRight(s"Unrecognized indicator $i"))
-  inline given Encoder[Indicator]    = Encoder[String].contramap(_.kind)
-  inline given KeyDecoder[Indicator] = KeyDecoder.instance(i => Indicator.values.find(_.kind == i))
-  inline given KeyEncoder[Indicator] = KeyEncoder.instance(_.kind)
-
-enum IndicatorParameters(val indicator: Indicator) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
-  case MACD(
-      fastLength: Int = 12,
-      slowLength: Int = 26,
-      signalSmoothing: Int = 9
-  ) extends IndicatorParameters(Indicator.MACD)
-
-  case RSI(
-      length: Int = 14,
-      upperLine: Int = 70,
-      lowerLine: Int = 30
-  ) extends IndicatorParameters(Indicator.RSI)
-
-  case Stochastic(
-      length: Int = 14,
-      slowKLength: Int = 3,
-      slowDLength: Int = 3,
-      upperLine: Int = 20,
-      lowerLine: Int = 80
-  ) extends IndicatorParameters(Indicator.Stochastic)
-
-  case HMA(
-      length: Int = 16
-  ) extends IndicatorParameters(Indicator.HMA)
-
-  case NMA(
-      length: Int = 12,
-      signalLength: Int = 6,
-      lambda: Double = 4.2
-  ) extends IndicatorParameters(Indicator.NMA)
-
-object IndicatorParameters:
-  given JsonTaggedAdt.Config[IndicatorParameters] = JsonTaggedAdt.Config.Values[IndicatorParameters](
+enum MovingAverage(val kind: String) derives JsonTaggedAdt.PureEncoderWithConfig, JsonTaggedAdt.PureDecoderWithConfig:
+  case Weighted    extends MovingAverage("weighted")
+  case Exponential extends MovingAverage("exponential")
+  case Simple      extends MovingAverage("simple")
+object MovingAverage:
+  given JsonTaggedAdt.PureConfig[MovingAverage] = JsonTaggedAdt.PureConfig.Values[MovingAverage](
     mappings = Map(
-      Indicator.MACD.kind       -> JsonTaggedAdt.tagged[IndicatorParameters.MACD],
-      Indicator.RSI.kind        -> JsonTaggedAdt.tagged[IndicatorParameters.RSI],
-      Indicator.HMA.kind        -> JsonTaggedAdt.tagged[IndicatorParameters.HMA],
-      Indicator.NMA.kind        -> JsonTaggedAdt.tagged[IndicatorParameters.NMA],
-      Indicator.Stochastic.kind -> JsonTaggedAdt.tagged[IndicatorParameters.Stochastic]
+      MovingAverage.Weighted.kind    -> JsonTaggedAdt.tagged[MovingAverage.Weighted.type],
+      MovingAverage.Exponential.kind -> JsonTaggedAdt.tagged[MovingAverage.Exponential.type],
+      MovingAverage.Simple.kind      -> JsonTaggedAdt.tagged[MovingAverage.Simple.type]
+    )
+  )
+
+enum CompositeMovingAverage(val kind: String) derives JsonTaggedAdt.PureEncoderWithConfig, JsonTaggedAdt.PureDecoderWithConfig:
+  case Triple  extends CompositeMovingAverage("triple")
+  case Hull    extends CompositeMovingAverage("hull")
+  case Nyquist extends CompositeMovingAverage("nyquist")
+object CompositeMovingAverage:
+  given JsonTaggedAdt.PureConfig[CompositeMovingAverage] = JsonTaggedAdt.PureConfig.Values[CompositeMovingAverage](
+    mappings = Map(
+      CompositeMovingAverage.Triple.kind  -> JsonTaggedAdt.tagged[CompositeMovingAverage.Triple.type],
+      CompositeMovingAverage.Hull.kind    -> JsonTaggedAdt.tagged[CompositeMovingAverage.Hull.type],
+      CompositeMovingAverage.Nyquist.kind -> JsonTaggedAdt.tagged[CompositeMovingAverage.Nyquist.type]
+    )
+  )
+
+enum ValueSource(val kind: String) derives JsonTaggedAdt.PureEncoderWithConfig, JsonTaggedAdt.PureDecoderWithConfig:
+  case Close extends ValueSource("close")
+  case Open  extends ValueSource("open")
+object ValueSource:
+  given JsonTaggedAdt.PureConfig[ValueSource] = JsonTaggedAdt.PureConfig.Values[ValueSource](
+    mappings = Map(
+      ValueSource.Close.kind -> JsonTaggedAdt.tagged[ValueSource.Close.type],
+      ValueSource.Open.kind  -> JsonTaggedAdt.tagged[ValueSource.Open.type]
+    )
+  )
+
+enum ValueTransformation(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+  case Sequenced(transformations: List[ValueTransformation]) extends ValueTransformation("sequenced")
+  case EMA(length: Int)                                      extends ValueTransformation("ema")
+  case HMA(length: Int)                                      extends ValueTransformation("hma")
+  case NMA(
+      length: Int,
+      signalLength: Int,
+      lambda: Double,
+      maCalc: MovingAverage
+  ) extends ValueTransformation("nma")
+
+object ValueTransformation:
+  given JsonTaggedAdt.Config[ValueTransformation] = JsonTaggedAdt.Config.Values[ValueTransformation](
+    mappings = Map(
+      "sequenced" -> JsonTaggedAdt.tagged[ValueTransformation.Sequenced],
+      "ema"       -> JsonTaggedAdt.tagged[ValueTransformation.EMA],
+      "hma"       -> JsonTaggedAdt.tagged[ValueTransformation.HMA],
+      "nma"       -> JsonTaggedAdt.tagged[ValueTransformation.NMA]
     ),
     strict = true,
-    typeFieldName = "indicator"
+    typeFieldName = "kind"
+  )
+
+enum Indicator(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+  case TrendChangeDetection(
+      source: ValueSource,
+      transformation: ValueTransformation
+  ) extends Indicator("trend-change-detection")
+
+object Indicator:
+  given JsonTaggedAdt.Config[Indicator] = JsonTaggedAdt.Config.Values[Indicator](
+    mappings = Map(
+      "trend-change-detection" -> JsonTaggedAdt.tagged[Indicator.TrendChangeDetection]
+    ),
+    strict = true,
+    typeFieldName = "kind"
   )

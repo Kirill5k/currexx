@@ -1,8 +1,7 @@
 package currexx.core.fixtures
 
-import currexx.domain.market.v2.{Indicator, ValueSource, ValueTransformation}
 import currexx.core.signal.*
-import currexx.domain.market.{Condition, Trend}
+import currexx.domain.market.{Condition, Indicator, Trend, ValueSource, ValueTransformation}
 import squants.market.{EUR, GBP}
 
 import java.time.Instant

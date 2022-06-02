@@ -8,8 +8,7 @@ import currexx.core.common.time.*
 import currexx.core.signal.Signal
 import currexx.core.market.db.MarketStateRepository
 import currexx.core.trade.TradeOrderPlacement
-import currexx.domain.market.{MarketTimeSeriesData, TradeOrder}
-import currexx.domain.market.v2.Indicator
+import currexx.domain.market.{Indicator, MarketTimeSeriesData, TradeOrder}
 import currexx.domain.user.UserId
 
 trait MarketService[F[_]]:

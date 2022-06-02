@@ -1,14 +1,13 @@
 package currexx.core.common.http
 
 import cats.syntax.option.*
-import currexx.domain.market.{Interval, TradeOrder, Trend}
+import currexx.domain.market.{Indicator, Interval, TradeOrder, Trend}
 import eu.timepit.refined.types.string.NonEmptyString
 import squants.Money
 import squants.market.Currency
 import currexx.domain.validations.{EmailString, IdString}
 import currexx.domain.user.UserId
 import currexx.core.monitor.MonitorId
-import currexx.domain.market.v2.Indicator
 import currexx.domain.monitor.Schedule
 import sttp.tapir.generic.auto.SchemaDerivation
 import sttp.tapir.{FieldName, Schema}

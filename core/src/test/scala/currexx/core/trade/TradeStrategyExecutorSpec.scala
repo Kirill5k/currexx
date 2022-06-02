@@ -3,8 +3,7 @@ package currexx.core.trade
 import currexx.core.fixtures.Markets
 import currexx.core.fixtures.Markets
 import currexx.core.market.{IndicatorState, PositionState}
-import currexx.domain.market.{Condition, TradeOrder, Trend}
-import currexx.domain.market.v2.Indicator
+import currexx.domain.market.{Condition, Indicator, TradeOrder, Trend}
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.matchers.must.Matchers
 

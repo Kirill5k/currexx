@@ -10,8 +10,7 @@ import currexx.calculations.{Filters, MomentumOscillators, MovingAverages}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{Condition, CurrencyPair, MarketTimeSeriesData, Trend}
-import currexx.domain.market.v2.{Indicator, MovingAverage, ValueSource, ValueTransformation}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, MarketTimeSeriesData, MovingAverage, Trend, ValueSource, ValueTransformation}
 import fs2.Stream
 
 import scala.util.Try

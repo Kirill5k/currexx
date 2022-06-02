@@ -5,8 +5,7 @@ import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.core.common.db.Repository
-import currexx.domain.market.{CurrencyPair}
-import currexx.domain.market.v2.Indicator
+import currexx.domain.market.{CurrencyPair, Indicator}
 import currexx.domain.user.UserId
 import currexx.core.signal.SignalSettings
 import currexx.domain.errors.AppError

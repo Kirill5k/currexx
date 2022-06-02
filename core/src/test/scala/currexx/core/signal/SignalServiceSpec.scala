@@ -5,8 +5,7 @@ import cats.effect.IO
 import cats.syntax.traverse.*
 import currexx.core.{CatsSpec, FileReader}
 import currexx.domain.user.UserId
-import currexx.domain.market.{Condition, CurrencyPair, PriceRange, Trend}
-import currexx.domain.market.v2.{Indicator, MovingAverage, ValueSource, ValueTransformation}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, MovingAverage, PriceRange, Trend, ValueSource, ValueTransformation}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.time.*
 import currexx.core.fixtures.{Markets, Signals, Users}

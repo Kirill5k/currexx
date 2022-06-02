@@ -8,8 +8,7 @@ import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema}
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
-import currexx.domain.market.{Condition, CurrencyPair}
-import currexx.domain.market.v2.Indicator
+import currexx.domain.market.{Condition, CurrencyPair, Indicator}
 import io.circe.Codec
 import org.http4s.HttpRoutes
 import sttp.model.StatusCode
