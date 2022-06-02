@@ -1,5 +1,6 @@
 package currexx.domain.market.v2
 
+import currexx.domain.market.MarketTimeSeriesData
 import org.latestbit.circe.adt.codec.*
 
 enum MovingAverage(val kind: String) derives JsonTaggedAdt.PureEncoderWithConfig, JsonTaggedAdt.PureDecoderWithConfig:
@@ -38,7 +39,7 @@ object ValueSource:
       ValueSource.Open.kind  -> JsonTaggedAdt.tagged[ValueSource.Open.type]
     )
   )
-
+  
 enum ValueTransformation(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Sequenced(transformations: List[ValueTransformation]) extends ValueTransformation("sequenced")
   case EMA(length: Int)                                      extends ValueTransformation("ema")
@@ -63,15 +64,15 @@ object ValueTransformation:
   )
 
 enum Indicator(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
-  case TrendDirectionChange(
+  case TrendDetection(
       source: ValueSource,
       transformation: ValueTransformation
-  ) extends Indicator("trend-direction-change")
+  ) extends Indicator("trend-detection")
 
 object Indicator:
   given JsonTaggedAdt.Config[Indicator] = JsonTaggedAdt.Config.Values[Indicator](
     mappings = Map(
-      "trend-direction-change" -> JsonTaggedAdt.tagged[Indicator.TrendDirectionChange]
+      "trend-detection" -> JsonTaggedAdt.tagged[Indicator.TrendDirectionChange]
     ),
     strict = true,
     typeFieldName = "kind"

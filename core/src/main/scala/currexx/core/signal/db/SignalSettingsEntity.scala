@@ -1,7 +1,8 @@
 package currexx.core.signal.db
 
 import cats.syntax.option.*
-import currexx.domain.market.{CurrencyPair, IndicatorParameters}
+import currexx.domain.market.CurrencyPair
+import currexx.domain.market.v2.Indicator
 import currexx.domain.user.UserId
 import currexx.core.signal.{SignalSettings, TriggerFrequency}
 import io.circe.Codec
@@ -12,7 +13,7 @@ final case class SignalSettingsEntity(
     _id: ObjectId,
     userId: ObjectId,
     triggerFrequency: Option[TriggerFrequency],
-    indicators: Set[IndicatorParameters]
+    indicators: Set[Indicator]
 ) derives Codec.AsObject:
   def toDomain: SignalSettings =
     SignalSettings(

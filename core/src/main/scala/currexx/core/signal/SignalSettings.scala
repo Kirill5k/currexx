@@ -1,24 +1,22 @@
 package currexx.core.signal
 
-import io.circe.{Decoder, Encoder}
-import currexx.domain.market.{CurrencyPair, Indicator, IndicatorParameters}
+import org.latestbit.circe.adt.codec.*
+import currexx.domain.market.v2.Indicator
 import currexx.domain.user.UserId
 
-enum TriggerFrequency(val kind: String):
-  case Continuously extends TriggerFrequency("continuously")
-  case OncePerDay   extends TriggerFrequency("once-per-day")
+enum TriggerFrequency derives JsonTaggedAdt.PureEncoderWithConfig, JsonTaggedAdt.PureDecoderWithConfig:
+  case Continuously, OncePerDay
 
 object TriggerFrequency:
-  inline given Encoder[TriggerFrequency] = Encoder[String].contramap(_.kind)
-  inline given Decoder[TriggerFrequency] =
-    Decoder[String].emap(tf => TriggerFrequency.values.find(_.kind == tf).toRight(s"Unrecognized trigger frequency $tf"))
+  given JsonTaggedAdt.PureConfig[TriggerFrequency] = JsonTaggedAdt.PureConfig.Values[TriggerFrequency](
+    mappings = Map(
+      "continuously" -> JsonTaggedAdt.tagged[TriggerFrequency.Continuously.type],
+      "once-per-day" -> JsonTaggedAdt.tagged[TriggerFrequency.OncePerDay.type]
+    )
+  )
 
 final case class SignalSettings(
     userId: UserId,
     triggerFrequency: TriggerFrequency,
-    indicators: List[IndicatorParameters]
+    indicators: List[Indicator]
 )
-
-object SignalSettings:
-  def default(userId: UserId): SignalSettings =
-    SignalSettings(userId, TriggerFrequency.OncePerDay, List(IndicatorParameters.MACD(), IndicatorParameters.RSI()))

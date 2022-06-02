@@ -8,7 +8,8 @@ import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema}
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorParameters}
+import currexx.domain.market.{Condition, CurrencyPair}
+import currexx.domain.market.v2.Indicator
 import io.circe.Codec
 import org.http4s.HttpRoutes
 import sttp.model.StatusCode
@@ -30,7 +31,7 @@ final private class SignalController[F[_]](
       .serverLogic { session => req =>
         for
           time <- F.realTimeInstant
-          signal = Signal(session.userId, req.currencyPair, req.indicator, req.condition, time)
+          signal = Signal(session.userId, req.currencyPair, req.condition, req.triggeredBy, time)
           res <- service.submit(signal).voidResponse
         yield res
       }
@@ -55,10 +56,9 @@ final private class SignalController[F[_]](
   private def updateSignalSettings(using auth: Authenticator[F]) =
     updateSignalSettingsEndpoint.withAuthenticatedSession
       .serverLogic { session => settings =>
-        F.raiseWhen(settings.hasDuplicates)(AppError.FailedValidation("Multiple indicators of the same kind are not allowed")) >>
-          service
-            .updateSettings(settings.toDomain(session.userId))
-            .voidResponse
+        service
+          .updateSettings(settings.toDomain(session.userId))
+          .voidResponse
       }
 
   def routes(using authenticator: Authenticator[F]): HttpRoutes[F] =
@@ -76,27 +76,26 @@ object SignalController extends TapirSchema with TapirJson with TapirCodecs {
 
   final case class SubmitSignalRequest(
       currencyPair: CurrencyPair,
-      indicator: Indicator,
-      condition: Condition
+      condition: Condition,
+      triggeredBy: Indicator
   ) derives Codec.AsObject
 
   final case class SignalView(
       currencyPair: CurrencyPair,
-      indicator: Indicator,
       condition: Condition,
+      triggeredBy: Indicator,
       time: Instant
   ) derives Codec.AsObject
 
-  final case class SignalSettingsView(
-      triggerFrequency: TriggerFrequency,
-      indicators: List[IndicatorParameters]
-  ) derives Codec.AsObject:
-    def hasDuplicates: Boolean                   = indicators.map(_.indicator).toSet.size != indicators.size
-    def toDomain(userId: UserId): SignalSettings = SignalSettings(userId, triggerFrequency, indicators)
-
   object SignalView:
     def from(signal: Signal): SignalView =
-      SignalView(signal.currencyPair, signal.indicator, signal.condition, signal.time)
+      SignalView(signal.currencyPair, signal.condition, signal.triggeredBy, signal.time)
+
+  final case class SignalSettingsView(
+      triggerFrequency: TriggerFrequency,
+      indicators: List[Indicator]
+  ) derives Codec.AsObject:
+    def toDomain(userId: UserId): SignalSettings = SignalSettings(userId, triggerFrequency, indicators)
 
   private val basePath     = "signals"
   private val settingsPath = basePath / "settings"

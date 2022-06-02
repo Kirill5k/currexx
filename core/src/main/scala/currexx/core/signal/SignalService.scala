@@ -9,7 +9,8 @@ import currexx.domain.user.UserId
 import currexx.calculations.{Filters, MomentumOscillators, MovingAverages}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorParameters, MarketTimeSeriesData, Trend}
+import currexx.domain.market.{Condition, CurrencyPair, MarketTimeSeriesData, Trend}
+import currexx.domain.market.v2.{Indicator, MovingAverage, ValueSource, ValueTransformation}
 import fs2.Stream
 
 import scala.util.Try
@@ -37,22 +38,12 @@ final private class LiveSignalService[F[_]](
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
     Stream
       .eval(getSettings(uid))
-      .evalMap {
-        case Some(settings) =>
-          settings.pure[F]
-        case None =>
-          val defaultSettings = SignalSettings.default(uid)
-          settingsRepo.update(defaultSettings).as(defaultSettings)
-      }
+      .unNone
       .flatMap { settings =>
         Stream
           .emits(
-            settings.indicators.flatMap {
-              case rsi: IndicatorParameters.RSI          => SignalService.detectRsi(uid, data, rsi)
-              case stoch: IndicatorParameters.Stochastic => SignalService.detectStoch(uid, data, stoch)
-              case macd: IndicatorParameters.MACD        => SignalService.detectMacd(uid, data, macd)
-              case hma: IndicatorParameters.HMA          => SignalService.detectHma(uid, data, hma)
-              case nma: IndicatorParameters.NMA          => SignalService.detectNma(uid, data, nma)
+            settings.indicators.flatMap { case trendDetection: Indicator.TrendDetection =>
+              SignalService.detectTrend(uid, data, trendDetection)
             }
           )
           .evalFilter { signal =>
@@ -67,6 +58,37 @@ final private class LiveSignalService[F[_]](
 }
 
 object SignalService:
+
+  extension (vs: ValueSource)
+    def extract(data: MarketTimeSeriesData): List[Double] =
+      vs match
+        case ValueSource.Close => data.prices.map(_.close.toDouble).toList
+        case ValueSource.Open  => data.prices.map(_.open.toDouble).toList
+
+  extension (vt: ValueTransformation)
+    def transform(data: List[Double]): List[Double] =
+      vt match
+        case ValueTransformation.Sequenced(transformations) => transformations.foldLeft(data)((d, t) => t.transform(d))
+        case ValueTransformation.EMA(length)                => MovingAverages.exponential(data, length)
+        case ValueTransformation.HMA(length)                => MovingAverages.hull(data, length)
+        case ValueTransformation.NMA(length, signalLength, lambda, ma) =>
+          MovingAverages.nyquist(data, length, signalLength, lambda, ma.calculation)
+
+  extension (ma: MovingAverage)
+    def calculation: (List[Double], Int) => List[Double] =
+      ma match
+        case MovingAverage.Exponential => MovingAverages.exponential _
+        case MovingAverage.Simple      => MovingAverages.simple
+        case MovingAverage.Weighted    => MovingAverages.weighted
+
+  def detectTrend(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.TrendDetection): Option[Signal] = {
+    val source = indicator.source.extract(data)
+    val transformed = indicator.transformation.transform(source)
+    val res    = identifyTrends(transformed.take(5))
+    Option
+      .when(res.head != res(1))(Condition.TrendDirectionChange(res(1), res.head))
+      .map(c => Signal(uid, data.currencyPair, indicator, c, data.prices.head.time))
+  }
 
   def detectMacd(uid: UserId, data: MarketTimeSeriesData, macd: IndicatorParameters.MACD): Option[Signal] = {
     val (macdLine, signalLine) = MovingAverages.macdWithSignal(

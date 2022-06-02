@@ -1,6 +1,7 @@
 package currexx.domain.market
 
 import cats.data.NonEmptyList
+import currexx.domain.market.v2.ValueSource
 import io.circe.Codec
 import org.latestbit.circe.adt.codec.*
 
