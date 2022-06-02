@@ -16,15 +16,26 @@ class MarketControllerSpec extends ControllerSpec {
     given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
     "DELETE /market/state" should {
-      "clear state of traded currencies" in {
+      "clear state of traded currencies and close pending orders by default" in {
         val svc = mock[MarketService[IO]]
-        when(svc.clearState(any[UserId])).thenReturn(IO.unit)
+        when(svc.clearState(any[UserId], any[Boolean])).thenReturn(IO.unit)
 
         val req = requestWithAuthHeader(uri"/market/state", Method.DELETE)
         val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.NoContent, None)
-        verify(svc).clearState(Users.uid)
+        verify(svc).clearState(Users.uid, true)
+      }
+
+      "clear state of traded currencies without closing pending orders" in {
+        val svc = mock[MarketService[IO]]
+        when(svc.clearState(any[UserId], any[Boolean])).thenReturn(IO.unit)
+
+        val req = requestWithAuthHeader(uri"/market/state?closePendingOrders=false", Method.DELETE)
+        val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        verifyJsonResponse(res, Status.NoContent, None)
+        verify(svc).clearState(Users.uid, false)
       }
     }
 

@@ -13,7 +13,7 @@ import currexx.domain.user.UserId
 
 trait MarketService[F[_]]:
   def getState(uid: UserId): F[List[MarketState]]
-  def clearState(uid: UserId): F[Unit]
+  def clearState(uid: UserId, closePendingOrders: Boolean): F[Unit]
   def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit]
   def processSignal(signal: Signal): F[Unit]
   def processTradeOrderPlacement(top: TradeOrderPlacement): F[Unit]
@@ -25,7 +25,8 @@ final private class LiveMarketService[F[_]](
     F: Monad[F]
 ) extends MarketService[F] {
   override def getState(uid: UserId): F[List[MarketState]] = stateRepo.getAll(uid)
-  override def clearState(uid: UserId): F[Unit]            = stateRepo.deleteAll(uid) >> dispatcher.dispatch(Action.CloseAllOpenOrders(uid))
+  override def clearState(uid: UserId, closePendingOrders: Boolean): F[Unit] =
+    stateRepo.deleteAll(uid) >> F.whenA(closePendingOrders)(dispatcher.dispatch(Action.CloseAllOpenOrders(uid)))
 
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
     stateRepo.update(uid, data.currencyPair, data.prices.head).void

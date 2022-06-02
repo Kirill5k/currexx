@@ -16,19 +16,36 @@ class MarketServiceSpec extends CatsSpec {
 
   "A MarketService" when {
     "clearState" should {
-      "delete all existing market states" in {
+      "delete all existing market states and close orders" in {
         val (stateRepo, disp) = mocks
         when(stateRepo.deleteAll(any[UserId])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc   <- MarketService.make[IO](stateRepo, disp)
-          state <- svc.clearState(Users.uid)
+          state <- svc.clearState(Users.uid, true)
         yield state
 
         result.asserting { res =>
           verify(stateRepo).deleteAll(Users.uid)
           verify(disp).dispatch(Action.CloseAllOpenOrders(Users.uid))
+          res mustBe ()
+        }
+      }
+
+      "delete all existing market states without closing orders" in {
+        val (stateRepo, disp) = mocks
+        when(stateRepo.deleteAll(any[UserId])).thenReturn(IO.unit)
+        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+
+        val result = for
+          svc   <- MarketService.make[IO](stateRepo, disp)
+          state <- svc.clearState(Users.uid, false)
+        yield state
+
+        result.asserting { res =>
+          verify(stateRepo).deleteAll(Users.uid)
+          verifyNoInteractions(disp)
           res mustBe ()
         }
       }
