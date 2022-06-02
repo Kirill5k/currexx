@@ -5,7 +5,7 @@ import io.circe.syntax.*
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-class TradeOrderSpec extends AnyWordSpec with Matchers{
+class TradeOrderSpec extends AnyWordSpec with Matchers {
 
   "A TradeOrder codecs" should {
     "decode order from json" in {
