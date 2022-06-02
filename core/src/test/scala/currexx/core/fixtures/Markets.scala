@@ -20,8 +20,8 @@ object Markets {
   lazy val timeSeriesData: MarketTimeSeriesData = MarketTimeSeriesData(gbpeur, Interval.H1, NonEmptyList.one(priceRange))
 
   lazy val positionState: PositionState = PositionState(TradeOrder.Position.Buy, ts, priceRange)
-  
-  lazy val indicatorState: IndicatorState = IndicatorState(Condition.TrendDirectionChange(Trend.Downward, Trend.Upward), ts, trendChangeDetection)
+
+  lazy val indicatorState: IndicatorState = IndicatorState(Signals.trendDirectionChanged.condition, Signals.trendDirectionChanged.time, trendChangeDetection)
   lazy val indicatorStates: Map[String, List[IndicatorState]] = Map(trendChangeDetection.kind -> List(indicatorState))
 
   lazy val state: MarketState = MarketState(

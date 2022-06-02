@@ -3,7 +3,7 @@ package currexx.core.market
 import cats.effect.IO
 import currexx.core.ControllerSpec
 import currexx.core.auth.Authenticator
-import currexx.core.fixtures.{Markets, Sessions, Users}
+import currexx.core.fixtures.{Markets, Sessions, Signals, Users}
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
 import org.http4s.circe.CirceEntityCodec.*
@@ -37,30 +37,53 @@ class MarketControllerSpec extends ControllerSpec {
         val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody =
-          s"""{
-             |"GBP/EUR" : {
-             |  "currentPosition" : "buy",
-             |  "latestPrice" : {
-             |    "open" : 2.0,
-             |    "high" : 4.0,
-             |    "low" : 1.0,
-             |    "close" : 3.0,
-             |    "volume" : 1000,
-             |    "time" : "${Markets.ts}"
-             |  },
-             |  "signals" : {
-             |    "macd" : [
-             |      {
-             |        "condition" : {
-             |          "kind" : "crossing-up"
-             |        },
-             |        "time" : "${Markets.ts}"
+          s"""
+             |{
+             |  "GBP/EUR": {
+             |    "currentPosition": {
+             |      "position": "buy",
+             |      "openedAt": "${Markets.ts}",
+             |      "price": {
+             |        "open": 2,
+             |        "high": 4,
+             |        "low": 1,
+             |        "close": 3,
+             |        "volume": 1000,
+             |        "time": "${Markets.ts}"
              |      }
-             |    ]
-             |  },
-             |  "lastUpdatedAt" : "${Markets.ts}"
+             |    },
+             |    "latestPrice": {
+             |      "open": 2,
+             |      "high": 4,
+             |      "low": 1,
+             |      "close": 3,
+             |      "volume": 1000,
+             |      "time": "${Markets.ts}"
+             |    },
+             |    "signals": {
+             |      "trend-change-detection": [
+             |        {
+             |          "triggeredBy": {
+             |            "kind": "trend-change-detection",
+             |            "source": "close",
+             |            "transformation": {
+             |              "kind": "hma",
+             |              "length": 16
+             |            }
+             |          },
+             |          "condition": {
+             |            "kind": "trend-direction-change",
+             |            "from": "downward",
+             |            "to": "upward"
+             |          },
+             |          "time": "${Signals.ts}"
+             |        }
+             |      ]
+             |    },
+             |    "lastUpdatedAt": "${Markets.ts}"
+             |  }
              |}
-             |}""".stripMargin
+             |""".stripMargin
 
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
         verify(svc).getState(Users.uid)
