@@ -42,8 +42,8 @@ final private class LiveSignalService[F[_]](
       .flatMap { settings =>
         Stream
           .emits(
-            settings.indicators.flatMap { case trendDetection: Indicator.TrendDetection =>
-              SignalService.detectTrend(uid, data, trendDetection)
+            settings.indicators.flatMap { case trendChangeDetection: Indicator.TrendChangeDetection =>
+              SignalService.detectTrendChange(uid, data, trendChangeDetection)
             }
           )
           .evalFilter { signal =>
@@ -81,10 +81,10 @@ object SignalService:
         case MovingAverage.Simple      => MovingAverages.simple
         case MovingAverage.Weighted    => MovingAverages.weighted
 
-  def detectTrend(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.TrendDetection): Option[Signal] = {
-    val source = indicator.source.extract(data)
+  def detectTrendChange(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.TrendDetection): Option[Signal] = {
+    val source      = indicator.source.extract(data)
     val transformed = indicator.transformation.transform(source)
-    val res    = identifyTrends(transformed.take(5))
+    val res         = identifyTrends(transformed.take(5))
     Option
       .when(res.head != res(1))(Condition.TrendDirectionChange(res(1), res.head))
       .map(c => Signal(uid, data.currencyPair, indicator, c, data.prices.head.time))

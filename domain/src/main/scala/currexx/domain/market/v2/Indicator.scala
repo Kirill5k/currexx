@@ -39,7 +39,7 @@ object ValueSource:
       ValueSource.Open.kind  -> JsonTaggedAdt.tagged[ValueSource.Open.type]
     )
   )
-  
+
 enum ValueTransformation(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Sequenced(transformations: List[ValueTransformation]) extends ValueTransformation("sequenced")
   case EMA(length: Int)                                      extends ValueTransformation("ema")
@@ -64,15 +64,15 @@ object ValueTransformation:
   )
 
 enum Indicator(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
-  case TrendDetection(
+  case TrendChangeDetection(
       source: ValueSource,
       transformation: ValueTransformation
-  ) extends Indicator("trend-detection")
+  ) extends Indicator("trend-change-detection")
 
 object Indicator:
   given JsonTaggedAdt.Config[Indicator] = JsonTaggedAdt.Config.Values[Indicator](
     mappings = Map(
-      "trend-detection" -> JsonTaggedAdt.tagged[Indicator.TrendDirectionChange]
+      "trend-change-detection" -> JsonTaggedAdt.tagged[Indicator.TrendDirectionChange]
     ),
     strict = true,
     typeFieldName = "kind"
