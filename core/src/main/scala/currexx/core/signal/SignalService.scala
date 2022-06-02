@@ -9,6 +9,7 @@ import currexx.domain.user.UserId
 import currexx.calculations.{Filters, MomentumOscillators, MovingAverages}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
+import currexx.domain.errors.AppError
 import currexx.domain.market.{Condition, CurrencyPair, MarketTimeSeriesData, Trend}
 import currexx.domain.market.v2.{Indicator, MovingAverage, ValueSource, ValueTransformation}
 import fs2.Stream
@@ -18,7 +19,7 @@ import scala.util.Try
 trait SignalService[F[_]]:
   def submit(signal: Signal): F[Unit]
   def getAll(uid: UserId): F[List[Signal]]
-  def getSettings(uid: UserId): F[Option[SignalSettings]]
+  def getSettings(uid: UserId): F[SignalSettings]
   def updateSettings(settings: SignalSettings): F[Unit]
   def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit]
 
@@ -29,16 +30,15 @@ final private class LiveSignalService[F[_]](
 )(using
     F: Concurrent[F]
 ) extends SignalService[F] {
-  override def getSettings(uid: UserId): F[Option[SignalSettings]] = settingsRepo.get(uid)
-  override def updateSettings(settings: SignalSettings): F[Unit]   = settingsRepo.update(settings)
-  override def getAll(uid: UserId): F[List[Signal]]                = signalRepo.getAll(uid)
+  override def getSettings(uid: UserId): F[SignalSettings]       = settingsRepo.get(uid)
+  override def updateSettings(settings: SignalSettings): F[Unit] = settingsRepo.update(settings)
+  override def getAll(uid: UserId): F[List[Signal]]              = signalRepo.getAll(uid)
   override def submit(signal: Signal): F[Unit] =
     signalRepo.save(signal) >> dispatcher.dispatch(Action.ProcessSignal(signal))
 
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
     Stream
       .eval(getSettings(uid))
-      .unNone
       .flatMap { settings =>
         Stream
           .emits(

@@ -49,7 +49,6 @@ final private class SignalController[F[_]](
       .serverLogic { session => _ =>
         service
           .getSettings(session.userId)
-          .flatMap(settings => F.fromOption(settings, AppError.NotSetup("Signal")))
           .mapResponse(s => SignalSettingsView(s.triggerFrequency, s.indicators))
       }
 
