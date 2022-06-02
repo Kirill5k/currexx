@@ -19,7 +19,7 @@ trait TradeService[F[_]]:
   def getSettings(uid: UserId): F[TradeSettings]
   def updateSettings(settings: TradeSettings): F[Unit]
   def getAllOrders(uid: UserId): F[List[TradeOrderPlacement]]
-  def processMarketState(state: MarketState, trigger: Indicator): F[Unit]
+  def processMarketStateUpdate(state: MarketState, trigger: Indicator): F[Unit]
   def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
   def closeOpenOrders(uid: UserId): F[Unit]
 
@@ -52,7 +52,7 @@ final private class LiveTradeService[F[_]](
         case Some(top) => F.realTimeInstant.map(t => top.copy(time = t, order = TradeOrder.Exit)).flatMap(submitOrderPlacement)
       }
 
-  override def processMarketState(state: MarketState, trigger: Indicator): F[Unit] =
+  override def processMarketStateUpdate(state: MarketState, trigger: Indicator): F[Unit] =
     (settingsRepository.get(state.userId), F.realTimeInstant)
       .mapN { (settings, time) =>
         (state.latestPrice, TradeStrategyExecutor.get(settings.strategy).analyze(state, trigger)).mapN { (price, result) =>

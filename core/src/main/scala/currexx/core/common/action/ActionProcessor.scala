@@ -49,7 +49,7 @@ final private class LiveActionProcessor[F[_]](
       case Action.ProcessSignal(signal) =>
         logger.info(s"processing submitted signal $signal") *> marketService.processSignal(signal)
       case Action.ProcessMarketStateUpdate(state, indicator) =>
-        logger.info(s"processing market state update triggered by $indicator") *> tradeService.processMarketState(state, indicator)
+        logger.info(s"processing market state update triggered by $indicator") *> tradeService.processMarketStateUpdate(state, indicator)
       case Action.ProcessTradeOrderPlacement(order) =>
         logger.info(s"processing trade order placement $order") *> marketService.processTradeOrderPlacement(order)
     ).handleErrorWith {
