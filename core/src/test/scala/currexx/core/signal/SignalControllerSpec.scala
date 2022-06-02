@@ -5,6 +5,7 @@ import currexx.core.ControllerSpec
 import currexx.core.auth.Authenticator
 import currexx.domain.user.UserId
 import currexx.core.fixtures.{Markets, Sessions, Signals, Users}
+import currexx.domain.errors.AppError
 import currexx.domain.market.CurrencyPair
 import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.implicits.*
@@ -22,7 +23,7 @@ class SignalControllerSpec extends ControllerSpec {
 
         val reqBody = parseJson(s"""{
              |"currencyPair":"GBP/EUR",
-             |"indicator": "macd",
+             |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
              |"condition": {"kind":"crossing-up"}
              |}""".stripMargin)
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
@@ -37,12 +38,12 @@ class SignalControllerSpec extends ControllerSpec {
 
         val reqBody = parseJson(s"""{
              |  "currencyPair":"GBP/EUR",
-             |  "indicator":"foo"
+             |  "triggeredBy": {"kind": "foo"}
              |}""".stripMargin)
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.UnprocessableEntity, Some("""{"message":"Unrecognized indicator foo, condition is required"}"""))
+        verifyJsonResponse(res, Status.UnprocessableEntity, Some("""{"message":"condition is required, Received unknown type: 'foo'. Exists only types: trend-change-detection."}"""))
         verifyNoInteractions(svc)
       }
 
@@ -51,7 +52,7 @@ class SignalControllerSpec extends ControllerSpec {
 
         val reqBody = parseJson(s"""{
              |"currencyPair":"GBP/EUR",
-             |"indicator": "macd",
+             |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
              |"condition": {"kind":"foo","value":0.05}
              |}""".stripMargin)
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
@@ -66,7 +67,7 @@ class SignalControllerSpec extends ControllerSpec {
 
         val reqBody = parseJson(s"""{
              |"currencyPair":"FOO/BAR",
-             |"indicator": "macd",
+             |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
              |"condition": {"kind":"crossing-up"}
              |}""".stripMargin)
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
@@ -87,7 +88,7 @@ class SignalControllerSpec extends ControllerSpec {
 
         val reqBody = parseJson(s"""{
                |"currencyPair":"FOO-BAR",
-               |"indicator": "macd",
+               |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
                |"condition": {"kind":"crossing-up"}
                |}""".stripMargin)
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
@@ -109,8 +110,8 @@ class SignalControllerSpec extends ControllerSpec {
         val responseBody = s"""[{
                |"currencyPair":"GBP/EUR",
                |"time": "${Signals.ts}",
-               |"indicator": "macd",
-               |"condition": {"kind":"crossing-up"}
+               |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
+               |"condition": {"kind":"trend-direction-change", "from": "downward", "to": "upward"}
                |}]""".stripMargin
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
         verify(svc).getAll(Users.uid)
@@ -120,7 +121,7 @@ class SignalControllerSpec extends ControllerSpec {
     "GET /signals/settings" should {
       "return signal settings for configured indicators" in {
         val svc = mock[SignalService[IO]]
-        when(svc.getSettings(any[UserId])).thenReturn(IO.pure(Some(Signals.settings)))
+        when(svc.getSettings(any[UserId])).thenReturn(IO.pure(Signals.settings))
 
         val req = requestWithAuthHeader(uri"/signals/settings", Method.GET)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
@@ -130,16 +131,9 @@ class SignalControllerSpec extends ControllerSpec {
               |"triggerFrequency" : "once-per-day",
               |"indicators": [
               |{
-              |   "indicator" : "macd",
-              |   "fastLength" : 12,
-              |   "slowLength" : 26,
-              |   "signalSmoothing" : 9
-              |},
-              |{
-              |   "indicator" : "rsi",
-              |   "length" : 14,
-              |   "upperLine" : 70,
-              |   "lowerLine" : 30
+              | "kind":"trend-change-detection",
+              | "source": "close",
+              | "transformation": {"kind": "hma", "length": 16}
               |}
               |]}""".stripMargin
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
@@ -148,7 +142,7 @@ class SignalControllerSpec extends ControllerSpec {
 
       "return error when signals are not configured in the given accounts" in {
         val svc = mock[SignalService[IO]]
-        when(svc.getSettings(any[UserId])).thenReturn(IO.pure(None))
+        when(svc.getSettings(any[UserId])).thenReturn(IO.raiseError(AppError.NotSetup("Signal")))
 
         val req = requestWithAuthHeader(uri"/signals/settings", Method.GET)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
@@ -168,16 +162,9 @@ class SignalControllerSpec extends ControllerSpec {
              |"triggerFrequency" : "continuously",
              |"indicators": [
              |{
-             |   "indicator" : "macd",
-             |   "fastLength" : 12,
-             |   "slowLength" : 26,
-             |   "signalSmoothing" : 9
-             |},
-             |{
-             |   "indicator" : "rsi",
-             |   "length" : 14,
-             |   "upperLine" : 70,
-             |   "lowerLine" : 30
+             | "kind":"trend-change-detection",
+             | "source": "close",
+             | "transformation": {"kind": "hma", "length": 16}
              |}
              |]}""".stripMargin
 
@@ -186,34 +173,6 @@ class SignalControllerSpec extends ControllerSpec {
 
         verifyJsonResponse(res, Status.NoContent, None)
         verify(svc).updateSettings(Signals.settings.copy(triggerFrequency = TriggerFrequency.Continuously))
-      }
-
-      "return error when request contains multiple indicators of the same kind" in {
-        val svc = mock[SignalService[IO]]
-
-        val requestBody =
-          s"""{
-             |"triggerFrequency" : "continuously",
-             |"indicators": [
-             |{
-             |   "indicator" : "rsi",
-             |   "length" : 20,
-             |   "upperLine" : 85,
-             |   "lowerLine" : 15
-             |},
-             |{
-             |   "indicator" : "rsi",
-             |   "length" : 14,
-             |   "upperLine" : 70,
-             |   "lowerLine" : 30
-             |}
-             |]}""".stripMargin
-
-        val req = requestWithAuthHeader(uri"/signals/settings", Method.PUT).withEntity(parseJson(requestBody))
-        val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
-
-        verifyJsonResponse(res, Status.UnprocessableEntity, Some("""{"message":"Multiple indicators of the same kind are not allowed"}"""))
-        verifyNoInteractions(svc)
       }
     }
   }

@@ -5,7 +5,8 @@ import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.core.common.db.Repository
-import currexx.domain.market.{CurrencyPair, IndicatorParameters}
+import currexx.domain.market.{CurrencyPair}
+import currexx.domain.market.v2.Indicator
 import currexx.domain.user.UserId
 import currexx.core.signal.SignalSettings
 import currexx.domain.errors.AppError
@@ -37,11 +38,11 @@ final private class LiveSignalSettingsRepository[F[_]: Async](
     collection
       .find(userIdEq(uid))
       .first
-      .flatMap(ss => Async[F].fromOption(ss.map(_.toDomain), AppError.NotSetup("Trade")))
+      .flatMap(ss => Async[F].fromOption(ss.map(_.toDomain), AppError.NotSetup("Signal")))
 }
 
 object SignalSettingsRepository extends MongoJsonCodecs:
 
   def make[F[_]: Async](db: MongoDatabase[F]): F[SignalSettingsRepository[F]] =
     db.getCollectionWithCodec[SignalSettingsEntity]("signal-settings")
-      .map(coll => LiveSignalSettingsRepository[F](coll.withAddedCodec[CurrencyPair].withAddedCodec[IndicatorParameters]))
+      .map(coll => LiveSignalSettingsRepository[F](coll.withAddedCodec[CurrencyPair].withAddedCodec[Indicator]))

@@ -22,7 +22,7 @@ class SignalServiceSpec extends CatsSpec {
     "getSettings" should {
       "store signal-settings in the repository" in {
         val (signRepo, settRepo, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Some(Signals.settings)))
+        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Signals.settings))
 
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
@@ -95,32 +95,15 @@ class SignalServiceSpec extends CatsSpec {
     "processMarketData" should {
       "not do anything when there are no changes in market data since last point" in {
         val (signRepo, settRepo, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Some(Signals.settings)))
+        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Signals.settings))
 
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
-          res <- svc.processMarketData(Users.uid, Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(1)))
+          res <- svc.processMarketData(Users.uid, Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(3)))
         yield res
 
         result.asserting { res =>
           verify(settRepo).get(Users.uid)
-          verifyNoInteractions(disp, signRepo)
-          res mustBe ()
-        }
-      }
-
-      "not do anything when there are no settings in repo" in {
-        val (signRepo, settRepo, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(None))
-
-        val result = for
-          svc <- SignalService.make[IO](signRepo, settRepo, disp)
-          res <- svc.processMarketData(Users.uid, Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2)))
-        yield res
-
-        result.asserting { res =>
-          verify(settRepo).get(Users.uid)
-          verifyNoMoreInteractions(settRepo)
           verifyNoInteractions(disp, signRepo)
           res mustBe ()
         }
@@ -128,7 +111,7 @@ class SignalServiceSpec extends CatsSpec {
 
       "not submit a signal if such signal has already been submitted on that date" in {
         val (signRepo, settRepo, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Some(Signals.settings)))
+        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Signals.settings))
         when(signRepo.isFirstOfItsKindForThatDate(any[Signal])).thenReturn(IO.pure(false))
 
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
@@ -155,7 +138,7 @@ class SignalServiceSpec extends CatsSpec {
 
       "create signal when trend direction changes" in {
         val (signRepo, settRepo, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Some(Signals.settings.copy(triggerFrequency = TriggerFrequency.Continuously))))
+        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Signals.settings.copy(triggerFrequency = TriggerFrequency.Continuously)))
         when(signRepo.save(any[Signal])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
@@ -183,7 +166,7 @@ class SignalServiceSpec extends CatsSpec {
 
       "not do anything when there are no changes in trend" in {
         val (signRepo, settRepo, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Some(Signals.settings)))
+        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Signals.settings))
         when(signRepo.isFirstOfItsKindForThatDate(any[Signal])).thenReturn(IO.pure(false))
 
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))

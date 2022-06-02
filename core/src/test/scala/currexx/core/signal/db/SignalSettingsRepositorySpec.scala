@@ -4,6 +4,7 @@ import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
 import currexx.core.fixtures.{Markets, Signals, Users}
+import currexx.domain.errors.AppError
 import currexx.domain.market.v2.{Indicator, ValueSource, ValueTransformation}
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
@@ -22,7 +23,7 @@ class SignalSettingsRepositorySpec extends MongoSpec {
           res  <- repo.get(Users.uid)
         yield res
 
-        result.map(_ mustBe Some(Signals.settings))
+        result.map(_ mustBe Signals.settings)
       }
 
       "update existing signal-settings" in withEmbeddedMongoDb { db =>
@@ -34,7 +35,16 @@ class SignalSettingsRepositorySpec extends MongoSpec {
           res  <- repo.get(Users.uid)
         yield res
 
-        result.map(_ mustBe Some(Signals.settings.copy(indicators = List(ema))))
+        result.map(_ mustBe Signals.settings.copy(indicators = List(ema)))
+      }
+
+      "return error when signals do not exist" in withEmbeddedMongoDb { db =>
+        val result = for
+          repo <- SignalSettingsRepository.make(db)
+          res  <- repo.get(Users.uid)
+        yield res
+
+        result.attempt.map(_ mustBe Left(AppError.NotSetup("Signal")))
       }
     }
   }
@@ -44,10 +54,7 @@ class SignalSettingsRepositorySpec extends MongoSpec {
       MongoClient
         .fromConnectionString[IO](s"mongodb://$mongoHost:$mongoPort")
         .use { client =>
-          for
-            db  <- client.getDatabase("currexx")
-            res <- test(db)
-          yield res
+          client.getDatabase("currexx").flatMap(test)
         }
     }.unsafeToFuture()(IORuntime.global)
 }
