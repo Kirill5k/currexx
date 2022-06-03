@@ -53,6 +53,9 @@ enum ValueTransformation(val kind: String) derives JsonTaggedAdt.EncoderWithConf
   ) extends ValueTransformation("nma")
 
 object ValueTransformation:
+  def sequenced(transformations: ValueTransformation*): ValueTransformation =
+    ValueTransformation.Sequenced(transformations.toList)
+
   given JsonTaggedAdt.Config[ValueTransformation] = JsonTaggedAdt.Config.Values[ValueTransformation](
     mappings = Map(
       "sequenced" -> JsonTaggedAdt.tagged[ValueTransformation.Sequenced],
