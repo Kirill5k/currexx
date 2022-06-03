@@ -78,6 +78,7 @@ object SignalService:
     def transform(data: List[Double]): List[Double] =
       vt match
         case ValueTransformation.Sequenced(transformations) => transformations.foldLeft(data)((d, t) => t.transform(d))
+        case ValueTransformation.Kalman(gain)               => Filters.kalman(data, gain)
         case ValueTransformation.EMA(length)                => MovingAverages.exponential(data, length)
         case ValueTransformation.HMA(length)                => MovingAverages.hull(data, length)
         case ValueTransformation.NMA(length, signalLength, lambda, ma) =>
