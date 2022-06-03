@@ -42,11 +42,26 @@ object Backtester extends IOApp.Simple {
   )
 
   val tradingParameters = TradingParameters(BigDecimal(0.1), None, None, None)
-  val tradeSettings     = TradeSettings(userId, TradeStrategy.TrendChangeAggressive, BrokerParameters.Vindaloo("1"), tradingParameters)
+  val tradeSettings     = TradeSettings(userId, TradeStrategy.TrendChange, BrokerParameters.Vindaloo("1"), tradingParameters)
 
   override val run: IO[Unit] =
     Stream
-      .emits(List("nzd-cad-1d.csv", "aud-jpy-1d.csv", "usd-jpy-1d.csv", "eur-gbp-1d.csv"))
+      .emits(List(
+        "aud-cad-1d.csv",
+        "aud-jpy-1d.csv",
+        "cad-jpy-1d.csv",
+        "eur-aud-1d.csv",
+        "eur-chf-1d.csv",
+        "eur-gbp-1d.csv",
+        "gbp-jpy-1d.csv",
+        "nzd-cad-1d.csv",
+        "nzd-chf-1d.csv",
+        "nzd-jpy-1d.csv",
+        "usd-dkk-1d.csv",
+        "usd-jpy-1d.csv",
+        "usd-nok-1d.csv",
+        "usd-pln-1d.csv",
+      ))
       .evalMap { filePath =>
         for
           _        <- logger.info(s"Processing $filePath")

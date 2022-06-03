@@ -44,6 +44,8 @@ object ValueSource:
 enum ValueTransformation(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Sequenced(transformations: List[ValueTransformation]) extends ValueTransformation("sequenced")
   case Kalman(gain: Double)                                  extends ValueTransformation("kalman")
+  case WMA(length: Int)                                      extends ValueTransformation("wma")
+  case SMA(length: Int)                                      extends ValueTransformation("sma")
   case EMA(length: Int)                                      extends ValueTransformation("ema")
   case HMA(length: Int)                                      extends ValueTransformation("hma")
   case NMA(
@@ -63,7 +65,9 @@ object ValueTransformation:
       "kalman"    -> JsonTaggedAdt.tagged[ValueTransformation.Kalman],
       "ema"       -> JsonTaggedAdt.tagged[ValueTransformation.EMA],
       "hma"       -> JsonTaggedAdt.tagged[ValueTransformation.HMA],
-      "nma"       -> JsonTaggedAdt.tagged[ValueTransformation.NMA]
+      "nma"       -> JsonTaggedAdt.tagged[ValueTransformation.NMA],
+      "sma"       -> JsonTaggedAdt.tagged[ValueTransformation.SMA],
+      "wma"       -> JsonTaggedAdt.tagged[ValueTransformation.WMA]
     ),
     strict = true,
     typeFieldName = "kind"
