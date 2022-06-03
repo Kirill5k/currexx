@@ -7,7 +7,7 @@ import currexx.core.common.action.{Action, ActionDispatcher, ActionProcessor}
 import currexx.core.market.MarketState
 import currexx.core.signal.{SignalSettings, TriggerFrequency}
 import currexx.core.trade.{TradeSettings, TradeStrategy, TradingParameters}
-import currexx.domain.market.{CurrencyPair, Indicator, Interval, ValueSource, ValueTransformation, MovingAverage}
+import currexx.domain.market.{CurrencyPair, Indicator, Interval, MovingAverage, ValueSource, ValueTransformation}
 import currexx.domain.user.UserId
 import mongo4cats.bson.ObjectId
 import org.typelevel.log4cats.Logger
@@ -31,7 +31,9 @@ object Backtester extends IOApp.Simple {
     List(
       Indicator.TrendChangeDetection(
         source = ValueSource.Close,
-        transformation = ValueTransformation.NMA(9, 3, 8D, MovingAverage.Weighted)
+        transformation = ValueTransformation.sequenced(
+          ValueTransformation.NMA(9, 3, 8d, MovingAverage.Weighted)
+        )
       )
     )
   )
