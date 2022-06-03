@@ -4,30 +4,25 @@ import scala.annotation.tailrec
 
 object Filters {
 
-  def kalman(
-      values: List[Double],
-      measurementError: Double,           // (0.1)
-      noiseVariance: Double,              // q (0.00011)
-      initialGuess: Double,               // ^x0,0
-      initializationEstimateError: Double // (100)
-  ): List[Double] = {
-    val measurementUncertainty = math.pow(measurementError, 2)
+  def kalman(values: List[Double], gain: Double): List[Double] = {
     @tailrec
     def calc(
-        measurements: List[Double],
-        currentEstimate: Double,                 // Xn,n
-        extrapolatedEstimateUncertainty: Double, // Pn,n
-        predictions: List[Double]
+        remainingValues: List[Double],
+        kf: Double,
+        velocity: Double,
+        result: List[Double]
     ): List[Double] =
-      if (measurements.isEmpty) predictions
+      if (remainingValues.isEmpty) result
       else {
-        val measurement             = measurements.head
-        val kalmanGain              = extrapolatedEstimateUncertainty / (extrapolatedEstimateUncertainty + measurementUncertainty)
-        val currentState            = currentEstimate + kalmanGain * (measurement - currentEstimate)
-        val currentStateUncertainty = (1 - kalmanGain) * extrapolatedEstimateUncertainty
-        calc(measurements.tail, currentState, currentStateUncertainty + noiseVariance, currentState :: predictions)
+        val dk          = remainingValues.head - kf
+        val smooth      = kf + dk * math.sqrt(gain * 2)
+        val newVelocity = velocity + gain * dk
+        val newKf = smooth + newVelocity
+        calc(remainingValues.tail, newKf, newVelocity, smooth :: result)
       }
-    calc(values.reverse, initialGuess, math.pow(initializationEstimateError, 2) + noiseVariance, Nil)
+
+    val reversed = values.reverse
+    calc(reversed, reversed.head, 0.0d, Nil)
   }
 
   def ghKalman(
