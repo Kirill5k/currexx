@@ -28,7 +28,7 @@ final class TestServices[F[_]] private (
         case n => dispatcher.actions.take(n)
       }
 
-  def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
+  def processMarketData(uid: UserId)(data: MarketTimeSeriesData): F[Unit] =
     (Stream.eval(marketService.processMarketData(uid, data) >> signalService.processMarketData(uid, data)) >>
       pendingActions.evalMap {
         case Action.ProcessSignal(signal) => marketService.processSignal(signal)

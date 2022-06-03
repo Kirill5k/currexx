@@ -18,7 +18,7 @@ final case class OrderStats(
 object OrderStatsCollector {
 
   def collect(orders: List[TradeOrderPlacement]): OrderStats =
-    orders.sortBy(_.time).reverse
+    orders.reverse
       .foldRight[(OrderStats, Option[TradeOrderPlacement])]((OrderStats(), None)) { case (currentOrder, (stats, prevOrder)) =>
         (prevOrder, currentOrder) match
           case (Some(prev), curr) if prev.isBuy && curr.isSell =>

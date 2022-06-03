@@ -33,9 +33,9 @@ object Backtester extends IOApp.Simple {
       Indicator.TrendChangeDetection(
         source = ValueSource.Close,
         transformation = ValueTransformation.sequenced(
-//          ValueTransformation.HMA(6),
-//          ValueTransformation.Kalman(0.85),
-          ValueTransformation.NMA(9, 3, 8d, MovingAverage.Weighted)
+          ValueTransformation.Kalman(0.25),
+          ValueTransformation.HMA(6),
+//          ValueTransformation.NMA(9, 3, 8d, MovingAverage.Weighted),
         )
       )
     )
@@ -45,14 +45,21 @@ object Backtester extends IOApp.Simple {
   val tradeSettings     = TradeSettings(userId, TradeStrategy.TrendChangeAggressive, BrokerParameters.Vindaloo("1"), tradingParameters)
 
   override val run: IO[Unit] =
-    for
-      services <- TestServices.make[IO](initialMarketState, tradeSettings, signalSettings)
-      _ <- MarketDataProvider
-        .read[IO](currencyPair, Interval.D1, "eur-gbp-1d-2021-2022.csv")
-        .evalMap(data => services.processMarketData(userId, data))
-        .compile
-        .drain
-      placedOrders <- services.getAllOrders(userId)
-      _            <- logger.info(s"placed orders stats ${OrderStatsCollector.collect(placedOrders)}")
-    yield ()
+    Stream
+      .emits(List("nzd-cad-1d.csv", "aud-jpy-1d.csv", "usd-jpy-1d.csv", "eur-gbp-1d.csv"))
+      .evalMap { filePath =>
+        for
+          _        <- logger.info(s"Processing $filePath")
+          services <- TestServices.make[IO](initialMarketState, tradeSettings, signalSettings)
+          _ <- MarketDataProvider
+            .read[IO](currencyPair, Interval.D1, filePath)
+            .evalMap(services.processMarketData(userId))
+            .compile
+            .drain
+          placedOrders <- services.getAllOrders(userId)
+          _            <- logger.info(s"placed orders stats ${OrderStatsCollector.collect(placedOrders)}")
+        yield ()
+      }
+      .compile
+      .drain
 }
