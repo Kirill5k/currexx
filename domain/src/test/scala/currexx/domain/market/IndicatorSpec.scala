@@ -34,7 +34,7 @@ class IndicatorSpec extends AnyWordSpec with Matchers {
       val json =
         """{
           |"source":"close",
-          |"transformation":{"transformations":[{"gain":0.25,"kind":"kalman"},{"length":6,"kind":"hma"}],"kind":"sequenced"},
+          |"transformation":{"sequence":[{"gain":0.25,"kind":"kalman"},{"length":6,"kind":"hma"}],"kind":"sequenced"},
           |"kind":"trend-change-detection"
           |}""".stripMargin.replaceAll("\n", "")
 
