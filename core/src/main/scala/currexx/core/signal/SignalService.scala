@@ -94,7 +94,7 @@ object SignalService:
   def detectTrendChange(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.TrendChangeDetection): Option[Signal] = {
     val source      = indicator.source.extract(data)
     val transformed = indicator.transformation.transform(source)
-    val res         = identifyTrends(transformed.take(5))
+    val res         = identifyTrends(transformed)
     Option
       .when(res.head != res(1))(Condition.TrendDirectionChange(res(1), res.head))
       .map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))
