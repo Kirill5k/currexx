@@ -1,15 +1,15 @@
-package currexx.backtest
+package currexx.backtest.services
 
 import cats.Monad
 import cats.effect.{Async, Ref}
-import cats.syntax.functor.*
 import cats.syntax.flatMap.*
-import currexx.domain.user.UserId
-import currexx.core.common.action.ActionDispatcher
-import currexx.core.trade.{TradeOrderPlacement, TradeService, TradeSettings}
-import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
+import cats.syntax.functor.*
 import currexx.clients.broker.{BrokerClient, BrokerParameters}
+import currexx.core.common.action.ActionDispatcher
+import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
+import currexx.core.trade.{TradeOrderPlacement, TradeService, TradeSettings}
 import currexx.domain.market.{CurrencyPair, TradeOrder}
+import currexx.domain.user.UserId
 
 final private class TestTradeSettingsRepository[F[_]](
     private val settings: Ref[F, TradeSettings]

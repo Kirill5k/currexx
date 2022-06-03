@@ -1,13 +1,13 @@
-package currexx.backtest
+package currexx.backtest.services
 
 import cats.Monad
 import cats.effect.{Async, Ref}
-import cats.syntax.functor.*
 import cats.syntax.flatMap.*
+import cats.syntax.functor.*
 import currexx.core.common.action.ActionDispatcher
+import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.core.signal.{Signal, SignalService, SignalSettings}
 import currexx.domain.user.UserId
-import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 
 final private class TestSignalRepository[F[_]](using F: Monad[F]) extends SignalRepository[F]:
   override def save(signal: Signal): F[Unit]                           = F.unit

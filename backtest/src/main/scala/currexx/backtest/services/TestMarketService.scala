@@ -1,14 +1,14 @@
-package currexx.backtest
+package currexx.backtest.services
 
 import cats.Monad
 import cats.effect.{Async, Ref}
-import cats.syntax.functor.*
 import cats.syntax.flatMap.*
+import cats.syntax.functor.*
 import currexx.core.common.action.ActionDispatcher
-import currexx.domain.user.UserId
-import currexx.core.market.{IndicatorState, MarketService, MarketState, PositionState}
 import currexx.core.market.db.MarketStateRepository
+import currexx.core.market.{IndicatorState, MarketService, MarketState, PositionState}
 import currexx.domain.market.{CurrencyPair, Indicator, MarketTimeSeriesData, PriceRange}
+import currexx.domain.user.UserId
 
 final private class TestMarketStateRepository[F[_]: Monad](
     private val state: Ref[F, MarketState]

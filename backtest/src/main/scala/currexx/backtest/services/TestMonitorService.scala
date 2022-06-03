@@ -1,8 +1,8 @@
-package currexx.backtest
+package currexx.backtest.services
 
 import cats.effect.Async
+import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId, MonitorService}
 import currexx.domain.user.UserId
-import currexx.core.monitor.{CreateMonitor, Monitor, MonitorService, MonitorId}
 
 final private class TestMonitorService[F[_]](using
     F: Async[F]

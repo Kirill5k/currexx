@@ -2,6 +2,7 @@ package currexx.backtest
 
 import cats.effect.{IO, IOApp}
 import cats.syntax.flatMap.*
+import currexx.backtest.services.{TestMarketService, TestMonitorService, TestServices, TestSignalService, TestTradeService}
 import currexx.clients.broker.BrokerParameters
 import currexx.core.common.action.{Action, ActionDispatcher, ActionProcessor}
 import currexx.core.market.MarketState
@@ -32,6 +33,8 @@ object Backtester extends IOApp.Simple {
       Indicator.TrendChangeDetection(
         source = ValueSource.Close,
         transformation = ValueTransformation.sequenced(
+//          ValueTransformation.HMA(6),
+//          ValueTransformation.Kalman(0.85),
           ValueTransformation.NMA(9, 3, 8d, MovingAverage.Weighted)
         )
       )
@@ -43,22 +46,13 @@ object Backtester extends IOApp.Simple {
 
   override val run: IO[Unit] =
     for
-      dispatcher <- ActionDispatcher.make[IO]
-      market     <- TestMarketService.make[IO](initialMarketState, dispatcher)
-      monitor    <- TestMonitorService.make[IO]
-      trade      <- TestTradeService.make[IO](tradeSettings, dispatcher)
-      signal     <- TestSignalService.make[IO](signalSettings, dispatcher)
-      processor  <- ActionProcessor.make[IO](dispatcher, monitor, signal, market, trade)
+      services <- TestServices.make[IO](initialMarketState, tradeSettings, signalSettings)
       _ <- MarketDataProvider
         .read[IO](currencyPair, Interval.D1, "eur-gbp-1d-2021-2022.csv")
-        .flatMap { data =>
-          Stream.eval(dispatcher.dispatch(Action.ProcessMarketData(userId, data))) >>
-            Stream.eval(dispatcher.numberOfPendingActions).delayBy(10.milli).repeat.takeWhile(_ > 0)
-        }
-        .concurrently(processor.run)
+        .evalMap(data => services.processMarketData(userId, data))
         .compile
         .drain
-      placedOrders <- trade.getAllOrders(userId)
+      placedOrders <- services.getAllOrders(userId)
       _            <- logger.info(s"placed orders stats ${OrderStatsCollector.collect(placedOrders)}")
     yield ()
 }
