@@ -10,11 +10,11 @@ final case class OrderStats(
     closes: Int = 0,
     biggestWin: Option[BigDecimal] = None,
     biggestLoss: Option[BigDecimal] = None,
-    profit: BigDecimal = BigDecimal(0),
-                           ):
-  def incBuy: OrderStats                = copy(total = total + 1, buys = buys + 1)
-  def incSell: OrderStats               = copy(total = total + 1, sells = sells + 1)
-  def incClose: OrderStats              = copy(total = total + 1, closes = closes + 1)
+    profit: BigDecimal = BigDecimal(0)
+):
+  def incBuy: OrderStats   = copy(total = total + 1, buys = buys + 1)
+  def incSell: OrderStats  = copy(total = total + 1, sells = sells + 1)
+  def incClose: OrderStats = copy(total = total + 1, closes = closes + 1)
   def addProfit(moreProfit: BigDecimal) =
     copy(
       profit = profit + moreProfit,
@@ -27,36 +27,28 @@ object OrderStatsCollector {
   def collect(orders: List[TradeOrderPlacement]): OrderStats =
     orders.reverse
       .foldRight[(OrderStats, Option[TradeOrderPlacement])]((OrderStats(), None)) { case (currentOrder, (stats, prevOrder)) =>
-        (prevOrder, currentOrder) match
-          case (Some(prev), curr) if prev.isBuy && curr.isSell =>
-            (stats.incSell.addProfit(curr.currentPrice.close - prev.currentPrice.close), Some(curr))
-          case (Some(prev), curr) if prev.isSell && curr.isBuy =>
-            (stats.incClose.addProfit(prev.currentPrice.close - curr.currentPrice.close), Some(curr))
-          case (Some(prev), curr) if prev.isBuy && curr.isClose =>
-            (stats.incClose.addProfit(curr.currentPrice.close - prev.currentPrice.close), None)
-          case (Some(prev), curr) if prev.isSell && curr.isClose =>
-            (stats.incClose.addProfit(prev.currentPrice.close - curr.currentPrice.close), None)
-          case (Some(prev), curr) if (prev.isSell && curr.isSell) || (prev.isBuy && curr.isBuy) =>
-            (stats, Some(prev))
-          case (Some(_), curr) =>
-            (stats, Some(curr))
-          case (None, curr) if curr.isBuy =>
-            (stats.incBuy, Some(curr))
-          case (None, curr) if curr.isSell =>
-            (stats.incSell, Some(curr))
-          case (None, curr) =>
-            (stats.incClose, Some(curr))
+        (prevOrder.map(_.order), currentOrder.order) match
+          case (None, TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _, _))  => (stats.incBuy, Some(currentOrder))
+          case (None, TradeOrder.Enter(TradeOrder.Position.Sell, _, _, _, _)) => (stats.incBuy, Some(currentOrder))
+          case (None, TradeOrder.Exit)                                        => (stats.incClose, None)
+
+          case (Some(TradeOrder.Exit), TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _, _))  => (stats.incBuy, Some(currentOrder))
+          case (Some(TradeOrder.Exit), TradeOrder.Enter(TradeOrder.Position.Sell, _, _, _, _)) => (stats.incBuy, Some(currentOrder))
+          case (Some(TradeOrder.Exit), TradeOrder.Exit)                                       => (stats.incClose, None)
+
+          case (Some(TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _, _)), TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _, _)) =>
+            (stats, prevOrder)
+          case (Some(TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _, _)), TradeOrder.Enter(TradeOrder.Position.Sell, _, _, _, _)) =>
+            (stats.incSell.addProfit(currentOrder.currentPrice.close - prevOrder.get.currentPrice.close), Some(currentOrder))
+          case (Some(TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _, _)), TradeOrder.Exit) =>
+            (stats.incClose.addProfit(currentOrder.currentPrice.close - prevOrder.get.currentPrice.close), None)
+
+          case (Some(TradeOrder.Enter(TradeOrder.Position.Sell, _, _, _, _)), TradeOrder.Enter(TradeOrder.Position.Sell, _, _, _, _)) =>
+            (stats, prevOrder)
+          case (Some(TradeOrder.Enter(TradeOrder.Position.Sell, _, _, _, _)), TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _, _)) =>
+            (stats.incBuy.addProfit(prevOrder.get.currentPrice.close - currentOrder.currentPrice.close), Some(currentOrder))
+          case (Some(TradeOrder.Enter(TradeOrder.Position.Sell, _, _, _, _)), TradeOrder.Exit) =>
+            (stats.incClose.addProfit(prevOrder.get.currentPrice.close - currentOrder.currentPrice.close), None)
       }
       ._1
-
-  extension (top: TradeOrderPlacement)
-    def isBuy: Boolean = top.order match
-      case TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _, _) => true
-      case _                                                     => false
-    def isSell: Boolean = top.order match
-      case TradeOrder.Enter(TradeOrder.Position.Sell, _, _, _, _) => true
-      case _                                                      => false
-    def isClose: Boolean = top.order match
-      case TradeOrder.Enter(_, _, _, _, _) => false
-      case TradeOrder.Exit                 => true
 }

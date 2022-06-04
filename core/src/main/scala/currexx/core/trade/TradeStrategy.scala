@@ -5,8 +5,8 @@ import currexx.domain.market.{Condition, Indicator, TradeOrder, Trend}
 import io.circe.{Decoder, Encoder}
 
 enum TradeStrategy(val name: String):
-  case Disabled            extends TradeStrategy("disabled")
-  case TrendChange         extends TradeStrategy("trend-change")
+  case Disabled              extends TradeStrategy("disabled")
+  case TrendChange           extends TradeStrategy("trend-change")
   case TrendChangeAggressive extends TradeStrategy("trend-change-aggressive")
 
 object TradeStrategy:
@@ -48,8 +48,8 @@ object TradeStrategyExecutor {
 
   def get(strategy: TradeStrategy): TradeStrategyExecutor =
     strategy match
-      case TradeStrategy.Disabled            => Disabled
-      case TradeStrategy.TrendChange         => TrendChange
+      case TradeStrategy.Disabled              => Disabled
+      case TradeStrategy.TrendChange           => TrendChange
       case TradeStrategy.TrendChangeAggressive => TrendChangeAggressive
 
   extension (state: MarketState)
