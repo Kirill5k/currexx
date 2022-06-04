@@ -8,12 +8,19 @@ final case class OrderStats(
     buys: Int = 0,
     sells: Int = 0,
     closes: Int = 0,
-    profit: BigDecimal = BigDecimal(0)
-):
-  def incBuy: OrderStats   = copy(total = total + 1, buys = buys + 1)
-  def incSell: OrderStats  = copy(total = total + 1, sells = sells + 1)
-  def incClose: OrderStats = copy(total = total + 1, closes = closes + 1)
-  def addProfit(moreProfit: BigDecimal) = copy(profit = profit + moreProfit)
+    biggestWin: Option[BigDecimal] = None,
+    biggestLoss: Option[BigDecimal] = None,
+    profit: BigDecimal = BigDecimal(0),
+                           ):
+  def incBuy: OrderStats                = copy(total = total + 1, buys = buys + 1)
+  def incSell: OrderStats               = copy(total = total + 1, sells = sells + 1)
+  def incClose: OrderStats              = copy(total = total + 1, closes = closes + 1)
+  def addProfit(moreProfit: BigDecimal) =
+    copy(
+      profit = profit + moreProfit,
+      biggestWin = biggestWin.orElse(Some(moreProfit)).map(w => if (moreProfit > w) moreProfit else w),
+      biggestLoss = biggestLoss.orElse(Some(moreProfit)).map(l => if (moreProfit < l) moreProfit else l)
+    )
 
 object OrderStatsCollector {
 

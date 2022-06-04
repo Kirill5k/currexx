@@ -43,11 +43,11 @@ object ValueSource:
 
 enum ValueTransformation(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Sequenced(sequence: List[ValueTransformation]) extends ValueTransformation("sequenced")
-  case Kalman(gain: Double)                                  extends ValueTransformation("kalman")
-  case WMA(length: Int)                                      extends ValueTransformation("wma")
-  case SMA(length: Int)                                      extends ValueTransformation("sma")
-  case EMA(length: Int)                                      extends ValueTransformation("ema")
-  case HMA(length: Int)                                      extends ValueTransformation("hma")
+  case Kalman(gain: Double)                           extends ValueTransformation("kalman")
+  case WMA(length: Int)                               extends ValueTransformation("wma")
+  case SMA(length: Int)                               extends ValueTransformation("sma")
+  case EMA(length: Int)                               extends ValueTransformation("ema")
+  case HMA(length: Int)                               extends ValueTransformation("hma")
   case NMA(
       length: Int,
       signalLength: Int,
