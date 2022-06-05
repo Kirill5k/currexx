@@ -33,9 +33,9 @@ object Backtester extends IOApp.Simple {
       Indicator.TrendChangeDetection(
         source = ValueSource.Close,
         transformation = ValueTransformation.sequenced(
-          ValueTransformation.Kalman(0.25),
-          ValueTransformation.HMA(6),
-//          ValueTransformation.NMA(9, 3, 8d, MovingAverage.Weighted),
+          ValueTransformation.HMA(5),
+//          ValueTransformation.Kalman(0.25),
+//                    ValueTransformation.NMA(9, 3, 8d, MovingAverage.Weighted),
         )
       )
     )
@@ -72,9 +72,11 @@ object Backtester extends IOApp.Simple {
             .compile
             .drain
           placedOrders <- services.getAllOrders(userId)
-          _            <- logger.info(s"placed orders stats ${OrderStatsCollector.collect(placedOrders)}")
-        yield ()
+          orderStats = OrderStatsCollector.collect(placedOrders)
+          _            <- logger.info(orderStats.toString)
+        yield orderStats
       }
       .compile
-      .drain
+      .toList
+      .flatMap(stats => logger.info(s"total profit: ${stats.map(_.totalProfit).sum}"))
 }
