@@ -33,9 +33,10 @@ object Backtester extends IOApp.Simple {
       Indicator.TrendChangeDetection(
         source = ValueSource.Close,
         transformation = ValueTransformation.sequenced(
+//          ValueTransformation.NMA(9, 4, 8d, MovingAverage.Weighted),
+//          ValueTransformation.WMA(5),
           ValueTransformation.HMA(5),
-//          ValueTransformation.Kalman(0.25),
-//                    ValueTransformation.NMA(9, 3, 8d, MovingAverage.Weighted),
+//          ValueTransformation.Kalman(0.85),
         )
       )
     )
@@ -46,22 +47,7 @@ object Backtester extends IOApp.Simple {
 
   override val run: IO[Unit] =
     Stream
-      .emits(List(
-        "aud-cad-1d.csv",
-        "aud-jpy-1d.csv",
-        "cad-jpy-1d.csv",
-        "eur-aud-1d.csv",
-        "eur-chf-1d.csv",
-        "eur-gbp-1d.csv",
-        "gbp-jpy-1d.csv",
-        "nzd-cad-1d.csv",
-        "nzd-chf-1d.csv",
-        "nzd-jpy-1d.csv",
-        "usd-dkk-1d.csv",
-        "usd-jpy-1d.csv",
-        "usd-nok-1d.csv",
-        "usd-pln-1d.csv",
-      ))
+      .emits(MarketDataProvider.euusDataset)
       .evalMap { filePath =>
         for
           _        <- logger.info(s"Processing $filePath")
@@ -73,7 +59,7 @@ object Backtester extends IOApp.Simple {
             .drain
           placedOrders <- services.getAllOrders(userId)
           orderStats = OrderStatsCollector.collect(placedOrders)
-          _            <- logger.info(orderStats.toString)
+          _ <- logger.info(orderStats.toString)
         yield orderStats
       }
       .compile

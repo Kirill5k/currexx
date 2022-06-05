@@ -32,7 +32,7 @@ final case class OrderStats(
 object OrderStatsCollector {
 
   def collect(orders: List[TradeOrderPlacement]): OrderStats =
-    orders.reverse
+    orders
       .foldRight[(OrderStats, Option[TradeOrderPlacement])]((OrderStats(), None)) { case (currentOrder, (stats, prevOrder)) =>
         (prevOrder.map(_.order), currentOrder.order) match
           case (None, TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _, _))  => (stats.incBuy, Some(currentOrder))

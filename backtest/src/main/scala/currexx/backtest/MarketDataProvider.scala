@@ -10,7 +10,35 @@ import java.time.{Instant, LocalDate, ZoneOffset}
 import java.time.format.DateTimeFormatter
 
 object MarketDataProvider:
-  private val timePattern = DateTimeFormatter.ofPattern( "dd.MM.yyyy")
+  val completeDataset = List(
+    "aud-cad-1d.csv",
+    "aud-jpy-1d.csv",
+    "cad-jpy-1d.csv",
+    "eur-aud-1d.csv",
+    "eur-chf-1d.csv",
+    "eur-gbp-1d.csv",
+    "gbp-jpy-1d.csv",
+    "nzd-cad-1d.csv",
+    "nzd-chf-1d.csv",
+    "nzd-jpy-1d.csv",
+    "usd-dkk-1d.csv",
+    "usd-jpy-1d.csv",
+    "usd-nok-1d.csv",
+    "usd-pln-1d.csv"
+  )
+
+  val euusDataset  = List(
+    "aud-cad-1d.csv",
+    "eur-aud-1d.csv",
+    "eur-chf-1d.csv",
+    "eur-gbp-1d.csv",
+    "nzd-cad-1d.csv",
+    "nzd-chf-1d.csv",
+    "usd-dkk-1d.csv",
+    "usd-pln-1d.csv"
+  )
+  
+  private val timePattern = DateTimeFormatter.ofPattern("dd.MM.yyyy")
   def read[F[_]: Sync: Files](
       currencyPair: CurrencyPair,
       interval: Interval,
