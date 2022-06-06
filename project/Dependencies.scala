@@ -2,6 +2,8 @@ import sbt._
 
 object Dependencies {
   object Versions {
+    val fs2            = "3.2.5"
+    val cats           = "2.7.0"
     val mongo4cats     = "0.4.8"
     val pureConfig     = "0.17.1"
     val circe          = "0.14.1"
@@ -22,6 +24,8 @@ object Dependencies {
   }
 
   object Libraries {
+    val fs2            = "co.fs2"               %% "fs2-core"               % Versions.fs2
+    val catsFree       = "org.typelevel"        %% "cats-free"              % Versions.cats
     val squants        = "org.typelevel"        %% "squants"                % Versions.squants
     val bcrypt         = "com.github.t3hnar"    %% "scala-bcrypt"           % Versions.bcrypt
     val jwt            = "com.github.jwt-scala" %% "jwt-circe"              % Versions.jwt
@@ -91,6 +95,11 @@ object Dependencies {
   ) ++
     Libraries.circe.all ++
     Libraries.refined.all
+
+  val algorithm = Seq(
+    Libraries.catsFree,
+    Libraries.fs2
+  )
 
   val clients = Libraries.sttp.all ++
     Libraries.logging.all

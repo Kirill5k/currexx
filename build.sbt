@@ -40,6 +40,14 @@ val domain = project
     libraryDependencies ++= Dependencies.domain ++ Dependencies.test
   )
 
+val algorithms = project
+  .in(file("algorithms"))
+  .settings(
+    name       := "currexx-algorithms",
+    moduleName := "currexx-algorithms",
+    libraryDependencies ++= Dependencies.test
+  )
+
 val calculations = project
   .in(file("calculations"))
   .settings(
@@ -82,4 +90,4 @@ val root = project
   .settings(
     name := "currexx"
   )
-  .aggregate(core, calculations, domain, clients)
+  .aggregate(core, algorithms, calculations, domain, clients)

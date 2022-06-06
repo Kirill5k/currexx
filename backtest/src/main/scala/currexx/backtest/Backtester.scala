@@ -33,7 +33,7 @@ object Backtester extends IOApp.Simple {
       Indicator.TrendChangeDetection(
         source = ValueSource.Close,
         transformation = ValueTransformation.sequenced(
-//          ValueTransformation.NMA(9, 4, 8d, MovingAverage.Weighted),
+//          ValueTransfor0mation.NMA(9, 4, 8d, MovingAverage.Weighted),
 //          ValueTransformation.WMA(5),
           ValueTransformation.HMA(5),
 //          ValueTransformation.Kalman(0.85),
