@@ -2,7 +2,7 @@ import sbt._
 
 object Dependencies {
   object Versions {
-    val fs2            = "3.2.5"
+    val fs2            = "3.2.7"
     val cats           = "2.7.0"
     val mongo4cats     = "0.4.8"
     val pureConfig     = "0.17.1"
@@ -96,7 +96,7 @@ object Dependencies {
     Libraries.circe.all ++
     Libraries.refined.all
 
-  val algorithm = Seq(
+  val algorithms = Seq(
     Libraries.catsFree,
     Libraries.fs2
   )

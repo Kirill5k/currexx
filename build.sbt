@@ -45,7 +45,7 @@ val algorithms = project
   .settings(
     name       := "currexx-algorithms",
     moduleName := "currexx-algorithms",
-    libraryDependencies ++= Dependencies.test
+    libraryDependencies ++= Dependencies.algorithms ++ Dependencies.test
   )
 
 val calculations = project
