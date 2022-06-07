@@ -43,7 +43,7 @@ class SignalControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.UnprocessableEntity, Some("""{"message":"condition is required, Received unknown type: 'foo'. Exists only types: trend-change-detection."}"""))
+        verifyJsonResponse(res, Status.UnprocessableEntity, Some("""{"message":"Missing required field, Received unknown type: 'foo'. Exists only types: trend-change-detection."}"""))
         verifyNoInteractions(svc)
       }
 

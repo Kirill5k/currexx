@@ -10,8 +10,7 @@ import fs2.Stream
 import scala.reflect.ClassTag
 import scala.util.Random
 
-//TODO: Make transparent
-opaque type Fitness = BigDecimal
+opaque type Fitness <: BigDecimal = BigDecimal
 object Fitness:
   def apply(value: BigDecimal): Fitness              = value
   extension (fitness: Fitness) def value: BigDecimal = fitness

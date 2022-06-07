@@ -6,15 +6,15 @@ object Dependencies {
     val cats           = "2.7.0"
     val mongo4cats     = "0.4.8"
     val pureConfig     = "0.17.1"
-    val circe          = "0.14.1"
-    val sttp           = "3.6.1"
-    val http4s         = "0.23.11"
+    val circe          = "0.14.2"
+    val sttp           = "3.6.2"
+    val http4s         = "0.23.12"
     val logback        = "1.2.11"
     val log4cats       = "2.3.1"
     val squants        = "1.8.3"
     val bcrypt         = "4.3.0"
-    val refined        = "0.9.28"
-    val tapir          = "1.0.0-RC1"
+    val refined        = "0.9.29"
+    val tapir          = "1.0.0-RC2"
     val jwt            = "9.0.5"
     val cronUtils      = "9.1.6"
     val taggedAdtCodec = "0.10.1"
@@ -72,7 +72,6 @@ object Dependencies {
       val core   = "com.softwaremill.sttp.tapir" %% "tapir-core"          % Versions.tapir
       val circe  = "com.softwaremill.sttp.tapir" %% "tapir-json-circe"    % Versions.tapir
       val http4s = "com.softwaremill.sttp.tapir" %% "tapir-http4s-server" % Versions.tapir
-
       val all = Seq(core, circe, http4s)
     }
 
