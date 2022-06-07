@@ -30,7 +30,7 @@ object Algorithm {
             pairs    <- Op.SelectPairs(evPop, params.populationSize).freeM
             crossed1 <- Op.ApplyToAll(pairs, (i1, i2) => Op.Cross(i1, i2, params.crossoverProbability)).freeM
             crossed2 <- Op.ApplyToAll(pairs, (i1, i2) => Op.Cross(i2, i1, params.crossoverProbability)).freeM
-            mutated  <- Op.ApplyToAll(crossed1 ++ crossed2, i => Op.Mutate(i, params.mutationProbability)).freeM
+            mutated  <- Op.ApplyToAll((crossed1 ++ crossed2).flatten, i => Op.Mutate(i, params.mutationProbability)).freeM
           yield mutated ++ elites
         }
         evPop   <- Op.EvaluatePopulation(finalPop).freeM

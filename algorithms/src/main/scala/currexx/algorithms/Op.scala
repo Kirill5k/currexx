@@ -25,7 +25,7 @@ type DistributedPopulation[G] = List[(Ind[G], Ind[G])]
 enum Op[A, G]:
   case UpdateOnProgress[G](iteration: Int, maxGen: Int)                                 extends Op[Unit, G]
   case InitPopulation[G](seed: Ind[G], size: Int, shuffle: Boolean)                     extends Op[Population[G], G]
-  case Cross[G](ind1: Ind[G], ind2: Ind[G], prob: Double)                               extends Op[Ind[G], G]
+  case Cross[G](ind1: Ind[G], ind2: Ind[G], prob: Double)                               extends Op[Option[Ind[G]], G]
   case Mutate[G](ind: Ind[G], prob: Double)                                             extends Op[Ind[G], G]
   case EvaluateOne[G](ind: Ind[G])                                                      extends Op[(Ind[G], Fitness), G]
   case EvaluatePopulation[G](population: Population[G])                                 extends Op[EvaluatedPopulation[G], G]
