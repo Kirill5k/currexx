@@ -8,7 +8,7 @@ import scala.util.Random
 
 class SelectorSpec extends AnyWordSpec with Matchers {
 
-  "A RouletteWheelSelector" should {
+  "A Selector.RouletteWheel" should {
 
     "sort population by fittest candidates based on probability and distribute them in pairs" in {
       val population = Vector(
@@ -24,7 +24,7 @@ class SelectorSpec extends AnyWordSpec with Matchers {
         (10, Fitness(-1.0))
       )
 
-      val selector = Selector.rouletteWheelSelector[Int]
+      val selector = Selector.rouletteWheel[Int]
 
       given r: Random   = Random(42)
       val newPopulation = selector.selectPairs(population, 6)
