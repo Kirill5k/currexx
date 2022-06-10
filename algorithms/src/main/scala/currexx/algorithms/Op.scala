@@ -13,10 +13,8 @@ opaque type Fitness = BigDecimal
 object Fitness:
   def apply(value: BigDecimal): Fitness = value
   extension (fitness: Fitness)
-    def *(other: Int): Fitness     = fitness * other
-    def <(other: Fitness): Boolean = fitness < other
-    def +(other: Fitness): Fitness = fitness + other
     def -(other: Fitness): Fitness = fitness - other
+    def +(other: Fitness): Fitness = fitness + other
     def /(other: Fitness): Fitness = fitness / other
     def value: BigDecimal          = fitness
   given ordering: Ordering[Fitness] with

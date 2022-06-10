@@ -14,12 +14,14 @@ class SelectorSpec extends AnyWordSpec with Matchers {
       val population = Vector(
         (1, Fitness(4.0)), // 6
         (2, Fitness(2.0)),
-        (3, Fitness(5.0)), // 2
-        (4, Fitness(10.0)), // 4
+        (3, Fitness(5.0)), // 4
+        (4, Fitness(10.0)), // 5
         (5, Fitness(1.0)),
-        (6, Fitness(20.0)), // 3
+        (6, Fitness(20.0)), // 2
         (7, Fitness(35.0)), // 1
-        (8, Fitness(7.0)) // 5
+        (8, Fitness(7.0)), // 3
+        (9, Fitness(-7.0)),
+        (10, Fitness(-1.0))
       )
 
       val selector = Selector.rouletteWheelSelector[Int]
@@ -27,7 +29,7 @@ class SelectorSpec extends AnyWordSpec with Matchers {
       given r: Random   = Random(42)
       val newPopulation = selector.selectPairs(population, 6)
 
-      newPopulation mustBe Vector((7,6), (3,1), (4,8))
+      newPopulation mustBe Vector((7,6), (8,3), (4,1))
     }
   }
 }
