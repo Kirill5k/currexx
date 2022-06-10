@@ -19,11 +19,11 @@ object Parameters {
 }
 
 sealed trait Algorithm[A <: Alg, P <: Parameters[A]]:
-  def optimize[I](target: I, params: P): Free[Op[*, I], (I, Fitness)]
+  def optimise[I](target: I, params: P): Free[Op[*, I], (I, Fitness)]
 
 object Algorithm {
   case object GA extends Algorithm[Alg.GA, Parameters.GA] {
-    override def optimize[I](target: I, params: Parameters.GA): Free[Op[*, I], (I, Fitness)] =
+    override def optimise[I](target: I, params: Parameters.GA): Free[Op[*, I], (I, Fitness)] =
       for
         pop <- Op.InitPopulation(target, params.populationSize, params.shuffle).freeM
         finalPop <- iterate(pop, params.maxGen) { (currentPop, i) =>

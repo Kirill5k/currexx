@@ -13,11 +13,11 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
     val params = Parameters.GA(5, 2, 0.5, 0.2, 0.25, true)
 
     "optimize a target by applying principles of natural selection" in {
-      val optResult = Algorithm.GA.optimize(ind, params)
+      val optResult = Algorithm.GA.optimise(ind, params)
       val result    = optResult.foldMap(stateInterpreter).run(List.empty).value._1
 
       result.mkString mustBe
-        """Initialize population of size 5 with shuffle=true
+        """Initialise population of size 5 with shuffle=true
           |Iteration 1 of 2
           |Evaluate entire population
           |Select 1.25 elites from the current population
@@ -41,7 +41,7 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
   def stateInterpreter[G]: Op[*, G] ~> State[List[String], *] = new (Op[*, G] ~> State[List[String], *]) {
     def apply[A](fa: Op[A, G]): State[List[String], A] = fa match {
       case Op.InitPopulation(seed, size, shuffle) =>
-        State.modify[List[String]](_ :+ s"Initialize population of size $size with shuffle=$shuffle\n") >>
+        State.modify[List[String]](_ :+ s"Initialise population of size $size with shuffle=$shuffle\n") >>
           State.pure(Vector.fill(size)(seed))
       case Op.UpdateOnProgress(i, maxGen) =>
         State.modify[List[String]](_ :+ s"Iteration $i of $maxGen\n")
