@@ -78,7 +78,7 @@ val core = project
 
 val backtest = project
   .in(file("backtest"))
-  .dependsOn(core)
+  .dependsOn(core, algorithms)
   .settings(
     name       := "currexx-backtest",
     moduleName := "currexx-backtest",

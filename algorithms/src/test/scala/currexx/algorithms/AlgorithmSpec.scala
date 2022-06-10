@@ -42,7 +42,7 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
     def apply[A](fa: Op[A, G]): State[List[String], A] = fa match {
       case Op.InitPopulation(seed, size, shuffle) =>
         State.modify[List[String]](_ :+ s"Initialize population of size $size with shuffle=$shuffle\n") >>
-          State.pure(List.fill(size)(seed))
+          State.pure(Vector.fill(size)(seed))
       case Op.UpdateOnProgress(i, maxGen) =>
         State.modify[List[String]](_ :+ s"Iteration $i of $maxGen\n")
       case Op.Cross(ind1, ind2, prob) =>
@@ -68,7 +68,7 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
           State.pure(population.head)
       case Op.ApplyToAll(population, op) =>
         State.modify[List[String]](_ :+ "Applied to the entire population: ") >>
-          apply(op(population.head)).map(r => List(r))
+          apply(op(population.head)).map(r => Vector(r))
       case _ | null => ???
     }
   }

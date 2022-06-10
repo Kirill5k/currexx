@@ -1,6 +1,6 @@
 package currexx.algorithms.operators
 
-import currexx.algorithms.{Fitness, Ind}
+import currexx.algorithms.{Fitness}
 
-trait Evaluator[A]:
-  def evaluateIndividual(individual: Ind[A]): (Ind[A], Fitness)
+trait Evaluator[I]:
+  def evaluateIndividual(individual: I): (I, Fitness)

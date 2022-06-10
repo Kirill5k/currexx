@@ -17,40 +17,40 @@ object Fitness:
   given ordering: Ordering[Fitness] with
     def compare(f1: Fitness, f2: Fitness) = f1.compare(f2)
 
-type Ind[G]                   = Array[G]
-type Population[G]            = List[Ind[G]]
-type EvaluatedPopulation[G]   = List[(Ind[G], Fitness)]
-type DistributedPopulation[G] = List[(Ind[G], Ind[G])]
+type Population[I]            = Vector[I]
+type EvaluatedPopulation[I]   = Vector[(I, Fitness)]
+type DistributedPopulation[I] = Vector[(I, I)]
 
-enum Op[A, G]:
-  case UpdateOnProgress[G](iteration: Int, maxGen: Int)                                 extends Op[Unit, G]
-  case InitPopulation[G](seed: Ind[G], size: Int, shuffle: Boolean)                     extends Op[Population[G], G]
-  case Cross[G](ind1: Ind[G], ind2: Ind[G], prob: Double)                               extends Op[Option[Ind[G]], G]
-  case Mutate[G](ind: Ind[G], prob: Double)                                             extends Op[Ind[G], G]
-  case EvaluateOne[G](ind: Ind[G])                                                      extends Op[(Ind[G], Fitness), G]
-  case EvaluatePopulation[G](population: Population[G])                                 extends Op[EvaluatedPopulation[G], G]
-  case SelectElites[G](population: EvaluatedPopulation[G], popSize: Int, ratio: Double) extends Op[Population[G], G]
-  case SelectPairs[G](population: EvaluatedPopulation[G], limit: Int)                   extends Op[DistributedPopulation[G], G]
-  case SelectFittest[G](population: EvaluatedPopulation[G])                             extends Op[(Ind[G], Fitness), G]
-  case ApplyToAll[A, B, G](population: List[A], op: A => Op[B, G])                      extends Op[List[B], G]
+enum Op[A, I]:
+  case UpdateOnProgress[I](iteration: Int, maxGen: Int)                                 extends Op[Unit, I]
+  case InitPopulation[I](seed: I, size: Int, shuffle: Boolean)                          extends Op[Population[I], I]
+  case Cross[I](ind1: I, ind2: I, prob: Double)                                         extends Op[Option[I], I]
+  case Mutate[I](ind: I, prob: Double)                                                  extends Op[I, I]
+  case EvaluateOne[I](ind: I)                                                           extends Op[(I, Fitness), I]
+  case EvaluatePopulation[I](population: Population[I])                                 extends Op[EvaluatedPopulation[I], I]
+  case SelectElites[I](population: EvaluatedPopulation[I], popSize: Int, ratio: Double) extends Op[Population[I], I]
+  case SelectPairs[I](population: EvaluatedPopulation[I], limit: Int)                   extends Op[DistributedPopulation[I], I]
+  case SelectFittest[I](population: EvaluatedPopulation[I])                             extends Op[(I, Fitness), I]
+  case ApplyToAll[A, B, I](population: Population[A], op: A => Op[B, I])                extends Op[Population[B], I]
 
 object Op:
-  extension [A, G](fa: Op[A, G]) def freeM: Free[Op[*, G], A] = Free.liftF(fa)
+  extension [A, I](fa: Op[A, I]) def freeM: Free[Op[*, I], A] = Free.liftF(fa)
 
-  inline def ioInterpreter[F[_], G: ClassTag](
-      crossover: Crossover[G],
-      mutator: Mutator[G],
-      evaluator: Evaluator[G],
-      selector: Selector[G],
-      elitism: Elitism[G],
+  inline def ioInterpreter[F[_], I](
+      initialiser: Initialiser[I],
+      crossover: Crossover[I],
+      mutator: Mutator[I],
+      evaluator: Evaluator[I],
+      selector: Selector[I],
+      elitism: Elitism[I],
       updateFn: Option[(Int, Int) => F[Unit]] = None
-  )(using F: Async[F], rand: Random): Op[*, G] ~> F = new (Op[*, G] ~> F) {
-    def apply[A](fa: Op[A, G]): F[A] =
+  )(using F: Async[F], rand: Random): Op[*, I] ~> F = new (Op[*, I] ~> F) {
+    def apply[A](fa: Op[A, I]): F[A] =
       fa match
         case Op.UpdateOnProgress(iteration, maxGen) =>
           updateFn.fold(F.unit)(f => f(iteration, maxGen))
         case Op.InitPopulation(seed, size, shuffle) =>
-          F.delay(List.fill(size)(if (shuffle) seed.shuffle else seed))
+          F.delay(initialiser.initialisePopulation(seed, size, shuffle))
         case Op.SelectFittest(population) =>
           F.delay(population.minBy(_._2))
         case Op.Cross(ind1, ind2, prob) =>
@@ -64,9 +64,9 @@ object Op:
         case Op.SelectElites(population, popSize, ratio) =>
           F.delay(elitism.select(population, popSize * ratio))
         case Op.SelectPairs(population, limit) =>
-          F.delay(selector.selectPairs(population, limit).toList)
+          F.delay(selector.selectPairs(population, limit))
         case Op.ApplyToAll(population, op) =>
-          Stream.emits(population).mapAsync(Int.MaxValue)(i => apply(op(i))).compile.toList
+          Stream.emits(population).mapAsync(Int.MaxValue)(i => apply(op(i))).compile.toVector
         case _ | null =>
           F.raiseError(new IllegalArgumentException("Unexpected Op type: null or something else"))
   }

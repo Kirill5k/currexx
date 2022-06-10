@@ -2,7 +2,11 @@ package currexx.algorithms
 
 import cats.free.Free
 
-sealed trait Parameters
+sealed trait Alg
+object Alg:
+  sealed abstract class GA extends Alg
+
+sealed trait Parameters[A <: Alg]
 object Parameters {
   final case class GA(
       populationSize: Int,
@@ -11,15 +15,15 @@ object Parameters {
       mutationProbability: Double,
       elitismRatio: Double,
       shuffle: Boolean
-  ) extends Parameters
+  ) extends Parameters[Alg.GA]
 }
 
-sealed trait Algorithm[P <: Parameters]:
-  def optimize[G](target: Ind[G], params: P): Free[Op[*, G], (Ind[G], Fitness)]
+sealed trait Algorithm[A <: Alg, P <: Parameters[A]]:
+  def optimize[I](target: I, params: P): Free[Op[*, I], (I, Fitness)]
 
 object Algorithm {
-  case object GA extends Algorithm[Parameters.GA] {
-    override def optimize[G](target: Ind[G], params: Parameters.GA): Free[Op[*, G], (Ind[G], Fitness)] =
+  case object GA extends Algorithm[Alg.GA, Parameters.GA] {
+    override def optimize[I](target: I, params: Parameters.GA): Free[Op[*, I], (I, Fitness)] =
       for
         pop <- Op.InitPopulation(target, params.populationSize, params.shuffle).freeM
         finalPop <- iterate(pop, params.maxGen) { (currentPop, i) =>
