@@ -10,7 +10,7 @@ trait Selector[I]:
   def selectPairs(population: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): DistributedPopulation[I]
 
 object Selector {
-  def rouletteWheelSelector[I]: Selector[I] = new Selector[I] {
+  inline def rouletteWheel[I]: Selector[I] = new Selector[I] {
     override def selectPairs(population: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): DistributedPopulation[I] = {
       val popByFitness = population
         .sortBy(_._2)(Ordering[Fitness].reverse)
