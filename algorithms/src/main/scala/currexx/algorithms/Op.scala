@@ -4,16 +4,21 @@ import cats.~>
 import cats.effect.{Async, Sync}
 import cats.free.Free
 import currexx.algorithms.operators.*
-import currexx.algorithms.collections.*
 import fs2.Stream
 
 import scala.reflect.ClassTag
 import scala.util.Random
 
-opaque type Fitness <: BigDecimal = BigDecimal
+opaque type Fitness = BigDecimal
 object Fitness:
-  def apply(value: BigDecimal): Fitness              = value
-  extension (fitness: Fitness) def value: BigDecimal = fitness
+  def apply(value: BigDecimal): Fitness = value
+  extension (fitness: Fitness)
+    def *(other: Int): Fitness     = fitness * other
+    def <(other: Fitness): Boolean = fitness < other
+    def +(other: Fitness): Fitness = fitness + other
+    def -(other: Fitness): Fitness = fitness - other
+    def /(other: Fitness): Fitness = fitness / other
+    def value: BigDecimal          = fitness
   given ordering: Ordering[Fitness] with
     def compare(f1: Fitness, f2: Fitness) = f1.compare(f2)
 
