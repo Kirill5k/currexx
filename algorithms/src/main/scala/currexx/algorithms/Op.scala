@@ -41,7 +41,7 @@ object Op:
 
   inline def ioInterpreter[F[_], I](
       initialiser: Initialiser[I],
-      crossover: Crossover[I],
+      crossover: Crossover[F, I],
       mutator: Mutator[I],
       evaluator: Evaluator[I],
       selector: Selector[I],
@@ -57,7 +57,7 @@ object Op:
         case Op.SelectFittest(population) =>
           F.delay(population.minBy(_._2))
         case Op.Cross(ind1, ind2, prob) =>
-          F.delay(crossover.cross(ind1, ind2, prob))
+          crossover.cross(ind1, ind2, prob)
         case Op.Mutate(ind, prob) =>
           F.delay(mutator.mutate(ind, prob))
         case Op.EvaluateOne(ind) =>
