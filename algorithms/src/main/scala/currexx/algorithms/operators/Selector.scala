@@ -1,31 +1,36 @@
 package currexx.algorithms.operators
 
+import cats.effect.Sync
 import currexx.algorithms.{DistributedPopulation, EvaluatedPopulation, Fitness, Population}
 import currexx.algorithms.collections.*
 
 import scala.annotation.tailrec
 import scala.util.Random
 
-trait Selector[I]:
-  def selectPairs(population: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): DistributedPopulation[I]
+trait Selector[F[_], I]:
+  def selectFittest(population: EvaluatedPopulation[I]): F[(I, Fitness)]
+  def selectPairs(population: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): F[DistributedPopulation[I]]
 
 object Selector {
-  inline def rouletteWheel[I]: Selector[I] = new Selector[I] {
-    override def selectPairs(population: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): DistributedPopulation[I] = {
-      val popByFitness = population
-        .sortBy(_._2)(Ordering[Fitness].reverse)
+  inline def rouletteWheel[F[_]: Sync, I]: Selector[F, I] = new Selector[F, I] {
+    override def selectFittest(population: EvaluatedPopulation[I]): F[(I, Fitness)] =
+      Sync[F].delay(population.maxBy(_._2))
+    override def selectPairs(population: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): F[DistributedPopulation[I]] =
+      Sync[F].delay {
+        val popByFitness = population
+          .sortBy(_._2)(Ordering[Fitness].reverse)
 
-      val fTotal = popByFitness.map(_._2).reduce(_ + _)
+        val fTotal = popByFitness.map(_._2).reduce(_ + _)
 
-      @tailrec
-      def go(newPop: Population[I], remPop: EvaluatedPopulation[I], remFitness: Fitness): Population[I] =
-        if (remPop.isEmpty || newPop.size >= populationLimit) newPop
-        else {
-          val ((pickedInd, indFitness), remaining) = pickOne(remPop, remFitness)
-          go(pickedInd +: newPop, remaining, remFitness - indFitness)
-        }
-      go(Vector.empty, popByFitness, fTotal).reverse.pairs
-    }
+        @tailrec
+        def go(newPop: Population[I], remPop: EvaluatedPopulation[I], remFitness: Fitness): Population[I] =
+          if (remPop.isEmpty || newPop.size >= populationLimit) newPop
+          else {
+            val ((pickedInd, indFitness), remaining) = pickOne(remPop, remFitness)
+            go(pickedInd +: newPop, remaining, remFitness - indFitness)
+          }
+        go(Vector.empty, popByFitness, fTotal).reverse.pairs
+      }
 
     private def pickOne(
         popByFitness: EvaluatedPopulation[I],

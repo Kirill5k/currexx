@@ -40,12 +40,12 @@ object Op:
   extension [A, I](fa: Op[A, I]) def freeM: Free[Op[*, I], A] = Free.liftF(fa)
 
   inline def ioInterpreter[F[_], I](
-      initialiser: Initialiser[I],
+      initialiser: Initialiser[F, I],
       crossover: Crossover[F, I],
-      mutator: Mutator[I],
-      evaluator: Evaluator[I],
-      selector: Selector[I],
-      elitism: Elitism[I],
+      mutator: Mutator[F, I],
+      evaluator: Evaluator[F, I],
+      selector: Selector[F, I],
+      elitism: Elitism[F, I],
       updateFn: Option[(Int, Int) => F[Unit]] = None
   )(using F: Async[F], rand: Random): Op[*, I] ~> F = new (Op[*, I] ~> F) {
     def apply[A](fa: Op[A, I]): F[A] =
@@ -53,21 +53,21 @@ object Op:
         case Op.UpdateOnProgress(iteration, maxGen) =>
           updateFn.fold(F.unit)(f => f(iteration, maxGen))
         case Op.InitPopulation(seed, size, shuffle) =>
-          F.delay(initialiser.initialisePopulation(seed, size, shuffle))
+          initialiser.initialisePopulation(seed, size, shuffle)
         case Op.SelectFittest(population) =>
-          F.delay(population.minBy(_._2))
+          selector.selectFittest(population)
         case Op.Cross(ind1, ind2, prob) =>
           crossover.cross(ind1, ind2, prob)
         case Op.Mutate(ind, prob) =>
-          F.delay(mutator.mutate(ind, prob))
+          mutator.mutate(ind, prob)
         case Op.EvaluateOne(ind) =>
-          F.delay(evaluator.evaluateIndividual(ind))
+          evaluator.evaluateIndividual(ind)
         case Op.EvaluatePopulation(population) =>
           apply(Op.ApplyToAll(population, i => Op.EvaluateOne(i)))
         case Op.SelectElites(population, popSize, ratio) =>
-          F.delay(elitism.select(population, popSize * ratio))
+          elitism.select(population, popSize * ratio)
         case Op.SelectPairs(population, limit) =>
-          F.delay(selector.selectPairs(population, limit))
+          selector.selectPairs(population, limit)
         case Op.ApplyToAll(population, op) =>
           Stream.emits(population).mapAsync(Int.MaxValue)(i => apply(op(i))).compile.toVector
         case _ | null =>

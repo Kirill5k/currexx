@@ -25,5 +25,10 @@ object Crossover:
         left ++ par2.filter(mid.contains) ++ right
       }
     override def cross(par1: Array[G], par2: Array[G], crossoverProbability: Double)(using r: Random): F[Option[Array[G]]] =
-      Sync[F].ifF(Sync[F].delay(r.nextDouble() < crossoverProbability))(cross(par1, par2).map(Some(_)), Sync[F].pure(None)).flatten
+      Sync[F]
+        .delay(r.nextDouble() < crossoverProbability)
+        .flatMap {
+          case true => cross(par1, par2).map(_.some)
+          case false => Sync[F].pure(None)
+        }
   }
