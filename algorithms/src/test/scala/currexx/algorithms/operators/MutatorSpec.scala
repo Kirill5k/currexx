@@ -14,7 +14,7 @@ class MutatorSpec extends AsyncWordSpec with Matchers {
       val individual = Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 
       given r: Random   = Random(40)
-      val result = Mutator.neighbourSwap[IO, Int].mutate(individual, 0.25)
+      val result = Mutator.neighbourSwap[IO, Int].flatMap(_.mutate(individual, 0.25))
 
       result.unsafeToFuture().map { mutated =>
         mutated must not contain theSameElementsInOrderAs(individual)

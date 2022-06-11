@@ -17,7 +17,7 @@ class CrossoverSpec extends AsyncWordSpec with Matchers {
       val p1 = Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
       val p2 = p1.reverse
 
-      val result = Crossover.threeWaySplit[IO, Int].cross(p1, p2)
+      val result = Crossover.threeWaySplit[IO, Int].flatMap(_.cross(p1, p2))
 
       result.unsafeToFuture().map { child =>
         child must contain theSameElementsAs p1

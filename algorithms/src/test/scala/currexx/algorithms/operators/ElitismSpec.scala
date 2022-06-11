@@ -20,7 +20,7 @@ class ElitismSpec extends AsyncWordSpec with Matchers {
         (6, Fitness(20.0))
       )
 
-      val result = Elitism.simple[IO, Int].select(population, 2)
+      val result = Elitism.simple[IO, Int].flatMap(_.select(population, 2))
 
       result.unsafeToFuture().map(_ mustBe List(6, 4))
     }
