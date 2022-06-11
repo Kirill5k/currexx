@@ -1,14 +1,11 @@
 package currexx.algorithms.operators
 
 import cats.effect.{IO, Ref}
-import cats.effect.unsafe.implicits.global
-import currexx.algorithms.Fitness
-import org.scalatest.matchers.must.Matchers
-import org.scalatest.wordspec.AsyncWordSpec
+import currexx.algorithms.{CatsSpec, Fitness}
 
-class EvaluatorSpec extends AsyncWordSpec with Matchers {
+class EvaluatorSpec extends CatsSpec {
 
-  "A Cached evaluator" should {
+  "Evaluator.cached" should {
     "store evaluation results in cache" in {
 
       val result = for
@@ -18,7 +15,7 @@ class EvaluatorSpec extends AsyncWordSpec with Matchers {
         res       <- evaluator.evaluateIndividual("foo")
       yield res
 
-      result.unsafeToFuture().map { (ind, fitness) =>
+      result.asserting { (ind, fitness) =>
         ind mustBe "foo"
         fitness mustBe Fitness(BigDecimal(1))
       }

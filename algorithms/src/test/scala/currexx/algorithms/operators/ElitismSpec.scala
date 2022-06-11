@@ -2,13 +2,11 @@ package currexx.algorithms.operators
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-import currexx.algorithms.Fitness
-import org.scalatest.matchers.must.Matchers
-import org.scalatest.wordspec.AsyncWordSpec
+import currexx.algorithms.{CatsSpec, Fitness}
 
-class ElitismSpec extends AsyncWordSpec with Matchers {
+class ElitismSpec extends CatsSpec {
 
-  "An Elitism operator" should {
+  "Elitism.simple" should {
 
     "select proportion of fittest individuals" in {
       val population = Vector(
@@ -22,7 +20,7 @@ class ElitismSpec extends AsyncWordSpec with Matchers {
 
       val result = Elitism.simple[IO, Int].flatMap(_.select(population, 2))
 
-      result.unsafeToFuture().map(_ mustBe List(6, 4))
+      result.asserting(_ mustBe List(6, 4))
     }
   }
 }

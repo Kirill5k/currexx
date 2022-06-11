@@ -1,15 +1,13 @@
 package currexx.algorithms.operators
 
 import cats.effect.IO
-import cats.effect.unsafe.implicits.global
-import org.scalatest.matchers.must.Matchers
-import org.scalatest.wordspec.AsyncWordSpec
+import currexx.algorithms.CatsSpec
 
 import scala.util.Random
 
-class InitialiserSpec extends AsyncWordSpec with Matchers {
+class InitialiserSpec extends CatsSpec {
 
-  "A Simple initialiser" should {
+  "Initialiser.initialisePopulation" should {
     val rand                                   = Random(42)
     val stringRandomiser: String => IO[String] = s => IO.delay(rand.shuffle(s.toList).mkString(""))
     val individual                             = "ABCDEFG"
@@ -20,7 +18,7 @@ class InitialiserSpec extends AsyncWordSpec with Matchers {
         population  <- initialiser.initialisePopulation(individual, 10, false)
       yield population
 
-      result.unsafeToFuture().map { pop =>
+      result.asserting { pop =>
         pop must have size 10
         pop.toSet mustBe Set(individual)
       }
@@ -32,7 +30,7 @@ class InitialiserSpec extends AsyncWordSpec with Matchers {
         population  <- initialiser.initialisePopulation(individual, 10, true)
       yield population
 
-      result.unsafeToFuture().map { pop =>
+      result.asserting { pop =>
         pop must have size 10
         pop.toSet must not be Set(individual)
       }

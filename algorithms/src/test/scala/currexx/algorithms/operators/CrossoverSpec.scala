@@ -2,14 +2,13 @@ package currexx.algorithms.operators
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-import org.scalatest.matchers.must.Matchers
-import org.scalatest.wordspec.AsyncWordSpec
+import currexx.algorithms.CatsSpec
 
 import scala.util.Random
 
-class CrossoverSpec extends AsyncWordSpec with Matchers {
+class CrossoverSpec extends CatsSpec {
 
-  "A threeWaySplitCrossover" should {
+  "Crossover.threeWaySplit" should {
 
     "cross 2 parents into a child" in {
       given Random(1000)
@@ -19,7 +18,7 @@ class CrossoverSpec extends AsyncWordSpec with Matchers {
 
       val result = Crossover.threeWaySplit[IO, Int].flatMap(_.cross(p1, p2))
 
-      result.unsafeToFuture().map { child =>
+      result.asserting { child =>
         child must contain theSameElementsAs p1
         child must contain theSameElementsAs p2
         child must not contain theSameElementsInOrderAs(p1)

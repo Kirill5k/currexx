@@ -10,7 +10,7 @@ class CollectionsSpec extends AnyWordSpec with Matchers with Inspectors {
 
   import collections.*
 
-  "Seq" should {
+  "Vector.pairs extension" should {
     "distribute list elements in pairs" in {
       val result = Vector(1, 2, 3, 4, 5, 6, 7, 8).pairs
       result mustBe Vector((1, 2), (3, 4), (5, 6), (7, 8))

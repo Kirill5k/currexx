@@ -8,7 +8,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class AlgorithmSpec extends AnyWordSpec with Matchers {
 
-  "A GeneticAlgorithm" should {
+  "Algorithm.GA (Genetic Algorithm)" should {
     val ind    = Array.range(0, 10)
     val params = Parameters.GA(5, 2, 0.5, 0.2, 0.25, true)
 

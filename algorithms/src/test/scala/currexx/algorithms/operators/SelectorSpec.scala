@@ -1,16 +1,14 @@
 package currexx.algorithms.operators
 
 import cats.effect.IO
-import cats.effect.unsafe.implicits.global
+import currexx.algorithms.CatsSpec
 import currexx.algorithms.Fitness
-import org.scalatest.matchers.must.Matchers
-import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.util.Random
 
-class SelectorSpec extends AsyncWordSpec with Matchers {
+class SelectorSpec extends CatsSpec {
 
-  "A Selector.RouletteWheel" should {
+  "Selector.rouletteWheel" should {
 
     "sort population by fittest candidates based on probability and distribute them in pairs" in {
       val population = Vector(
@@ -29,7 +27,7 @@ class SelectorSpec extends AsyncWordSpec with Matchers {
       given Random = Random(42)
       val result   = Selector.rouletteWheel[IO, Int].flatMap(_.selectPairs(population, 6))
 
-      result.unsafeToFuture().map(_ mustBe Vector((7, 6), (8, 3), (4, 1)))
+      result.asserting(_ mustBe Vector((7, 6), (8, 3), (4, 1)))
     }
   }
 }
