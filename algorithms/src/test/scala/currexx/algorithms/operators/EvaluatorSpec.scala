@@ -8,12 +8,12 @@ import org.scalatest.wordspec.AsyncWordSpec
 
 class EvaluatorSpec extends AsyncWordSpec with Matchers {
 
-  "A Memoized evaluator" should {
+  "A Cached evaluator" should {
     "store evaluation results in cache" in {
 
       val result = for
         attempts  <- Ref.of[IO, Int](0)
-        evaluator <- Evaluator.memoized[IO, String](evaluate(attempts))
+        evaluator <- Evaluator.cached[IO, String](evaluate(attempts))
         _         <- evaluator.evaluateIndividual("foo")
         res       <- evaluator.evaluateIndividual("foo")
       yield res
