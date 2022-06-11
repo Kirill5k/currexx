@@ -8,7 +8,7 @@ import currexx.algorithms.Fitness
 trait Evaluator[F[_], I]:
   def evaluateIndividual(individual: I): F[(I, Fitness)]
 
-object Evaluator {
+object Evaluator:
   def cached[F[_]: Concurrent, I](evaluate: I => F[(I, Fitness)]): F[Evaluator[F, I]] =
     Ref.of(Map.empty[I, Fitness]).map { cache =>
       new Evaluator[F, I] {
@@ -20,4 +20,3 @@ object Evaluator {
           }
       }
     }
-}

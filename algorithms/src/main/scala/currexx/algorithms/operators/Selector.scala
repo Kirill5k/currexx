@@ -11,7 +11,7 @@ trait Selector[F[_], I]:
   def selectFittest(population: EvaluatedPopulation[I]): F[(I, Fitness)]
   def selectPairs(population: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): F[DistributedPopulation[I]]
 
-object Selector {
+object Selector:
   def rouletteWheel[F[_]: Sync, I]: F[Selector[F, I]] =
     Sync[F].delay {
       new Selector[F, I] {
@@ -60,4 +60,3 @@ object Selector {
         }
       }
     }
-}
