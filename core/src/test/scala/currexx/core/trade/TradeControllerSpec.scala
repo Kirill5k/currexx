@@ -73,6 +73,7 @@ class TradeControllerSpec extends ControllerSpec {
              |"trading" : {
              |  "volume" : 0.1,
              |  "stopLoss" : null,
+             |  "stopLossPerCurrency" : {},
              |  "trailingStopLoss" : null,
              |  "takeProfit" : null
              |}
@@ -108,6 +109,7 @@ class TradeControllerSpec extends ControllerSpec {
              |"trading" : {
              |  "volume" : 0.1,
              |  "stopLoss" : null,
+             |  "stopLossPerCurrency" : {},
              |  "trailingStopLoss" : null,
              |  "takeProfit" : null
              |}
