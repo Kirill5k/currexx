@@ -82,6 +82,7 @@ val backtest = project
   .settings(
     name       := "currexx-backtest",
     moduleName := "currexx-backtest",
+    libraryDependencies ++= Dependencies.test
   )
 
 val root = project

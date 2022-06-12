@@ -41,9 +41,7 @@ object Backtester extends IOApp.Simple {
       )
     )
   )
-
-  val tradingParameters = TradingParameters(BigDecimal(0.1), None, None, None)
-  val tradeSettings     = TradeSettings(userId, TradeStrategy.TrendChangeAggressive, BrokerParameters.Vindaloo("1"), tradingParameters)
+  val tradeSettings = TradeSettings(userId, TradeStrategy.TrendChangeAggressive, BrokerParameters.Vindaloo("1"), TradingParameters(BigDecimal(0.1)))
 
   override val run: IO[Unit] =
     Stream
