@@ -28,5 +28,28 @@ class OptimisableSpec extends AnyWordSpec with Matchers {
         optimisable.toGenome(transformation) mustBe Array(Array(1), Array(0, 0, 0, 1, 0, 1, 0), Array(5), Array(0, 1, 1, 1, 0))
       }
     }
+
+    "fromGenome" should {
+      "convert genome to ValueTransformation.Kalman" in {
+        val genome = Array(Array(1), Array(0, 0, 0, 1, 0, 1, 0))
+
+        optimisable.fromGenome(genome) mustBe ValueTransformation.sequenced(ValueTransformation.Kalman(0.1))
+      }
+
+      "convert genome to ValueTransformation.HMA" in {
+        val genome = Array(Array(5), Array(0, 1, 1, 1, 0))
+
+        optimisable.fromGenome(genome) mustBe ValueTransformation.sequenced(ValueTransformation.HMA(14))
+      }
+
+      "convert complex genome into multiple transformations" in {
+        val genome = Array(Array(1), Array(0, 0, 0, 1, 0, 1, 0), Array(5), Array(0, 1, 1, 1, 0))
+
+        optimisable.fromGenome(genome) mustBe ValueTransformation.sequenced(
+          ValueTransformation.Kalman(0.1),
+          ValueTransformation.HMA(14)
+        )
+      }
+    }
   }
 }
