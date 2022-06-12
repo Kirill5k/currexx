@@ -56,8 +56,8 @@ final private class LiveTradeService[F[_]](
       .mapN { (settings, time) =>
         (state.latestPrice, TradeStrategyExecutor.get(settings.strategy).analyze(state, trigger)).mapN { (price, result) =>
           val order = result match
-            case Decision.Buy   => settings.trading.toOrder(TradeOrder.Position.Buy)
-            case Decision.Sell  => settings.trading.toOrder(TradeOrder.Position.Sell)
+            case Decision.Buy   => settings.trading.toOrder(state.currencyPair, TradeOrder.Position.Buy)
+            case Decision.Sell  => settings.trading.toOrder(state.currencyPair, TradeOrder.Position.Sell)
             case Decision.Close => TradeOrder.Exit
           TradeOrderPlacement(state.userId, state.currencyPair, order, settings.broker, price, time)
         }

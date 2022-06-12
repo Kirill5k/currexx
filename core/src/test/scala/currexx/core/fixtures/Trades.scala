@@ -16,7 +16,7 @@ object Trades {
     Users.uid,
     TradeStrategy.Disabled,
     BrokerParameters.Vindaloo("1"),
-    TradingParameters(BigDecimal(0.1), None, None, None)
+    TradingParameters(BigDecimal(0.1))
   )
 
   lazy val order = TradeOrderPlacement(
