@@ -5,9 +5,9 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.backtest.TestSettings
 import currexx.core.common.action.{Action, ActionDispatcher}
-import currexx.core.signal.{SignalService, SignalSettings}
-import currexx.core.market.{MarketService, MarketState}
-import currexx.core.trade.{TradeOrderPlacement, TradeService, TradeSettings}
+import currexx.core.signal.SignalService
+import currexx.core.market.MarketService
+import currexx.core.trade.{TradeOrderPlacement, TradeService}
 import currexx.domain.market.MarketTimeSeriesData
 import currexx.domain.user.UserId
 import fs2.{Pipe, Stream}

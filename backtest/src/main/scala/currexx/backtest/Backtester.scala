@@ -2,18 +2,10 @@ package currexx.backtest
 
 import cats.effect.{IO, IOApp}
 import cats.syntax.flatMap.*
-import currexx.backtest.services.{TestMarketService, TestMonitorService, TestServices, TestSignalService, TestTradeService}
-import currexx.clients.broker.BrokerParameters
-import currexx.core.common.action.{Action, ActionDispatcher, ActionProcessor}
-import currexx.core.market.MarketState
-import currexx.core.signal.{SignalSettings, TriggerFrequency}
-import currexx.core.trade.{TradeSettings, TradeStrategy, TradingParameters}
-import currexx.domain.market.{CurrencyPair, Indicator, Interval, MovingAverage, ValueSource, ValueTransformation}
-import currexx.domain.user.UserId
-import mongo4cats.bson.ObjectId
+import currexx.backtest.services.TestServices
+import currexx.domain.market.{Indicator, ValueSource, ValueTransformation}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import squants.market.{EUR, GBP}
 import fs2.Stream
 
 import scala.concurrent.duration.*
