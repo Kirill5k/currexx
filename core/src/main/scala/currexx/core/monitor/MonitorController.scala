@@ -58,6 +58,15 @@ final private class MonitorController[F[_]](
           .voidResponse
       }
 
+  // TODO: add tests
+  private def queryMonitor(using authenticator: Authenticator[F]) =
+    queryMonitorEndpoint.withAuthenticatedSession
+      .serverLogic { session => mid =>
+        service
+          .query(session.userId, mid)
+          .voidResponse
+      }
+
   private def getMonitorById(using authenticator: Authenticator[F]) =
     getMonitorByIdEndpoint.withAuthenticatedSession
       .serverLogic { session => mid =>
@@ -92,7 +101,8 @@ final private class MonitorController[F[_]](
         deleteMonitor,
         getMonitorById,
         updateMonitor,
-        getAllMonitors
+        getAllMonitors,
+        queryMonitor
       )
     )
 }
@@ -147,6 +157,11 @@ object MonitorController extends TapirSchema with TapirJson {
     .in(monitorIdPath / "resume")
     .out(statusCode(StatusCode.NoContent))
     .description("Resume existing monitor by updating its active status")
+
+  val queryMonitorEndpoint = Controller.securedEndpoint.post
+    .in(monitorIdPath / "query")
+    .out(statusCode(StatusCode.NoContent))
+    .description("Manually query a monitor")
 
   val getAllMonitorsEndpoint = Controller.securedEndpoint.get
     .in(basePath)
