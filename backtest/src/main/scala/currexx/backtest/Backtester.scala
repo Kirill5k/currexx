@@ -21,27 +21,17 @@ import scala.concurrent.duration.*
 object Backtester extends IOApp.Simple {
   inline given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
-  val userId       = UserId(ObjectId.get)
-  val currencyPair = CurrencyPair(EUR, GBP)
-
-  val initialMarketState = MarketState(userId, currencyPair, None, None, Map.empty, None)
-
-  val signalSettings = SignalSettings(
-    userId,
-    TriggerFrequency.OncePerDay,
-    List(
-      Indicator.TrendChangeDetection(
-        source = ValueSource.Close,
-        transformation = ValueTransformation.sequenced(
-//          ValueTransfor0mation.NMA(9, 4, 8d, MovingAverage.Weighted),
-//          ValueTransformation.WMA(5),
-          ValueTransformation.HMA(5),
-//          ValueTransformation.Kalman(0.85),
-        )
+  val settings = TestSettings.make(
+    Indicator.TrendChangeDetection(
+      source = ValueSource.Close,
+      transformation = ValueTransformation.sequenced(
+        //          ValueTransfor0mation.NMA(9, 4, 8d, MovingAverage.Weighted),
+        //          ValueTransformation.WMA(5),
+        ValueTransformation.HMA(5)
+        //          ValueTransformation.Kalman(0.85),
       )
     )
   )
-  val tradeSettings = TradeSettings(userId, TradeStrategy.TrendChangeAggressive, BrokerParameters.Vindaloo("1"), TradingParameters(BigDecimal(0.1)))
 
   override val run: IO[Unit] =
     Stream
@@ -49,15 +39,14 @@ object Backtester extends IOApp.Simple {
       .evalMap { filePath =>
         for
           _        <- logger.info(s"Processing $filePath")
-          services <- TestServices.make[IO](initialMarketState, tradeSettings, signalSettings)
+          services <- TestServices.make[IO](settings)
           _ <- MarketDataProvider
-            .read[IO](currencyPair, Interval.D1, filePath)
-            .evalMap(services.processMarketData(userId))
+            .read[IO](filePath, settings.currencyPair)
+            .through(services.processMarketData)
             .compile
             .drain
-          placedOrders <- services.getAllOrders(userId)
-          orderStats = OrderStatsCollector.collect(placedOrders)
-          _ <- logger.info(orderStats.toString)
+          orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
+          _          <- logger.info(orderStats.toString)
         yield orderStats
       }
       .compile
