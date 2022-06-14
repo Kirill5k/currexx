@@ -49,12 +49,8 @@ final private class LiveMonitorService[F[_]](
 
   private def scheduleNew(schedule: Schedule, uid: UserId)(mid: MonitorId): F[Unit] =
     schedule match
-      case _: Schedule.Periodic =>
-        actionDispatcher.dispatch(Action.QueryMonitor(uid, mid))
-      case c: Schedule.Cron =>
-        F.realTimeInstant.flatMap { now =>
-          actionDispatcher.dispatch(Action.ScheduleMonitor(uid, mid, now.durationBetween(c.nextExecutionTime(now))))
-        }
+      case _: Schedule.Periodic => actionDispatcher.dispatch(Action.QueryMonitor(uid, mid))
+      case _: Schedule.Cron     => reschedule(uid, mid, schedule)
 
   override def query(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit] =
     for
@@ -65,14 +61,14 @@ final private class LiveMonitorService[F[_]](
           .flatMap(tsd => actionDispatcher.dispatch(Action.ProcessMarketData(uid, tsd)))
           .flatTap(_ => repository.updateQueriedTimestamp(uid, id))
       }
-      _ <- F.whenA(!manual)(reschedule(mon))
+      _ <- F.whenA(!manual)(reschedule(uid, id, mon.schedule))
     yield ()
 
-  private def reschedule(mon: Monitor): F[Unit] =
+  private def reschedule(uid: UserId, mid: MonitorId, schedule: Schedule): F[Unit] =
     for
       now <- F.realTimeInstant
-      next = mon.schedule.nextExecutionTime(now)
-      _ <- actionDispatcher.dispatch(Action.ScheduleMonitor(mon.userId, mon.id, now.durationBetween(next)))
+      next = schedule.nextExecutionTime(now)
+      _ <- actionDispatcher.dispatch(Action.ScheduleMonitor(uid, mid, now.durationBetween(next)))
     yield ()
 
   override def rescheduleAll: F[Unit] =
@@ -80,7 +76,7 @@ final private class LiveMonitorService[F[_]](
       repository.stream
         .map { mon =>
           mon.lastQueriedAt
-            .map(prev => mon.schedule.nextExecutionTime(prev))
+            .map(mon.schedule.nextExecutionTime)
             .filter(_.isAfter(now))
             .map(now.durationBetween(_)) match
             case Some(db) => actionDispatcher.dispatch(Action.ScheduleMonitor(mon.userId, mon.id, db))
