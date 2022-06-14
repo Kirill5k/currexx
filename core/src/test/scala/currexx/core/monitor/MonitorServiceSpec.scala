@@ -230,6 +230,28 @@ class MonitorServiceSpec extends CatsSpec {
         }
       }
 
+      "not reschedule monitor in case of manual query" in {
+        val (repo, disp, client) = mocks
+        when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.monitor))
+        when(repo.updateQueriedTimestamp(any[UserId], any[MonitorId])).thenReturn(IO.unit)
+        when(client.timeSeriesData(any[CurrencyPair], any[Interval])).thenReturn(IO.pure(Markets.timeSeriesData))
+        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+
+        val result = for
+          svc <- MonitorService.make[IO](repo, disp, client)
+          res <- svc.query(Users.uid, Monitors.mid, true)
+        yield res
+
+        result.asserting { res =>
+          verify(repo).find(Users.uid, Monitors.mid)
+          verify(client).timeSeriesData(Markets.gbpeur, Interval.H1)
+          verify(disp).dispatch(Action.ProcessMarketData(Users.uid, Markets.timeSeriesData))
+          verify(repo).updateQueriedTimestamp(Users.uid, Monitors.mid)
+          verifyNoMoreInteractions(repo, client, disp)
+          res mustBe ()
+        }
+      }
+
       "not get market data for inactive monitor" in {
         val (repo, disp, client) = mocks
         when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.monitor.copy(active = false)))
