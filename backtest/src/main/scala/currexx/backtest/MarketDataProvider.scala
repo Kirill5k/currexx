@@ -27,7 +27,7 @@ object MarketDataProvider:
     "usd-pln-1d.csv"
   )
 
-  val euusDataset  = List(
+  val euusDataset = List(
     "aud-cad-1d.csv",
     "eur-aud-1d.csv",
     "eur-chf-1d.csv",
@@ -37,12 +37,12 @@ object MarketDataProvider:
     "usd-dkk-1d.csv",
     "usd-pln-1d.csv"
   )
-  
+
   private val timePattern = DateTimeFormatter.ofPattern("dd.MM.yyyy")
   def read[F[_]: Sync: Files](
+      filePath: String,
       currencyPair: CurrencyPair,
-      interval: Interval,
-      filePath: String
+      interval: Interval = Interval.D1
   ): Stream[F, MarketTimeSeriesData] =
     Files[F]
       .readAll(Path(getClass.getClassLoader.getResource(filePath).getPath))

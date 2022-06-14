@@ -191,7 +191,7 @@ class TradeServiceSpec extends CatsSpec {
         result.asserting { res =>
           verify(settRepo).get(Users.uid)
           verify(client).submit(Markets.gbpeur, Trades.broker, TradeOrder.Exit)
-          verify(client).submit(Markets.gbpeur, Trades.broker, Trades.settings.trading.toOrder(TradeOrder.Position.Buy))
+          verify(client).submit(Markets.gbpeur, Trades.broker, Trades.settings.trading.toOrder(Markets.gbpeur, TradeOrder.Position.Buy))
           verify(orderRepo).save(any[TradeOrderPlacement])
           verify(disp).dispatch(any[Action])
           res mustBe ()

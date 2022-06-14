@@ -3,15 +3,17 @@ package currexx.backtest.services
 import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import currexx.backtest.TestSettings
 import currexx.core.common.action.{Action, ActionDispatcher}
-import currexx.core.signal.{SignalService, SignalSettings}
-import currexx.core.market.{MarketService, MarketState}
-import currexx.core.trade.{TradeOrderPlacement, TradeService, TradeSettings}
+import currexx.core.signal.SignalService
+import currexx.core.market.MarketService
+import currexx.core.trade.{TradeOrderPlacement, TradeService}
 import currexx.domain.market.MarketTimeSeriesData
 import currexx.domain.user.UserId
-import fs2.Stream
+import fs2.{Pipe, Stream}
 
 final class TestServices[F[_]] private (
+    private val settings: TestSettings,
     private val signalService: SignalService[F],
     private val marketService: MarketService[F],
     private val tradeService: TradeService[F],
@@ -28,35 +30,34 @@ final class TestServices[F[_]] private (
         case n => dispatcher.actions.take(n)
       }
 
-  def processMarketData(uid: UserId)(data: MarketTimeSeriesData): F[Unit] =
-    (Stream.eval(marketService.processMarketData(uid, data) >> signalService.processMarketData(uid, data)) >>
-      pendingActions.evalMap {
+  def processMarketData: Pipe[F, MarketTimeSeriesData, Unit] = { dataStream =>
+    for
+      data <- dataStream
+      _    <- Stream.eval(marketService.processMarketData(settings.userId, data) >> signalService.processMarketData(settings.userId, data))
+      _ <- pendingActions.evalMap {
         case Action.ProcessSignal(signal) => marketService.processSignal(signal)
         case _                            => F.unit
-      } >>
-      pendingActions.evalMap {
+      }
+      _ <- pendingActions.evalMap {
         case Action.ProcessMarketStateUpdate(state, triggeredBy) => tradeService.processMarketStateUpdate(state, triggeredBy)
         case _                                                   => F.unit
-      } >>
-      pendingActions.evalMap {
+      }
+      _ <- pendingActions.evalMap {
         case Action.ProcessTradeOrderPlacement(top) => marketService.processTradeOrderPlacement(top)
         case _                                      => F.unit
-      }).compile.drain
+      }
+    yield ()
+  }
 
-  def getAllOrders(uid: UserId): F[List[TradeOrderPlacement]] =
-    tradeService.getAllOrders(uid)
+  def getAllOrders: F[List[TradeOrderPlacement]] =
+    tradeService.getAllOrders(settings.userId)
 }
 
-object TestServices {
-  def make[F[_]: Async](
-      initialMarketState: MarketState,
-      initialTradeSettings: TradeSettings,
-      initialSignalSettings: SignalSettings
-  ): F[TestServices[F]] =
+object TestServices:
+  def make[F[_]: Async](settings: TestSettings): F[TestServices[F]] =
     for
       dispatcher <- ActionDispatcher.make[F]
-      market     <- TestMarketService.make[F](initialMarketState, dispatcher)
-      trade      <- TestTradeService.make[F](initialTradeSettings, dispatcher)
-      signal     <- TestSignalService.make[F](initialSignalSettings, dispatcher)
-    yield TestServices[F](signal, market, trade, dispatcher)
-}
+      market     <- TestMarketService.make[F](settings.marketState, dispatcher)
+      trade      <- TestTradeService.make[F](settings.trade, dispatcher)
+      signal     <- TestSignalService.make[F](settings.signal, dispatcher)
+    yield TestServices[F](settings, signal, market, trade, dispatcher)
