@@ -58,12 +58,11 @@ final private class MonitorController[F[_]](
           .voidResponse
       }
 
-  // TODO: add tests
   private def queryMonitor(using authenticator: Authenticator[F]) =
     queryMonitorEndpoint.withAuthenticatedSession
       .serverLogic { session => mid =>
         service
-          .query(session.userId, mid)
+          .query(session.userId, mid, true)
           .voidResponse
       }
 

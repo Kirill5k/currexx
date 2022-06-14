@@ -129,6 +129,21 @@ class MonitorControllerSpec extends ControllerSpec {
       }
     }
 
+    "POST /monitors/:id/query" should {
+      "manually query the monitor" in {
+        val svc = mock[MonitorService[IO]]
+        when(svc.query(any[UserId], any[MonitorId], any[Boolean])).thenReturn(IO.unit)
+
+        given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
+
+        val req = requestWithAuthHeader(uriWith(Monitors.mid, "/query"), method = Method.POST)
+        val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        verifyJsonResponse(res, Status.NoContent, None)
+        verify(svc).query(Users.uid, Monitors.mid, true)
+      }
+    }
+
     "GET /monitors" should {
       "return all monitors" in {
         val svc = mock[MonitorService[IO]]
