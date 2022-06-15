@@ -1,7 +1,7 @@
 package currexx.core.common.http
 
 import cats.syntax.option.*
-import currexx.domain.market.{Indicator, Interval, TradeOrder, Trend}
+import currexx.domain.market.{Condition, Indicator, Interval, TradeOrder, Trend}
 import eu.timepit.refined.types.string.NonEmptyString
 import squants.Money
 import squants.market.Currency
@@ -18,17 +18,19 @@ import scala.concurrent.duration.FiniteDuration
 
 transparent trait TapirSchema extends SchemaDerivation {
   // TODO: fix schemas
-  inline given Schema[UserId]         = Schema.string
-  inline given Schema[MonitorId]      = Schema.string
-  inline given Schema[IdString]       = Schema.string
-  inline given Schema[NonEmptyString] = Schema.string
-  inline given Schema[EmailString]    = Schema.string
-  inline given Schema[Currency]       = Schema.string
-  inline given Schema[FiniteDuration] = Schema.string
-  inline given Schema[Trend]          = Schema.string
-  inline given Schema[Schedule]       = Schema.string
-  inline given Schema[TradeOrder]     = Schema.string
-  inline given Schema[Indicator]     = Schema.string
+  inline given Schema[UserId]              = Schema.string
+  inline given Schema[MonitorId]           = Schema.string
+  inline given Schema[IdString]            = Schema.string
+  inline given Schema[NonEmptyString]      = Schema.string
+  inline given Schema[EmailString]         = Schema.string
+  inline given Schema[Currency]            = Schema.string
+  inline given Schema[FiniteDuration]      = Schema.string
+  inline given Schema[Trend]               = Schema.string
+  inline given Schema[Schedule]            = Schema.string
+  inline given Schema[TradeOrder]          = Schema.string
+  inline given Schema[TradeOrder.Position] = Schema.string
+  inline given Schema[Indicator]           = Schema.string
+  inline given Schema[Condition]           = Schema.string
 
   inline given (using currencySchema: Schema[Currency]): Schema[Money] = Schema(
     SProduct(
