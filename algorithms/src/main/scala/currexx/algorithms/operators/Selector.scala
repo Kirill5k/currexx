@@ -13,7 +13,7 @@ trait Selector[F[_], I]:
 
 object Selector:
   def rouletteWheel[F[_]: Sync, I]: F[Selector[F, I]] =
-    Sync[F].delay {
+    Sync[F].pure {
       new Selector[F, I] {
         override def selectFittest(population: EvaluatedPopulation[I]): F[(I, Fitness)] =
           Sync[F].delay(population.maxBy(_._2))

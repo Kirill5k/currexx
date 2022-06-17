@@ -8,11 +8,11 @@ trait Mutator[F[_], I]:
   def mutate(ind: I, mutationProbability: Double)(using r: Random): F[I]
 
 object Mutator:
-  def bitFlip[F[_]: Sync]: F[Mutator[F, Array[Int]]] =
-    Sync[F].pure {
+  def bitFlip[F[_]](using F: Sync[F]): F[Mutator[F, Array[Int]]] =
+    F.pure {
       new Mutator[F, Array[Int]] {
         override def mutate(ind: Array[Int], mutationProbability: Double)(using r: Random): F[Array[Int]] =
-          Sync[F].delay {
+          F.delay {
             val result = ind.clone()
             var i      = 0
             while (i < result.length - 1) {
@@ -27,11 +27,11 @@ object Mutator:
       }
     }
 
-  def neighbourSwap[F[_]: Sync, G]: F[Mutator[F, Array[G]]] =
-    Sync[F].pure {
+  def neighbourSwap[F[_], G](using F: Sync[F]): F[Mutator[F, Array[G]]] =
+    F.pure {
       new Mutator[F, Array[G]] {
         override def mutate(ind: Array[G], mutationFactor: Double)(using r: Random): F[Array[G]] =
-          Sync[F].delay {
+          F.delay {
             val result = ind.clone()
             var i      = 0
             while (i < result.length - 1) {

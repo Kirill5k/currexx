@@ -8,11 +8,11 @@ trait Initialiser[F[_], I]:
   def initialisePopulation(seed: I, populationSize: Int, shuffle: Boolean): F[Population[I]]
 
 object Initialiser:
-  def simple[F[_]: Sync, I](randomise: I => F[I]): F[Initialiser[F, I]] =
-    Sync[F].delay {
+  def simple[F[_], I](randomise: I => F[I])(using F: Sync[F]): F[Initialiser[F, I]] =
+    F.pure {
       new Initialiser[F, I] {
         override def initialisePopulation(seed: I, populationSize: Int, shuffle: Boolean): F[Population[I]] =
           if (shuffle) Stream.eval(randomise(seed)).repeatN(populationSize).compile.toVector
-          else Sync[F].delay(Vector.fill(populationSize)(seed))
+          else F.delay(Vector.fill(populationSize)(seed))
       }
     }

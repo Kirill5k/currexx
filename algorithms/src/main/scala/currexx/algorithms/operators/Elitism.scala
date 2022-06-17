@@ -7,10 +7,10 @@ trait Elitism[F[_], I]:
   def select(population: EvaluatedPopulation[I], n: Double): F[Population[I]]
 
 object Elitism:
-  def simple[F[_]: Sync, A]: F[Elitism[F, A]] =
-    Sync[F].delay {
+  def simple[F[_], A](using F: Sync[F]): F[Elitism[F, A]] =
+    F.pure {
       new Elitism[F, A] {
         override def select(population: EvaluatedPopulation[A], n: Double): F[Population[A]] =
-          Sync[F].delay(population.sortBy(_._2)(Ordering[Fitness].reverse).take(n.toInt).map(_._1))
+          F.delay(population.sortBy(_._2)(Ordering[Fitness].reverse).take(n.toInt).map(_._1))
       }
     }
