@@ -9,14 +9,14 @@ trait Evaluator[F[_], I]:
   def evaluateIndividual(individual: I): F[(I, Fitness)]
 
 object Evaluator:
-  def cached[F[_]: Concurrent, I](evaluate: I => F[(I, Fitness)]): F[Evaluator[F, I]] =
+  def cached[F[_]: Concurrent, I](objectiveFn: I => F[(I, Fitness)]): F[Evaluator[F, I]] =
     Ref.of(Map.empty[I, Fitness]).map { cache =>
       new Evaluator[F, I] {
         override def evaluateIndividual(individual: I): F[(I, Fitness)] =
           cache.get.flatMap { storedResult =>
             storedResult.get(individual) match
               case Some(fitness) => Concurrent[F].pure((individual, fitness))
-              case None          => evaluate(individual).flatTap(res => cache.update(_ + res))
+              case None          => objectiveFn(individual).flatTap(res => cache.update(_ + res))
           }
       }
     }
