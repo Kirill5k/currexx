@@ -6,7 +6,6 @@ import cats.syntax.traverse.*
 import cats.syntax.option.*
 import currexx.algorithms.{Fitness, Parameters}
 import currexx.algorithms.operators.{Crossover, Elitism, Evaluator, Initialiser, Mutator, Selector}
-import currexx.backtest.Backtester.settings
 import currexx.backtest.optimizer.{Optimisable, OptimisationAlgorithm}
 import currexx.backtest.optimizer.Optimisable.given
 import currexx.backtest.services.TestServices

@@ -16,8 +16,8 @@ class OptimisableSpec extends AnyWordSpec with Matchers {
       }
 
       "convert ValueTransformation.HMA to genome" in {
-        val transformation = ValueTransformation.HMA(14)
-        optimisable.toGenome(transformation) mustBe Array(Array(5), Array(0, 1, 1, 1, 0))
+        val transformation = ValueTransformation.HMA(60)
+        optimisable.toGenome(transformation) mustBe Array(Array(5), Array(1, 1, 1, 1, 0, 0))
       }
 
       "convert ValueTransformation.Sequence to genome" in {
@@ -25,7 +25,7 @@ class OptimisableSpec extends AnyWordSpec with Matchers {
           ValueTransformation.Kalman(0.1),
           ValueTransformation.HMA(14)
         )
-        optimisable.toGenome(transformation) mustBe Array(Array(1), Array(0, 0, 0, 1, 0, 1, 0), Array(5), Array(0, 1, 1, 1, 0))
+        optimisable.toGenome(transformation) mustBe Array(Array(1), Array(0, 0, 0, 1, 0, 1, 0), Array(5), Array(0, 0, 1, 1, 1, 0))
       }
     }
 
@@ -43,11 +43,11 @@ class OptimisableSpec extends AnyWordSpec with Matchers {
       }
 
       "convert complex genome into multiple transformations" in {
-        val genome = Array(Array(1), Array(0, 0, 0, 1, 0, 1, 0), Array(5), Array(0, 1, 1, 1, 0))
+        val genome = Array(Array(5), Array(0, 0, 1, 1, 1, 0), Array(1), Array(0, 0, 0, 1, 0, 1, 0))
 
         optimisable.fromGenome(genome) mustBe ValueTransformation.sequenced(
-          ValueTransformation.Kalman(0.1),
-          ValueTransformation.HMA(14)
+          ValueTransformation.HMA(14),
+          ValueTransformation.Kalman(0.1)
         )
       }
     }

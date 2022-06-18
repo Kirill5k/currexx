@@ -22,8 +22,6 @@ import currexx.domain.market.{
 }
 import fs2.Stream
 
-import scala.util.Try
-
 trait SignalService[F[_]]:
   def submit(signal: Signal): F[Unit]
   def getAll(uid: UserId): F[List[Signal]]
