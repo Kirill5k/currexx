@@ -3,7 +3,7 @@ package currexx.backtest
 import cats.effect.{IO, IOApp}
 import cats.syntax.flatMap.*
 import currexx.backtest.services.TestServices
-import currexx.domain.market.{CurrencyPair, Indicator, ValueSource, ValueTransformation}
+import currexx.domain.market.{CurrencyPair, Indicator, MovingAverage, ValueSource, ValueTransformation}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import fs2.Stream
@@ -19,10 +19,10 @@ object Backtester extends IOApp.Simple {
     Indicator.TrendChangeDetection(
       source = ValueSource.Close,
       transformation = ValueTransformation.sequenced(
-        //          ValueTransfor0mation.NMA(9, 4, 8d, MovingAverage.Weighted),
+                  ValueTransformation.NMA(35,26,41.4D, MovingAverage.Weighted),
         //          ValueTransformation.WMA(5),
-        ValueTransformation.HMA(5)
-        //          ValueTransformation.Kalman(0.85),
+//        ValueTransformation.HMA(15),
+//        ValueTransformation.Kalman(0.2)
       )
     )
   )

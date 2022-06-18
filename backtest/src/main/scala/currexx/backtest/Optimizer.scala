@@ -17,6 +17,11 @@ import scala.util.Random
 
 object Optimizer extends IOApp.Simple {
 
+  extension [A](arr: Array[A])
+    def withAddedElement(i: Int, a: A): Array[A] =
+      arr.update(i, a)
+      arr
+
   given Random = Random()
 
   given showArray[A: Show]: Show[Array[A]] = new Show[Array[A]]:
@@ -58,25 +63,23 @@ object Optimizer extends IOApp.Simple {
   def mutator: IO[Mutator[IO, Array[Array[Int]]]] = Mutator.bitFlip[IO].map { bitFlipMutator =>
     new Mutator[IO, Array[Array[Int]]] {
       override def mutate(ind: Array[Array[Int]], mutationProbability: Double)(using r: Random): IO[Array[Array[Int]]] =
-        ind.toList
-          .traverse { gene =>
-            if (gene.size == 1) IO.pure(gene)
-            else bitFlipMutator.mutate(gene, mutationProbability)
-          }
-          .map(_.toArray)
+        ind
+          .foldLeft((IO.pure(Array.ofDim[Array[Int]](ind.length)), 0)) { case ((res, i), gene) =>
+            val child = if (gene.length == 1) IO.pure(gene) else bitFlipMutator.mutate(gene, mutationProbability)
+            (child.flatMap(compRes => res.map(_.withAddedElement(i, compRes))), i + 1)
+          }._1
     }
   }
 
   def crossover: IO[Crossover[IO, Array[Array[Int]]]] = Crossover.threeWaySplit[IO, Int].map { threeWaySplitCrossover =>
     new Crossover[IO, Array[Array[Int]]] {
       override def cross(par1: Array[Array[Int]], par2: Array[Array[Int]])(using r: Random): IO[Array[Array[Int]]] =
-        par1.toList
-          .zip(par2.toList)
-          .traverse { (gene1, gene2) =>
-            if (gene1.size == 1) IO.pure(gene1)
-            else threeWaySplitCrossover.cross(gene1, gene2)
+        par1
+          .foldLeft((IO.pure(Array.ofDim[Array[Int]](par1.length)), 0)) { case ((res, i), g1) =>
+            val child = if (g1.length == 1) IO.pure(g1) else threeWaySplitCrossover.cross(g1, par2(i))
+            (child.flatMap(compRes => res.map(_.withAddedElement(i, compRes))), i + 1)
           }
-          .map(_.toArray)
+          ._1
 
       override def cross(par1: Array[Array[Int]], par2: Array[Array[Int]], crossoverProbability: Double)(using
           r: Random
@@ -87,7 +90,7 @@ object Optimizer extends IOApp.Simple {
 
   val gaParameters = Parameters.GA(
     populationSize = 100,
-    maxGen = 100,
+    maxGen = 200,
     crossoverProbability = 0.7,
     mutationProbability = 0.2,
     elitismRatio = 0.4,
@@ -95,8 +98,7 @@ object Optimizer extends IOApp.Simple {
   )
 
   val target = ValueTransformation.sequenced(
-    ValueTransformation.HMA(5),
-    ValueTransformation.Kalman(0.85)
+    ValueTransformation.NMA(42, 21, 0.5, MovingAverage.Weighted)
   )
 
   override def run: IO[Unit] =

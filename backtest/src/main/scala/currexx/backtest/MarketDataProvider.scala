@@ -37,8 +37,9 @@ object MarketDataProvider:
     "usd-dkk-1d.csv",
     "usd-pln-1d.csv"
   )
-
+  
   private val timePattern = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+  
   def read[F[_]: Sync: Files](
       filePath: String,
       currencyPair: CurrencyPair,

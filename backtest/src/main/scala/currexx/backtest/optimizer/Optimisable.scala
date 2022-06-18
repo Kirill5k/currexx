@@ -9,12 +9,12 @@ trait Optimisable[T]:
 object Optimisable:
   given Optimisable[ValueTransformation] = new Optimisable[ValueTransformation] {
     extension (i: Int)
+      def divBy(n: Int): Double =
+        i.toDouble / n
       def toBinaryArray(minSize: Int): Array[Int] =
         i.toBinaryString.reverse.padTo(minSize, '0').reverse.map(_.toString.toInt).toArray
 
-    extension (array: Array[Int])
-      def toInt: Int       = Integer.parseInt(array.mkString(""), 2)
-      def toDouble: Double = array.toInt.toDouble
+    extension (array: Array[Int]) def toInt: Int = Integer.parseInt(array.mkString(""), 2)
 
     override def toGenome(target: ValueTransformation): Array[Array[Int]] =
       target match
@@ -43,7 +43,7 @@ object Optimisable:
         if (remaining.isEmpty) transformations
         else {
           remaining.head.head match
-            case 1 => go(remaining.drop(2), transformations :+ ValueTransformation.Kalman(remaining(1).toDouble / 100))
+            case 1 => go(remaining.drop(2), transformations :+ ValueTransformation.Kalman(remaining(1).toInt.divBy(100)))
             case 2 => go(remaining.drop(2), transformations :+ ValueTransformation.WMA(remaining(1).toInt))
             case 3 => go(remaining.drop(2), transformations :+ ValueTransformation.SMA(remaining(1).toInt))
             case 4 => go(remaining.drop(2), transformations :+ ValueTransformation.EMA(remaining(1).toInt))
@@ -52,7 +52,7 @@ object Optimisable:
               val nma = ValueTransformation.NMA(
                 remaining(1).toInt,
                 remaining(2).toInt,
-                remaining(3).toDouble / 10,
+                remaining(3).toInt.divBy(10),
                 MovingAverage.Weighted
               )
               go(remaining.drop(4), transformations :+ nma)
