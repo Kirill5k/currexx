@@ -39,7 +39,7 @@ object Optimisable:
             Array(nma.ordinal),
             length.toBinaryArray(6),
             signalLength.toBinaryArray(5),
-            lambda.toInt.toBinaryArray(6)
+            lambda.toInt.toBinaryArray(7)
           )
 
     override def fromGenome(genome: Array[Array[Int]]): ValueTransformation = {

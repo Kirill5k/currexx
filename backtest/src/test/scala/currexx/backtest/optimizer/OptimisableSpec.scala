@@ -13,7 +13,7 @@ class OptimisableSpec extends AnyWordSpec with Matchers {
       "convert ValueTransformation.NMA to genome" in {
         val transformation = ValueTransformation.NMA(42, 12, 12d, MovingAverage.Weighted)
         optimisable
-          .toGenome(transformation) mustBe Array(Array(6), Array(1, 0, 1, 0, 1, 0), Array(0, 1, 1, 0, 0), Array(0, 0, 1, 1, 0, 0))
+          .toGenome(transformation) mustBe Array(Array(6), Array(1, 0, 1, 0, 1, 0), Array(0, 1, 1, 0, 0), Array(0, 0, 0, 1, 1, 0, 0))
       }
 
       "convert ValueTransformation.Kalman to genome" in {
@@ -49,7 +49,7 @@ class OptimisableSpec extends AnyWordSpec with Matchers {
       }
 
       "convert genome to ValueTransformation.NMA" in {
-        val genome = Array(Array(6), Array(1, 0, 1, 0, 1, 0), Array(0, 1, 1, 0, 0), Array(0, 0, 1, 1, 0, 0))
+        val genome = Array(Array(6), Array(1, 0, 1, 0, 1, 0), Array(0, 1, 1, 0, 0), Array(0, 0, 0, 1, 1, 0, 0))
         optimisable.fromGenome(genome) mustBe ValueTransformation.sequenced(
           ValueTransformation.NMA(42, 12, 12d, MovingAverage.Weighted)
         )
