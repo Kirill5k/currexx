@@ -75,7 +75,6 @@ object Optimizer extends IOApp.Simple {
   def crossover: IO[Crossover[IO, Array[Array[Int]]]] = Crossover.threeWaySplit[IO, Int].map { threeWaySplitCrossover =>
     new Crossover[IO, Array[Array[Int]]] {
       override def cross(par1: Array[Array[Int]], par2: Array[Array[Int]])(using r: Random): IO[Array[Array[Int]]] =
-        println(s"Crossing ${par1.map(_.length).mkString(" ")} and ${par2.map(_.length).mkString(" ")}")
         par1
           .foldLeft((IO.pure(Array.ofDim[Array[Int]](par1.length)), 0)) { case ((res, i), g1) =>
             val child = if (g1.length == 1) IO.pure(g1) else threeWaySplitCrossover.cross(g1, par2(i))
