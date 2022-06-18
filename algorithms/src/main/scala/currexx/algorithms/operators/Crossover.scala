@@ -28,9 +28,9 @@ object Crossover:
             val point1: Int = r.nextInt(middle)
             val point2: Int = r.nextInt(middle) + middle
             val left        = par1.slice(0, point1)
-            val mid         = par1.slice(point1, point2).toSet
+            val mid         = par2.slice(point1, point2)
             val right       = par1.slice(point2, par1.length)
-            left ++ par2.filter(mid.contains) ++ right
+            left ++ mid ++ right
           }
         override def cross(par1: Array[G], par2: Array[G], crossoverProbability: Double)(using r: Random): F[Option[Array[G]]] =
           maybeCrossSync(par1, par2, crossoverProbability)
