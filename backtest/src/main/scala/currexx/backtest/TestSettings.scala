@@ -18,9 +18,8 @@ final case class TestSettings(
 )
 
 object TestSettings:
-  def make(indicators: Indicator*): TestSettings = {
+  def make(currencyPair: CurrencyPair, indicators: Indicator*): TestSettings = {
     val userId       = UserId(ObjectId.get)
-    val currencyPair = CurrencyPair(EUR, GBP)
     TestSettings(
       userId = userId,
       currencyPair = currencyPair,

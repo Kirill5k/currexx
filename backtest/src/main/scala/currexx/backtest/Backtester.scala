@@ -3,10 +3,11 @@ package currexx.backtest
 import cats.effect.{IO, IOApp}
 import cats.syntax.flatMap.*
 import currexx.backtest.services.TestServices
-import currexx.domain.market.{Indicator, ValueSource, ValueTransformation}
+import currexx.domain.market.{CurrencyPair, Indicator, ValueSource, ValueTransformation}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import fs2.Stream
+import squants.market.{EUR, GBP}
 
 import scala.concurrent.duration.*
 
@@ -14,6 +15,7 @@ object Backtester extends IOApp.Simple {
   inline given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
   val settings = TestSettings.make(
+    CurrencyPair(EUR, GBP),
     Indicator.TrendChangeDetection(
       source = ValueSource.Close,
       transformation = ValueTransformation.sequenced(

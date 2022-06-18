@@ -10,7 +10,9 @@ import currexx.backtest.Backtester.settings
 import currexx.backtest.optimizer.{Optimisable, OptimisationAlgorithm}
 import currexx.backtest.optimizer.Optimisable.given
 import currexx.backtest.services.TestServices
-import currexx.domain.market.{Indicator, MovingAverage, ValueSource, ValueTransformation}
+import currexx.domain.market.{CurrencyPair, Indicator, MovingAverage, ValueSource, ValueTransformation}
+import squants.market.{EUR, GBP}
+import fs2.Stream
 
 import scala.util.Random
 
@@ -37,18 +39,22 @@ object Optimizer extends IOApp.Simple {
     }
 
   def evaluator(testFilePath: String)(using opt: Optimisable[ValueTransformation]): IO[Evaluator[IO, Array[Array[Int]]]] =
-    Evaluator.cached[IO, Array[Array[Int]]] { individual =>
-      val settings = TestSettings.make(Indicator.TrendChangeDetection(ValueSource.Close, opt.fromGenome(individual)))
-      for
-        services <- TestServices.make[IO](settings)
-        _ <- MarketDataProvider
-          .read[IO](testFilePath, settings.currencyPair)
-          .through(services.processMarketData)
-          .compile
-          .drain
-        orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
-      yield (individual, Fitness(orderStats.totalProfit))
-    }
+    val cp = CurrencyPair(EUR, GBP)
+    for
+      testData <- MarketDataProvider.read[IO](testFilePath, cp).compile.toList
+      eval <- Evaluator.cached[IO, Array[Array[Int]]] { individual =>
+        val settings = TestSettings.make(cp, Indicator.TrendChangeDetection(ValueSource.Close, opt.fromGenome(individual)))
+        for
+          services <- TestServices.make[IO](settings)
+          _ <- Stream
+            .emits(testData)
+            .through(services.processMarketData)
+            .compile
+            .drain
+          orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
+        yield (individual, Fitness(orderStats.totalProfit))
+      }
+    yield eval
 
   def mutator: IO[Mutator[IO, Array[Array[Int]]]] = Mutator.bitFlip[IO].map { bitFlipMutator =>
     new Mutator[IO, Array[Array[Int]]] {
@@ -82,7 +88,7 @@ object Optimizer extends IOApp.Simple {
 
   val gaParameters = Parameters.GA(
     populationSize = 100,
-    maxGen = 500,
+    maxGen = 100,
     crossoverProbability = 0.7,
     mutationProbability = 0.2,
     elitismRatio = 0.4,
@@ -102,8 +108,7 @@ object Optimizer extends IOApp.Simple {
       eval  <- evaluator("eur-gbp-1d.csv")
       sel   <- Selector.rouletteWheel[IO, Array[Array[Int]]]
       elit  <- Elitism.simple[IO, Array[Array[Int]]]
-      alg = OptimisationAlgorithm.ga[IO](init, cross, mut, eval, sel, elit)
-      res <- alg.optimise(target, gaParameters)
-      _   <- IO.println(s"${res._1} - ${res._2}")
+      res   <- OptimisationAlgorithm.ga[IO](init, cross, mut, eval, sel, elit).optimise(target, gaParameters)
+      _     <- IO.println(s"${res._1} - ${res._2}")
     yield ()
 }
