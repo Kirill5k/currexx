@@ -2,8 +2,10 @@ package currexx.backtest
 
 import cats.Show
 import cats.effect.{IO, IOApp}
+import cats.syntax.traverse.*
+import cats.syntax.option.*
 import currexx.algorithms.Fitness
-import currexx.algorithms.operators.{Evaluator, Initialiser}
+import currexx.algorithms.operators.{Crossover, Evaluator, Initialiser, Mutator}
 import currexx.backtest.Backtester.settings
 import currexx.backtest.optimizer.Optimisable
 import currexx.backtest.services.TestServices
@@ -13,8 +15,8 @@ import scala.util.Random
 
 object Optimizer extends IOApp.Simple {
 
-  given showArray[A](using S: Show[A]): Show[Array[A]] = new Show[Array[A]]:
-    override def show(t: Array[A]): String = t.map(S.show).mkString(",")
+  given showArray[A: Show]: Show[Array[A]] = new Show[Array[A]]:
+    override def show(t: Array[A]): String = t.map(Show[A].show).mkString(",")
 
   def initialiser(using opt: Optimisable[ValueTransformation], rand: Random): IO[Initialiser[IO, Array[Array[Int]]]] =
     Initialiser.simple[IO, Array[Array[Int]]] { individual =>
@@ -44,6 +46,34 @@ object Optimizer extends IOApp.Simple {
         orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
       yield (individual, Fitness(orderStats.totalProfit))
     }
+
+  def mutator: IO[Mutator[IO, Array[Array[Int]]]] = Mutator.bitFlip[IO].map { bitFlipMutator =>
+    new Mutator[IO, Array[Array[Int]]] {
+      override def mutate(ind: Array[Array[Int]], mutationProbability: Double)(using r: Random): IO[Array[Array[Int]]] =
+        ind.toList
+          .traverse { gene =>
+            if (gene.size == 1) IO.pure(gene)
+            else bitFlipMutator.mutate(gene, mutationProbability)
+          }
+          .map(_.toArray)
+    }
+  }
+
+  def crossover: IO[Crossover[IO, Array[Array[Int]]]] = Crossover.threeWaySplit[IO, Int].map { threeWaySplitCrossover =>
+    new Crossover[IO, Array[Array[Int]]] {
+      override def cross(par1: Array[Array[Int]], par2: Array[Array[Int]])(using r: Random): IO[Array[Array[Int]]] =
+        par1.toList.zip(par2.toList)
+          .traverse { (gene1, gene2) =>
+            if (gene1.size == 1) IO.pure(gene1)
+            else threeWaySplitCrossover.cross(gene1, gene2)
+          }
+          .map(_.toArray)
+
+      override def cross(par1: Array[Array[Int]], par2: Array[Array[Int]], crossoverProbability: Double)(using r: Random): IO[Option[Array[Array[Int]]]] =
+        maybeCrossSync(par1, par2, crossoverProbability)
+    }
+
+  }
 
   override def run: IO[Unit] = IO.unit
 }
