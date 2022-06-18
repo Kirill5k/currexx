@@ -4,16 +4,19 @@ import cats.Show
 import cats.effect.{IO, IOApp}
 import cats.syntax.traverse.*
 import cats.syntax.option.*
-import currexx.algorithms.Fitness
-import currexx.algorithms.operators.{Crossover, Evaluator, Initialiser, Mutator}
+import currexx.algorithms.{Fitness, Parameters}
+import currexx.algorithms.operators.{Crossover, Elitism, Evaluator, Initialiser, Mutator, Selector}
 import currexx.backtest.Backtester.settings
-import currexx.backtest.optimizer.Optimisable
+import currexx.backtest.optimizer.{Optimisable, OptimisationAlgorithm}
+import currexx.backtest.optimizer.Optimisable.given
 import currexx.backtest.services.TestServices
 import currexx.domain.market.{Indicator, MovingAverage, ValueSource, ValueTransformation}
 
 import scala.util.Random
 
 object Optimizer extends IOApp.Simple {
+
+  given Random = Random()
 
   given showArray[A: Show]: Show[Array[A]] = new Show[Array[A]]:
     override def show(t: Array[A]): String = t.map(Show[A].show).mkString(",")
@@ -62,18 +65,45 @@ object Optimizer extends IOApp.Simple {
   def crossover: IO[Crossover[IO, Array[Array[Int]]]] = Crossover.threeWaySplit[IO, Int].map { threeWaySplitCrossover =>
     new Crossover[IO, Array[Array[Int]]] {
       override def cross(par1: Array[Array[Int]], par2: Array[Array[Int]])(using r: Random): IO[Array[Array[Int]]] =
-        par1.toList.zip(par2.toList)
+        par1.toList
+          .zip(par2.toList)
           .traverse { (gene1, gene2) =>
             if (gene1.size == 1) IO.pure(gene1)
             else threeWaySplitCrossover.cross(gene1, gene2)
           }
           .map(_.toArray)
 
-      override def cross(par1: Array[Array[Int]], par2: Array[Array[Int]], crossoverProbability: Double)(using r: Random): IO[Option[Array[Array[Int]]]] =
+      override def cross(par1: Array[Array[Int]], par2: Array[Array[Int]], crossoverProbability: Double)(using
+          r: Random
+      ): IO[Option[Array[Array[Int]]]] =
         maybeCrossSync(par1, par2, crossoverProbability)
     }
-
   }
 
-  override def run: IO[Unit] = IO.unit
+  val gaParameters = Parameters.GA(
+    populationSize = 100,
+    maxGen = 500,
+    crossoverProbability = 0.7,
+    mutationProbability = 0.2,
+    elitismRatio = 0.4,
+    shuffle = true
+  )
+
+  val target = ValueTransformation.sequenced(
+    ValueTransformation.HMA(5),
+    ValueTransformation.Kalman(0.85)
+  )
+
+  override def run: IO[Unit] =
+    for
+      init  <- initialiser
+      cross <- crossover
+      mut   <- mutator
+      eval  <- evaluator("eur-gbp-1d.csv")
+      sel   <- Selector.rouletteWheel[IO, Array[Array[Int]]]
+      elit  <- Elitism.simple[IO, Array[Array[Int]]]
+      alg = OptimisationAlgorithm.ga[IO](init, cross, mut, eval, sel, elit)
+      res <- alg.optimise(target, gaParameters)
+      _   <- IO.println(s"${res._1} - ${res._2}")
+    yield ()
 }
