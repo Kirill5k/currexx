@@ -1,5 +1,6 @@
 package currexx.backtest
 
+import cats.Show
 import cats.effect.{IO, IOApp}
 import currexx.algorithms.Fitness
 import currexx.algorithms.operators.{Evaluator, Initialiser}
@@ -11,6 +12,9 @@ import currexx.domain.market.{Indicator, MovingAverage, ValueSource, ValueTransf
 import scala.util.Random
 
 object Optimizer extends IOApp.Simple {
+
+  given showArray[A](using S: Show[A]): Show[Array[A]] = new Show[Array[A]]:
+    override def show(t: Array[A]): String = t.map(S.show).mkString(",")
 
   def initialiser(using opt: Optimisable[ValueTransformation], rand: Random): IO[Initialiser[IO, Array[Array[Int]]]] =
     Initialiser.simple[IO, Array[Array[Int]]] { individual =>
