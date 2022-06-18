@@ -9,7 +9,7 @@ import scala.reflect.ClassTag
 import scala.util.Random
 
 trait OptimisationAlgorithm[F[_], A <: Alg, P <: Parameters[A]]:
-  def optimise[T](target: T, params: P)(using rand: Random, opt: Optimisable[T]): F[(T, Fitness)]
+  def optimise[T: Optimisable](target: T, params: P)(using rand: Random): F[(T, Fitness)]
 
 object OptimisationAlgorithm:
   def ga[F[_]: Async](
@@ -20,8 +20,8 @@ object OptimisationAlgorithm:
       selector: Selector[F, Array[Array[Int]]],
       elitism: Elitism[F, Array[Array[Int]]]
   ): OptimisationAlgorithm[F, Alg.GA, Parameters.GA] = new OptimisationAlgorithm[F, Alg.GA, Parameters.GA]:
-    override def optimise[T](target: T, params: Parameters.GA)(using rand: Random, opt: Optimisable[T]): F[(T, Fitness)] =
+    override def optimise[T: Optimisable](target: T, params: Parameters.GA)(using rand: Random): F[(T, Fitness)] =
       Algorithm.GA
-        .optimise[Array[Array[Int]]](opt.toGenome(target), params)
+        .optimise[Array[Array[Int]]](Optimisable[T].toGenome(target), params)
         .foldMap(Op.ioInterpreter[F, Array[Array[Int]]](initialiser, crossover, mutator, evaluator, selector, elitism, None))
-        .map((res, fit) => (opt.fromGenome(res), fit))
+        .map((res, fit) => (Optimisable[T].fromGenome(res), fit))

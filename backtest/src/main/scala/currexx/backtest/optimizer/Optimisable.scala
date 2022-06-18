@@ -7,6 +7,8 @@ trait Optimisable[T]:
   def fromGenome(genome: Array[Array[Int]]): T
 
 object Optimisable:
+  def apply[T](using ev: Optimisable[T]): Optimisable[T] = ev
+  
   given Optimisable[ValueTransformation] = new Optimisable[ValueTransformation] {
     extension (i: Int)
       def divBy(n: Int): Double =

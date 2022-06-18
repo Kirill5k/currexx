@@ -67,7 +67,8 @@ object Optimizer extends IOApp.Simple {
           .foldLeft((IO.pure(Array.ofDim[Array[Int]](ind.length)), 0)) { case ((res, i), gene) =>
             val child = if (gene.length == 1) IO.pure(gene) else bitFlipMutator.mutate(gene, mutationProbability)
             (child.flatMap(compRes => res.map(_.withAddedElement(i, compRes))), i + 1)
-          }._1
+          }
+          ._1
     }
   }
 
@@ -81,7 +82,11 @@ object Optimizer extends IOApp.Simple {
           }
           ._1
 
-      override def cross(par1: Array[Array[Int]], par2: Array[Array[Int]], crossoverProbability: Double)(using
+      override def cross(
+          par1: Array[Array[Int]],
+          par2: Array[Array[Int]],
+          crossoverProbability: Double
+      )(using
           r: Random
       ): IO[Option[Array[Array[Int]]]] =
         maybeCrossSync(par1, par2, crossoverProbability)
@@ -98,7 +103,7 @@ object Optimizer extends IOApp.Simple {
   )
 
   val target = ValueTransformation.sequenced(
-    ValueTransformation.NMA(42, 21, 0.5, MovingAverage.Weighted)
+    ValueTransformation.NMA(37, 4, 8.0d, MovingAverage.Weighted)
   )
 
   override def run: IO[Unit] =
@@ -106,7 +111,7 @@ object Optimizer extends IOApp.Simple {
       init  <- initialiser
       cross <- crossover
       mut   <- mutator
-      eval  <- evaluator("eur-gbp-1d.csv")
+      eval  <- evaluator("usd-pln-1d.csv")
       sel   <- Selector.rouletteWheel[IO, Array[Array[Int]]]
       elit  <- Elitism.simple[IO, Array[Array[Int]]]
       res   <- OptimisationAlgorithm.ga[IO](init, cross, mut, eval, sel, elit).optimise(target, gaParameters)
