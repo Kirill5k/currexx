@@ -24,13 +24,24 @@ object Crossover:
       new Crossover[F, Array[G]] {
         override def cross(par1: Array[G], par2: Array[G])(using r: Random): F[Array[G]] =
           F.delay {
-            val middle      = par1.length / 2
-            val point1: Int = r.nextInt(middle)
-            val point2: Int = r.nextInt(middle) + middle
-            val left        = par1.slice(0, point1)
-            val mid         = par2.slice(point1, point2)
-            val right       = par1.slice(point2, par1.length)
-            left ++ mid ++ right
+            val child  = Array.ofDim[G](par1.length)
+            val middle = par1.length / 2
+            val point1 = r.nextInt(middle)
+            val point2 = r.nextInt(middle) + middle
+            var i      = 0
+            while (i < point1) {
+              child(i) = par1(i)
+              i += 1
+            }
+            while (i < point2) {
+              child(i) = par2(i)
+              i += 1
+            }
+            while (i < par1.length) {
+              child(i) = par1(i)
+              i += 1
+            }
+            child
           }
         override def cross(par1: Array[G], par2: Array[G], crossoverProbability: Double)(using r: Random): F[Option[Array[G]]] =
           maybeCrossSync(par1, par2, crossoverProbability)

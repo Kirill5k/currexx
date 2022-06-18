@@ -8,7 +8,7 @@ trait Optimisable[T]:
 
 object Optimisable:
   def apply[T](using ev: Optimisable[T]): Optimisable[T] = ev
-  
+
   given Optimisable[ValueTransformation] = new Optimisable[ValueTransformation] {
     extension (i: Int)
       def divBy(n: Int): Double =
@@ -16,7 +16,9 @@ object Optimisable:
       def toBinaryArray(minSize: Int): Array[Int] =
         i.toBinaryString.reverse.padTo(minSize, '0').reverse.map(_.toString.toInt).toArray
 
-    extension (array: Array[Int]) def toInt: Int = Integer.parseInt(array.mkString(""), 2)
+    extension (array: Array[Int])
+      def toInt: Int       = Integer.parseInt(array.mkString(""), 2)
+      def toDouble: Double = toInt.toDouble
 
     override def toGenome(target: ValueTransformation): Array[Array[Int]] =
       target match
@@ -37,7 +39,7 @@ object Optimisable:
             Array(nma.ordinal),
             length.toBinaryArray(6),
             signalLength.toBinaryArray(5),
-            (lambda * 10).toInt.toBinaryArray(6)
+            lambda.toInt.toBinaryArray(6)
           )
 
     override def fromGenome(genome: Array[Array[Int]]): ValueTransformation = {
@@ -54,7 +56,7 @@ object Optimisable:
               val nma = ValueTransformation.NMA(
                 remaining(1).toInt,
                 remaining(2).toInt,
-                remaining(3).toInt.divBy(10),
+                remaining(3).toDouble,
                 MovingAverage.Weighted
               )
               go(remaining.drop(4), transformations :+ nma)
