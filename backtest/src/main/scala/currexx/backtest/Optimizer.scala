@@ -24,8 +24,8 @@ object Optimizer extends IOApp.Simple {
 
   def initialiser(using opt: Optimisable[ValueTransformation], rand: Random): IO[Initialiser[IO, Array[Array[Int]]]] =
     Initialiser.simple[IO, Array[Array[Int]]] { individual =>
-      IO {
-        opt.fromGenome(individual) match
+      def randomise(transformation: ValueTransformation): ValueTransformation =
+        transformation match
           case ValueTransformation.Sequenced(sequence) => ValueTransformation.Sequenced(sequence.map(randomise))
           case ValueTransformation.Kalman(_)           => ValueTransformation.Kalman(rand.nextDouble())
           case ValueTransformation.WMA(_)              => ValueTransformation.WMA(rand.nextInt(23) + 2)
@@ -34,7 +34,7 @@ object Optimizer extends IOApp.Simple {
           case ValueTransformation.HMA(_)              => ValueTransformation.HMA(rand.nextInt(23) + 2)
           case ValueTransformation.NMA(_, _, _, _) =>
             ValueTransformation.NMA(rand.nextInt(43) + 2, rand.nextInt(23) + 2, rand.nextInt(61).toDouble, MovingAverage.Weighted)
-      }.map(opt.toGenome)
+      IO(randomise(opt.fromGenome(individual))).map(opt.toGenome)
     }
 
   def evaluator(testFilePath: String)(using opt: Optimisable[ValueTransformation]): IO[Evaluator[IO, Array[Array[Int]]]] =

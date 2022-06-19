@@ -21,7 +21,7 @@ object Backtester extends IOApp.Simple {
       transformation = ValueTransformation.sequenced(
 //        ValueTransformation.NMA(4, 23, 24.0, MovingAverage.Weighted)
         //          ValueTransformation.WMA(5),
-        ValueTransformation.Kalman(0.83),
+//        ValueTransformation.Kalman(0.83),
         ValueTransformation.HMA(5),
       )
     )
