@@ -17,11 +17,6 @@ import scala.util.Random
 
 object Optimizer extends IOApp.Simple {
 
-  extension [A](arr: Array[A])
-    def withAddedElement(i: Int, a: A): Array[A] =
-      arr.update(i, a)
-      arr
-
   given Random = Random()
 
   given showArray[A: Show]: Show[Array[A]] = new Show[Array[A]]:
@@ -29,8 +24,8 @@ object Optimizer extends IOApp.Simple {
 
   def initialiser(using opt: Optimisable[ValueTransformation], rand: Random): IO[Initialiser[IO, Array[Array[Int]]]] =
     Initialiser.simple[IO, Array[Array[Int]]] { individual =>
-      def randomise(transformation: ValueTransformation): ValueTransformation =
-        transformation match
+      IO {
+        opt.fromGenome(individual) match
           case ValueTransformation.Sequenced(sequence) => ValueTransformation.Sequenced(sequence.map(randomise))
           case ValueTransformation.Kalman(_)           => ValueTransformation.Kalman(rand.nextDouble())
           case ValueTransformation.WMA(_)              => ValueTransformation.WMA(rand.nextInt(23) + 2)
@@ -39,7 +34,7 @@ object Optimizer extends IOApp.Simple {
           case ValueTransformation.HMA(_)              => ValueTransformation.HMA(rand.nextInt(23) + 2)
           case ValueTransformation.NMA(_, _, _, _) =>
             ValueTransformation.NMA(rand.nextInt(43) + 2, rand.nextInt(23) + 2, rand.nextInt(61).toDouble, MovingAverage.Weighted)
-      IO(randomise(opt.fromGenome(individual))).map(opt.toGenome)
+      }.map(opt.toGenome)
     }
 
   def evaluator(testFilePath: String)(using opt: Optimisable[ValueTransformation]): IO[Evaluator[IO, Array[Array[Int]]]] =
@@ -60,27 +55,39 @@ object Optimizer extends IOApp.Simple {
       }
     yield eval
 
-  def mutator: IO[Mutator[IO, Array[Array[Int]]]] = Mutator.bitFlip[IO].map { bitFlipMutator =>
+  def mutator: IO[Mutator[IO, Array[Array[Int]]]] = IO.pure {
     new Mutator[IO, Array[Array[Int]]] {
+      val bitFlitMutator = Mutator.pureBitFlip
       override def mutate(ind: Array[Array[Int]], mutationProbability: Double)(using r: Random): IO[Array[Array[Int]]] =
-        ind
-          .foldLeft((IO.pure(Array.ofDim[Array[Int]](ind.length)), 0)) { case ((res, i), gene) =>
-            val child = if (gene.length == 1) IO.pure(gene) else bitFlipMutator.mutate(gene, mutationProbability)
-            (child.flatMap(compRes => res.map(_.withAddedElement(i, compRes))), i + 1)
+        IO {
+          var i   = 0
+          val res = Array.ofDim[Array[Int]](ind.length)
+          while (i < ind.length) {
+            val gene = ind(i)
+            if (gene.length == 1) res.update(i, gene)
+            else res.update(i, bitFlitMutator.mutate(gene, mutationProbability))
+            i += 1
           }
-          ._1
+          res
+        }
     }
   }
 
-  def crossover: IO[Crossover[IO, Array[Array[Int]]]] = Crossover.threeWaySplit[IO, Int].map { threeWaySplitCrossover =>
+  def crossover: IO[Crossover[IO, Array[Array[Int]]]] = IO.pure {
     new Crossover[IO, Array[Array[Int]]] {
+      val threeWaySplitCrossover = Crossover.pureThreeWaySplit[Int]
       override def cross(par1: Array[Array[Int]], par2: Array[Array[Int]])(using r: Random): IO[Array[Array[Int]]] =
-        par1
-          .foldLeft((IO.pure(Array.ofDim[Array[Int]](par1.length)), 0)) { case ((res, i), g1) =>
-            val child = if (g1.length == 1) IO.pure(g1) else threeWaySplitCrossover.cross(g1, par2(i))
-            (child.flatMap(compRes => res.map(_.withAddedElement(i, compRes))), i + 1)
+        IO {
+          var i     = 0
+          val child = Array.ofDim[Array[Int]](par1.length)
+          while (i < par1.length) {
+            val g1 = par1(i)
+            if (g1.length == 1) child.update(i, g1)
+            else child.update(i, threeWaySplitCrossover.cross(par1(i), par2(i)))
+            i += 1
           }
-          ._1
+          child
+        }
 
       override def cross(
           par1: Array[Array[Int]],
@@ -104,7 +111,7 @@ object Optimizer extends IOApp.Simple {
 
   val target = ValueTransformation.sequenced(
     ValueTransformation.Kalman(0.4),
-    ValueTransformation.HMA(20),
+    ValueTransformation.HMA(20)
   )
 
   override def run: IO[Unit] =

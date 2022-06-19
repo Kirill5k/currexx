@@ -47,8 +47,8 @@ object Crossover:
 
   def threeWaySplit[F[_], G: ClassTag](using F: Sync[F]): F[Crossover[F, Array[G]]] =
     F.pure {
-      val crossover = pureThreeWaySplit[G]
       new Crossover[F, Array[G]] {
+        val crossover = pureThreeWaySplit[G]
         override def cross(par1: Array[G], par2: Array[G])(using r: Random): F[Array[G]] =
           F.delay(crossover.cross(par1, par2))
         override def cross(par1: Array[G], par2: Array[G], crossoverProbability: Double)(using r: Random): F[Option[Array[G]]] =
