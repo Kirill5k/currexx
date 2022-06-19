@@ -3,6 +3,7 @@ package currexx.backtest
 import cats.effect.{IO, IOApp}
 import cats.syntax.flatMap.*
 import currexx.backtest.services.TestServices
+import currexx.core.trade.TradeStrategy
 import currexx.domain.market.{CurrencyPair, Indicator, MovingAverage, ValueSource, ValueTransformation}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -16,6 +17,7 @@ object Backtester extends IOApp.Simple {
 
   val settings = TestSettings.make(
     CurrencyPair(EUR, GBP),
+    TradeStrategy.TrendChangeAggressive,
     Indicator.TrendChangeDetection(
       source = ValueSource.Close,
       transformation = ValueTransformation.sequenced(

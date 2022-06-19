@@ -9,6 +9,7 @@ import currexx.algorithms.operators.{Crossover, Elitism, Evaluator, Initialiser,
 import currexx.backtest.optimizer.{Optimisable, OptimisationAlgorithm}
 import currexx.backtest.optimizer.Optimisable.given
 import currexx.backtest.services.TestServices
+import currexx.core.trade.TradeStrategy
 import currexx.domain.market.{CurrencyPair, Indicator, MovingAverage, ValueSource, ValueTransformation}
 import squants.market.{EUR, GBP}
 import fs2.Stream
@@ -42,9 +43,14 @@ object Optimizer extends IOApp.Simple {
     for
       testData <- MarketDataProvider.read[IO](testFilePath, cp).compile.toList
       eval <- Evaluator.cached[IO, Array[Array[Int]]] { individual =>
-        val settings = TestSettings.make(cp, Indicator.TrendChangeDetection(ValueSource.Close, opt.fromGenome(individual)))
         for
-          services <- TestServices.make[IO](settings)
+          services <- TestServices.make[IO](
+            TestSettings.make(
+              cp,
+              TradeStrategy.TrendChangeAggressive,
+              Indicator.TrendChangeDetection(ValueSource.Close, opt.fromGenome(individual))
+            )
+          )
           _ <- Stream
             .emits(testData)
             .through(services.processMarketData)
@@ -110,7 +116,7 @@ object Optimizer extends IOApp.Simple {
   )
 
   val target = ValueTransformation.sequenced(
-    ValueTransformation.Kalman(0.4),
+//    ValueTransformation.Kalman(0.4),
     ValueTransformation.HMA(20)
   )
 
@@ -119,7 +125,7 @@ object Optimizer extends IOApp.Simple {
       init  <- initialiser
       cross <- crossover
       mut   <- mutator
-      eval  <- evaluator("eur-chf-1d.csv")
+      eval  <- evaluator("eur-gbp-1d.csv")
       sel   <- Selector.rouletteWheel[IO, Array[Array[Int]]]
       elit  <- Elitism.simple[IO, Array[Array[Int]]]
       res   <- OptimisationAlgorithm.ga[IO](init, cross, mut, eval, sel, elit).optimise(target, gaParameters)

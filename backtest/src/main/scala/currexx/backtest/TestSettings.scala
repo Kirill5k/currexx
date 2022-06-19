@@ -18,13 +18,17 @@ final case class TestSettings(
 )
 
 object TestSettings:
-  def make(currencyPair: CurrencyPair, indicators: Indicator*): TestSettings = {
-    val userId       = UserId(ObjectId.get)
+  def make(
+      currencyPair: CurrencyPair,
+      strategy: TradeStrategy,
+      indicators: Indicator*
+  ): TestSettings = {
+    val userId = UserId(ObjectId.get)
     TestSettings(
       userId = userId,
       currencyPair = currencyPair,
       marketState = MarketState(userId, currencyPair, None, None, Map.empty, None),
       signal = SignalSettings(userId, TriggerFrequency.OncePerDay, indicators.toList),
-      trade = TradeSettings(userId, TradeStrategy.TrendChangeAggressive, BrokerParameters.Vindaloo("1"), TradingParameters(BigDecimal(0.1)))
+      trade = TradeSettings(userId, strategy, BrokerParameters.Vindaloo("1"), TradingParameters(BigDecimal(0.1)))
     )
   }
