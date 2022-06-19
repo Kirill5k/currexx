@@ -18,7 +18,7 @@ import sttp.model.{StatusCode, Uri}
 
 import scala.concurrent.duration.*
 
-private[clients] trait AlphaVantageClient[F[_]] extends HttpClient[F]:
+private[clients] trait AlphaVantageClient[F[_]] extends MarketDataClient[F] with HttpClient[F]:
   def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData]
 
 final private class LiveAlphaVantageClient[F[_]](
@@ -33,6 +33,9 @@ final private class LiveAlphaVantageClient[F[_]](
   override protected val name: String                         = "alpha-vantage"
   override protected val delayBetweenFailures: FiniteDuration = 5.seconds
 
+  override def latestPrice(pair: CurrencyPair): F[PriceRange] =
+    timeSeriesData(pair, Interval.D1).map(_.prices.head)
+  
   override def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] =
     interval match
       case Interval.D1                                                           => dailyTimeSeriesData(pair)

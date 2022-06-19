@@ -1,6 +1,8 @@
 package currexx.clients
 
 import cats.effect.IO
+import cats.effect.unsafe.IORuntime
+import org.scalatest.Assertion
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
 import sttp.client3
@@ -8,10 +10,15 @@ import sttp.client3.asynchttpclient.cats.AsyncHttpClientCatsBackend
 import sttp.client3.testing.SttpBackendStub
 import sttp.model.{Header, Method}
 
+import scala.concurrent.Future
 import scala.io.Source
 
 trait ApiClientSpec extends AsyncWordSpec with Matchers {
 
+  extension [A](io: IO[A])
+    def asserting(f: A => Assertion): Future[Assertion] =
+      io.map(f).unsafeToFuture()(IORuntime.global)
+  
   def backendStub: SttpBackendStub[IO, Any] =
     AsyncHttpClientCatsBackend.stub[IO]
 

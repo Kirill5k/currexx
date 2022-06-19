@@ -1,7 +1,6 @@
 package currexx.clients.data.alphavantage
 
 import cats.effect.IO
-import cats.effect.unsafe.implicits.global
 import currexx.clients.data.alphavantage.AlphaVantageClient
 import currexx.clients.{ApiClientSpec, ClientConfig}
 import currexx.domain.errors.AppError
@@ -23,8 +22,13 @@ class AlphaVantageClientSpec extends ApiClientSpec {
 
   "An AlphaVantageClient" should {
     "retrieve hourly price time series data" in {
-      val params =
-        Map("function" -> "FX_INTRADAY", "from_symbol" -> "GBP", "to_symbol" -> "USD", "apikey" -> "api-key", "interval" -> "60min")
+      val params = Map(
+        "function"    -> "FX_INTRADAY",
+        "from_symbol" -> "GBP",
+        "to_symbol"   -> "USD",
+        "apikey"      -> "api-key",
+        "interval"    -> "60min"
+      )
       val testingBackend: SttpBackend[IO, Any] = backendStub
         .whenRequestMatchesPartial {
           case r if r.isGet && r.isGoingTo("alpha-vantage.com/query") && r.hasParams(params) =>
@@ -37,7 +41,7 @@ class AlphaVantageClientSpec extends ApiClientSpec {
         res    <- client.timeSeriesData(pair, Interval.H1)
       yield res
 
-      result.unsafeToFuture().map { timeSeriesData =>
+      result.asserting { timeSeriesData =>
         timeSeriesData.currencyPair mustBe pair
         timeSeriesData.interval mustBe Interval.H1
         timeSeriesData.prices must have size 100
@@ -76,7 +80,7 @@ class AlphaVantageClientSpec extends ApiClientSpec {
         res    <- client.timeSeriesData(pair, Interval.D1)
       yield res
 
-      result.unsafeToFuture().map { timeSeriesData =>
+      result.asserting { timeSeriesData =>
         timeSeriesData.currencyPair mustBe pair
         timeSeriesData.interval mustBe Interval.D1
         timeSeriesData.prices must have size 100
@@ -101,9 +105,33 @@ class AlphaVantageClientSpec extends ApiClientSpec {
       }
     }
 
-    "retry on client or server error" in {
+    "retrieve the latest price for a given currency pair" in {
       val testingBackend: SttpBackend[IO, Any] = backendStub
-        .whenAnyRequest
+        .whenRequestMatchesPartial {
+          case r if r.isGet && r.isGoingTo("alpha-vantage.com/query") =>
+            Response.ok(json("alphavantage/gbp-usd-daily-prices-response.json"))
+          case _ => throw new RuntimeException()
+        }
+
+      val result = for
+        client <- AlphaVantageClient.make[IO](config, testingBackend)
+        res    <- client.latestPrice(pair)
+      yield res
+
+      result.asserting { price =>
+        price mustBe PriceRange(
+          BigDecimal(1.31211),
+          BigDecimal(1.31472),
+          BigDecimal(1.30320),
+          BigDecimal(1.30395),
+          BigDecimal(0),
+          Instant.parse("2022-04-14T14:10:00Z")
+        )
+      }
+    }
+
+    "retry on client or server error" in {
+      val testingBackend: SttpBackend[IO, Any] = backendStub.whenAnyRequest
         .thenRespondCyclicResponses(
           Response("uh-oh!", StatusCode.BadRequest),
           Response.ok(json("alphavantage/gbp-usd-hourly-prices-response.json"))
@@ -114,7 +142,7 @@ class AlphaVantageClientSpec extends ApiClientSpec {
         res    <- client.timeSeriesData(pair, Interval.H1)
       yield res
 
-      result.unsafeToFuture().map { timeSeriesData =>
+      result.asserting { timeSeriesData =>
         timeSeriesData.currencyPair mustBe pair
         timeSeriesData.interval mustBe Interval.H1
         timeSeriesData.prices must have size 100
@@ -122,8 +150,7 @@ class AlphaVantageClientSpec extends ApiClientSpec {
     }
 
     "return error when not enough data points" in {
-      val testingBackend: SttpBackend[IO, Any] = backendStub
-        .whenAnyRequest
+      val testingBackend: SttpBackend[IO, Any] = backendStub.whenAnyRequest
         .thenRespond(Response.ok(json("alphavantage/gbp-usd-daily-almost-empty-response.json")))
 
       val result = for
@@ -131,7 +158,7 @@ class AlphaVantageClientSpec extends ApiClientSpec {
         res    <- client.timeSeriesData(pair, Interval.D1)
       yield res
 
-      result.attempt.unsafeToFuture().map { res =>
+      result.attempt.asserting { res =>
         res mustBe Left(AppError.NotEnoughDataPoints("alpha-vantage", 2))
       }
     }
