@@ -103,7 +103,8 @@ object Optimizer extends IOApp.Simple {
   )
 
   val target = ValueTransformation.sequenced(
-    ValueTransformation.NMA(37, 4, 8.0d, MovingAverage.Weighted)
+    ValueTransformation.Kalman(0.4),
+    ValueTransformation.HMA(20),
   )
 
   override def run: IO[Unit] =
@@ -111,7 +112,7 @@ object Optimizer extends IOApp.Simple {
       init  <- initialiser
       cross <- crossover
       mut   <- mutator
-      eval  <- evaluator("usd-pln-1d.csv")
+      eval  <- evaluator("eur-chf-1d.csv")
       sel   <- Selector.rouletteWheel[IO, Array[Array[Int]]]
       elit  <- Elitism.simple[IO, Array[Array[Int]]]
       res   <- OptimisationAlgorithm.ga[IO](init, cross, mut, eval, sel, elit).optimise(target, gaParameters)

@@ -1,5 +1,6 @@
 package currexx.algorithms.operators
 
+import cats.Id
 import cats.effect.Sync
 
 import scala.util.Random
@@ -8,22 +9,25 @@ trait Mutator[F[_], I]:
   def mutate(ind: I, mutationProbability: Double)(using r: Random): F[I]
 
 object Mutator:
+  def pureBitFlip = new Mutator[Id, Array[Int]]:
+    override def mutate(ind: Array[Int], mutationProbability: Double)(using r: Random): Id[Array[Int]] =
+      val result = ind.clone()
+      var i      = 0
+      while (i < result.length - 1) {
+        if (r.nextDouble() < mutationProbability) {
+          val curr = result(i)
+          result(i) = if (curr == 0) 1 else 0
+        }
+        i += 1
+      }
+      result
+
   def bitFlip[F[_]](using F: Sync[F]): F[Mutator[F, Array[Int]]] =
     F.pure {
       new Mutator[F, Array[Int]] {
+        val mutator = pureBitFlip
         override def mutate(ind: Array[Int], mutationProbability: Double)(using r: Random): F[Array[Int]] =
-          F.delay {
-            val result = ind.clone()
-            var i      = 0
-            while (i < result.length - 1) {
-              if (r.nextDouble() < mutationProbability) {
-                val curr = result(i)
-                result(i) = if (curr == 0) 1 else 0
-              }
-              i += 1
-            }
-            result
-          }
+          F.delay(mutator.mutate(ind, mutationProbability))
       }
     }
 
