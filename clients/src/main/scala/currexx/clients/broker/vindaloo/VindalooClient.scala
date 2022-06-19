@@ -25,7 +25,7 @@ final private class LiveVindalooClient[F[_]](
 ) extends VindalooClient[F] {
 
   override protected val name: String                         = "vindaloo"
-  override protected val delayBetweenFailures: FiniteDuration = 5.seconds
+  override protected val delayBetweenConnectionFailures: FiniteDuration = 5.seconds
 
   override def submit(externalId: String, pair: CurrencyPair, order: TradeOrder): F[Unit] =
     order match
@@ -51,7 +51,7 @@ final private class LiveVindalooClient[F[_]](
           case Right(_) => F.unit
           case Left(error) =>
             logger.error(s"$name-client/error-${r.code.code}\n$error") *>
-              F.sleep(delayBetweenFailures) *> sendRequest(uri)
+              F.sleep(delayBetweenConnectionFailures) *> sendRequest(uri)
         }
       }
 }

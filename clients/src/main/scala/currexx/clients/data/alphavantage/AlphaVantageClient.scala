@@ -23,19 +23,20 @@ private[clients] trait AlphaVantageClient[F[_]] extends MarketDataClient[F] with
 
 final private class LiveAlphaVantageClient[F[_]](
     private val config: ClientConfig,
-    override protected val backend: SttpBackend[F, Any]
+    override protected val backend: SttpBackend[F, Any],
+    private val delayBetweenClientFailures: FiniteDuration
 )(using
     F: Temporal[F],
     logger: Logger[F]
 ) extends AlphaVantageClient[F]:
   import AlphaVantageClient.*
 
-  override protected val name: String                         = "alpha-vantage"
-  override protected val delayBetweenFailures: FiniteDuration = 5.seconds
+  override protected val name: String                                   = "alpha-vantage"
+  override protected val delayBetweenConnectionFailures: FiniteDuration = 5.seconds
 
   override def latestPrice(pair: CurrencyPair): F[PriceRange] =
-    timeSeriesData(pair, Interval.D1).map(_.prices.head)
-  
+    timeSeriesData(pair, Interval.M1).map(_.prices.head)
+
   override def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] =
     interval match
       case Interval.D1                                                           => dailyTimeSeriesData(pair)
@@ -86,14 +87,14 @@ final private class LiveAlphaVantageClient[F[_]](
               F.raiseError(AppError.AccessDenied(s"$name authentication has expired"))
           case Left(HttpError(responseBody, status)) =>
             logger.error(s"$name-client/${status.code}\n$responseBody") *>
-              F.sleep(delayBetweenFailures) *> sendRequest(uri, mapper)
+              F.sleep(delayBetweenConnectionFailures) *> sendRequest(uri, mapper)
           case Left(error) =>
             logger.error(s"$name-client/error\n$error") *>
-              F.sleep(delayBetweenFailures) *> sendRequest(uri, mapper)
+              F.sleep(delayBetweenConnectionFailures) *> sendRequest(uri, mapper)
         }
       }
       .handleErrorWith { error =>
-        if (attempt < 5) F.sleep(1.minute) >> sendRequest(uri, mapper, attempt + 1)
+        if (attempt < 5) F.sleep(delayBetweenClientFailures) >> sendRequest(uri, mapper, attempt + 1)
         else F.raiseError(error)
       }
 
@@ -128,9 +129,10 @@ private[clients] object AlphaVantageClient {
 
   def make[F[_]: Temporal: Logger](
       config: ClientConfig,
-      backend: SttpBackend[F, Any]
+      backend: SttpBackend[F, Any],
+      delayBetweenClientFailures: FiniteDuration = 1.minute
   ): F[AlphaVantageClient[F]] =
     Temporal[F]
       .raiseWhen(config.apiKey.isEmpty)(new RuntimeException("Cannot create alpha-vantage client without providing api-key"))
-      .as(LiveAlphaVantageClient(config, backend))
+      .as(LiveAlphaVantageClient(config, backend, delayBetweenClientFailures))
 }

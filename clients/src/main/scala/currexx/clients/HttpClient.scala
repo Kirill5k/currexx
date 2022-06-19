@@ -13,7 +13,7 @@ trait HttpClient[F[_]] {
   protected val name: String
   protected val backend: SttpBackend[F, Any]
 
-  protected val delayBetweenFailures: FiniteDuration = 10.seconds
+  protected val delayBetweenConnectionFailures: FiniteDuration = 10.seconds
 
   protected def dispatch[T](request: Request[T, Any])(using F: Temporal[F], logger: Logger[F]): F[Response[T]] =
     dispatchWithRetry(request)
@@ -27,6 +27,6 @@ trait HttpClient[F[_]] {
         val errorMsg   = cause.fold(error.getMessage)(_.getMessage)
         val message    = s"$name-client/${errorClass.toLowerCase}-$attempt: ${errorMsg}\n$error"
         (if (attempt >= 50 && attempt % 10 == 0) logger.error(message) else logger.warn(message)) *>
-          F.sleep(delayBetweenFailures) *> dispatchWithRetry(request, attempt + 1)
+          F.sleep(delayBetweenConnectionFailures) *> dispatchWithRetry(request, attempt + 1)
       }
 }

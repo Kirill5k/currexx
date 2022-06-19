@@ -12,6 +12,7 @@ import sttp.client3.{Response, SttpBackend}
 import sttp.model.StatusCode
 
 import java.time.Instant
+import scala.concurrent.duration.*
 
 class AlphaVantageClientSpec extends ApiClientSpec {
 
@@ -37,7 +38,7 @@ class AlphaVantageClientSpec extends ApiClientSpec {
         }
 
       val result = for
-        client <- AlphaVantageClient.make[IO](config, testingBackend)
+        client <- AlphaVantageClient.make[IO](config, testingBackend, 100.millis)
         res    <- client.timeSeriesData(pair, Interval.H1)
       yield res
 
@@ -76,7 +77,7 @@ class AlphaVantageClientSpec extends ApiClientSpec {
         }
 
       val result = for
-        client <- AlphaVantageClient.make[IO](config, testingBackend)
+        client <- AlphaVantageClient.make[IO](config, testingBackend, 100.millis)
         res    <- client.timeSeriesData(pair, Interval.D1)
       yield res
 
@@ -109,23 +110,23 @@ class AlphaVantageClientSpec extends ApiClientSpec {
       val testingBackend: SttpBackend[IO, Any] = backendStub
         .whenRequestMatchesPartial {
           case r if r.isGet && r.isGoingTo("alpha-vantage.com/query") =>
-            Response.ok(json("alphavantage/gbp-usd-daily-prices-response.json"))
+            Response.ok(json("alphavantage/gbp-usd-hourly-prices-response.json"))
           case _ => throw new RuntimeException()
         }
 
       val result = for
-        client <- AlphaVantageClient.make[IO](config, testingBackend)
+        client <- AlphaVantageClient.make[IO](config, testingBackend, 100.millis)
         res    <- client.latestPrice(pair)
       yield res
 
       result.asserting { price =>
         price mustBe PriceRange(
-          BigDecimal(1.31211),
-          BigDecimal(1.31472),
+          BigDecimal(1.30370),
+          BigDecimal(1.30505),
           BigDecimal(1.30320),
-          BigDecimal(1.30395),
+          BigDecimal(1.30438),
           BigDecimal(0),
-          Instant.parse("2022-04-14T14:10:00Z")
+          Instant.parse("2022-04-14T15:00:00Z")
         )
       }
     }
@@ -138,7 +139,7 @@ class AlphaVantageClientSpec extends ApiClientSpec {
         )
 
       val result = for
-        client <- AlphaVantageClient.make[IO](config, testingBackend)
+        client <- AlphaVantageClient.make[IO](config, testingBackend, 100.millis)
         res    <- client.timeSeriesData(pair, Interval.H1)
       yield res
 
@@ -154,7 +155,7 @@ class AlphaVantageClientSpec extends ApiClientSpec {
         .thenRespond(Response.ok(json("alphavantage/gbp-usd-daily-almost-empty-response.json")))
 
       val result = for
-        client <- AlphaVantageClient.make[IO](config, testingBackend)
+        client <- AlphaVantageClient.make[IO](config, testingBackend, 100.millis)
         res    <- client.timeSeriesData(pair, Interval.D1)
       yield res
 

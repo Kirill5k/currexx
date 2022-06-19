@@ -1,7 +1,6 @@
 package currexx.clients.broker.vindaloo
 
 import cats.effect.IO
-import cats.effect.unsafe.implicits.global
 import currexx.clients.{ApiClientSpec, ClientConfig}
 import currexx.domain.market.{CurrencyPair, Interval, TradeOrder}
 import org.typelevel.log4cats.Logger
@@ -30,7 +29,7 @@ class VindalooClientSpec extends ApiClientSpec {
         res    <- client.submit("15", pair, TradeOrder.Enter(TradeOrder.Position.Buy, BigDecimal(0.1), Some(BigDecimal(25)), None, None))
       yield res
 
-      result.unsafeToFuture().map(_ mustBe ())
+      result.asserting(_ mustBe ())
     }
 
     "send exit market requests" in {
@@ -46,7 +45,7 @@ class VindalooClientSpec extends ApiClientSpec {
         res    <- client.submit("15", pair, TradeOrder.Exit)
       yield res
 
-      result.unsafeToFuture().map(_ mustBe ())
+      result.asserting(_ mustBe ())
     }
   }
 }
