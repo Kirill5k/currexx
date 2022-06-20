@@ -1,7 +1,6 @@
 package currexx.core.common
 
 import cats.effect.IO
-import cats.effect.unsafe.implicits.global
 import config.AppConfig
 import currexx.core.CatsSpec
 
@@ -14,11 +13,11 @@ class AppConfigSpec extends CatsSpec {
 
   "An AppConfig" should {
 
-    "load itself from reference.conf" in {
-      AppConfig.load[IO].unsafeToFuture().map { config =>
+    "load itself from application.conf" in {
+      AppConfig.load[IO].asserting { config =>
         config.server.host mustBe "0.0.0.0"
         config.mongo.connectionUri mustBe "mongodb+srv://user:password@mongo/currexx"
-        config.clients.alphaVantage.apiKey mustBe Some("av-key")
+        config.clients.alphaVantage.apiKey mustBe "av-key"
       }
     }
   }

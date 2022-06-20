@@ -7,7 +7,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.applicativeError.*
 import currexx.clients.data.MarketDataClient
-import currexx.clients.{ClientConfig, HttpClient}
+import currexx.clients.HttpClient
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import io.circe.{Codec, JsonObject}
@@ -22,7 +22,7 @@ private[clients] trait AlphaVantageClient[F[_]] extends MarketDataClient[F] with
   def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData]
 
 final private class LiveAlphaVantageClient[F[_]](
-    private val config: ClientConfig,
+    private val config: AlphaVantageConfig,
     override protected val backend: SttpBackend[F, Any],
     private val delayBetweenClientFailures: FiniteDuration
 )(using
@@ -47,7 +47,7 @@ final private class LiveAlphaVantageClient[F[_]](
       "function"    -> "FX_DAILY",
       "from_symbol" -> pair.base.code,
       "to_symbol"   -> pair.quote.code,
-      "apikey"      -> config.apiKey.get
+      "apikey"      -> config.apiKey
     )
     sendRequest(uri"${config.baseUri}/query?$params", ResponseMapper.mapDailyTimeSeriesData)
       .map(prs => MarketTimeSeriesData(pair, Interval.D1, prs))
@@ -128,11 +128,9 @@ private[clients] object AlphaVantageClient {
   ) derives Codec.AsObject
 
   def make[F[_]: Temporal: Logger](
-      config: ClientConfig,
+      config: AlphaVantageConfig,
       backend: SttpBackend[F, Any],
       delayBetweenClientFailures: FiniteDuration = 1.minute
   ): F[AlphaVantageClient[F]] =
-    Temporal[F]
-      .raiseWhen(config.apiKey.isEmpty)(new RuntimeException("Cannot create alpha-vantage client without providing api-key"))
-      .as(LiveAlphaVantageClient(config, backend, delayBetweenClientFailures))
+    Temporal[F].pure(LiveAlphaVantageClient(config, backend, delayBetweenClientFailures))
 }

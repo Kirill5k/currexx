@@ -4,7 +4,7 @@ import cats.Monad
 import cats.effect.Temporal
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
-import currexx.clients.{ClientConfig, HttpClient}
+import currexx.clients.HttpClient
 import currexx.clients.broker.{BrokerClient, BrokerParameters}
 import currexx.domain.market.{CurrencyPair, TradeOrder}
 import org.typelevel.log4cats.Logger
@@ -17,14 +17,14 @@ private[clients] trait VindalooClient[F[_]] extends HttpClient[F]:
   def submit(externalId: String, pair: CurrencyPair, order: TradeOrder): F[Unit]
 
 final private class LiveVindalooClient[F[_]](
-    private val config: ClientConfig,
+    private val config: VindalooConfig,
     override protected val backend: SttpBackend[F, Any]
 )(using
     F: Temporal[F],
     logger: Logger[F]
 ) extends VindalooClient[F] {
 
-  override protected val name: String                         = "vindaloo"
+  override protected val name: String                                   = "vindaloo"
   override protected val delayBetweenConnectionFailures: FiniteDuration = 5.seconds
 
   override def submit(externalId: String, pair: CurrencyPair, order: TradeOrder): F[Unit] =
@@ -58,7 +58,7 @@ final private class LiveVindalooClient[F[_]](
 
 object VindalooClient:
   def make[F[_]: Temporal: Logger](
-      config: ClientConfig,
+      config: VindalooConfig,
       backend: SttpBackend[F, Any]
   ): F[VindalooClient[F]] =
     Monad[F].pure(LiveVindalooClient(config, backend))

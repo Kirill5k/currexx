@@ -4,20 +4,17 @@ import cats.effect.Temporal
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.clients.broker.BrokerClient
-import currexx.clients.broker.vindaloo.VindalooClient
+import currexx.clients.broker.vindaloo.{VindalooClient, VindalooConfig}
+import currexx.clients.broker.xtb.XtbConfig
 import currexx.clients.data.MarketDataClient
-import currexx.clients.data.alphavantage.AlphaVantageClient
+import currexx.clients.data.alphavantage.{AlphaVantageClient, AlphaVantageConfig}
 import org.typelevel.log4cats.Logger
 import sttp.client3.SttpBackend
 
-final case class ClientConfig(
-    baseUri: String,
-    apiKey: Option[String]
-)
-
 final case class ClientsConfig(
-    alphaVantage: ClientConfig,
-    vindaloo: ClientConfig
+    alphaVantage: AlphaVantageConfig,
+    vindaloo: VindalooConfig,
+    xtb: XtbConfig
 )
 
 final class Clients[F[_]] private (

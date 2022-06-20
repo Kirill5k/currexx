@@ -1,7 +1,7 @@
 package currexx.clients.broker.vindaloo
 
 import cats.effect.IO
-import currexx.clients.{ApiClientSpec, ClientConfig}
+import currexx.clients.ApiClientSpec
 import currexx.domain.market.{CurrencyPair, Interval, TradeOrder}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -12,7 +12,7 @@ class VindalooClientSpec extends ApiClientSpec {
 
   given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
-  val config = ClientConfig("http://vindaloo.com", Some("api-key"))
+  val config = VindalooConfig("http://vindaloo.com")
   val pair   = CurrencyPair(GBP, USD)
 
   "A VindalooClient" should {
