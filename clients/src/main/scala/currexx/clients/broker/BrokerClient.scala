@@ -14,7 +14,8 @@ final private class LiveBrokerClient[F[_]](
 ) extends BrokerClient[F]:
   override def submit(pair: CurrencyPair, parameters: BrokerParameters, order: TradeOrder): F[Unit] =
     parameters match
-      case BrokerParameters.Vindaloo(externalId) => vindalooClient.submit(externalId, pair, order)
+      case params: BrokerParameters.Vindaloo => vindalooClient.submit(params, pair, order)
+      case params: BrokerParameters.Xtb      => ???
 
 object BrokerClient:
   def make[F[_]: Monad](vindalooClient: VindalooClient[F]): F[BrokerClient[F]] =

@@ -2,6 +2,7 @@ package currexx.clients.broker.vindaloo
 
 import cats.effect.IO
 import currexx.clients.ApiClientSpec
+import currexx.clients.broker.BrokerParameters
 import currexx.domain.market.{CurrencyPair, Interval, TradeOrder}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -19,14 +20,14 @@ class VindalooClientSpec extends ApiClientSpec {
     "send enter market requests" in {
       val testingBackend: SttpBackend[IO, Any] = backendStub
         .whenRequestMatchesPartial {
-          case r if r.isPost && r.isGoingTo("vindaloo.com/15/25/0/0/buy/GBPUSD/0.1") =>
-            Response.ok("ok")
-          case _ => throw new RuntimeException()
+          case r if r.isPost && r.isGoingTo("vindaloo.com/15/25/0/0/buy/GBPUSD/0.1") => Response.ok("ok")
+          case _                                                                     => throw new RuntimeException()
         }
 
       val result = for
         client <- VindalooClient.make[IO](config, testingBackend)
-        res    <- client.submit("15", pair, TradeOrder.Enter(TradeOrder.Position.Buy, BigDecimal(0.1), Some(BigDecimal(25)), None, None))
+        order = TradeOrder.Enter(TradeOrder.Position.Buy, BigDecimal(0.1), Some(BigDecimal(25)), None, None)
+        res <- client.submit(BrokerParameters.Vindaloo("15"), pair, order)
       yield res
 
       result.asserting(_ mustBe ())
@@ -35,14 +36,13 @@ class VindalooClientSpec extends ApiClientSpec {
     "send exit market requests" in {
       val testingBackend: SttpBackend[IO, Any] = backendStub
         .whenRequestMatchesPartial {
-          case r if r.isPost && r.isGoingTo("vindaloo.com/close/15/GBPUSD") =>
-            Response.ok("ok")
-          case _ => throw new RuntimeException()
+          case r if r.isPost && r.isGoingTo("vindaloo.com/close/15/GBPUSD") => Response.ok("ok")
+          case _                                                            => throw new RuntimeException()
         }
 
       val result = for
         client <- VindalooClient.make[IO](config, testingBackend)
-        res    <- client.submit("15", pair, TradeOrder.Exit)
+        res    <- client.submit(BrokerParameters.Vindaloo("15"), pair, TradeOrder.Exit)
       yield res
 
       result.asserting(_ mustBe ())

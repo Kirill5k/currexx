@@ -5,6 +5,7 @@ import org.latestbit.circe.adt.codec.*
 
 enum Broker(val kind: String) derives JsonTaggedAdt.PureEncoderWithConfig, JsonTaggedAdt.PureDecoderWithConfig:
   case Vindaloo extends Broker("vindaloo")
+  case Xtb      extends Broker("xtb")
 
 object Broker:
   given JsonTaggedAdt.PureConfig[Broker] = JsonTaggedAdt.PureConfig.Values[Broker](
@@ -14,7 +15,8 @@ object Broker:
   )
 
 enum BrokerParameters(val broker: Broker) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
-  case Vindaloo(externalId: String) extends BrokerParameters(Broker.Vindaloo)
+  case Vindaloo(externalId: String)                         extends BrokerParameters(Broker.Vindaloo)
+  case Xtb(userId: String, password: String, demo: Boolean) extends BrokerParameters(Broker.Xtb)
 
 object BrokerParameters:
   given JsonTaggedAdt.Config[BrokerParameters] = JsonTaggedAdt.Config.Values[BrokerParameters](
