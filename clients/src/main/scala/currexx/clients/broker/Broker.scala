@@ -21,7 +21,8 @@ enum BrokerParameters(val broker: Broker) derives JsonTaggedAdt.EncoderWithConfi
 object BrokerParameters:
   given JsonTaggedAdt.Config[BrokerParameters] = JsonTaggedAdt.Config.Values[BrokerParameters](
     mappings = Map(
-      Broker.Vindaloo.kind -> JsonTaggedAdt.tagged[BrokerParameters.Vindaloo]
+      Broker.Vindaloo.kind -> JsonTaggedAdt.tagged[BrokerParameters.Vindaloo],
+      Broker.Xtb.kind      -> JsonTaggedAdt.tagged[BrokerParameters.Xtb]
     ),
     strict = true,
     typeFieldName = "broker"
