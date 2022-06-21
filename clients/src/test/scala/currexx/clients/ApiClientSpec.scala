@@ -5,8 +5,10 @@ import cats.effect.unsafe.IORuntime
 import org.scalatest.Assertion
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
+import sttp.capabilities.WebSockets
+import sttp.capabilities.fs2.Fs2Streams
 import sttp.client3
-import sttp.client3.asynchttpclient.cats.AsyncHttpClientCatsBackend
+import sttp.client3.asynchttpclient.fs2.AsyncHttpClientFs2Backend
 import sttp.client3.testing.SttpBackendStub
 import sttp.model.{Header, Method}
 
@@ -18,9 +20,10 @@ trait ApiClientSpec extends AsyncWordSpec with Matchers {
   extension [A](io: IO[A])
     def asserting(f: A => Assertion): Future[Assertion] =
       io.map(f).unsafeToFuture()(IORuntime.global)
-  
-  def backendStub: SttpBackendStub[IO, Any] =
-    AsyncHttpClientCatsBackend.stub[IO]
+    def assertIsVoid: Future[Assertion] = asserting(_ mustBe ())
+
+  def backendStub: SttpBackendStub[IO, Fs2Streams[IO] with WebSockets] =
+    AsyncHttpClientFs2Backend.stub[IO]
 
   def json(path: String): String = Source.fromResource(path).getLines().toList.mkString
 

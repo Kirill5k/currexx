@@ -5,14 +5,16 @@ import cats.syntax.apply.*
 import currexx.core.common.config.{AppConfig, MongoConfig}
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
-import sttp.client3.asynchttpclient.cats.AsyncHttpClientCatsBackend
+import sttp.capabilities.WebSockets
+import sttp.capabilities.fs2.Fs2Streams
+import sttp.client3.asynchttpclient.fs2.AsyncHttpClientFs2Backend
 import sttp.client3.{SttpBackend, SttpBackendOptions}
 
 import scala.concurrent.duration.*
 
 final class Resources[F[_]] private (
     val mongo: MongoDatabase[F],
-    val sttpBackend: SttpBackend[F, Any]
+    val sttpBackend: SttpBackend[F, Fs2Streams[F] with WebSockets]
 )
 
 object Resources:
@@ -21,8 +23,8 @@ object Resources:
       .fromConnectionString[F](config.connectionUri)
       .evalMap(_.getDatabase("currexx"))
 
-  private def sttpBackend[F[_]: Async]: Resource[F, SttpBackend[F, Any]] =
-    Resource.make(AsyncHttpClientCatsBackend[F](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None)))(_.close())
+  private def sttpBackend[F[_]: Async]: Resource[F, SttpBackend[F, Fs2Streams[F] with WebSockets]] =
+    AsyncHttpClientFs2Backend.resource[F](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
 
   def make[F[_]: Async](config: AppConfig): Resource[F, Resources[F]] =
     (

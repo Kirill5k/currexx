@@ -30,7 +30,7 @@ class VindalooClientSpec extends ApiClientSpec {
         res <- client.submit(BrokerParameters.Vindaloo("15"), pair, order)
       yield res
 
-      result.asserting(_ mustBe ())
+      result.assertIsVoid
     }
 
     "send exit market requests" in {
@@ -45,7 +45,7 @@ class VindalooClientSpec extends ApiClientSpec {
         res    <- client.submit(BrokerParameters.Vindaloo("15"), pair, TradeOrder.Exit)
       yield res
 
-      result.asserting(_ mustBe ())
+      result.assertIsVoid
     }
   }
 }

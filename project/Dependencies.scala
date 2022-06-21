@@ -62,17 +62,17 @@ object Dependencies {
     }
 
     object sttp {
-      val core        = "com.softwaremill.sttp.client3" %% "core"                           % Versions.sttp
-      val circe       = "com.softwaremill.sttp.client3" %% "circe"                          % Versions.sttp
-      val catsBackend = "com.softwaremill.sttp.client3" %% "async-http-client-backend-cats" % Versions.sttp
-      val all         = Seq(core, circe, catsBackend)
+      val core       = "com.softwaremill.sttp.client3" %% "core"                          % Versions.sttp
+      val circe      = "com.softwaremill.sttp.client3" %% "circe"                         % Versions.sttp
+      val fs2Backend = "com.softwaremill.sttp.client3" %% "async-http-client-backend-fs2" % Versions.sttp
+      val all        = Seq(core, circe, fs2Backend)
     }
 
     object tapir {
       val core   = "com.softwaremill.sttp.tapir" %% "tapir-core"          % Versions.tapir
       val circe  = "com.softwaremill.sttp.tapir" %% "tapir-json-circe"    % Versions.tapir
       val http4s = "com.softwaremill.sttp.tapir" %% "tapir-http4s-server" % Versions.tapir
-      val all = Seq(core, circe, http4s)
+      val all    = Seq(core, circe, http4s)
     }
 
     object http4s {

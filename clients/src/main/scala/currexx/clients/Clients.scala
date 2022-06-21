@@ -9,6 +9,8 @@ import currexx.clients.broker.xtb.XtbConfig
 import currexx.clients.data.MarketDataClient
 import currexx.clients.data.alphavantage.{AlphaVantageClient, AlphaVantageConfig}
 import org.typelevel.log4cats.Logger
+import sttp.capabilities.WebSockets
+import sttp.capabilities.fs2.Fs2Streams
 import sttp.client3.SttpBackend
 
 final case class ClientsConfig(
@@ -23,7 +25,10 @@ final class Clients[F[_]] private (
 )
 
 object Clients:
-  def make[F[_]: Temporal: Logger](config: ClientsConfig, backend: SttpBackend[F, Any]): F[Clients[F]] =
+  def make[F[_]: Temporal: Logger](
+      config: ClientsConfig,
+      backend: SttpBackend[F, Fs2Streams[F] with WebSockets]
+  ): F[Clients[F]] =
     for
       alphavantage <- AlphaVantageClient.make[F](config.alphaVantage, backend)
       vindaloo     <- VindalooClient.make[F](config.vindaloo, backend)
