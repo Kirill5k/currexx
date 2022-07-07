@@ -36,8 +36,8 @@ final private class LiveXtbClient[F[_]](
 
   override def submit(params: BrokerParameters.Xtb, pair: CurrencyPair, order: TradeOrder): F[Unit] =
     basicRequest
-      .get(uri"${config.baseUri}/${if (params.demo) "demo" else "real"}")
       .response(asWebSocketStream(Fs2Streams[F])(orderPlacementPipe(params, pair, order)))
+      .get(uri"${config.baseUri}/${if (params.demo) "demo" else "real"}")
       .send(backend)
       .void
 
@@ -48,6 +48,7 @@ final private class LiveXtbClient[F[_]](
   ): Pipe[F, WebSocketFrame.Data[_], WebSocketFrame] = { input =>
     Stream.emit(WebSocketFrame.text(XtbRequest.login(params.userId, params.password).asJson.noSpaces)) ++
       input
+        .evalTap(m => F.delay(println(s"received $m")))
         .map {
           case WebSocketFrame.Text(jsonPayload, _, _) => XtbResponse.fromJson(jsonPayload)
           case WebSocketFrame.Binary(bytes, _, _)     => XtbResponse.fromJson(new String(bytes, StandardCharsets.UTF_8))
@@ -61,13 +62,14 @@ final private class LiveXtbClient[F[_]](
             Stream.emit(WebSocketFrame.close)
           case XtbResponse.Error("BE005", desc) =>
             Stream.emit(WebSocketFrame.close) ++
-              Stream.eval(logger.error(s"$name-client/forbidden: $desc")).drain ++
+              Stream.logError(s"$name-client/forbidden: $desc") ++
               Stream.raiseError(AppError.AccessDenied(s"Failed to authenticate with $name: $desc"))
           case XtbResponse.Error(code, desc) =>
             Stream.emit(WebSocketFrame.close) ++
-              Stream.eval(logger.error(s"$name-client/error: $desc")).drain ++
+              Stream.logError(s"$name-client/error: $desc") ++
               Stream.raiseError(AppError.ClientFailure(name, s"$code - $desc"))
-          case _ => Stream.empty
+          case _ =>
+            Stream.empty
         }
   }
 }
