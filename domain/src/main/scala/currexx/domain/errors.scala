@@ -20,6 +20,9 @@ object errors {
     sealed trait Unprocessable extends AppError
     sealed trait BadData       extends AppError
 
+    final case class ClientFailure(client: String, error: String) extends AppError:
+      override val message: String = s"Error sending a request to $client: $error"
+
     final case class NotEnoughDataPoints(source: String, returnedCount: Int) extends BadData:
       override val message: String = s"$source response returned only $returnedCount data points"
 

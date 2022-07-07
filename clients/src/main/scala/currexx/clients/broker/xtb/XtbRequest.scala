@@ -12,7 +12,8 @@ object RequestArguments:
       password: String
   ) extends RequestArguments
       derives Codec.AsObject
-  final case class Trade(
+
+  final case class TradeTransInfo(
       cmd: Option[Int],
       `type`: Int,
       symbol: String,
@@ -25,6 +26,8 @@ object RequestArguments:
   ) extends RequestArguments
       derives Codec.AsObject
 
+  final case class Trade(tradeTransInfo: TradeTransInfo) extends RequestArguments derives Codec.AsObject
+
 final case class XtbRequest[A <: RequestArguments](
     command: String,
     streamSessionId: Option[String],
@@ -35,37 +38,40 @@ object XtbRequest {
   def login(userId: String, password: String): XtbRequest[RequestArguments.Login] =
     XtbRequest("login", None, RequestArguments.Login(userId, password))
 
-  def enterMarket(sessionId: String, pair: CurrencyPair, order: TradeOrder.Enter): XtbRequest[RequestArguments.Trade] =
+  def trade(sessionId: String, pair: CurrencyPair, order: TradeOrder): XtbRequest[RequestArguments.Trade] =
     XtbRequest(
       "tradeTransaction",
       Some(sessionId),
       RequestArguments.Trade(
-        `type` = 0,
-        cmd = Some(if (order.position == TradeOrder.Position.Buy) 0 else 1),
-        symbol = s"${pair.base}${pair.quote}",
-        customComment = s"Currex - ${TradeOrder.Position.Buy.toString} $pair",
-        offset = order.trailingStopLoss,
-        price = Some(BigDecimal(0.1)),
-        sl = order.stopLoss,
-        tp = order.takeProfit,
-        volume = Some(order.volume)
+        tradeTransInfo = order match
+          case TradeOrder.Exit         => exitMarket(pair)
+          case enter: TradeOrder.Enter => enterMarket(pair, enter)
       )
     )
 
-  def exitMarket(sessionId: String, pair: CurrencyPair): XtbRequest[RequestArguments.Trade] =
-    XtbRequest(
-      "tradeTransaction",
-      Some(sessionId),
-      RequestArguments.Trade(
-        `type` = 2,
-        symbol = s"${pair.base}${pair.quote}",
-        customComment = s"Currex - Close $pair",
-        cmd = None,
-        offset = None,
-        price = None,
-        sl = None,
-        tp = None,
-        volume = None
-      )
+  private def enterMarket(pair: CurrencyPair, order: TradeOrder.Enter): RequestArguments.TradeTransInfo =
+    RequestArguments.TradeTransInfo(
+      `type` = 0,
+      cmd = Some(if (order.position == TradeOrder.Position.Buy) 0 else 1),
+      symbol = s"${pair.base}${pair.quote}",
+      customComment = s"Currexx - ${TradeOrder.Position.Buy.toString} $pair",
+      offset = order.trailingStopLoss,
+      price = Some(BigDecimal(0.1)),
+      sl = order.stopLoss,
+      tp = order.takeProfit,
+      volume = Some(order.volume)
+    )
+
+  private def exitMarket(pair: CurrencyPair): RequestArguments.TradeTransInfo =
+    RequestArguments.TradeTransInfo(
+      `type` = 2,
+      symbol = s"${pair.base}${pair.quote}",
+      customComment = s"Currexx - Close $pair",
+      cmd = None,
+      offset = None,
+      price = None,
+      sl = None,
+      tp = None,
+      volume = None
     )
 }
