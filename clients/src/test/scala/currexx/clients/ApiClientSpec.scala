@@ -21,6 +21,8 @@ trait ApiClientSpec extends AsyncWordSpec with Matchers {
     def asserting(f: A => Assertion): Future[Assertion] =
       io.map(f).unsafeToFuture()(IORuntime.global)
     def assertIsVoid: Future[Assertion] = asserting(_ mustBe ())
+    def assertError(error: Throwable): Future[Assertion] =
+      io.attempt.asserting(_ mustBe Left(error))
 
   def backendStub: SttpBackendStub[IO, Fs2Streams[IO] with WebSockets] =
     AsyncHttpClientFs2Backend.stub[IO]

@@ -1,5 +1,6 @@
 package currexx.clients.broker.xtb
 
+import cats.Monad
 import cats.effect.Async
 import cats.syntax.functor.*
 import currexx.clients.HttpClient
@@ -59,11 +60,21 @@ final private class LiveXtbClient[F[_]](
           case XtbResponse.OrderPlacement(_) =>
             Stream.emit(WebSocketFrame.close)
           case XtbResponse.Error("BE005", desc) =>
-            Stream.emit(WebSocketFrame.close) ++ Stream.raiseError(AppError.AccessDenied(s"Failed to authenticate with $name: $desc"))
+            Stream.emit(WebSocketFrame.close) ++
+              Stream.eval(logger.error(s"$name-client/forbidden: $desc")).drain ++
+              Stream.raiseError(AppError.AccessDenied(s"Failed to authenticate with $name: $desc"))
           case XtbResponse.Error(code, desc) =>
-            Stream.emit(WebSocketFrame.close) ++ Stream.raiseError(AppError.ClientFailure(name, s"$code - $desc"))
+            Stream.emit(WebSocketFrame.close) ++
+              Stream.eval(logger.error(s"$name-client/error: $desc")).drain ++
+              Stream.raiseError(AppError.ClientFailure(name, s"$code - $desc"))
           case _ => Stream.empty
         }
   }
-
 }
+
+object XtbClient:
+  def make[F[_]: Async: Logger](
+      config: XtbConfig,
+      backend: SttpBackend[F, Fs2Streams[F] with WebSockets]
+  ): F[XtbClient[F]] =
+    Monad[F].pure(LiveXtbClient(config, backend))

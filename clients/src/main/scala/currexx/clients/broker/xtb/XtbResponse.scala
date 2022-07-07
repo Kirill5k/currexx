@@ -18,6 +18,7 @@ object XtbResponse {
 
   given Decoder[XtbResponse] = List[Decoder[XtbResponse]](
     Decoder[Error].widen,
+    Decoder[OrderPlacement].widen,
     Decoder[Login].widen
   ).reduceLeft(_ or _)
 

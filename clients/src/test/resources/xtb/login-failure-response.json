@@ -1,0 +1,5 @@
+{
+  "status": false,
+  "errorCode": "BE005",
+  "errorDescr": "userPasswordCheck: Invalid login or password"
+}
