@@ -58,6 +58,8 @@ final private class LiveXtbClient[F[_]](
             Stream.emit(WebSocketFrame.text(XtbRequest.trade(sessionId, pair, order).asJson.noSpaces))
           case XtbResponse.OrderPlacement(_) =>
             Stream.emit(WebSocketFrame.close)
+          case XtbResponse.Error("BE005", desc) =>
+            Stream.emit(WebSocketFrame.close) ++ Stream.raiseError(AppError.AccessDenied(s"Failed to authenticate with $name: $desc"))
           case XtbResponse.Error(code, desc) =>
             Stream.emit(WebSocketFrame.close) ++ Stream.raiseError(AppError.ClientFailure(name, s"$code - $desc"))
           case _ => Stream.empty
