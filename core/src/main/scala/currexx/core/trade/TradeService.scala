@@ -5,6 +5,7 @@ import cats.effect.kernel.Temporal
 import cats.syntax.apply.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
+import cats.syntax.traverse.*
 import currexx.clients.broker.BrokerClient
 import currexx.clients.data.MarketDataClient
 import currexx.core.common.action.{Action, ActionDispatcher}
@@ -38,10 +39,24 @@ final private class LiveTradeService[F[_]](
   override def getAllOrders(uid: UserId): F[List[TradeOrderPlacement]] = orderRepository.getAll(uid)
 
   override def placeOrder(uid: UserId, cp: CurrencyPair, order: TradeOrder, closePendingOrders: Boolean): F[Unit] =
-    F.whenA(closePendingOrders)(closeOpenOrders(uid, cp)) >>
-      (F.realTimeInstant, marketDataClient.latestPrice(cp), settingsRepository.get(uid))
-        .mapN((time, price, sett) => TradeOrderPlacement(uid, cp, order, sett.broker, price, time))
-        .flatMap(submitOrderPlacement)
+    (F.realTimeInstant, marketDataClient.latestPrice(cp), settingsRepository.get(uid))
+      .mapN { (time, price, sett) =>
+        val pendingClose = if (closePendingOrders && order.isEnter) {
+          orderRepository
+            .findLatestBy(uid, cp)
+            .map {
+              case None                                                      => None
+              case Some(TradeOrderPlacement(_, _, TradeOrder.Exit, _, _, _)) => None
+              case Some(top) => Some(top.copy(time = time, currentPrice = price, order = TradeOrder.Exit))
+            }
+        } else F.pure(None)
+
+        pendingClose.map(_.toVector :+ TradeOrderPlacement(uid, cp, order, sett.broker, price, time))
+      }
+      .flatten
+      .flatMap { tops =>
+        tops.traverse(submitOrderPlacement).void
+      }
 
   override def closeOpenOrders(uid: UserId): F[Unit] =
     Stream
@@ -92,6 +107,12 @@ final private class LiveTradeService[F[_]](
       top.order match
         case order: TradeOrder.Enter => order.position != currentPosition.position
         case TradeOrder.Exit         => false
+
+  extension (to: TradeOrder)
+    def isEnter: Boolean =
+      to match
+        case TradeOrder.Exit     => false
+        case _: TradeOrder.Enter => true
 }
 
 object TradeService:

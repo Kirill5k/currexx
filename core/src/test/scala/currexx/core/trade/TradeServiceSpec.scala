@@ -94,15 +94,16 @@ class TradeServiceSpec extends CatsSpec {
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
+        val order = TradeOrder.Enter(TradeOrder.Position.Buy, BigDecimal(0.1))
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.placeOrder(Users.uid, Markets.gbpeur, TradeOrder.Exit, false)
+          _   <- svc.placeOrder(Users.uid, Markets.gbpeur, order, false)
         yield ()
 
         result.asserting { res =>
           verify(dataClient).latestPrice(Markets.gbpeur)
           verify(settRepo).get(Users.uid)
-          verify(brokerClient).submit(Markets.gbpeur, Trades.broker, TradeOrder.Exit)
+          verify(brokerClient).submit(Markets.gbpeur, Trades.broker, order)
           verify(orderRepo, Mockito.never()).findLatestBy(any[UserId], any[CurrencyPair])
           verify(orderRepo).save(any[TradeOrderPlacement])
           verify(disp).dispatch(any[Action])
@@ -119,15 +120,16 @@ class TradeServiceSpec extends CatsSpec {
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
+        val order = TradeOrder.Enter(TradeOrder.Position.Buy, BigDecimal(0.1))
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.placeOrder(Users.uid, Markets.gbpeur, TradeOrder.Exit, true)
+          _   <- svc.placeOrder(Users.uid, Markets.gbpeur, order, true)
         yield ()
 
         result.asserting { res =>
           verify(dataClient).latestPrice(Markets.gbpeur)
           verify(settRepo).get(Users.uid)
-          verify(brokerClient).submit(Markets.gbpeur, Trades.broker, TradeOrder.Exit)
+          verify(brokerClient).submit(Markets.gbpeur, Trades.broker, order)
           verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
           verify(orderRepo).save(any[TradeOrderPlacement])
           verify(disp).dispatch(any[Action])
