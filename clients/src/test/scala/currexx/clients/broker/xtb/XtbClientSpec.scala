@@ -43,31 +43,12 @@ class XtbClientSpec extends ApiClientSpec {
       result.assertError(AppError.AccessDenied("foo"))
     }
 
-    "send enter market request" ignore {
-      val result = AsyncHttpClientFs2Backend
-        .resource[IO](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
-        .use { backend =>
-          for
-            client <- XtbClient.make[IO](config, backend)
-            order = TradeOrder.Enter(TradeOrder.Position.Buy, BigDecimal(0.1))
-            res <- client.submit(BrokerParameters.Xtb("13529575", "Boroda123", true), pair, order)
-          yield res
-        }
-
-      result.asserting(_ mustBe ())
+    "send enter market request" in {
+      pending
     }
 
     "send exit market request" in {
-      val result = AsyncHttpClientFs2Backend
-        .resource[IO](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
-        .use { backend =>
-          for
-            client <- XtbClient.make[IO](config, backend)
-            res    <- client.submit(BrokerParameters.Xtb("13529575", "Boroda123", true), pair, TradeOrder.Exit)
-          yield res
-        }
-
-      result.asserting(_ mustBe ())
+      pending
     }
   }
 }
