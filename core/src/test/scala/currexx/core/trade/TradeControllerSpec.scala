@@ -5,6 +5,7 @@ import currexx.core.auth.Authenticator
 import currexx.core.{CatsSpec, ControllerSpec}
 import currexx.core.fixtures.{Markets, Sessions, Trades, Users}
 import currexx.domain.errors.AppError
+import currexx.domain.market.{CurrencyPair, TradeOrder}
 import currexx.domain.user.UserId
 import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.implicits.*
@@ -14,6 +15,35 @@ class TradeControllerSpec extends ControllerSpec {
 
   "A TradeController" when {
     given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
+
+    "POST /trade/orders" should {
+      "submit order placement request" in {
+        val svc = mock[TradeService[IO]]
+        when(svc.placeOrder(any[UserId], any[CurrencyPair], any[TradeOrder], any[Boolean])).thenReturn(IO.unit)
+
+        val requestBody =
+          s"""
+             |{
+             |  "currencyPair" : "GBP/EUR",
+             |  "order" : {
+             |    "kind" : "enter",
+             |    "position" : "buy",
+             |    "volume" : 0.1,
+             |    "stopLoss" : 25,
+             |    "trailingStopLoss" : null,
+             |    "takeProfit" : null
+             |  }
+             |}
+             |""".stripMargin
+
+        val req = requestWithAuthHeader(uri"/trade/orders?closePendingOrders=false", Method.POST)
+          .withEntity(parseJson(requestBody))
+        val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        verifyJsonResponse(res, Status.Created, None)
+        verify(svc).placeOrder(Users.uid, Markets.gbpeur, Trades.order.order, false)
+      }
+    }
 
     "GET /trade/orders" should {
       "return placed orders" in {

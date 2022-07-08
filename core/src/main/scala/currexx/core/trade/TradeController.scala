@@ -48,7 +48,7 @@ final private class TradeController[F[_]](
 
   private def submitTradeOrderPlacement(using auth: Authenticator[F]) =
     submitTradeOrderPlacementEndpoint.withAuthenticatedSession
-      .serverLogic { session => (closePendingOrders, req) =>
+      .serverLogic { session => (req, closePendingOrders) =>
         service
           .placeOrder(session.userId, req.currencyPair, req.order, closePendingOrders)
           .voidResponse
@@ -102,8 +102,8 @@ object TradeController extends TapirSchema with TapirJson with TapirCodecs {
 
   val submitTradeOrderPlacementEndpoint = Controller.securedEndpoint.post
     .in(ordersPath)
-    .in(query[Boolean]("closePendingOrders").description("Close pending orders").default(true))
     .in(jsonBody[TradeOrderPlacementRequest])
+    .in(query[Boolean]("closePendingOrders").description("Close pending orders").default(true))
     .out(statusCode(StatusCode.Created))
     .description("Submit trade order placement")
 
