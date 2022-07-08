@@ -6,6 +6,7 @@ import cats.syntax.apply.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.clients.broker.BrokerClient
+import currexx.clients.data.MarketDataClient
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.market.{MarketState, PositionState}
 import currexx.core.trade.TradeStrategyExecutor.Decision
@@ -26,6 +27,7 @@ final private class LiveTradeService[F[_]](
     private val settingsRepository: TradeSettingsRepository[F],
     private val orderRepository: TradeOrderRepository[F],
     private val brokerClient: BrokerClient[F],
+    private val marketDataClient: MarketDataClient[F],
     private val dispatcher: ActionDispatcher[F]
 )(using
     F: Temporal[F]
@@ -48,7 +50,10 @@ final private class LiveTradeService[F[_]](
       .flatMap {
         case None                                                      => F.unit
         case Some(TradeOrderPlacement(_, _, TradeOrder.Exit, _, _, _)) => F.unit
-        case Some(top) => F.realTimeInstant.map(t => top.copy(time = t, order = TradeOrder.Exit)).flatMap(submitOrderPlacement)
+        case Some(top) =>
+          (F.realTimeInstant, marketDataClient.latestPrice(cp))
+            .mapN((time, price) => top.copy(time = time, currentPrice = price, order = TradeOrder.Exit))
+            .flatMap(submitOrderPlacement)
       }
 
   override def processMarketStateUpdate(state: MarketState, trigger: Indicator): F[Unit] =
@@ -87,6 +92,7 @@ object TradeService:
       settingsRepo: TradeSettingsRepository[F],
       orderRepository: TradeOrderRepository[F],
       brokerClient: BrokerClient[F],
+      marketDataClient: MarketDataClient[F],
       dispatcher: ActionDispatcher[F]
   ): F[TradeService[F]] =
-    Monad[F].pure(LiveTradeService[F](settingsRepo, orderRepository, brokerClient, dispatcher))
+    Monad[F].pure(LiveTradeService[F](settingsRepo, orderRepository, brokerClient, marketDataClient, dispatcher))
