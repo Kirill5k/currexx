@@ -10,6 +10,7 @@ import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
 import currexx.domain.market.{CurrencyPair, Indicator, TradeOrder}
+import org.mockito.Mockito
 
 class TradeServiceSpec extends CatsSpec {
 
@@ -79,6 +80,57 @@ class TradeServiceSpec extends CatsSpec {
         result.asserting { res =>
           verify(settRepo).update(Trades.settings)
           verifyNoInteractions(orderRepo, brokerClient, dataClient, disp)
+          res mustBe ()
+        }
+      }
+    }
+
+    "placeOrder" should {
+      "submit order placements" in {
+        val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
+        when(dataClient.latestPrice(any[CurrencyPair])).thenReturn(IO.pure(Markets.priceRange))
+        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
+        when(brokerClient.submit(any[CurrencyPair], any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
+        when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
+        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
+          _   <- svc.placeOrder(Users.uid, Markets.gbpeur, TradeOrder.Exit, false)
+        yield ()
+
+        result.asserting { res =>
+          verify(dataClient).latestPrice(Markets.gbpeur)
+          verify(settRepo).get(Users.uid)
+          verify(brokerClient).submit(Markets.gbpeur, Trades.broker, TradeOrder.Exit)
+          verify(orderRepo, Mockito.never()).findLatestBy(any[UserId], any[CurrencyPair])
+          verify(orderRepo).save(any[TradeOrderPlacement])
+          verify(disp).dispatch(any[Action])
+          res mustBe ()
+        }
+      }
+
+      "close existing orders before submitting the actual placement" in {
+        val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
+        when(dataClient.latestPrice(any[CurrencyPair])).thenReturn(IO.pure(Markets.priceRange))
+        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
+        when(brokerClient.submit(any[CurrencyPair], any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
+        when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturn(IO.none)
+        when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
+        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
+          _   <- svc.placeOrder(Users.uid, Markets.gbpeur, TradeOrder.Exit, true)
+        yield ()
+
+        result.asserting { res =>
+          verify(dataClient).latestPrice(Markets.gbpeur)
+          verify(settRepo).get(Users.uid)
+          verify(brokerClient).submit(Markets.gbpeur, Trades.broker, TradeOrder.Exit)
+          verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
+          verify(orderRepo).save(any[TradeOrderPlacement])
+          verify(disp).dispatch(any[Action])
           res mustBe ()
         }
       }
@@ -196,7 +248,11 @@ class TradeServiceSpec extends CatsSpec {
         result.asserting { res =>
           verify(settRepo).get(Users.uid)
           verify(brokerClient).submit(Markets.gbpeur, Trades.broker, TradeOrder.Exit)
-          verify(brokerClient).submit(Markets.gbpeur, Trades.broker, Trades.settings.trading.toOrder(Markets.gbpeur, TradeOrder.Position.Buy))
+          verify(brokerClient).submit(
+            Markets.gbpeur,
+            Trades.broker,
+            Trades.settings.trading.toOrder(Markets.gbpeur, TradeOrder.Position.Buy)
+          )
           verify(orderRepo).save(any[TradeOrderPlacement])
           verify(disp).dispatch(any[Action])
           res mustBe ()

@@ -20,6 +20,7 @@ trait TradeService[F[_]]:
   def updateSettings(settings: TradeSettings): F[Unit]
   def getAllOrders(uid: UserId): F[List[TradeOrderPlacement]]
   def processMarketStateUpdate(state: MarketState, trigger: Indicator): F[Unit]
+  def placeOrder(uid: UserId, cp: CurrencyPair, order: TradeOrder, closePendingOrders: Boolean): F[Unit]
   def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
   def closeOpenOrders(uid: UserId): F[Unit]
 
@@ -35,6 +36,12 @@ final private class LiveTradeService[F[_]](
   override def getSettings(uid: UserId): F[TradeSettings]              = settingsRepository.get(uid)
   override def updateSettings(settings: TradeSettings): F[Unit]        = settingsRepository.update(settings)
   override def getAllOrders(uid: UserId): F[List[TradeOrderPlacement]] = orderRepository.getAll(uid)
+
+  override def placeOrder(uid: UserId, cp: CurrencyPair, order: TradeOrder, closePendingOrders: Boolean): F[Unit] =
+    F.whenA(closePendingOrders)(closeOpenOrders(uid, cp)) >>
+      (F.realTimeInstant, marketDataClient.latestPrice(cp), settingsRepository.get(uid))
+        .mapN((time, price, sett) => TradeOrderPlacement(uid, cp, order, sett.broker, price, time))
+        .flatMap(submitOrderPlacement)
 
   override def closeOpenOrders(uid: UserId): F[Unit] =
     Stream
