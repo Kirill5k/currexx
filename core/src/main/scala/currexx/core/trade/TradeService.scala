@@ -45,18 +45,16 @@ final private class LiveTradeService[F[_]](
           orderRepository
             .findLatestBy(uid, cp)
             .map {
-              case None                                                      => None
-              case Some(TradeOrderPlacement(_, _, TradeOrder.Exit, _, _, _)) => None
-              case Some(top) => Some(top.copy(time = time, currentPrice = price, order = TradeOrder.Exit))
+              case Some(top) if top.order.isEnter =>
+                Some(top.copy(time = time, currentPrice = price, order = TradeOrder.Exit))
+              case _ => None
             }
         } else F.pure(None)
 
         pendingClose.map(_.toVector :+ TradeOrderPlacement(uid, cp, order, sett.broker, price, time))
       }
       .flatten
-      .flatMap { tops =>
-        tops.traverse(submitOrderPlacement).void
-      }
+      .flatMap(_.traverse(submitOrderPlacement).void)
 
   override def closeOpenOrders(uid: UserId): F[Unit] =
     Stream
@@ -70,12 +68,11 @@ final private class LiveTradeService[F[_]](
     orderRepository
       .findLatestBy(uid, cp)
       .flatMap {
-        case None                                                      => F.unit
-        case Some(TradeOrderPlacement(_, _, TradeOrder.Exit, _, _, _)) => F.unit
-        case Some(top) =>
+        case Some(top) if top.order.isEnter =>
           (F.realTimeInstant, marketDataClient.latestPrice(cp))
             .mapN((time, price) => top.copy(time = time, currentPrice = price, order = TradeOrder.Exit))
             .flatMap(submitOrderPlacement)
+        case _ => F.unit
       }
 
   override def processMarketStateUpdate(state: MarketState, trigger: Indicator): F[Unit] =
