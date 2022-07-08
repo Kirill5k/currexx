@@ -9,12 +9,11 @@ import io.circe.parser.*
 sealed trait XtbResponse
 
 object XtbResponse {
-  case object Void extends XtbResponse
-  final case class OrderData(order: Long) derives Codec.AsObject
-
+  case object Void                                              extends XtbResponse
   final case class Login(streamSessionId: String)               extends XtbResponse derives Codec.AsObject
   final case class Error(errorCode: String, errorDescr: String) extends XtbResponse derives Codec.AsObject
-  final case class OrderPlacement(returnData: List[OrderData])  extends XtbResponse derives Codec.AsObject
+  final case class OrderData(order: Long) derives Codec.AsObject
+  final case class OrderPlacement(returnData: OrderData) extends XtbResponse derives Codec.AsObject
 
   given Decoder[XtbResponse] = List[Decoder[XtbResponse]](
     Decoder[Error].widen,

@@ -17,12 +17,13 @@ object RequestArguments:
       cmd: Option[Int],
       `type`: Int,
       symbol: String,
-      price: Option[BigDecimal],
-      sl: Option[BigDecimal],
-      tp: Option[BigDecimal],
-      offset: Option[BigDecimal],
-      volume: Option[BigDecimal],
-      customComment: String
+      customComment: String,
+      volume: Option[BigDecimal] = None,
+      price: Option[BigDecimal] = None,
+      sl: Option[BigDecimal] = None,
+      tp: Option[BigDecimal] = None,
+      offset: Option[BigDecimal] = None,
+      order: Option[Long] = None
   ) extends RequestArguments
       derives Codec.AsObject
 
@@ -67,11 +68,9 @@ object XtbRequest {
       `type` = 2,
       symbol = s"${pair.base}${pair.quote}",
       customComment = s"Currexx - Close $pair",
-      cmd = None,
-      offset = None,
-      price = None,
-      sl = None,
-      tp = None,
-      volume = None
+      cmd = Some(0),
+      order = Some(403108161),
+      price = Some(BigDecimal(0)),
+      volume = Some(BigDecimal(0)),
     )
 }

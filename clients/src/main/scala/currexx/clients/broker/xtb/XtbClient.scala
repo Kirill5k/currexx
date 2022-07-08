@@ -3,6 +3,7 @@ package currexx.clients.broker.xtb
 import cats.Monad
 import cats.effect.Async
 import cats.syntax.functor.*
+import cats.syntax.flatMap.*
 import currexx.clients.HttpClient
 import currexx.clients.broker.BrokerParameters
 import currexx.domain.errors.AppError

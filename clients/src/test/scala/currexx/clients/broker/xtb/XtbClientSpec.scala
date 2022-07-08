@@ -11,27 +11,28 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import squants.market.{GBP, USD}
 import sttp.capabilities.WebSockets
 import sttp.capabilities.fs2.Fs2Streams
-import sttp.client3.{Response, SttpBackend}
+import sttp.client3.asynchttpclient.fs2.AsyncHttpClientFs2Backend
+import sttp.client3.{Response, SttpBackend, SttpBackendOptions}
 import sttp.model.StatusCode
 import sttp.ws.{WebSocket, WebSocketFrame}
 import sttp.ws.testing.WebSocketStub
+
+import scala.concurrent.duration.*
 
 class XtbClientSpec extends ApiClientSpec {
 
   given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
-  val config = XtbConfig("wss://echo.websocket.org")
+  val config = XtbConfig("wss://ws.xtb.com")
   val pair   = CurrencyPair(GBP, USD)
 
   "A XtbClient" should {
-    "return error on failed authentication" in {
+    "return error on failed authentication" ignore {
       val testingBackend: SttpBackend[IO, Fs2Streams[IO] with WebSockets] = backendStub
         .whenRequestMatches(_ => true)
         .thenRespond(
-          WebSocketStub
-            .noInitialReceive
-            .thenRespond(_ => List(WebSocketFrame.text(json("xtb/login-failure-response.json")))),
-          StatusCode.SwitchingProtocols
+          WebSocketStub.noInitialReceive
+            .thenRespond(_ => List(WebSocketFrame.text(json("xtb/login-failure-response.json"))))
         )
 
       val result = for
@@ -42,12 +43,31 @@ class XtbClientSpec extends ApiClientSpec {
       result.assertError(AppError.AccessDenied("foo"))
     }
 
-    "send enter market requests" in {
-      pending
+    "send enter market request" ignore {
+      val result = AsyncHttpClientFs2Backend
+        .resource[IO](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
+        .use { backend =>
+          for
+            client <- XtbClient.make[IO](config, backend)
+            order = TradeOrder.Enter(TradeOrder.Position.Buy, BigDecimal(0.1))
+            res <- client.submit(BrokerParameters.Xtb("13529575", "Boroda123", true), pair, order)
+          yield res
+        }
+
+      result.asserting(_ mustBe ())
     }
 
-    "send exit market requests" in {
-      pending
+    "send exit market request" in {
+      val result = AsyncHttpClientFs2Backend
+        .resource[IO](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
+        .use { backend =>
+          for
+            client <- XtbClient.make[IO](config, backend)
+            res    <- client.submit(BrokerParameters.Xtb("13529575", "Boroda123", true), pair, TradeOrder.Exit)
+          yield res
+        }
+
+      result.asserting(_ mustBe ())
     }
   }
 }

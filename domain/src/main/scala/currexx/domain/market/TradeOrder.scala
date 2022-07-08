@@ -9,9 +9,9 @@ enum TradeOrder derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWi
   case Enter(
       position: TradeOrder.Position,
       volume: BigDecimal,
-      stopLoss: Option[BigDecimal],
-      trailingStopLoss: Option[BigDecimal],
-      takeProfit: Option[BigDecimal]
+      stopLoss: Option[BigDecimal] = None,
+      trailingStopLoss: Option[BigDecimal] = None,
+      takeProfit: Option[BigDecimal] = None
   )
 
 object TradeOrder {
