@@ -1,6 +1,6 @@
 package currexx.clients
 
-import cats.effect.{Async, Temporal}
+import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.clients.broker.BrokerClient
