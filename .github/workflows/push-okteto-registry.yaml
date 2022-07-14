@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DOCKER_REPO_URI: "registry.cloud.okteto.net"
-      DOCKER_USERNAME: "currexx-kirill5k"
+      DOCKER_USERNAME: "kirill5k"
     steps:
       - name: Checkout
         uses: actions/checkout@v2
