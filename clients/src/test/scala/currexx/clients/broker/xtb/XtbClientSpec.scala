@@ -8,7 +8,7 @@ import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, TradeOrder}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import squants.market.{GBP, USD}
+import squants.market.{EUR, CAD}
 import sttp.capabilities.WebSockets
 import sttp.capabilities.fs2.Fs2Streams
 import sttp.client3.asynchttpclient.fs2.AsyncHttpClientFs2Backend
@@ -24,7 +24,7 @@ class XtbClientSpec extends ApiClientSpec {
   given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
   val config = XtbConfig("wss://ws.xtb.com")
-  val pair   = CurrencyPair(GBP, USD)
+  val pair   = CurrencyPair(EUR, CAD)
 
   "A XtbClient" should {
     "return error on failed authentication" ignore {
