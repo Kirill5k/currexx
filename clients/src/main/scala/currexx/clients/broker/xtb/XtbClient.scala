@@ -66,7 +66,7 @@ final private class LiveXtbClient[F[_]](
               for
                 sessionId <- Stream.eval(state.get.map(_.sessionId.toRight(AppError.ClientFailure(name, "no session id")))).rethrow
                 price     <- Stream(tickPricesData.findAskPriceFor(pair).toRight(AppError.ClientFailure(name, "missing price"))).rethrow
-                _         <- Stream.eval(state.update(_.withPrice(price))).drain
+                _         <- Stream.eval(state.update(_.withPrice(price)))
               yield WebSocketFrame.text(XtbRequest.trade(sessionId, pair, order, price).asJson.noSpaces)
             case XtbResponse.OrderPlacement(_) =>
               Stream.emit(WebSocketFrame.close)

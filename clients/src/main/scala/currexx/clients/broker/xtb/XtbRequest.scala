@@ -60,7 +60,7 @@ object XtbRequest {
       RequestArguments.TickPrice(
         level = 0,
         symbols = List(cp.toSymbol),
-        timestamp = Instant.now.toEpochMilli
+        timestamp = Instant.now.minusSeconds(60).toEpochMilli
       )
     )
 
