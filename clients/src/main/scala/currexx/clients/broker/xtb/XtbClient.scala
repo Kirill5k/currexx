@@ -62,9 +62,10 @@ final private class LiveXtbClient[F[_]](
               Stream.eval(state.update(_.withSessionId(sessionId))).drain ++
                 Stream.emit(WebSocketFrame.text(XtbRequest.symbolInfo(sessionId, pair).asJson.noSpaces))
             case XtbResponse.SymbolInfo(price) =>
-              for
-                sessionId <- Stream.eval(state.get.map(_.sessionId.toRight(AppError.ClientFailure(name, "no session id")))).rethrow
-              yield WebSocketFrame.text(XtbRequest.trade(sessionId, pair, order, price).asJson.noSpaces)
+              Stream
+                .eval(state.get.map(_.sessionId.toRight(AppError.ClientFailure(name, "no session id"))))
+                .rethrow
+                .map(sid => WebSocketFrame.text(XtbRequest.trade(sid, pair, order, price).asJson.noSpaces))
             case XtbResponse.OrderPlacement(_) =>
               Stream.emit(WebSocketFrame.close)
             case XtbResponse.Error("BE005", desc) =>
