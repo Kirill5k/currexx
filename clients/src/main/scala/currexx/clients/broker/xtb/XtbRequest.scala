@@ -1,6 +1,6 @@
 package currexx.clients.broker.xtb
 
-import currexx.clients.broker.xtb.XtbResponse.TickPrice
+import currexx.clients.broker.xtb.XtbResponse.SymbolData
 import currexx.domain.market.{CurrencyPair, TradeOrder}
 import io.circe.Codec
 
@@ -31,7 +31,7 @@ object RequestArguments:
 
   final case class Trade(tradeTransInfo: TradeTransInfo) extends RequestArguments derives Codec.AsObject
 
-  final case class TickPrice(level: Int, symbols: List[String], timestamp: Long) extends RequestArguments derives Codec.AsObject
+  final case class SymbolInfo(symbol: String) extends RequestArguments derives Codec.AsObject
 
 final case class XtbRequest[A <: RequestArguments](
     command: String,
@@ -43,7 +43,7 @@ object XtbRequest {
   def login(userId: String, password: String): XtbRequest[RequestArguments.Login] =
     XtbRequest("login", None, RequestArguments.Login(userId, password))
 
-  def trade(sessionId: String, cp: CurrencyPair, order: TradeOrder, price: TickPrice): XtbRequest[RequestArguments.Trade] =
+  def trade(sessionId: String, cp: CurrencyPair, order: TradeOrder, price: SymbolData): XtbRequest[RequestArguments.Trade] =
     XtbRequest(
       "tradeTransaction",
       Some(sessionId),
@@ -54,18 +54,14 @@ object XtbRequest {
       )
     )
 
-  def tickPrice(sessionId: String, cp: CurrencyPair): XtbRequest[RequestArguments.TickPrice] =
+  def symbolInfo(sessionId: String, cp: CurrencyPair): XtbRequest[RequestArguments.SymbolInfo] =
     XtbRequest(
-      "getTickPrices",
+      "getSymbol",
       Some(sessionId),
-      RequestArguments.TickPrice(
-        level = 0,
-        symbols = List(cp.toSymbol),
-        timestamp = Instant.now.minusSeconds(60).toEpochMilli
-      )
+      RequestArguments.SymbolInfo(cp.toSymbol)
     )
 
-  private def enterMarket(cp: CurrencyPair, order: TradeOrder.Enter, price: TickPrice): RequestArguments.TradeTransInfo =
+  private def enterMarket(cp: CurrencyPair, order: TradeOrder.Enter, price: SymbolData): RequestArguments.TradeTransInfo =
     RequestArguments.TradeTransInfo(
       `type` = 0,
       cmd = if (order.position == TradeOrder.Position.Buy) 0 else 1,
@@ -78,7 +74,7 @@ object XtbRequest {
       volume = Some(order.volume)
     )
 
-  private def exitMarket(cp: CurrencyPair, price: TickPrice): RequestArguments.TradeTransInfo =
+  private def exitMarket(cp: CurrencyPair, price: SymbolData): RequestArguments.TradeTransInfo =
     RequestArguments.TradeTransInfo(
       `type` = 2,
       price = price.ask,

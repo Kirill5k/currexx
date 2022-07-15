@@ -6,7 +6,6 @@ import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.clients.HttpClient
 import currexx.clients.broker.BrokerParameters
-import currexx.clients.broker.xtb.XtbResponse.TickPrice
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, TradeOrder}
 import io.circe.syntax.*
@@ -48,7 +47,7 @@ final private class LiveXtbClient[F[_]](
       pair: CurrencyPair,
       order: TradeOrder
   ): Pipe[F, WebSocketFrame.Data[_], WebSocketFrame] = { input =>
-    Stream.eval(Ref.of(XtbClient.WsState(None, None))).flatMap { state =>
+    Stream.eval(Ref.of(XtbClient.WsState(None))).flatMap { state =>
       Stream.emit(WebSocketFrame.text(XtbRequest.login(params.userId, params.password).asJson.noSpaces)) ++
         input
           .evalTap(m => F.delay(println(s"received $m")))
@@ -61,12 +60,10 @@ final private class LiveXtbClient[F[_]](
           .flatMap {
             case XtbResponse.Login(sessionId) =>
               Stream.eval(state.update(_.withSessionId(sessionId))).drain ++
-                Stream.emit(WebSocketFrame.text(XtbRequest.tickPrice(sessionId, pair).asJson.noSpaces))
-            case XtbResponse.TickPrices(tickPricesData) =>
+                Stream.emit(WebSocketFrame.text(XtbRequest.symbolInfo(sessionId, pair).asJson.noSpaces))
+            case XtbResponse.SymbolInfo(price) =>
               for
                 sessionId <- Stream.eval(state.get.map(_.sessionId.toRight(AppError.ClientFailure(name, "no session id")))).rethrow
-                price     <- Stream(tickPricesData.findPriceFor(pair).toRight(AppError.ClientFailure(name, "missing price"))).rethrow
-                _         <- Stream.eval(state.update(_.withPrice(price)))
               yield WebSocketFrame.text(XtbRequest.trade(sessionId, pair, order, price).asJson.noSpaces)
             case XtbResponse.OrderPlacement(_) =>
               Stream.emit(WebSocketFrame.close)
@@ -86,9 +83,8 @@ final private class LiveXtbClient[F[_]](
 }
 
 object XtbClient:
-  final case class WsState(sessionId: Option[String], price: Option[TickPrice]):
+  final case class WsState(sessionId: Option[String]):
     def withSessionId(sessionId: String): WsState = copy(sessionId = Some(sessionId))
-    def withPrice(price: TickPrice): WsState     = copy(price = Some(price))
 
   def make[F[_]: Async: Logger](
       config: XtbConfig,
