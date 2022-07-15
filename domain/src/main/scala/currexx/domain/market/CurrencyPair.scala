@@ -5,6 +5,7 @@ import io.circe.{Decoder, Encoder}
 import squants.market.{Currency, defaultMoneyContext}
 
 final case class CurrencyPair(base: Currency, quote: Currency):
+  def toSymbol: String = s"${base.code}${quote.code}"
   override def toString: String = s"${base.code}/${quote.code}"
 
 object CurrencyPair:

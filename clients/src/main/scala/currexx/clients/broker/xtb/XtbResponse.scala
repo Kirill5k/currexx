@@ -3,15 +3,22 @@ package currexx.clients.broker.xtb
 import cats.syntax.functor.*
 import cats.syntax.either.*
 import currexx.domain.errors.AppError
+import currexx.domain.market.CurrencyPair
 import io.circe.{Codec, Decoder}
 import io.circe.parser.*
 
 sealed trait XtbResponse
-
 object XtbResponse {
   case object Void                                              extends XtbResponse
   final case class Login(streamSessionId: String)               extends XtbResponse derives Codec.AsObject
   final case class Error(errorCode: String, errorDescr: String) extends XtbResponse derives Codec.AsObject
+
+  final case class TickPrice(symbol: String, ask: BigDecimal) derives Codec.AsObject
+  final case class TickPricesData(quotations: List[TickPrice]) derives Codec.AsObject:
+    def findAskPriceFor(cp: CurrencyPair): Option[BigDecimal] =
+      quotations.find(_.symbol == cp.toSymbol).map(_.ask)
+  final case class TickPrices(returnData: TickPricesData) extends XtbResponse derives Codec.AsObject
+
   final case class OrderData(order: Long) derives Codec.AsObject
   final case class OrderPlacement(returnData: OrderData) extends XtbResponse derives Codec.AsObject
 
