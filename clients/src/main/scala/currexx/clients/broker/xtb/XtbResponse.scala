@@ -13,10 +13,9 @@ object XtbResponse {
   final case class Login(streamSessionId: String)               extends XtbResponse derives Codec.AsObject
   final case class Error(errorCode: String, errorDescr: String) extends XtbResponse derives Codec.AsObject
 
-  final case class TickPrice(symbol: String, ask: BigDecimal) derives Codec.AsObject
+  final case class TickPrice(symbol: String, ask: BigDecimal, bid: BigDecimal) derives Codec.AsObject
   final case class TickPricesData(quotations: List[TickPrice]) derives Codec.AsObject:
-    def findAskPriceFor(cp: CurrencyPair): Option[BigDecimal] =
-      quotations.find(_.symbol == cp.toSymbol).map(_.ask)
+    def findPriceFor(cp: CurrencyPair): Option[TickPrice] = quotations.find(_.symbol == cp.toSymbol)
   final case class TickPrices(returnData: TickPricesData) extends XtbResponse derives Codec.AsObject
 
   final case class OrderData(order: Long) derives Codec.AsObject

@@ -6,7 +6,7 @@ import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.clients.HttpClient
 import currexx.clients.broker.BrokerParameters
-import currexx.clients.broker.xtb.XtbResponse.TickPricesData
+import currexx.clients.broker.xtb.XtbResponse.TickPrice
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, TradeOrder}
 import io.circe.syntax.*
@@ -65,7 +65,7 @@ final private class LiveXtbClient[F[_]](
             case XtbResponse.TickPrices(tickPricesData) =>
               for
                 sessionId <- Stream.eval(state.get.map(_.sessionId.toRight(AppError.ClientFailure(name, "no session id")))).rethrow
-                price     <- Stream(tickPricesData.findAskPriceFor(pair).toRight(AppError.ClientFailure(name, "missing price"))).rethrow
+                price     <- Stream(tickPricesData.findPriceFor(pair).toRight(AppError.ClientFailure(name, "missing price"))).rethrow
                 _         <- Stream.eval(state.update(_.withPrice(price)))
               yield WebSocketFrame.text(XtbRequest.trade(sessionId, pair, order, price).asJson.noSpaces)
             case XtbResponse.OrderPlacement(_) =>
@@ -86,9 +86,9 @@ final private class LiveXtbClient[F[_]](
 }
 
 object XtbClient:
-  final case class WsState(sessionId: Option[String], price: Option[BigDecimal]):
+  final case class WsState(sessionId: Option[String], price: Option[TickPrice]):
     def withSessionId(sessionId: String): WsState = copy(sessionId = Some(sessionId))
-    def withPrice(price: BigDecimal): WsState     = copy(price = Some(price))
+    def withPrice(price: TickPrice): WsState     = copy(price = Some(price))
 
   def make[F[_]: Async: Logger](
       config: XtbConfig,

@@ -1,5 +1,6 @@
 package currexx.clients.broker.xtb
 
+import currexx.clients.broker.xtb.XtbResponse.TickPrice
 import currexx.domain.market.{CurrencyPair, TradeOrder}
 import io.circe.Codec
 
@@ -14,7 +15,7 @@ object RequestArguments:
       derives Codec.AsObject
 
   final case class TradeTransInfo(
-      cmd: Option[Int],
+      cmd: Int,
       `type`: Int,
       symbol: String,
       customComment: String,
@@ -42,7 +43,7 @@ object XtbRequest {
   def login(userId: String, password: String): XtbRequest[RequestArguments.Login] =
     XtbRequest("login", None, RequestArguments.Login(userId, password))
 
-  def trade(sessionId: String, cp: CurrencyPair, order: TradeOrder, price: BigDecimal): XtbRequest[RequestArguments.Trade] =
+  def trade(sessionId: String, cp: CurrencyPair, order: TradeOrder, price: TickPrice): XtbRequest[RequestArguments.Trade] =
     XtbRequest(
       "tradeTransaction",
       Some(sessionId),
@@ -64,25 +65,25 @@ object XtbRequest {
       )
     )
 
-  private def enterMarket(cp: CurrencyPair, order: TradeOrder.Enter, price: BigDecimal): RequestArguments.TradeTransInfo =
+  private def enterMarket(cp: CurrencyPair, order: TradeOrder.Enter, price: TickPrice): RequestArguments.TradeTransInfo =
     RequestArguments.TradeTransInfo(
       `type` = 0,
-      cmd = Some(if (order.position == TradeOrder.Position.Buy) 0 else 1),
+      cmd = if (order.position == TradeOrder.Position.Buy) 0 else 1,
       symbol = cp.toSymbol,
       customComment = s"Currexx - ${TradeOrder.Position.Buy.toString} $cp",
       offset = order.trailingStopLoss,
-      price = price,
+      price = if (order.position == TradeOrder.Position.Buy) price.ask else price.bid,
       sl = order.stopLoss,
       tp = order.takeProfit,
       volume = Some(order.volume)
     )
 
-  private def exitMarket(cp: CurrencyPair, price: BigDecimal): RequestArguments.TradeTransInfo =
+  private def exitMarket(cp: CurrencyPair, price: TickPrice): RequestArguments.TradeTransInfo =
     RequestArguments.TradeTransInfo(
       `type` = 2,
-      price = price,
+      price = price.ask,
       symbol = cp.toSymbol,
       customComment = s"Currexx - Close $cp",
-      cmd = None
+      cmd = 0
     )
 }
