@@ -17,6 +17,8 @@ import sttp.ws.WebSocketFrame
 import sttp.client3.*
 import sttp.model.Uri
 import fs2.{Pipe, Stream}
+import io.circe.Encoder
+import sttp.ws.WebSocketFrame.Text
 
 import scala.concurrent.duration.*
 import java.nio.charset.StandardCharsets
@@ -48,7 +50,7 @@ final private class LiveXtbClient[F[_]](
       order: TradeOrder
   ): Pipe[F, WebSocketFrame.Data[_], WebSocketFrame] = { input =>
     Stream.eval(Ref.of(XtbClient.WsState(None))).flatMap { state =>
-      Stream.emit(WebSocketFrame.text(XtbRequest.login(params.userId, params.password).asJson.noSpaces)) ++
+      Stream.emit(XtbRequest.login(params.userId, params.password).asText) ++
         input
           .evalTap(m => F.delay(println(s"received $m")))
           .map {
@@ -60,12 +62,12 @@ final private class LiveXtbClient[F[_]](
           .flatMap {
             case XtbResponse.Login(sessionId) =>
               Stream.eval(state.update(_.withSessionId(sessionId))).drain ++
-                Stream.emit(WebSocketFrame.text(XtbRequest.symbolInfo(sessionId, pair).asJson.noSpaces))
+                Stream.emit(XtbRequest.symbolInfo(sessionId, pair).asText)
             case XtbResponse.SymbolInfo(price) =>
               Stream
                 .eval(state.get.map(_.sessionId.toRight(AppError.ClientFailure(name, "no session id"))))
                 .rethrow
-                .map(sid => WebSocketFrame.text(XtbRequest.trade(sid, pair, order, price).asJson.noSpaces))
+                .map(sid => XtbRequest.trade(sid, pair, order, price).asText)
             case XtbResponse.OrderPlacement(_) =>
               Stream.emit(WebSocketFrame.close)
             case XtbResponse.Error("BE005", desc) =>
@@ -81,6 +83,9 @@ final private class LiveXtbClient[F[_]](
           }
     }
   }
+
+  extension [A <: RequestArguments](req: XtbRequest[A])
+    def asText(using enc: Encoder[XtbRequest[A]]): Text = WebSocketFrame.text(req.asJson.noSpaces)
 }
 
 object XtbClient:

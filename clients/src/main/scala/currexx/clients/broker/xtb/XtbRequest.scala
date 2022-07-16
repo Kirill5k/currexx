@@ -26,8 +26,7 @@ object RequestArguments:
       offset: Option[BigDecimal] = None,
       order: Option[Long] = None,
       expiration: Option[Long] = None
-  ) extends RequestArguments
-      derives Codec.AsObject
+  ) derives Codec.AsObject
 
   final case class Trade(tradeTransInfo: TradeTransInfo) extends RequestArguments derives Codec.AsObject
 
