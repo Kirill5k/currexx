@@ -5,6 +5,8 @@ import cats.effect.unsafe.IORuntime
 import org.scalatest.Assertion
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import sttp.capabilities.WebSockets
 import sttp.capabilities.fs2.Fs2Streams
 import sttp.client3
@@ -15,8 +17,9 @@ import sttp.model.{Header, Method}
 import scala.concurrent.Future
 import scala.io.Source
 
-trait ApiClientSpec extends AsyncWordSpec with Matchers {
-
+trait ClientSpec extends AsyncWordSpec with Matchers {
+  given Logger[IO] = Slf4jLogger.getLogger[IO]
+  
   extension [A](io: IO[A])
     def asserting(f: A => Assertion): Future[Assertion] =
       io.map(f).unsafeToFuture()(IORuntime.global)

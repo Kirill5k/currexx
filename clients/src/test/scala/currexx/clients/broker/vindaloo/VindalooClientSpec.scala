@@ -1,7 +1,7 @@
 package currexx.clients.broker.vindaloo
 
 import cats.effect.IO
-import currexx.clients.ApiClientSpec
+import currexx.clients.ClientSpec
 import currexx.clients.broker.BrokerParameters
 import currexx.domain.market.{CurrencyPair, Interval, TradeOrder}
 import org.typelevel.log4cats.Logger
@@ -9,7 +9,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import squants.market.{GBP, USD}
 import sttp.client3.{Response, SttpBackend}
 
-class VindalooClientSpec extends ApiClientSpec {
+class VindalooClientSpec extends ClientSpec {
 
   given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 

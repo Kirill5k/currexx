@@ -2,7 +2,7 @@ package currexx.clients.data.alphavantage
 
 import cats.effect.IO
 import currexx.clients.data.alphavantage.AlphaVantageClient
-import currexx.clients.ApiClientSpec
+import currexx.clients.ClientSpec
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval, PriceRange}
 import org.typelevel.log4cats.Logger
@@ -14,7 +14,7 @@ import sttp.model.StatusCode
 import java.time.Instant
 import scala.concurrent.duration.*
 
-class AlphaVantageClientSpec extends ApiClientSpec {
+class AlphaVantageClientSpec extends ClientSpec {
 
   given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
