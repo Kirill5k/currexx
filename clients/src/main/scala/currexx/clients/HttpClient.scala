@@ -6,7 +6,7 @@ import cats.syntax.applicativeError.*
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData}
 import org.typelevel.log4cats.Logger
 import sttp.client3.{Request, Response, SttpBackend}
-import fs2.{INothing, Stream}
+import fs2.Stream
 
 import scala.concurrent.duration.*
 
@@ -32,7 +32,7 @@ trait HttpClient[F[_]] {
       }
     
   extension (S: Stream.type)
-    def logError[F[_]](message: String)(using logger: Logger[F]): Stream[F, INothing] =
+    def logError[F[_]](message: String)(using logger: Logger[F]): Stream[F, Nothing] =
       S.eval(logger.error(message)).drain
       
 }
