@@ -29,10 +29,10 @@ object TradeStrategyExecutor {
       trigger match
         case _: Indicator.TrendChangeDetection =>
           state.signals.getOrElse(trigger.kind, Nil).headOption.map(_.condition).collect {
-            case Condition.TrendDirectionChange(Trend.Downward, Trend.Consolidation) => Decision.Close
-            case Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation)   => Decision.Close
-            case Condition.TrendDirectionChange(_, Trend.Upward) if !state.buying    => Decision.Buy
-            case Condition.TrendDirectionChange(_, Trend.Downward) if !state.selling => Decision.Sell
+            case Condition.TrendDirectionChange(Trend.Downward, Trend.Consolidation, _) => Decision.Close
+            case Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, _)   => Decision.Close
+            case Condition.TrendDirectionChange(_, Trend.Upward, _) if !state.buying    => Decision.Buy
+            case Condition.TrendDirectionChange(_, Trend.Downward, _) if !state.selling => Decision.Sell
           }
 
   private case object TrendChangeAggressive extends TradeStrategyExecutor:
@@ -40,10 +40,10 @@ object TradeStrategyExecutor {
       trigger match
         case _: Indicator.TrendChangeDetection =>
           state.signals.getOrElse(trigger.kind, Nil).headOption.map(_.condition).collect {
-            case Condition.TrendDirectionChange(Trend.Downward, Trend.Consolidation) => Decision.Buy
-            case Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation)   => Decision.Sell
-            case Condition.TrendDirectionChange(_, Trend.Upward) if !state.buying    => Decision.Buy
-            case Condition.TrendDirectionChange(_, Trend.Downward) if !state.selling => Decision.Sell
+            case Condition.TrendDirectionChange(Trend.Downward, Trend.Consolidation, _) => Decision.Buy
+            case Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, _)   => Decision.Sell
+            case Condition.TrendDirectionChange(_, Trend.Upward, _) if !state.buying    => Decision.Buy
+            case Condition.TrendDirectionChange(_, Trend.Downward, _) if !state.selling => Decision.Sell
           }
 
   def get(strategy: TradeStrategy): TradeStrategyExecutor =

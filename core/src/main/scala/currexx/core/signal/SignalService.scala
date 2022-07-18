@@ -95,13 +95,14 @@ object SignalService:
     val source      = indicator.source.extract(data)
     val transformed = indicator.transformation.transform(source)
     val res         = identifyTrends(transformed)
+    val prevTrend = res.drop(1).head
     Option
-      .when(res.head != res(1))(Condition.TrendDirectionChange(res(1), res.head))
+      .when(res.head != prevTrend)(Condition.TrendDirectionChange(prevTrend, res.head, Some(res.drop(1).takeWhile(_ == prevTrend).size)))
       .map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))
   }
 
   private def identifyTrends(values: List[Double]): List[Trend] = {
-    val vals  = values.take(5).toArray
+    val vals  = values.toArray
     val vals2 = vals.tail
     val vals3 = vals.zip(vals.map(-_)).map(_ - _)
     val vals4 = vals.zip(vals).map(_ + _)
@@ -113,7 +114,7 @@ object SignalService:
     val isNotDown: Int => Boolean = i => diff3(i) > diff3(i + 1) && diff3(i + 1) > diff3(i + 2)
 
     val trend         = vals.zip(vals2).map((v1, v2) => if (v1 > v2) Trend.Upward else Trend.Downward)
-    val consolidation = (0 until 2).map(i => Option.when(isNotUp(i) == isNotDown(i))(Trend.Consolidation))
+    val consolidation = (0 until values.size - 5).map(i => Option.when(isNotUp(i) == isNotDown(i))(Trend.Consolidation))
     consolidation.zip(trend).map(_.getOrElse(_)).toList
   }
 

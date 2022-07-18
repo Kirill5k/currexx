@@ -121,7 +121,7 @@ class SignalServiceSpec extends CatsSpec {
           val expectedSignal = Signal(
             Users.uid,
             Markets.gbpeur,
-            Condition.TrendDirectionChange(Trend.Consolidation, Trend.Upward),
+            Condition.TrendDirectionChange(Trend.Consolidation, Trend.Upward, Some(1)),
             Markets.trendChangeDetection,
             timeSeriesData.prices.head.time
           )
@@ -149,7 +149,7 @@ class SignalServiceSpec extends CatsSpec {
           val expectedSignal = Signal(
             Users.uid,
             Markets.gbpeur,
-            Condition.TrendDirectionChange(Trend.Consolidation, Trend.Upward),
+            Condition.TrendDirectionChange(Trend.Consolidation, Trend.Upward, Some(1)),
             Markets.trendChangeDetection,
             timeSeriesData.prices.head.time
           )
@@ -187,7 +187,7 @@ class SignalServiceSpec extends CatsSpec {
         val indicator      = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.NMA(16, 8, 4.2d, MovingAverage.Weighted))
         val signal         = SignalService.detectTrendChange(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.TrendChangeDetection])
 
-        val expectedCondition = Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation)
+        val expectedCondition = Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, Some(1))
         signal mustBe Some(Signal(Users.uid, Markets.gbpeur, expectedCondition, indicator, timeSeriesData.prices.head.time))
       }
 

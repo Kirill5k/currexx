@@ -7,7 +7,7 @@ enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWit
   case CrossingDown
   case AboveThreshold(threshold: BigDecimal, value: BigDecimal)
   case BelowThreshold(threshold: BigDecimal, value: BigDecimal)
-  case TrendDirectionChange(from: Trend, to: Trend)
+  case TrendDirectionChange(from: Trend, to: Trend, previousTrendLength: Option[Int] = None)
 
 object Condition {
   given JsonTaggedAdt.Config[Condition] = JsonTaggedAdt.Config.Values[Condition](

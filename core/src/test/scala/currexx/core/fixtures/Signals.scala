@@ -13,7 +13,7 @@ object Signals {
   lazy val trendDirectionChanged = Signal(
     Users.uid,
     Markets.gbpeur,
-    Condition.TrendDirectionChange(Trend.Downward, Trend.Upward),
+    Condition.TrendDirectionChange(Trend.Downward, Trend.Upward, Some(1)),
     Markets.trendChangeDetection,
     ts
   )
