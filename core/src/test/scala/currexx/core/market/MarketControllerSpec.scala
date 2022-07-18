@@ -85,7 +85,8 @@ class MarketControllerSpec extends ControllerSpec {
              |          "condition": {
              |            "kind": "trend-direction-change",
              |            "from": "downward",
-             |            "to": "upward"
+             |            "to": "upward",
+             |            "previousTrendLength": 1
              |          },
              |          "time": "${Signals.ts}"
              |        }

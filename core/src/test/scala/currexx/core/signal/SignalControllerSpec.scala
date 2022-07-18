@@ -111,7 +111,7 @@ class SignalControllerSpec extends ControllerSpec {
                |"currencyPair":"GBP/EUR",
                |"time": "${Signals.ts}",
                |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
-               |"condition": {"kind":"trend-direction-change", "from": "downward", "to": "upward"}
+               |"condition": {"kind":"trend-direction-change","from":"downward","to":"upward","previousTrendLength":1}
                |}]""".stripMargin
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
         verify(svc).getAll(Users.uid)
