@@ -25,21 +25,6 @@ class SignalRepositorySpec extends MongoSpec {
       }
     }
 
-    "deleteAll" should {
-      "delete all signals for a user" in withEmbeddedMongoDb { db =>
-        val result = for
-          repo <- SignalRepository.make(db)
-          _    <- repo.save(Signals.trendDirectionChanged)
-          _    <- repo.save(Signals.trendDirectionChanged)
-          _    <- repo.save(Signals.trendDirectionChanged)
-          _    <- repo.deleteAll(Users.uid)
-          res  <- repo.getAll(Users.uid)
-        yield res
-
-        result.map(_ mustBe List.empty)
-      }
-    }
-
     "getAll" should {
       "return all signals sorted by time in descending order" in withEmbeddedMongoDb { db =>
         val result = for

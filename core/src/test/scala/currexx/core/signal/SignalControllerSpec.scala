@@ -115,19 +115,6 @@ class SignalControllerSpec extends ControllerSpec {
       }
     }
 
-    "DELETE /signals" should {
-      "return all submitted signals" in {
-        val svc = mock[SignalService[IO]]
-        when(svc.deleteAll(any[UserId])).thenReturn(IO.unit)
-
-        val req = requestWithAuthHeader(uri"/signals", Method.DELETE)
-        val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
-
-        verifyJsonResponse(res, Status.NoContent, None)
-        verify(svc).deleteAll(Users.uid)
-      }
-    }
-
     "GET /signals/settings" should {
       "return signal settings for configured indicators" in {
         val svc = mock[SignalService[IO]]

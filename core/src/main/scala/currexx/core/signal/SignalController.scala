@@ -43,14 +43,6 @@ final private class SignalController[F[_]](
           .mapResponse(_.map(SignalView.from))
       }
 
-  private def deleteAllSignals(using auth: Authenticator[F]) =
-    deleteAllSignalsEndpoint.withAuthenticatedSession
-      .serverLogic { session => _ =>
-        service
-          .deleteAll(session.userId)
-          .voidResponse
-      }
-
   private def getSignalSettings(using auth: Authenticator[F]) =
     getSignalSettingsEndpoint.withAuthenticatedSession
       .serverLogic { session => _ =>
@@ -72,7 +64,6 @@ final private class SignalController[F[_]](
       List(
         submitSignal,
         getAllSignals,
-        deleteAllSignals,
         getSignalSettings,
         updateSignalSettings
       )
@@ -117,11 +108,6 @@ object SignalController extends TapirSchema with TapirJson with TapirCodecs {
     .in(basePath)
     .out(jsonBody[List[SignalView]])
     .description("Retrieve all submitted signals")
-
-  val deleteAllSignalsEndpoint = Controller.securedEndpoint.delete
-    .in(basePath)
-    .out(statusCode(StatusCode.NoContent))
-    .description("Delete all submitted signals")
 
   val getSignalSettingsEndpoint = Controller.securedEndpoint.get
     .in(settingsPath)

@@ -18,7 +18,6 @@ trait SignalRepository[F[_]] extends Repository[F]:
   def save(signal: Signal): F[Unit]
   def isFirstOfItsKindForThatDate(signal: Signal): F[Boolean]
   def getAll(userId: UserId): F[List[Signal]]
-  def deleteAll(userId: UserId): F[Unit]
 
 final private class LiveSignalRepository[F[_]: Async](
     private val collection: MongoCollection[F, SignalEntity]
@@ -39,9 +38,6 @@ final private class LiveSignalRepository[F[_]: Async](
 
   override def getAll(userId: UserId): F[List[Signal]] =
     collection.find(userIdEq(userId)).sortByDesc("time").all.map(_.map(_.toDomain).toList)
-    
-  override def deleteAll(userId: UserId): F[Unit] =
-    collection.deleteMany(userIdEq(userId)).void
 }
 
 object SignalRepository extends MongoJsonCodecs:
