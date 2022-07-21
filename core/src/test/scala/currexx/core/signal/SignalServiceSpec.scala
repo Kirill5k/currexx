@@ -72,7 +72,7 @@ class SignalServiceSpec extends CatsSpec {
     }
 
     "getAll" should {
-      "return all signals from the signRepository" in {
+      "return all signals from the signalRepository" in {
         val (signRepo, settRepo, disp) = mocks
         when(signRepo.getAll(any[UserId])).thenReturn(IO.pure(List(Signals.trendDirectionChanged)))
 
@@ -85,6 +85,24 @@ class SignalServiceSpec extends CatsSpec {
           verifyNoInteractions(settRepo, disp)
           verify(signRepo).getAll(Users.uid)
           res mustBe List(Signals.trendDirectionChanged)
+        }
+      }
+    }
+
+    "deleteAll" should {
+      "delete all signals in the signalRepository" in {
+        val (signRepo, settRepo, disp) = mocks
+        when(signRepo.deleteAll(any[UserId])).thenReturn(IO.unit)
+
+        val result = for
+          svc <- SignalService.make[IO](signRepo, settRepo, disp)
+          res <- svc.deleteAll(Users.uid)
+        yield res
+
+        result.asserting { res =>
+          verifyNoInteractions(settRepo, disp)
+          verify(signRepo).deleteAll(Users.uid)
+          res mustBe ()
         }
       }
     }

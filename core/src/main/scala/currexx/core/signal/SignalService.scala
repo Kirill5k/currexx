@@ -40,7 +40,7 @@ final private class LiveSignalService[F[_]](
   override def getSettings(uid: UserId): F[SignalSettings]       = settingsRepo.get(uid)
   override def updateSettings(settings: SignalSettings): F[Unit] = settingsRepo.update(settings)
   override def getAll(uid: UserId): F[List[Signal]]              = signalRepo.getAll(uid)
-  override def deleteAll(uid: UserId): F[Unit]                   = ???
+  override def deleteAll(uid: UserId): F[Unit]                   = signalRepo.deleteAll(uid)
   override def submit(signal: Signal): F[Unit] =
     signalRepo.save(signal) >> dispatcher.dispatch(Action.ProcessSignal(signal))
 
