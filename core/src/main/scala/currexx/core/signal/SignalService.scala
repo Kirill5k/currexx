@@ -25,6 +25,7 @@ import fs2.Stream
 trait SignalService[F[_]]:
   def submit(signal: Signal): F[Unit]
   def getAll(uid: UserId): F[List[Signal]]
+  def deleteAll(uid: UserId): F[Unit]
   def getSettings(uid: UserId): F[SignalSettings]
   def updateSettings(settings: SignalSettings): F[Unit]
   def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit]
@@ -39,6 +40,7 @@ final private class LiveSignalService[F[_]](
   override def getSettings(uid: UserId): F[SignalSettings]       = settingsRepo.get(uid)
   override def updateSettings(settings: SignalSettings): F[Unit] = settingsRepo.update(settings)
   override def getAll(uid: UserId): F[List[Signal]]              = signalRepo.getAll(uid)
+  override def deleteAll(uid: UserId): F[Unit]                   = ???
   override def submit(signal: Signal): F[Unit] =
     signalRepo.save(signal) >> dispatcher.dispatch(Action.ProcessSignal(signal))
 
@@ -95,7 +97,7 @@ object SignalService:
     val source      = indicator.source.extract(data)
     val transformed = indicator.transformation.transform(source)
     val res         = identifyTrends(transformed)
-    val prevTrend = res.drop(1).head
+    val prevTrend   = res.drop(1).head
     Option
       .when(res.head != prevTrend)(Condition.TrendDirectionChange(prevTrend, res.head, Some(res.drop(1).takeWhile(_ == prevTrend).size)))
       .map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))
