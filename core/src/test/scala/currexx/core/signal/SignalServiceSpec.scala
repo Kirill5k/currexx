@@ -89,24 +89,6 @@ class SignalServiceSpec extends CatsSpec {
       }
     }
 
-    "deleteAll" should {
-      "delete all signals in the signalRepository" in {
-        val (signRepo, settRepo, disp) = mocks
-        when(signRepo.deleteAll(any[UserId])).thenReturn(IO.unit)
-
-        val result = for
-          svc <- SignalService.make[IO](signRepo, settRepo, disp)
-          res <- svc.deleteAll(Users.uid)
-        yield res
-
-        result.asserting { res =>
-          verifyNoInteractions(settRepo, disp)
-          verify(signRepo).deleteAll(Users.uid)
-          res mustBe ()
-        }
-      }
-    }
-
     "processMarketData" should {
       "not do anything when there are no changes in market data since last point" in {
         val (signRepo, settRepo, disp) = mocks
