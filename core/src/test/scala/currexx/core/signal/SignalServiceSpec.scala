@@ -78,7 +78,7 @@ class SignalServiceSpec extends CatsSpec {
 
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
-          res <- svc.getAll(Users.uid)
+          res <- svc.getAll(Users.uid, Some(Signals.ts), None)
         yield res
 
         result.asserting { res =>

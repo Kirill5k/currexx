@@ -11,6 +11,8 @@ import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.implicits.*
 import org.http4s.{Method, Request, Status, Uri}
 
+import java.time.Instant
+
 class SignalControllerSpec extends ControllerSpec {
 
   "A SignalController" when {
@@ -43,7 +45,8 @@ class SignalControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val responseBody = """{"message":"Missing required field, Received unknown type: 'foo'. Exists only types: trend-change-detection."}"""
+        val responseBody =
+          """{"message":"Missing required field, Received unknown type: 'foo'. Exists only types: trend-change-detection."}"""
         verifyJsonResponse(res, Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
       }
@@ -59,7 +62,8 @@ class SignalControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val responseBody = """{"message":"Received unknown type: 'foo'. Exists only types: above-threshold, crossing-up, trend-direction-change, crossing-down, below-threshold."}"""
+        val responseBody =
+          """{"message":"Received unknown type: 'foo'. Exists only types: above-threshold, crossing-up, trend-direction-change, crossing-down, below-threshold."}"""
         verifyJsonResponse(res, Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
       }
@@ -75,7 +79,8 @@ class SignalControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val responseBody = """{"message":"Code FOO cannot be matched against any context defined Currency. Available Currencies are CAD, CZK, GBP, MXN, CHF, CNY, RUB, NZD, HKD, AUD, SEK, TRY, BRL, KRW, ETH, CLP, INR, LTC, BTC, DKK, XAU, XAG, JPY, ARS, MYR, USD, NOK, NAD, EUR, ZAR"}"""
+        val responseBody =
+          """{"message":"Code FOO cannot be matched against any context defined Currency. Available Currencies are CAD, CZK, GBP, MXN, CHF, CNY, RUB, NZD, HKD, AUD, SEK, TRY, BRL, KRW, ETH, CLP, INR, LTC, BTC, DKK, XAU, XAG, JPY, ARS, MYR, USD, NOK, NAD, EUR, ZAR"}"""
         verifyJsonResponse(res, Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
       }
@@ -99,9 +104,9 @@ class SignalControllerSpec extends ControllerSpec {
     "GET /signals" should {
       "return all submitted signals" in {
         val svc = mock[SignalService[IO]]
-        when(svc.getAll(any[UserId])).thenReturn(IO.pure(List(Signals.trendDirectionChanged)))
+        when(svc.getAll(any[UserId], any[Option[Instant]], any[Option[Instant]])).thenReturn(IO.pure(List(Signals.trendDirectionChanged)))
 
-        val req = requestWithAuthHeader(uri"/signals", Method.GET)
+        val req = requestWithAuthHeader(uri"/signals?from=2020-01-01&to=2021-01-01T04:01:00Z", Method.GET)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody = s"""[{
@@ -111,7 +116,7 @@ class SignalControllerSpec extends ControllerSpec {
                |"condition": {"kind":"trend-direction-change","from":"downward","to":"upward","previousTrendLength":1}
                |}]""".stripMargin
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
-        verify(svc).getAll(Users.uid)
+        verify(svc).getAll(Users.uid, Some(Instant.parse("2020-01-01T00:00:00Z")), Some(Instant.parse("2021-01-01T04:01:00Z")))
       }
     }
 

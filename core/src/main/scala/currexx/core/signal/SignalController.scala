@@ -37,9 +37,9 @@ final private class SignalController[F[_]](
 
   private def getAllSignals(using auth: Authenticator[F]) =
     getAllSignalsEndpoint.withAuthenticatedSession
-      .serverLogic { session => _ =>
+      .serverLogic { session => (from, to) =>
         service
-          .getAll(session.userId)
+          .getAll(session.userId, from, to)
           .mapResponse(_.map(SignalView.from))
       }
 
@@ -106,6 +106,7 @@ object SignalController extends TapirSchema with TapirJson with TapirCodecs {
 
   val getAllSignalsEndpoint = Controller.securedEndpoint.get
     .in(basePath)
+    .in(query[Option[Instant]]("from").and(query[Option[Instant]]("to")))
     .out(jsonBody[List[SignalView]])
     .description("Retrieve all submitted signals")
 

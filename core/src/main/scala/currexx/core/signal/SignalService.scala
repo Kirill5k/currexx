@@ -22,9 +22,11 @@ import currexx.domain.market.{
 }
 import fs2.Stream
 
+import java.time.Instant
+
 trait SignalService[F[_]]:
   def submit(signal: Signal): F[Unit]
-  def getAll(uid: UserId): F[List[Signal]]
+  def getAll(uid: UserId, from: Option[Instant], to: Option[Instant]): F[List[Signal]]
   def getSettings(uid: UserId): F[SignalSettings]
   def updateSettings(settings: SignalSettings): F[Unit]
   def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit]
@@ -36,9 +38,9 @@ final private class LiveSignalService[F[_]](
 )(using
     F: Concurrent[F]
 ) extends SignalService[F] {
-  override def getSettings(uid: UserId): F[SignalSettings]       = settingsRepo.get(uid)
-  override def updateSettings(settings: SignalSettings): F[Unit] = settingsRepo.update(settings)
-  override def getAll(uid: UserId): F[List[Signal]]              = signalRepo.getAll(uid)
+  override def getSettings(uid: UserId): F[SignalSettings]                                      = settingsRepo.get(uid)
+  override def updateSettings(settings: SignalSettings): F[Unit]                                = settingsRepo.update(settings)
+  override def getAll(uid: UserId, from: Option[Instant], to: Option[Instant]): F[List[Signal]] = signalRepo.getAll(uid)
   override def submit(signal: Signal): F[Unit] =
     signalRepo.save(signal) >> dispatcher.dispatch(Action.ProcessSignal(signal))
 
