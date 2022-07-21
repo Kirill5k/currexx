@@ -40,9 +40,9 @@ final private class TradeController[F[_]](
 
   private def getTradeOrders(using auth: Authenticator[F]) =
     getTradeOrdersEndpoint.withAuthenticatedSession
-      .serverLogic { session => _ =>
+      .serverLogic { session => (from, to) =>
         service
-          .getAllOrders(session.userId)
+          .getAllOrders(session.userId, from, to)
           .mapResponse(_.map(TradeOrderView.from))
       }
 
@@ -97,6 +97,7 @@ object TradeController extends TapirSchema with TapirJson with TapirCodecs {
 
   val getTradeOrdersEndpoint = Controller.securedEndpoint.get
     .in(ordersPath)
+    .in(query[Option[Instant]]("from").and(query[Option[Instant]]("to")))
     .out(jsonBody[List[TradeOrderView]])
     .description("Retrieve placed trade orders")
 

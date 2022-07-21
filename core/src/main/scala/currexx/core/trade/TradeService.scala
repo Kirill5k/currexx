@@ -16,10 +16,12 @@ import currexx.domain.market.{CurrencyPair, Indicator, TradeOrder}
 import currexx.domain.user.UserId
 import fs2.Stream
 
+import java.time.Instant
+
 trait TradeService[F[_]]:
   def getSettings(uid: UserId): F[TradeSettings]
   def updateSettings(settings: TradeSettings): F[Unit]
-  def getAllOrders(uid: UserId): F[List[TradeOrderPlacement]]
+  def getAllOrders(uid: UserId, from: Option[Instant], to: Option[Instant]): F[List[TradeOrderPlacement]]
   def processMarketStateUpdate(state: MarketState, trigger: Indicator): F[Unit]
   def placeOrder(uid: UserId, cp: CurrencyPair, order: TradeOrder, closePendingOrders: Boolean): F[Unit]
   def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
@@ -34,9 +36,11 @@ final private class LiveTradeService[F[_]](
 )(using
     F: Temporal[F]
 ) extends TradeService[F] {
-  override def getSettings(uid: UserId): F[TradeSettings]              = settingsRepository.get(uid)
-  override def updateSettings(settings: TradeSettings): F[Unit]        = settingsRepository.update(settings)
-  override def getAllOrders(uid: UserId): F[List[TradeOrderPlacement]] = orderRepository.getAll(uid)
+  override def getSettings(uid: UserId): F[TradeSettings]       = settingsRepository.get(uid)
+  override def updateSettings(settings: TradeSettings): F[Unit] = settingsRepository.update(settings)
+  
+  override def getAllOrders(uid: UserId, from: Option[Instant], to: Option[Instant]): F[List[TradeOrderPlacement]] =
+    orderRepository.getAll(uid)
 
   override def placeOrder(uid: UserId, cp: CurrencyPair, order: TradeOrder, closePendingOrders: Boolean): F[Unit] =
     (F.realTimeInstant, marketDataClient.latestPrice(cp), settingsRepository.get(uid))

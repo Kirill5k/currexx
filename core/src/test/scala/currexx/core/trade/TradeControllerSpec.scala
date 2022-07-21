@@ -11,6 +11,8 @@ import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.implicits.*
 import org.http4s.{Method, Request, Status, Uri}
 
+import java.time.Instant
+
 class TradeControllerSpec extends ControllerSpec {
 
   "A TradeController" when {
@@ -48,9 +50,9 @@ class TradeControllerSpec extends ControllerSpec {
     "GET /trade/orders" should {
       "return placed orders" in {
         val svc = mock[TradeService[IO]]
-        when(svc.getAllOrders(any[UserId])).thenReturn(IO.pure(List(Trades.order)))
+        when(svc.getAllOrders(any[UserId], any[Option[Instant]], any[Option[Instant]])).thenReturn(IO.pure(List(Trades.order)))
 
-        val req = requestWithAuthHeader(uri"/trade/orders", Method.GET)
+        val req = requestWithAuthHeader(uri"/trade/orders?from=2020-01-01", Method.GET)
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody =
@@ -81,7 +83,7 @@ class TradeControllerSpec extends ControllerSpec {
              |}
              |]""".stripMargin
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
-        verify(svc).getAllOrders(Users.uid)
+        verify(svc).getAllOrders(Users.uid, Some(Instant.parse("2020-01-01T00:00:00Z")), None)
       }
     }
 

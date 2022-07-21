@@ -22,7 +22,7 @@ class TradeServiceSpec extends CatsSpec {
 
         val result = for
           svc    <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          orders <- svc.getAllOrders(Users.uid)
+          orders <- svc.getAllOrders(Users.uid, None, Some(Trades.ts))
         yield orders
 
         result.asserting { res =>
