@@ -78,5 +78,8 @@ object errors {
     final case class InvalidJwtToken(message: String) extends Forbidden
 
     final case class FailedValidation(message: String) extends Unprocessable
+
+    case object InvalidDateRange extends Unprocessable:
+      override val message: String = "Date 'from' must be before date 'to'"
   }
 }

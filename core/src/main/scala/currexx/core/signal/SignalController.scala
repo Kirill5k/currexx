@@ -1,6 +1,7 @@
 package currexx.core.signal
 
 import cats.Monad
+import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.effect.Async
@@ -38,9 +39,10 @@ final private class SignalController[F[_]](
   private def getAllSignals(using auth: Authenticator[F]) =
     getAllSignalsEndpoint.withAuthenticatedSession
       .serverLogic { session => (from, to) =>
-        service
-          .getAll(session.userId, from, to)
-          .mapResponse(_.map(SignalView.from))
+        (from, to).mapN((f, t) => F.raiseWhen(f.isAfter(t))(AppError.InvalidDateRange)).getOrElse(F.unit) >>
+          service
+            .getAll(session.userId, from, to)
+            .mapResponse(_.map(SignalView.from))
       }
 
   private def getSignalSettings(using auth: Authenticator[F]) =

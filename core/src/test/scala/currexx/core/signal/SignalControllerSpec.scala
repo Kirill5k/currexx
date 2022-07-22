@@ -118,6 +118,17 @@ class SignalControllerSpec extends ControllerSpec {
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
         verify(svc).getAll(Users.uid, Some(Instant.parse("2020-01-01T00:00:00Z")), Some(Instant.parse("2021-01-01T04:01:00Z")))
       }
+
+      "return error when date 'from' is after 'to'" in {
+        val svc = mock[SignalService[IO]]
+
+        val req = requestWithAuthHeader(uri"/signals?from=2021-01-02&to=2021-01-01", Method.GET)
+        val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        val responseBody = s"""{"message":"Date 'from' must be before date 'to'"}"""
+        verifyJsonResponse(res, Status.UnprocessableEntity, Some(responseBody))
+        verifyNoInteractions(svc)
+      }
     }
 
     "GET /signals/settings" should {
