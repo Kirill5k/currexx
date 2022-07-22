@@ -40,7 +40,7 @@ final private class LiveSignalService[F[_]](
 ) extends SignalService[F] {
   override def getSettings(uid: UserId): F[SignalSettings]                                      = settingsRepo.get(uid)
   override def updateSettings(settings: SignalSettings): F[Unit]                                = settingsRepo.update(settings)
-  override def getAll(uid: UserId, from: Option[Instant], to: Option[Instant]): F[List[Signal]] = signalRepo.getAll(uid)
+  override def getAll(uid: UserId, from: Option[Instant], to: Option[Instant]): F[List[Signal]] = signalRepo.getAll(uid, from, to)
   override def submit(signal: Signal): F[Unit] =
     signalRepo.save(signal) >> dispatcher.dispatch(Action.ProcessSignal(signal))
 

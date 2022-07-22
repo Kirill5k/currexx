@@ -18,7 +18,7 @@ class SignalRepositorySpec extends MongoSpec {
         val result = for
           repo <- SignalRepository.make(db)
           _    <- repo.save(Signals.trendDirectionChanged)
-          res  <- repo.getAll(Users.uid)
+          res  <- repo.getAll(Users.uid, None, None)
         yield res
 
         result.map(_ mustBe List(Signals.trendDirectionChanged))
@@ -31,7 +31,7 @@ class SignalRepositorySpec extends MongoSpec {
           repo <- SignalRepository.make(db)
           _    <- repo.save(Signals.trendDirectionChanged)
           _    <- repo.save(Signals.trendDirectionChanged.copy(time = Signals.ts.minusSeconds(10)))
-          res  <- repo.getAll(Users.uid)
+          res  <- repo.getAll(Users.uid, None, None)
         yield res
 
         result.map(_.head mustBe Signals.trendDirectionChanged)
@@ -41,7 +41,18 @@ class SignalRepositorySpec extends MongoSpec {
         val result = for
           repo <- SignalRepository.make(db)
           _    <- repo.save(Signals.trendDirectionChanged)
-          res  <- repo.getAll(Users.uid2)
+          res  <- repo.getAll(Users.uid2, None, None)
+        yield res
+
+        result.map(_ mustBe Nil)
+      }
+
+      "filter out signals by time" in withEmbeddedMongoDb { db =>
+        val result = for
+          repo <- SignalRepository.make(db)
+          _    <- repo.save(Signals.trendDirectionChanged)
+          _    <- repo.save(Signals.trendDirectionChanged.copy(time = Signals.ts.minusSeconds(10)))
+          res  <- repo.getAll(Users.uid, Some(Signals.ts.minusSeconds(100)), Some(Signals.ts.minusSeconds(50)))
         yield res
 
         result.map(_ mustBe Nil)

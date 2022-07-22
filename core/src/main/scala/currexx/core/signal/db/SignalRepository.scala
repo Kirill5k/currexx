@@ -14,10 +14,12 @@ import mongo4cats.collection.MongoCollection
 import mongo4cats.collection.operations.Filter
 import mongo4cats.database.{CreateCollectionOptions, MongoDatabase}
 
+import java.time.Instant
+
 trait SignalRepository[F[_]] extends Repository[F]:
   def save(signal: Signal): F[Unit]
   def isFirstOfItsKindForThatDate(signal: Signal): F[Boolean]
-  def getAll(userId: UserId): F[List[Signal]]
+  def getAll(userId: UserId, from: Option[Instant], to: Option[Instant]): F[List[Signal]]
 
 final private class LiveSignalRepository[F[_]: Async](
     private val collection: MongoCollection[F, SignalEntity]
@@ -36,8 +38,12 @@ final private class LiveSignalRepository[F[_]: Async](
       )
       .map(_ == 0)
 
-  override def getAll(userId: UserId): F[List[Signal]] =
-    collection.find(userIdEq(userId)).sortByDesc("time").all.map(_.map(_.toDomain).toList)
+  override def getAll(userId: UserId, from: Option[Instant], to: Option[Instant]): F[List[Signal]] =
+    val filter = List(
+      from.map(Filter.gte("time", _)),
+      to.map(Filter.lt("time", _))
+    ).flatten.foldLeft(userIdEq(userId))(_ && _)
+    collection.find(filter).sortByDesc("time").all.map(_.map(_.toDomain).toList)
 }
 
 object SignalRepository extends MongoJsonCodecs:

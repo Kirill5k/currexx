@@ -10,7 +10,7 @@ import currexx.core.fixtures.{Markets, Signals, Users}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import io.circe.JsonObject
 
-import java.time.LocalDate
+import java.time.{Instant, LocalDate}
 import scala.collection.immutable.ListMap
 
 class SignalServiceSpec extends CatsSpec {
@@ -74,7 +74,7 @@ class SignalServiceSpec extends CatsSpec {
     "getAll" should {
       "return all signals from the signalRepository" in {
         val (signRepo, settRepo, disp) = mocks
-        when(signRepo.getAll(any[UserId])).thenReturn(IO.pure(List(Signals.trendDirectionChanged)))
+        when(signRepo.getAll(any[UserId], anyOpt[Instant], anyOpt[Instant])).thenReturn(IO.pure(List(Signals.trendDirectionChanged)))
 
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
@@ -83,7 +83,7 @@ class SignalServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verifyNoInteractions(settRepo, disp)
-          verify(signRepo).getAll(Users.uid)
+          verify(signRepo).getAll(Users.uid, Some(Signals.ts), None)
           res mustBe List(Signals.trendDirectionChanged)
         }
       }
@@ -185,7 +185,7 @@ class SignalServiceSpec extends CatsSpec {
       "create signal when trend direction changes" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val indicator      = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.NMA(16, 8, 4.2d, MovingAverage.Weighted))
-        val signal         = SignalService.detectTrendChange(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.TrendChangeDetection])
+        val signal = SignalService.detectTrendChange(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.TrendChangeDetection])
 
         val expectedCondition = Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, Some(1))
         signal mustBe Some(Signal(Users.uid, Markets.gbpeur, expectedCondition, indicator, timeSeriesData.prices.head.time))
@@ -194,7 +194,7 @@ class SignalServiceSpec extends CatsSpec {
       "not do anything when trend hasn't changed" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
         val indicator      = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.NMA(16, 8, 4.2d, MovingAverage.Weighted))
-        val signal         = SignalService.detectTrendChange(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.TrendChangeDetection])
+        val signal = SignalService.detectTrendChange(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.TrendChangeDetection])
 
         signal mustBe None
       }
