@@ -13,9 +13,11 @@ import mongo4cats.collection.MongoCollection
 import mongo4cats.collection.operations.Filter
 import mongo4cats.database.{CreateCollectionOptions, MongoDatabase}
 
+import java.time.Instant
+
 trait TradeOrderRepository[F[_]] extends Repository[F]:
   def save(top: TradeOrderPlacement): F[Unit]
-  def getAll(uid: UserId): F[List[TradeOrderPlacement]]
+  def getAll(uid: UserId, from: Option[Instant], to: Option[Instant]): F[List[TradeOrderPlacement]]
   def getAllTradedCurrencies(uid: UserId): F[List[CurrencyPair]]
   def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]]
 
@@ -24,10 +26,15 @@ final private class LiveTradeOrderRepository[F[_]: Async](
 ) extends TradeOrderRepository[F]:
   def save(top: TradeOrderPlacement): F[Unit] =
     collection.insertOne(TradeOrderEntity.from(top)).void
-  def getAll(uid: UserId): F[List[TradeOrderPlacement]] =
-    collection.find(userIdEq(uid)).sortByDesc("time").all.map(_.map(_.toDomain).toList)
   def getAllTradedCurrencies(uid: UserId): F[List[CurrencyPair]] =
     collection.distinct[CurrencyPair](Field.CurrencyPair).filter(userIdEq(uid)).all.map(_.toList)
+
+  def getAll(uid: UserId, from: Option[Instant], to: Option[Instant]): F[List[TradeOrderPlacement]] =
+    val filter = List(
+      from.map(f => Filter.gte(Field.Time, f)),
+      to.map(t => Filter.lt(Field.Time, t))
+    ).flatten.foldLeft(userIdEq(uid))(_ && _)
+    collection.find(filter).sortByDesc("time").all.map(_.map(_.toDomain).toList)
 
   def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]] =
     collection.find(userIdAndCurrencyPairEq(uid, cp)).sortByDesc("time").first.map(_.map(_.toDomain))

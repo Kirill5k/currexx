@@ -16,6 +16,7 @@ trait Repository[F[_]] {
   protected object Field {
     val Id             = "_id"
     val Name           = "name"
+    val Time           = "time"
     val UId            = "userId"
     val Email          = "email"
     val LastQueriedAt  = "lastQueriedAt"

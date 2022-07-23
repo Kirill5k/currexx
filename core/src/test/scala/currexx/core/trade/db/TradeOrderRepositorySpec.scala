@@ -19,7 +19,7 @@ class TradeOrderRepositorySpec extends MongoSpec {
           repo <- TradeOrderRepository.make(db)
           _    <- repo.save(Trades.order)
           _    <- repo.save(Trades.order.copy(time = Trades.ts.minusSeconds(100)))
-          res  <- repo.getAll(Users.uid)
+          res  <- repo.getAll(Users.uid, None, None)
         yield res
 
         result.map(_ mustBe List(Trades.order, Trades.order.copy(time = Trades.ts.minusSeconds(100))))
@@ -31,10 +31,20 @@ class TradeOrderRepositorySpec extends MongoSpec {
         val result = for
           repo <- TradeOrderRepository.make(db)
           _    <- repo.save(Trades.order)
-          res  <- repo.getAll(Users.uid2)
+          res  <- repo.getAll(Users.uid2, None, None)
         yield res
 
         result.map(_ mustBe Nil)
+      }
+
+      "filter orders by placement time" in withEmbeddedMongoDb { db =>
+        val result = for
+          repo <- TradeOrderRepository.make(db)
+          _    <- repo.save(Trades.order)
+          res  <- repo.getAll(Users.uid, Some(Trades.ts.minusSeconds(10)), Some(Trades.ts.plusSeconds(10)))
+        yield res
+
+        result.map(_ mustBe List(Trades.order))
       }
     }
 

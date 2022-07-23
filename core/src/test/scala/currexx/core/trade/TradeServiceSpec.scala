@@ -12,13 +12,15 @@ import currexx.domain.user.UserId
 import currexx.domain.market.{CurrencyPair, Indicator, TradeOrder}
 import org.mockito.Mockito
 
+import java.time.Instant
+
 class TradeServiceSpec extends CatsSpec {
 
   "A TradeService" should {
     "getAllOrders" should {
       "return all orders from the repository" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(orderRepo.getAll(any[UserId])).thenReturn(IO.pure(List(Trades.order)))
+        when(orderRepo.getAll(any[UserId], anyOpt[Instant], anyOpt[Instant])).thenReturn(IO.pure(List(Trades.order)))
 
         val result = for
           svc    <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
@@ -26,7 +28,7 @@ class TradeServiceSpec extends CatsSpec {
         yield orders
 
         result.asserting { res =>
-          verify(orderRepo).getAll(Users.uid)
+          verify(orderRepo).getAll(Users.uid, None, Some(Trades.ts))
           verifyNoInteractions(settRepo, brokerClient, dataClient, disp)
           res mustBe List(Trades.order)
         }
