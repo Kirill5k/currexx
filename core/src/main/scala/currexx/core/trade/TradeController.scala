@@ -101,7 +101,7 @@ object TradeController extends TapirSchema with TapirJson {
 
   val getTradeOrdersEndpoint = Controller.securedEndpoint.get
     .in(ordersPath)
-    .in(Controller.querySearchParams)
+    .in(Controller.searchParams)
     .out(jsonBody[List[TradeOrderView]])
     .description("Retrieve placed trade orders")
 

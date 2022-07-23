@@ -63,7 +63,7 @@ object Controller extends TapirSchema with TapirJson with TapirCodecs {
 
   private val error = statusCode.and(jsonBody[ErrorResponse])
 
-  val querySearchParams = query[Option[Instant]]("from")
+  val searchParams: EndpointInput[SearchParams] = query[Option[Instant]]("from")
     .and(query[Option[Instant]]("to"))
     .and(query[Option[CurrencyPair]]("currencyPair"))
     .map((f, t, cp) => SearchParams(f, t, cp))(sp => (sp.from, sp.to, sp.currencyPair))
@@ -116,7 +116,7 @@ object Controller extends TapirSchema with TapirJson with TapirCodecs {
       .mkString(", ")
 
   def mapError(error: Throwable): (StatusCode, ErrorResponse) =
-    error match {
+    error match
       case err: AppError.Conflict =>
         (StatusCode.Conflict, ErrorResponse(err.getMessage))
       case err: AppError.BadReq =>
@@ -135,5 +135,4 @@ object Controller extends TapirSchema with TapirJson with TapirCodecs {
         (StatusCode.BadRequest, ErrorResponse(err.getMessage))
       case err =>
         (StatusCode.InternalServerError, ErrorResponse(err.getMessage))
-    }
 }

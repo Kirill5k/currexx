@@ -108,7 +108,7 @@ object SignalController extends TapirSchema with TapirJson {
 
   val getAllSignalsEndpoint = Controller.securedEndpoint.get
     .in(basePath)
-    .in(Controller.querySearchParams)
+    .in(Controller.searchParams)
     .out(jsonBody[List[SignalView]])
     .description("Retrieve all submitted signals")
 
