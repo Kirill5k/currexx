@@ -38,10 +38,10 @@ final private class SignalController[F[_]](
 
   private def getAllSignals(using auth: Authenticator[F]) =
     getAllSignalsEndpoint.withAuthenticatedSession
-      .serverLogic { session => (from, to) =>
-        (from, to).mapN((f, t) => F.raiseWhen(f.isAfter(t))(AppError.InvalidDateRange)).getOrElse(F.unit) >>
+      .serverLogic { session => sp =>
+        (sp.from, sp.to).mapN((f, t) => F.raiseWhen(f.isAfter(t))(AppError.InvalidDateRange)).getOrElse(F.unit) >>
           service
-            .getAll(session.userId, from, to)
+            .getAll(session.userId, sp.from, sp.to)
             .mapResponse(_.map(SignalView.from))
       }
 
@@ -72,7 +72,7 @@ final private class SignalController[F[_]](
     )
 }
 
-object SignalController extends TapirSchema with TapirJson with TapirCodecs {
+object SignalController extends TapirSchema with TapirJson {
 
   final case class SubmitSignalRequest(
       currencyPair: CurrencyPair,
@@ -108,7 +108,7 @@ object SignalController extends TapirSchema with TapirJson with TapirCodecs {
 
   val getAllSignalsEndpoint = Controller.securedEndpoint.get
     .in(basePath)
-    .in(query[Option[Instant]]("from").and(query[Option[Instant]]("to")))
+    .in(Controller.querySearchParams)
     .out(jsonBody[List[SignalView]])
     .description("Retrieve all submitted signals")
 

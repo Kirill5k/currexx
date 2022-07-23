@@ -2,9 +2,12 @@ package currexx.core.trade
 
 import cats.Monad
 import cats.effect.Async
+import cats.syntax.apply.*
+import cats.syntax.flatMap.*
 import currexx.clients.broker.BrokerParameters
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema}
+import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, PriceRange, TradeOrder}
 import currexx.domain.user.UserId
 import io.circe.Codec
@@ -40,10 +43,11 @@ final private class TradeController[F[_]](
 
   private def getTradeOrders(using auth: Authenticator[F]) =
     getTradeOrdersEndpoint.withAuthenticatedSession
-      .serverLogic { session => (from, to) =>
-        service
-          .getAllOrders(session.userId, from, to)
-          .mapResponse(_.map(TradeOrderView.from))
+      .serverLogic { session => sp =>
+        (sp.from, sp.to).mapN((f, t) => F.raiseWhen(f.isAfter(t))(AppError.InvalidDateRange)).getOrElse(F.unit) >>
+          service
+            .getAllOrders(session.userId, sp.from, sp.to)
+            .mapResponse(_.map(TradeOrderView.from))
       }
 
   private def submitTradeOrderPlacement(using auth: Authenticator[F]) =
@@ -65,7 +69,7 @@ final private class TradeController[F[_]](
     )
 }
 
-object TradeController extends TapirSchema with TapirJson with TapirCodecs {
+object TradeController extends TapirSchema with TapirJson {
 
   final case class TradeSettingsView(
       strategy: TradeStrategy,
@@ -97,7 +101,7 @@ object TradeController extends TapirSchema with TapirJson with TapirCodecs {
 
   val getTradeOrdersEndpoint = Controller.securedEndpoint.get
     .in(ordersPath)
-    .in(query[Option[Instant]]("from").and(query[Option[Instant]]("to")))
+    .in(Controller.querySearchParams)
     .out(jsonBody[List[TradeOrderView]])
     .description("Retrieve placed trade orders")
 

@@ -11,6 +11,7 @@ import currexx.core.auth.jwt.BearerToken
 import currexx.domain.errors.AppError
 import currexx.domain.session.Session
 import currexx.domain.JsonCodecs
+import currexx.domain.market.CurrencyPair
 import currexx.domain.session.Session
 import io.circe.Codec
 import mongo4cats.bson.ObjectId
@@ -26,7 +27,15 @@ import sttp.tapir.server.interceptor.exception.{ExceptionContext, ExceptionHandl
 import sttp.tapir.server.model.ValuedEndpointOutput
 import squants.market.NoSuchCurrencyException
 
+import java.time.Instant
+
 final case class ErrorResponse(message: String) derives Codec.AsObject
+
+final case class SearchParams(
+    from: Option[Instant],
+    to: Option[Instant],
+    currencyPair: Option[CurrencyPair]
+)
 
 trait Controller[F[_]] extends TapirJson with TapirSchema {
 
@@ -47,12 +56,17 @@ trait Controller[F[_]] extends TapirJson with TapirSchema {
       se.serverSecurityLogic(t => auth.authenticate(t).mapResponse(identity))
 }
 
-object Controller extends TapirSchema with TapirJson {
+object Controller extends TapirSchema with TapirJson with TapirCodecs {
   val validId: Validator[String] = Validator.custom { id =>
     if ObjectId.isValid(id) then ValidationResult.Valid else ValidationResult.Invalid(s"Invalid hexadecimal representation of an id: $id")
   }
 
   private val error = statusCode.and(jsonBody[ErrorResponse])
+
+  val querySearchParams = query[Option[Instant]]("from")
+    .and(query[Option[Instant]]("to"))
+    .and(query[Option[CurrencyPair]]("currencyPair"))
+    .map((f, t, cp) => SearchParams(f, t, cp))(sp => (sp.from, sp.to, sp.currencyPair))
 
   val publicEndpoint: PublicEndpoint[Unit, (StatusCode, ErrorResponse), Unit, Any] =
     endpoint.errorOut(error)
