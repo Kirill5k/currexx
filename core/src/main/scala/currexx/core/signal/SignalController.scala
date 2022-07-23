@@ -41,7 +41,7 @@ final private class SignalController[F[_]](
       .serverLogic { session => sp =>
         (sp.from, sp.to).mapN((f, t) => F.raiseWhen(f.isAfter(t))(AppError.InvalidDateRange)).getOrElse(F.unit) >>
           service
-            .getAll(session.userId, sp.from, sp.to)
+            .getAll(session.userId, sp)
             .mapResponse(_.map(SignalView.from))
       }
 

@@ -5,6 +5,7 @@ import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.core.common.db.Repository
+import currexx.core.common.http.SearchParams
 import currexx.core.signal.Signal
 import currexx.core.common.time.*
 import currexx.domain.market.{CurrencyPair, Indicator}
@@ -19,7 +20,7 @@ import java.time.Instant
 trait SignalRepository[F[_]] extends Repository[F]:
   def save(signal: Signal): F[Unit]
   def isFirstOfItsKindForThatDate(signal: Signal): F[Boolean]
-  def getAll(userId: UserId, from: Option[Instant], to: Option[Instant]): F[List[Signal]]
+  def getAll(userId: UserId, sp: SearchParams): F[List[Signal]]
 
 final private class LiveSignalRepository[F[_]: Async](
     private val collection: MongoCollection[F, SignalEntity]
@@ -38,10 +39,10 @@ final private class LiveSignalRepository[F[_]: Async](
       )
       .map(_ == 0)
 
-  override def getAll(userId: UserId, from: Option[Instant], to: Option[Instant]): F[List[Signal]] =
+  override def getAll(userId: UserId, sp: SearchParams): F[List[Signal]] =
     val filter = List(
-      from.map(Filter.gte("time", _)),
-      to.map(Filter.lt("time", _))
+      sp.from.map(Filter.gte(Field.Time, _)),
+      sp.to.map(Filter.lt(Field.Time, _))
     ).flatten.foldLeft(userIdEq(userId))(_ && _)
     collection.find(filter).sortByDesc("time").all.map(_.map(_.toDomain).toList)
 }

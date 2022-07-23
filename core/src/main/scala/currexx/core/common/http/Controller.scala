@@ -37,6 +37,9 @@ final case class SearchParams(
     currencyPair: Option[CurrencyPair]
 )
 
+object SearchParams:
+  val empty = SearchParams(None, None, None)
+
 trait Controller[F[_]] extends TapirJson with TapirSchema {
 
   def routes(using authenticator: Authenticator[F]): HttpRoutes[F]

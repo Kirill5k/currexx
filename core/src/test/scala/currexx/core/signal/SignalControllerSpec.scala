@@ -3,6 +3,7 @@ package currexx.core.signal
 import cats.effect.IO
 import currexx.core.ControllerSpec
 import currexx.core.auth.Authenticator
+import currexx.core.common.http.SearchParams
 import currexx.domain.user.UserId
 import currexx.core.fixtures.{Markets, Sessions, Signals, Users}
 import currexx.domain.errors.AppError
@@ -104,9 +105,9 @@ class SignalControllerSpec extends ControllerSpec {
     "GET /signals" should {
       "return all submitted signals" in {
         val svc = mock[SignalService[IO]]
-        when(svc.getAll(any[UserId], any[Option[Instant]], any[Option[Instant]])).thenReturn(IO.pure(List(Signals.trendDirectionChanged)))
+        when(svc.getAll(any[UserId], any[SearchParams])).thenReturn(IO.pure(List(Signals.trendDirectionChanged)))
 
-        val req = requestWithAuthHeader(uri"/signals?from=2020-01-01&to=2021-01-01T04:01:00Z", Method.GET)
+        val req = requestWithAuthHeader(uri"/signals?from=2020-01-01&to=2021-01-01T04:01:00Z&currencyPair=GBP/USD", Method.GET)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody = s"""[{
@@ -116,7 +117,10 @@ class SignalControllerSpec extends ControllerSpec {
                |"condition": {"kind":"trend-direction-change","from":"downward","to":"upward","previousTrendLength":1}
                |}]""".stripMargin
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
-        verify(svc).getAll(Users.uid, Some(Instant.parse("2020-01-01T00:00:00Z")), Some(Instant.parse("2021-01-01T04:01:00Z")))
+        verify(svc).getAll(
+          Users.uid,
+          SearchParams(Some(Instant.parse("2020-01-01T00:00:00Z")), Some(Instant.parse("2021-01-01T04:01:00Z")), Some(Markets.gbpusd))
+        )
       }
 
       "return error when date 'from' is after 'to'" in {

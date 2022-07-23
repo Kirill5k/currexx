@@ -3,6 +3,7 @@ package currexx.core.signal.db
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
+import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Signals, Users}
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
@@ -18,7 +19,7 @@ class SignalRepositorySpec extends MongoSpec {
         val result = for
           repo <- SignalRepository.make(db)
           _    <- repo.save(Signals.trendDirectionChanged)
-          res  <- repo.getAll(Users.uid, None, None)
+          res  <- repo.getAll(Users.uid, SearchParams.empty)
         yield res
 
         result.map(_ mustBe List(Signals.trendDirectionChanged))
@@ -31,7 +32,7 @@ class SignalRepositorySpec extends MongoSpec {
           repo <- SignalRepository.make(db)
           _    <- repo.save(Signals.trendDirectionChanged)
           _    <- repo.save(Signals.trendDirectionChanged.copy(time = Signals.ts.minusSeconds(10)))
-          res  <- repo.getAll(Users.uid, None, None)
+          res  <- repo.getAll(Users.uid, SearchParams.empty)
         yield res
 
         result.map(_.head mustBe Signals.trendDirectionChanged)
@@ -41,7 +42,7 @@ class SignalRepositorySpec extends MongoSpec {
         val result = for
           repo <- SignalRepository.make(db)
           _    <- repo.save(Signals.trendDirectionChanged)
-          res  <- repo.getAll(Users.uid2, None, None)
+          res  <- repo.getAll(Users.uid2, SearchParams.empty)
         yield res
 
         result.map(_ mustBe Nil)
@@ -52,7 +53,8 @@ class SignalRepositorySpec extends MongoSpec {
           repo <- SignalRepository.make(db)
           _    <- repo.save(Signals.trendDirectionChanged)
           _    <- repo.save(Signals.trendDirectionChanged.copy(time = Signals.ts.minusSeconds(10)))
-          res  <- repo.getAll(Users.uid, Some(Signals.ts.minusSeconds(100)), Some(Signals.ts.minusSeconds(50)))
+          sp = SearchParams(Some(Signals.ts.minusSeconds(100)), Some(Signals.ts.minusSeconds(50)), None)
+          res <- repo.getAll(Users.uid, sp)
         yield res
 
         result.map(_ mustBe Nil)
@@ -86,8 +88,6 @@ class SignalRepositorySpec extends MongoSpec {
     withRunningEmbeddedMongo {
       MongoClient
         .fromConnectionString[IO](s"mongodb://$mongoHost:$mongoPort")
-        .use { client =>
-          client.getDatabase("currexx").flatMap(test)
-        }
+        .use(_.getDatabase("currexx").flatMap(test))
     }.unsafeToFuture()(IORuntime.global)
 }

@@ -6,6 +6,7 @@ import currexx.core.{CatsSpec, FileReader}
 import currexx.domain.user.UserId
 import currexx.domain.market.{Condition, CurrencyPair, Indicator, MovingAverage, PriceRange, Trend, ValueSource, ValueTransformation}
 import currexx.core.common.action.{Action, ActionDispatcher}
+import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Signals, Users}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import io.circe.JsonObject
@@ -74,16 +75,16 @@ class SignalServiceSpec extends CatsSpec {
     "getAll" should {
       "return all signals from the signalRepository" in {
         val (signRepo, settRepo, disp) = mocks
-        when(signRepo.getAll(any[UserId], anyOpt[Instant], anyOpt[Instant])).thenReturn(IO.pure(List(Signals.trendDirectionChanged)))
+        when(signRepo.getAll(any[UserId], any[SearchParams])).thenReturn(IO.pure(List(Signals.trendDirectionChanged)))
 
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
-          res <- svc.getAll(Users.uid, Some(Signals.ts), None)
+          res <- svc.getAll(Users.uid, SearchParams(Some(Signals.ts), None, Some(Markets.gbpeur)))
         yield res
 
         result.asserting { res =>
           verifyNoInteractions(settRepo, disp)
-          verify(signRepo).getAll(Users.uid, Some(Signals.ts), None)
+          verify(signRepo).getAll(Users.uid, SearchParams(Some(Signals.ts), None, Some(Markets.gbpeur)))
           res mustBe List(Signals.trendDirectionChanged)
         }
       }
