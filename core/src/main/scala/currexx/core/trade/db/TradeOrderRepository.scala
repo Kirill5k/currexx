@@ -6,6 +6,7 @@ import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.core.trade.TradeOrderPlacement
 import currexx.core.common.db.Repository
+import currexx.core.common.http.SearchParams
 import currexx.domain.user.UserId
 import currexx.domain.market.CurrencyPair
 import mongo4cats.circe.MongoJsonCodecs
@@ -17,7 +18,7 @@ import java.time.Instant
 
 trait TradeOrderRepository[F[_]] extends Repository[F]:
   def save(top: TradeOrderPlacement): F[Unit]
-  def getAll(uid: UserId, from: Option[Instant], to: Option[Instant]): F[List[TradeOrderPlacement]]
+  def getAll(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]]
   def getAllTradedCurrencies(uid: UserId): F[List[CurrencyPair]]
   def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]]
 
@@ -29,10 +30,11 @@ final private class LiveTradeOrderRepository[F[_]: Async](
   def getAllTradedCurrencies(uid: UserId): F[List[CurrencyPair]] =
     collection.distinct[CurrencyPair](Field.CurrencyPair).filter(userIdEq(uid)).all.map(_.toList)
 
-  def getAll(uid: UserId, from: Option[Instant], to: Option[Instant]): F[List[TradeOrderPlacement]] =
+  def getAll(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]] =
     val filter = List(
-      from.map(f => Filter.gte(Field.Time, f)),
-      to.map(t => Filter.lt(Field.Time, t))
+      sp.from.map(f => Filter.gte(Field.Time, f)),
+      sp.to.map(t => Filter.lt(Field.Time, t)),
+      sp.currencyPair.map(cp => Filter.eq(Field.CurrencyPair, cp))
     ).flatten.foldLeft(userIdEq(uid))(_ && _)
     collection.find(filter).sortByDesc(Field.Time).all.map(_.map(_.toDomain).toList)
 

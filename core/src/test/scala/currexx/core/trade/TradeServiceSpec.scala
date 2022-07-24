@@ -21,7 +21,7 @@ class TradeServiceSpec extends CatsSpec {
     "getAllOrders" should {
       "return all orders from the repository" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(orderRepo.getAll(any[UserId], anyOpt[Instant], anyOpt[Instant])).thenReturn(IO.pure(List(Trades.order)))
+        when(orderRepo.getAll(any[UserId], any[SearchParams])).thenReturn(IO.pure(List(Trades.order)))
 
         val result = for
           svc    <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
@@ -29,7 +29,7 @@ class TradeServiceSpec extends CatsSpec {
         yield orders
 
         result.asserting { res =>
-          verify(orderRepo).getAll(Users.uid, None, Some(Trades.ts))
+          verify(orderRepo).getAll(Users.uid, SearchParams(None, Some(Trades.ts), None))
           verifyNoInteractions(settRepo, brokerClient, dataClient, disp)
           res mustBe List(Trades.order)
         }

@@ -37,11 +37,9 @@ final private class LiveTradeService[F[_]](
 )(using
     F: Temporal[F]
 ) extends TradeService[F] {
-  override def getSettings(uid: UserId): F[TradeSettings]       = settingsRepository.get(uid)
-  override def updateSettings(settings: TradeSettings): F[Unit] = settingsRepository.update(settings)
-  
-  override def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]] =
-    orderRepository.getAll(uid, sp.from, sp.to)
+  override def getSettings(uid: UserId): F[TradeSettings]                                = settingsRepository.get(uid)
+  override def updateSettings(settings: TradeSettings): F[Unit]                          = settingsRepository.update(settings)
+  override def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]] = orderRepository.getAll(uid, sp)
 
   override def placeOrder(uid: UserId, cp: CurrencyPair, order: TradeOrder, closePendingOrders: Boolean): F[Unit] =
     (F.realTimeInstant, marketDataClient.latestPrice(cp), settingsRepository.get(uid))
