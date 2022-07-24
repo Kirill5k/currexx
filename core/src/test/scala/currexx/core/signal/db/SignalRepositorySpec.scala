@@ -13,13 +13,15 @@ import scala.concurrent.Future
 class SignalRepositorySpec extends MongoSpec {
   override protected val mongoPort: Int = 12348
 
+  val emptySearchParams = SearchParams(None, None, None)
+
   "A SignalRepository" when {
     "save" should {
       "store signal in the repository" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- SignalRepository.make(db)
           _    <- repo.save(Signals.trendDirectionChanged)
-          res  <- repo.getAll(Users.uid, SearchParams.empty)
+          res  <- repo.getAll(Users.uid, emptySearchParams)
         yield res
 
         result.map(_ mustBe List(Signals.trendDirectionChanged))
@@ -32,7 +34,7 @@ class SignalRepositorySpec extends MongoSpec {
           repo <- SignalRepository.make(db)
           _    <- repo.save(Signals.trendDirectionChanged)
           _    <- repo.save(Signals.trendDirectionChanged.copy(time = Signals.ts.minusSeconds(10)))
-          res  <- repo.getAll(Users.uid, SearchParams.empty)
+          res  <- repo.getAll(Users.uid, emptySearchParams)
         yield res
 
         result.map(_.head mustBe Signals.trendDirectionChanged)
@@ -42,7 +44,7 @@ class SignalRepositorySpec extends MongoSpec {
         val result = for
           repo <- SignalRepository.make(db)
           _    <- repo.save(Signals.trendDirectionChanged)
-          res  <- repo.getAll(Users.uid2, SearchParams.empty)
+          res  <- repo.getAll(Users.uid2, emptySearchParams)
         yield res
 
         result.map(_ mustBe Nil)
@@ -54,6 +56,17 @@ class SignalRepositorySpec extends MongoSpec {
           _    <- repo.save(Signals.trendDirectionChanged)
           _    <- repo.save(Signals.trendDirectionChanged.copy(time = Signals.ts.minusSeconds(10)))
           sp = SearchParams(Some(Signals.ts.minusSeconds(100)), Some(Signals.ts.minusSeconds(50)), None)
+          res <- repo.getAll(Users.uid, sp)
+        yield res
+
+        result.map(_ mustBe Nil)
+      }
+
+      "filter out signals by currencyPair" in withEmbeddedMongoDb { db =>
+        val result = for
+          repo <- SignalRepository.make(db)
+          _    <- repo.save(Signals.trendDirectionChanged)
+          sp = SearchParams(None, None, Some(Markets.gbpusd))
           res <- repo.getAll(Users.uid, sp)
         yield res
 

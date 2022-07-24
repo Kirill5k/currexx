@@ -34,17 +34,18 @@ final private class LiveSignalRepository[F[_]: Async](
       .count(
         userIdAndCurrencyPairEq(signal.userId, signal.currencyPair) &&
           Filter.eq("triggeredBy", signal.triggeredBy) &&
-          Filter.gte("time", signal.time.atStartOfDay) &&
-          Filter.lt("time", signal.time.atEndOfDay)
+          Filter.gte(Field.Time, signal.time.atStartOfDay) &&
+          Filter.lt(Field.Time, signal.time.atEndOfDay)
       )
       .map(_ == 0)
 
   override def getAll(userId: UserId, sp: SearchParams): F[List[Signal]] =
     val filter = List(
       sp.from.map(Filter.gte(Field.Time, _)),
-      sp.to.map(Filter.lt(Field.Time, _))
+      sp.to.map(Filter.lt(Field.Time, _)),
+      sp.currencyPair.map(cp => Filter.eq(Field.CurrencyPair, cp))
     ).flatten.foldLeft(userIdEq(userId))(_ && _)
-    collection.find(filter).sortByDesc("time").all.map(_.map(_.toDomain).toList)
+    collection.find(filter).sortByDesc(Field.Time).all.map(_.map(_.toDomain).toList)
 }
 
 object SignalRepository extends MongoJsonCodecs:
