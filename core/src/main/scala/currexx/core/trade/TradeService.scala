@@ -9,6 +9,7 @@ import cats.syntax.traverse.*
 import currexx.clients.broker.BrokerClient
 import currexx.clients.data.MarketDataClient
 import currexx.core.common.action.{Action, ActionDispatcher}
+import currexx.core.common.http.SearchParams
 import currexx.core.market.{MarketState, PositionState}
 import currexx.core.trade.TradeStrategyExecutor.Decision
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
@@ -21,7 +22,7 @@ import java.time.Instant
 trait TradeService[F[_]]:
   def getSettings(uid: UserId): F[TradeSettings]
   def updateSettings(settings: TradeSettings): F[Unit]
-  def getAllOrders(uid: UserId, from: Option[Instant], to: Option[Instant]): F[List[TradeOrderPlacement]]
+  def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]]
   def processMarketStateUpdate(state: MarketState, trigger: Indicator): F[Unit]
   def placeOrder(uid: UserId, cp: CurrencyPair, order: TradeOrder, closePendingOrders: Boolean): F[Unit]
   def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
@@ -39,8 +40,8 @@ final private class LiveTradeService[F[_]](
   override def getSettings(uid: UserId): F[TradeSettings]       = settingsRepository.get(uid)
   override def updateSettings(settings: TradeSettings): F[Unit] = settingsRepository.update(settings)
   
-  override def getAllOrders(uid: UserId, from: Option[Instant], to: Option[Instant]): F[List[TradeOrderPlacement]] =
-    orderRepository.getAll(uid, from, to)
+  override def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]] =
+    orderRepository.getAll(uid, sp.from, sp.to)
 
   override def placeOrder(uid: UserId, cp: CurrencyPair, order: TradeOrder, closePendingOrders: Boolean): F[Unit] =
     (F.realTimeInstant, marketDataClient.latestPrice(cp), settingsRepository.get(uid))

@@ -5,6 +5,7 @@ import currexx.clients.broker.{BrokerClient, BrokerParameters}
 import currexx.clients.data.MarketDataClient
 import currexx.core.CatsSpec
 import currexx.core.common.action.{Action, ActionDispatcher}
+import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Trades, Users}
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.errors.AppError
@@ -24,7 +25,7 @@ class TradeServiceSpec extends CatsSpec {
 
         val result = for
           svc    <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          orders <- svc.getAllOrders(Users.uid, None, Some(Trades.ts))
+          orders <- svc.getAllOrders(Users.uid, SearchParams(None, Some(Trades.ts), None))
         yield orders
 
         result.asserting { res =>

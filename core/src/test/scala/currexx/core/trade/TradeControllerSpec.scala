@@ -2,6 +2,7 @@ package currexx.core.trade
 
 import cats.effect.IO
 import currexx.core.auth.Authenticator
+import currexx.core.common.http.SearchParams
 import currexx.core.{CatsSpec, ControllerSpec}
 import currexx.core.fixtures.{Markets, Sessions, Trades, Users}
 import currexx.domain.errors.AppError
@@ -50,9 +51,9 @@ class TradeControllerSpec extends ControllerSpec {
     "GET /trade/orders" should {
       "return placed orders" in {
         val svc = mock[TradeService[IO]]
-        when(svc.getAllOrders(any[UserId], any[Option[Instant]], any[Option[Instant]])).thenReturn(IO.pure(List(Trades.order)))
+        when(svc.getAllOrders(any[UserId], any[SearchParams])).thenReturn(IO.pure(List(Trades.order)))
 
-        val req = requestWithAuthHeader(uri"/trade/orders?from=2020-01-01", Method.GET)
+        val req = requestWithAuthHeader(uri"/trade/orders?from=2020-01-01&currencyPair=GBP/EUR", Method.GET)
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody =
@@ -83,7 +84,7 @@ class TradeControllerSpec extends ControllerSpec {
              |}
              |]""".stripMargin
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
-        verify(svc).getAllOrders(Users.uid, Some(Instant.parse("2020-01-01T00:00:00Z")), None)
+        verify(svc).getAllOrders(Users.uid, SearchParams(Some(Instant.parse("2020-01-01T00:00:00Z")), None, Some(Markets.gbpeur)))
       }
     }
 

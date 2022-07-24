@@ -46,7 +46,7 @@ final private class TradeController[F[_]](
       .serverLogic { session => sp =>
         (sp.from, sp.to).mapN((f, t) => F.raiseWhen(f.isAfter(t))(AppError.InvalidDateRange)).getOrElse(F.unit) >>
           service
-            .getAllOrders(session.userId, sp.from, sp.to)
+            .getAllOrders(session.userId, sp)
             .mapResponse(_.map(TradeOrderView.from))
       }
 
