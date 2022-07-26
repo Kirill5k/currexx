@@ -57,14 +57,14 @@ object XtbRequest {
     XtbRequest(
       "getSymbol",
       Some(sessionId),
-      RequestArguments.SymbolInfo(cp.toSymbol)
+      RequestArguments.SymbolInfo(cp.toString)
     )
 
   private def enterMarket(cp: CurrencyPair, order: TradeOrder.Enter, price: SymbolData): RequestArguments.TradeTransInfo =
     RequestArguments.TradeTransInfo(
       `type` = 0,
       cmd = if (order.position == TradeOrder.Position.Buy) 0 else 1,
-      symbol = cp.toSymbol,
+      symbol = cp.toString,
       customComment = s"Currexx - ${TradeOrder.Position.Buy.toString} $cp",
       offset = order.trailingStopLoss,
       price = if (order.position == TradeOrder.Position.Buy) price.ask else price.bid,
@@ -77,7 +77,7 @@ object XtbRequest {
     RequestArguments.TradeTransInfo(
       `type` = 2,
       price = price.ask,
-      symbol = cp.toSymbol,
+      symbol = cp.toString,
       customComment = s"Currexx - Close $cp",
       cmd = 0
     )

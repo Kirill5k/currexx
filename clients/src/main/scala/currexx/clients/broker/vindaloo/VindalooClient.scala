@@ -37,12 +37,11 @@ final private class LiveVindalooClient[F[_]](
     val trailingSL = order.trailingStopLoss.getOrElse(0)
     val takeProfit = order.takeProfit.getOrElse(0)
     val pos        = order.position.toString.toLowerCase
-    val pair       = s"${currencyPair.base.code}${currencyPair.quote.code}"
-    sendRequest(uri"${config.baseUri}/$externalId/$stopLoss/$trailingSL/$takeProfit/$pos/$pair/${order.volume}")
+    sendRequest(uri"${config.baseUri}/$externalId/$stopLoss/$trailingSL/$takeProfit/$pos/$currencyPair/${order.volume}")
   }
 
   private def exitMarketOrder(externalId: String, currencyPair: CurrencyPair): F[Unit] =
-    sendRequest(uri"${config.baseUri}/close/$externalId/${currencyPair.base.code}${currencyPair.quote.code}")
+    sendRequest(uri"${config.baseUri}/close/$externalId/$currencyPair")
 
   private def sendRequest(uri: Uri): F[Unit] =
     dispatch(basicRequest.post(uri))
