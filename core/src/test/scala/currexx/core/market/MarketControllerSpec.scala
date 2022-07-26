@@ -50,7 +50,7 @@ class MarketControllerSpec extends ControllerSpec {
         val responseBody =
           s"""
              |{
-             |  "GBP/EUR": {
+             |  "GBPEUR": {
              |    "currentPosition": {
              |      "position": "buy",
              |      "openedAt": "${Markets.ts}",

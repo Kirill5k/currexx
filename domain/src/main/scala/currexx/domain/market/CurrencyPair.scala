@@ -11,7 +11,7 @@ object CurrencyPair:
   inline def from(strRepr: String): Either[String, CurrencyPair] =
     for
       pair <- Either.cond(
-        strRepr.matches("^[A-Z]{3}\\(/)?[A-Z]{3}$"),
+        strRepr.matches("^[A-Z]{3}\\/?[A-Z]{3}$"),
         (strRepr.take(3), strRepr.substring(strRepr.length - 3, strRepr.length)),
         s"$strRepr is not valid currency pair representation"
       )

@@ -111,7 +111,7 @@ class SignalControllerSpec extends ControllerSpec {
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody = s"""[{
-               |"currencyPair":"GBP/EUR",
+               |"currencyPair":"GBPEUR",
                |"time": "${Signals.ts}",
                |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
                |"condition": {"kind":"trend-direction-change","from":"downward","to":"upward","previousTrendLength":1}

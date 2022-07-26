@@ -59,7 +59,7 @@ class TradeControllerSpec extends ControllerSpec {
         val responseBody =
           s"""[
              |{
-             |  "currencyPair" : "GBP/EUR",
+             |  "currencyPair" : "GBPEUR",
              |  "order" : {
              |    "kind" : "enter",
              |    "position" : "buy",
