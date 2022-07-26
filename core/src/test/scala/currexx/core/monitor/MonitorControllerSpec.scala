@@ -54,7 +54,7 @@ class MonitorControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withEntity(requestBody)
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.Conflict, Some("""{"message":"Monitor for currency pair GBP/EUR already exists"}"""))
+        verifyJsonResponse(res, Status.Conflict, Some("""{"message":"Monitor for currency pair GBPEUR already exists"}"""))
         verify(svc).create(Monitors.create())
       }
     }
