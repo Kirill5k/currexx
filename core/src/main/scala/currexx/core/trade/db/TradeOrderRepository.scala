@@ -34,7 +34,7 @@ final private class LiveTradeOrderRepository[F[_]: Async](
     val filter = List(
       sp.from.map(f => Filter.gte(Field.Time, f)),
       sp.to.map(t => Filter.lt(Field.Time, t)),
-      sp.currencyPair.map(cp => Filter.eq(Field.CurrencyPair, cp))
+      sp.currencyPair.map(cp => Filter.regex(Field.CurrencyPair, s"${cp.base.code}\\/?${cp.quote.code}"))
     ).flatten.foldLeft(userIdEq(uid))(_ && _)
     collection.find(filter).sortByDesc(Field.Time).all.map(_.map(_.toDomain).toList)
 
