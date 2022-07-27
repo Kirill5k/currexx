@@ -43,7 +43,7 @@ final private class LiveSignalRepository[F[_]: Async](
     val filter = List(
       sp.from.map(Filter.gte(Field.Time, _)),
       sp.to.map(Filter.lt(Field.Time, _)),
-      sp.currencyPair.map(cp => Filter.eq(Field.CurrencyPair, cp))
+      sp.currencyPair.map(cp => Filter.regex(Field.CurrencyPair, s"${cp.base.code}\\/?${cp.quote.code}"))
     ).flatten.foldLeft(userIdEq(userId))(_ && _)
     collection.find(filter).sortByDesc(Field.Time).all.map(_.map(_.toDomain).toList)
 }
