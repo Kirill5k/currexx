@@ -31,12 +31,7 @@ final private class LiveTradeOrderRepository[F[_]: Async](
     collection.distinct[CurrencyPair](Field.CurrencyPair).filter(userIdEq(uid)).all.map(_.toList)
 
   def getAll(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]] =
-    val filter = List(
-      sp.from.map(f => Filter.gte(Field.Time, f)),
-      sp.to.map(t => Filter.lt(Field.Time, t)),
-      sp.currencyPair.map(cp => Filter.regex(Field.CurrencyPair, s"${cp.base.code}\\/?${cp.quote.code}"))
-    ).flatten.foldLeft(userIdEq(uid))(_ && _)
-    collection.find(filter).sortByDesc(Field.Time).all.map(_.map(_.toDomain).toList)
+    collection.find(searchBy(uid, sp)).sortByDesc(Field.Time).all.map(_.map(_.toDomain).toList)
 
   def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]] =
     collection.find(userIdAndCurrencyPairEq(uid, cp)).sortByDesc("time").first.map(_.map(_.toDomain))

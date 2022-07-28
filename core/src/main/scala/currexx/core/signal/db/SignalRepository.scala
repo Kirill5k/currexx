@@ -39,13 +39,8 @@ final private class LiveSignalRepository[F[_]: Async](
       )
       .map(_ == 0)
 
-  override def getAll(userId: UserId, sp: SearchParams): F[List[Signal]] =
-    val filter = List(
-      sp.from.map(Filter.gte(Field.Time, _)),
-      sp.to.map(Filter.lt(Field.Time, _)),
-      sp.currencyPair.map(cp => Filter.regex(Field.CurrencyPair, s"${cp.base.code}\\/?${cp.quote.code}"))
-    ).flatten.foldLeft(userIdEq(userId))(_ && _)
-    collection.find(filter).sortByDesc(Field.Time).all.map(_.map(_.toDomain).toList)
+  override def getAll(uid: UserId, sp: SearchParams): F[List[Signal]] =
+    collection.find(searchBy(uid, sp)).sortByDesc(Field.Time).all.map(_.map(_.toDomain).toList)
 }
 
 object SignalRepository extends MongoJsonCodecs:
