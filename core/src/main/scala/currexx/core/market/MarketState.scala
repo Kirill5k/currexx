@@ -24,5 +24,6 @@ final case class MarketState(
     currentPosition: Option[PositionState],
     latestPrice: Option[PriceRange],
     signals: Map[String, List[IndicatorState]],
-    lastUpdatedAt: Option[Instant]
+    lastUpdatedAt: Option[Instant],
+    createdAt: Option[Instant]
 ) derives Codec.AsObject

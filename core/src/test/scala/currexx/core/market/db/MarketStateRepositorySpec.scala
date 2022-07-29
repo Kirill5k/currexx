@@ -22,7 +22,7 @@ class MarketStateRepositorySpec extends MongoSpec {
           res  <- repo.update(Users.uid, Markets.gbpeur, Markets.priceRange)
         yield res
 
-        result.map(_ mustBe MarketState(Users.uid, Markets.gbpeur, None, Some(Markets.priceRange), Map.empty, None))
+        result.map(_.withoutCreatedAt mustBe MarketState(Users.uid, Markets.gbpeur, None, Some(Markets.priceRange), Map.empty, None, None))
       }
 
       "update existing state if it exists" in withEmbeddedMongoDb { db =>
@@ -44,7 +44,7 @@ class MarketStateRepositorySpec extends MongoSpec {
           res  <- repo.update(Users.uid, Markets.gbpeur, Markets.indicatorStates)
         yield res
 
-        result.map(_ mustBe MarketState(Users.uid, Markets.gbpeur, None, None, Markets.indicatorStates, None))
+        result.map(_.withoutCreatedAt mustBe MarketState(Users.uid, Markets.gbpeur, None, None, Markets.indicatorStates, None, None))
       }
     }
 
@@ -81,9 +81,9 @@ class MarketStateRepositorySpec extends MongoSpec {
         yield res
 
         result.map {
-          _ mustBe List(
-            MarketState(Users.uid, Markets.gbpeur, None, Some(Markets.priceRange), Map.empty, None),
-            MarketState(Users.uid, Markets.gbpusd, None, Some(Markets.priceRange), Map.empty, None)
+          _.map(_.withoutCreatedAt) mustBe List(
+            MarketState(Users.uid, Markets.gbpeur, None, Some(Markets.priceRange), Map.empty, None, None),
+            MarketState(Users.uid, Markets.gbpusd, None, Some(Markets.priceRange), Map.empty, None, None)
           )
         }
       }
@@ -104,12 +104,13 @@ class MarketStateRepositorySpec extends MongoSpec {
     }
   }
 
+  extension (s: MarketState)
+    def withoutCreatedAt: MarketState = s.copy(createdAt = None)
+  
   def withEmbeddedMongoDb[A](test: MongoDatabase[IO] => IO[A]): Future[A] =
     withRunningEmbeddedMongo {
       MongoClient
         .fromConnectionString[IO](s"mongodb://$mongoHost:$mongoPort")
-        .use { client =>
-          client.getDatabase("currexx").flatMap(test)
-        }
+        .use(_.getDatabase("currexx").flatMap(test))
     }.unsafeToFuture()(IORuntime.global)
 }

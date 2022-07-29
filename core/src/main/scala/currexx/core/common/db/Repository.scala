@@ -27,6 +27,7 @@ trait Repository[F[_]] {
     val Active         = "active"
     val CurrencyPair   = "currencyPair"
     val Indicators     = "indicators"
+    val TriggeredBy    = "triggeredBy"
   }
 
   private def idEqFilter(name: String, id: Option[String]): Filter = Filter.eq(name, id.map(ObjectId.apply).orNull)
@@ -43,7 +44,7 @@ trait Repository[F[_]] {
       sp.to.map(t => Filter.lt(Field.Time, t)),
       sp.currencyPair.map(cp => Filter.regex(Field.CurrencyPair, s"${cp.base.code}\\/?${cp.quote.code}"))
     ).flatten.foldLeft(userIdEq(uid))(_ && _)
-  
+
   protected def errorIfNotDeleted(error: Throwable)(res: DeleteResult)(using F: MonadError[F, Throwable]): F[Unit] =
     F.raiseWhen(res.getDeletedCount == 0)(error)
 

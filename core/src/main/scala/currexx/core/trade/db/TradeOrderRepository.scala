@@ -34,7 +34,7 @@ final private class LiveTradeOrderRepository[F[_]: Async](
     collection.find(searchBy(uid, sp)).sortByDesc(Field.Time).all.map(_.map(_.toDomain).toList)
 
   def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]] =
-    collection.find(userIdAndCurrencyPairEq(uid, cp)).sortByDesc("time").first.map(_.map(_.toDomain))
+    collection.find(userIdAndCurrencyPairEq(uid, cp)).sortByDesc(Field.Time).first.map(_.map(_.toDomain))
 
 object TradeOrderRepository extends MongoJsonCodecs:
   private val collectionName    = "trade-orders"

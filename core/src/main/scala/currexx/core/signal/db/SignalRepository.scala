@@ -33,7 +33,7 @@ final private class LiveSignalRepository[F[_]: Async](
     collection
       .count(
         userIdAndCurrencyPairEq(signal.userId, signal.currencyPair) &&
-          Filter.eq("triggeredBy", signal.triggeredBy) &&
+          Filter.eq(Field.TriggeredBy, signal.triggeredBy) &&
           Filter.gte(Field.Time, signal.time.atStartOfDay) &&
           Filter.lt(Field.Time, signal.time.atEndOfDay)
       )

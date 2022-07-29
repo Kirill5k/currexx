@@ -92,7 +92,8 @@ class MarketControllerSpec extends ControllerSpec {
              |        }
              |      ]
              |    },
-             |    "lastUpdatedAt": "${Markets.ts}"
+             |    "lastUpdatedAt": "${Markets.ts}",
+             |    "createdAt": "${Markets.ts}"
              |  }
              |}
              |""".stripMargin

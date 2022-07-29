@@ -55,7 +55,8 @@ object MarketController extends TapirSchema with TapirJson with TapirCodecs {
       currentPosition: Option[PositionState],
       latestPrice: Option[PriceRange],
       signals: Map[String, List[IndicatorState]],
-      lastUpdatedAt: Option[Instant]
+      lastUpdatedAt: Option[Instant],
+      createdAt: Option[Instant]
   ) derives Codec.AsObject
 
   object MarketStateView:
@@ -64,7 +65,8 @@ object MarketController extends TapirSchema with TapirJson with TapirCodecs {
         ms.currentPosition,
         ms.latestPrice,
         ms.signals,
-        ms.lastUpdatedAt
+        ms.lastUpdatedAt,
+        ms.createdAt
       )
 
   private val basePath  = "market"

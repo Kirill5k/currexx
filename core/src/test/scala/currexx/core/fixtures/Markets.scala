@@ -29,6 +29,7 @@ object Markets {
     Some(positionState),
     Some(priceRange),
     Map.empty,
+    Some(ts),
     Some(ts)
   )
 

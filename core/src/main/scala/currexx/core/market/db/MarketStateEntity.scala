@@ -16,9 +16,10 @@ final case class MarketStateEntity(
     currentPosition: Option[PositionState],
     latestPrice: Option[PriceRange],
     signals: Map[String, List[IndicatorState]],
-    lastUpdatedAt: Option[Instant]
+    lastUpdatedAt: Option[Instant],
+    createdAt: Option[Instant]
 ) derives Codec.AsObject:
-  def toDomain: MarketState = MarketState(UserId(userId), currencyPair, currentPosition, latestPrice, signals, lastUpdatedAt)
+  def toDomain: MarketState = MarketState(UserId(userId), currencyPair, currentPosition, latestPrice, signals, lastUpdatedAt, createdAt)
 
 object MarketStateEntity:
   def make(
@@ -27,6 +28,7 @@ object MarketStateEntity:
       currentPosition: Option[PositionState] = None,
       latestPrice: Option[PriceRange] = None,
       signals: Map[String, List[IndicatorState]] = Map.empty,
-      lastUpdatedAt: Option[Instant] = None
+      lastUpdatedAt: Option[Instant] = None,
+      createdAt: Option[Instant] = Some(Instant.now())
   ): MarketStateEntity =
-    MarketStateEntity(ObjectId(), userId.toObjectId, currencyPair, currentPosition, latestPrice, signals, lastUpdatedAt)
+    MarketStateEntity(ObjectId(), userId.toObjectId, currencyPair, currentPosition, latestPrice, signals, lastUpdatedAt, createdAt)
