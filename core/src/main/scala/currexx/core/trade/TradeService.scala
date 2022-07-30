@@ -91,7 +91,7 @@ final private class LiveTradeService[F[_]](
       }
       .flatMap {
         case Some(top) =>
-          F.whenA(state.currentPosition.exists(top.isReverse))(brokerClient.submit(top.currencyPair, top.broker, TradeOrder.Exit)) *>
+          F.whenA(state.hasOpenPosition && top.order.isEnter)(brokerClient.submit(top.currencyPair, top.broker, TradeOrder.Exit)) *>
             submitOrderPlacement(top)
         case None =>
           F.unit
@@ -102,11 +102,7 @@ final private class LiveTradeService[F[_]](
       orderRepository.save(top) *>
       dispatcher.dispatch(Action.ProcessTradeOrderPlacement(top))
 
-  extension (top: TradeOrderPlacement)
-    def isReverse(currentPosition: PositionState): Boolean =
-      top.order match
-        case order: TradeOrder.Enter => order.position != currentPosition.position
-        case TradeOrder.Exit         => false
+  extension (ms: MarketState) def hasOpenPosition: Boolean = ms.currentPosition.isDefined
 
   extension (to: TradeOrder)
     def isEnter: Boolean =
