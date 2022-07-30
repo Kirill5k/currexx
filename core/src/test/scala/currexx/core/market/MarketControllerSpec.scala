@@ -20,7 +20,7 @@ class MarketControllerSpec extends ControllerSpec {
         val svc = mock[MarketService[IO]]
         when(svc.clearState(any[UserId], any[Boolean])).thenReturn(IO.unit)
 
-        val req = requestWithAuthHeader(uri"/market/state", Method.DELETE)
+        val req = requestWithAuthHeader(uri"/market/state?dryRun=false", Method.DELETE)
         val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.NoContent, None)
@@ -31,11 +31,21 @@ class MarketControllerSpec extends ControllerSpec {
         val svc = mock[MarketService[IO]]
         when(svc.clearState(any[UserId], any[Boolean])).thenReturn(IO.unit)
 
-        val req = requestWithAuthHeader(uri"/market/state?closePendingOrders=false", Method.DELETE)
+        val req = requestWithAuthHeader(uri"/market/state?closePendingOrders=false&dryRun=false", Method.DELETE)
         val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.NoContent, None)
         verify(svc).clearState(Users.uid, false)
+      }
+
+      "not do anything when dryRun is not provided" in {
+        val svc = mock[MarketService[IO]]
+
+        val req = requestWithAuthHeader(uri"/market/state", Method.DELETE)
+        val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        verifyJsonResponse(res, Status.NoContent, None)
+        verifyNoInteractions(svc)
       }
     }
 

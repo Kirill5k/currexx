@@ -34,10 +34,8 @@ final private class MarketController[F[_]](
 
   private def clearMarketState(using auth: Authenticator[F]) =
     clearMarketStateEndpoint.withAuthenticatedSession
-      .serverLogic { session => closePendingOrders =>
-        service
-          .clearState(session.userId, closePendingOrders)
-          .voidResponse
+      .serverLogic { session => (closePendingOrders, dryRun) =>
+        F.whenA(!dryRun)(service.clearState(session.userId, closePendingOrders)).voidResponse
       }
 
   def routes(using authenticator: Authenticator[F]): HttpRoutes[F] =
@@ -79,7 +77,12 @@ object MarketController extends TapirSchema with TapirJson with TapirCodecs {
 
   val clearMarketStateEndpoint = Controller.securedEndpoint.delete
     .in(statePath)
-    .in(query[Boolean]("closePendingOrders").description("Close pending orders").default(true))
+    .in(
+      query[Boolean]("closePendingOrders")
+        .default(true)
+        .description("Close pending orders")
+        .and(query[Boolean]("dryRun").default(true))
+    )
     .out(statusCode(StatusCode.NoContent))
     .description("Clear all states of traded currencies")
 
