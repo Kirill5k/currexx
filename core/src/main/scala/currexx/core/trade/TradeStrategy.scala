@@ -10,9 +10,10 @@ enum TradeStrategy(val name: String):
   case TrendChangeAggressive extends TradeStrategy("trend-change-aggressive")
 
 object TradeStrategy:
+  def from(name: String): Option[TradeStrategy] = TradeStrategy.values.find(_.name == name)
+
   inline given Encoder[TradeStrategy] = Encoder[String].contramap(_.name)
-  inline given Decoder[TradeStrategy] =
-    Decoder[String].emap(s => TradeStrategy.values.find(_.name == s).toRight(s"Unrecognized strategy $s"))
+  inline given Decoder[TradeStrategy] = Decoder[String].emap(s => from(s).toRight(s"Unrecognized strategy $s"))
 
 trait TradeStrategyExecutor:
   def analyze(state: MarketState, trigger: Indicator): Option[TradeStrategyExecutor.Decision]
@@ -53,7 +54,6 @@ object TradeStrategyExecutor {
       case TradeStrategy.TrendChangeAggressive => TrendChangeAggressive
 
   extension (state: MarketState)
-    def hasPosition: Boolean = state.currentPosition.isDefined
     def buying: Boolean      = state.currentPosition.map(_.position).contains(TradeOrder.Position.Buy)
     def selling: Boolean     = state.currentPosition.map(_.position).contains(TradeOrder.Position.Sell)
 }

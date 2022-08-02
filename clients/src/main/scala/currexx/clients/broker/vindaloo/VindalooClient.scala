@@ -28,9 +28,11 @@ final private class LiveVindalooClient[F[_]](
   override protected val delayBetweenConnectionFailures: FiniteDuration = 5.seconds
 
   override def submit(params: BrokerParameters.Vindaloo, pair: CurrencyPair, order: TradeOrder): F[Unit] =
-    order match
-      case enter: TradeOrder.Enter => enterMarketOrder(params.externalId, pair, enter)
-      case TradeOrder.Exit         => exitMarketOrder(params.externalId, pair)
+    logger.info(s"Submitting $pair order $order to Vindaloo") >> {
+      order match
+        case enter: TradeOrder.Enter => enterMarketOrder(params.externalId, pair, enter)
+        case TradeOrder.Exit => exitMarketOrder(params.externalId, pair)
+    }
 
   private def enterMarketOrder(externalId: String, currencyPair: CurrencyPair, order: TradeOrder.Enter): F[Unit] = {
     val stopLoss   = order.stopLoss.getOrElse(0)
