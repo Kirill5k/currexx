@@ -21,15 +21,15 @@ class LogEventRepositorySpec extends MongoSpec {
       "store log-event in the repository" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- LogEventRepository.make(db)
-          _ <- repo.save(LogEvent(LogLevel.Error, ts, "uh-oh!"))
-          res <- repo.getAll
+          _    <- repo.save(LogEvent(LogLevel.Error, ts, "uh-oh!"))
+          res  <- repo.getAll
         yield res
 
         result.map(_ mustBe List(LogEvent(LogLevel.Error, ts, "uh-oh!")))
       }
     }
   }
-  
+
   def withEmbeddedMongoDb[A](test: MongoDatabase[IO] => IO[A]): Future[A] =
     withRunningEmbeddedMongo {
       MongoClient

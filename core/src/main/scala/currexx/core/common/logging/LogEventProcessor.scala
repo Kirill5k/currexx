@@ -20,5 +20,5 @@ final private class LiveLogEventProcessor[F[_]](
 }
 
 object LogEventProcessor:
-  def make[F[_] : Async: Logger](database: MongoDatabase[F]): F[LogEventProcessor[F]] =
+  def make[F[_]: Async: Logger](database: MongoDatabase[F]): F[LogEventProcessor[F]] =
     LogEventRepository.make(database).map(repo => LiveLogEventProcessor(repo))
