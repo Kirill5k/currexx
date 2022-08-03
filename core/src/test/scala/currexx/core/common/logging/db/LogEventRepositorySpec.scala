@@ -9,12 +9,13 @@ import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
 
 import java.time.Instant
+import java.time.temporal.ChronoField
 import scala.concurrent.Future
 
 class LogEventRepositorySpec extends MongoSpec {
   override protected val mongoPort: Int = 12352
 
-  val ts = Instant.now()
+  val ts = Instant.now.`with`(ChronoField.MILLI_OF_SECOND, 0)
 
   "LogEventRepository" when {
     "save" should {
