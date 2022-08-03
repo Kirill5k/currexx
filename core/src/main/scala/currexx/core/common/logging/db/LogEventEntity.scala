@@ -1,6 +1,6 @@
 package currexx.core.common.logging.db
 
-import currexx.core.common.logging.LogEvent
+import currexx.core.common.logging.{LogEvent, LogLevel}
 import io.circe.Codec
 import mongo4cats.bson.ObjectId
 import mongo4cats.circe.given
@@ -12,7 +12,8 @@ final case class LogEventEntity(
     level: String,
     time: Instant,
     message: String
-) derives Codec.AsObject
+) derives Codec.AsObject:
+  def toDomain: LogEvent = LogEvent(LogLevel.valueOf(level.toLowerCase.capitalize), time, message)
 
 object LogEventEntity:
   def from(event: LogEvent): LogEventEntity =

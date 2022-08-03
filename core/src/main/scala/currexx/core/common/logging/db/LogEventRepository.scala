@@ -10,6 +10,7 @@ import mongo4cats.database.{CreateCollectionOptions, MongoDatabase}
 
 trait LogEventRepository[F[_]] extends Repository[F]:
   def save(event: LogEvent): F[Unit]
+  def getAll: F[List[LogEvent]]
 
 final private class LiveLogEventRepository[F[_]](
     private val collection: MongoCollection[F, LogEventEntity]
@@ -18,6 +19,9 @@ final private class LiveLogEventRepository[F[_]](
 ) extends LogEventRepository[F]:
   override def save(event: LogEvent): F[Unit] =
     collection.insertOne(LogEventEntity.from(event)).void
+
+  override def getAll: F[List[LogEvent]] =
+    collection.find.all.map(_.toList.map(_.toDomain))
 
 object LogEventRepository:
   private val collectionName    = "log-events"
