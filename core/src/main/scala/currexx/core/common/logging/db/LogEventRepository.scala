@@ -1,10 +1,12 @@
 package currexx.core.common.logging.db
 
 import cats.effect.Async
+import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.core.common.db.Repository
 import currexx.core.common.logging.LogEvent
+import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
 import mongo4cats.database.{CreateCollectionOptions, MongoDatabase}
 
@@ -23,7 +25,7 @@ final private class LiveLogEventRepository[F[_]](
   override def getAll: F[List[LogEvent]] =
     collection.find.all.map(_.toList.map(_.toDomain))
 
-object LogEventRepository:
+object LogEventRepository extends MongoJsonCodecs:
   private val collectionName    = "log-events"
   private val collectionOptions = CreateCollectionOptions().capped(true).sizeInBytes(268435456L)
 
@@ -32,4 +34,4 @@ object LogEventRepository:
       collNames <- db.listCollectionNames
       _         <- if (collNames.toSet.contains(collectionName)) ().pure[F] else db.createCollection(collectionName, collectionOptions)
       coll      <- db.getCollectionWithCodec[LogEventEntity](collectionName)
-    yield LiveSignalRepository[F](coll)
+    yield LiveLogEventRepository[F](coll)

@@ -6,7 +6,7 @@ import currexx.core.auth.Auth
 import currexx.core.common.action.{Action, ActionDispatcher, ActionProcessor}
 import currexx.core.common.config.AppConfig
 import currexx.core.common.http.Http
-import currexx.core.common.logging.Logger
+import currexx.core.common.logging.{LogEventProcessor, Logger}
 import currexx.core.health.Health
 import currexx.core.market.Markets
 import currexx.core.signal.Signals
@@ -20,19 +20,21 @@ object Application extends IOApp.Simple:
         config <- AppConfig.load[IO]
         _ <- Resources.make[IO](config).use { res =>
           for
-            dispatcher <- ActionDispatcher.make[IO].flatTap(_.dispatch(Action.RescheduleAllMonitors))
-            clients    <- Clients.make[IO](config.clients, res.sttpBackend)
-            health     <- Health.make[IO]
-            auth       <- Auth.make(config.auth, res.mongo)
-            signals    <- Signals.make(res.mongo, dispatcher)
-            monitors   <- Monitors.make(res.mongo, clients, dispatcher)
-            markets    <- Markets.make(res.mongo, dispatcher)
-            trades     <- Trades.make(res.mongo, clients, dispatcher)
-            http       <- Http.make[IO](health, auth, signals, monitors, markets, trades)
-            processor  <- ActionProcessor.make[IO](dispatcher, monitors.service, signals.service, markets.service, trades.service)
+            dispatcher      <- ActionDispatcher.make[IO].flatTap(_.dispatch(Action.RescheduleAllMonitors))
+            clients         <- Clients.make[IO](config.clients, res.sttpBackend)
+            health          <- Health.make[IO]
+            auth            <- Auth.make(config.auth, res.mongo)
+            signals         <- Signals.make(res.mongo, dispatcher)
+            monitors        <- Monitors.make(res.mongo, clients, dispatcher)
+            markets         <- Markets.make(res.mongo, dispatcher)
+            trades          <- Trades.make(res.mongo, clients, dispatcher)
+            http            <- Http.make[IO](health, auth, signals, monitors, markets, trades)
+            actionProcessor <- ActionProcessor.make[IO](dispatcher, monitors.service, signals.service, markets.service, trades.service)
+            logProcessor    <- LogEventProcessor.make[IO](res.mongo)
             _ <- Server
               .serve[IO](config.server, http.app, runtime.compute)
-              .concurrently(processor.run)
+              .concurrently(actionProcessor.run)
+              .concurrently(logProcessor.run)
               .compile
               .drain
           yield ()
