@@ -6,8 +6,8 @@ import currexx.core.auth.Auth
 import currexx.core.common.action.{Action, ActionDispatcher, ActionProcessor}
 import currexx.core.common.config.AppConfig
 import currexx.core.common.http.Http
+import currexx.core.common.logging.Logger
 import currexx.core.health.Health
-import currexx.core.logging.Logger
 import currexx.core.market.Markets
 import currexx.core.signal.Signals
 import currexx.core.trade.Trades

@@ -1,4 +1,4 @@
-package currexx.core.logging
+package currexx.core.common.logging
 
 import cats.effect.{Async, Temporal}
 import cats.effect.std.Queue
@@ -14,15 +14,15 @@ import java.time.Instant
 private[logging] enum LogLevel:
   case Trace, Debug, Info, Warn, Error
 
-final private[logging] case class LoggedEvent(level: LogLevel, time: Instant, message: String)
+final private[logging] case class LogEvent(level: LogLevel, time: Instant, message: String)
 
 trait Logger[F[_]] extends Logger4Cats[F] {
-  def events: Stream[F, LoggedEvent]
+  def events: Stream[F, LogEvent]
 }
 
 final private class LiveLogger[F[_]](
     private val logger: Logger4Cats[F],
-    private val loggedEvents: Queue[F, LoggedEvent]
+    private val loggedEvents: Queue[F, LogEvent]
 )(using
     F: Temporal[F]
 ) extends Logger[F] {
@@ -31,9 +31,9 @@ final private class LiveLogger[F[_]](
     enqueue(level, s"${message.split("\n").head} - ${t.getMessage}")
 
   private def enqueue(level: LogLevel, message: => String): F[Unit] =
-    F.realTimeInstant.flatMap(t => loggedEvents.offer(LoggedEvent(level, t, message.split("\n").head)))
+    F.realTimeInstant.flatMap(t => loggedEvents.offer(LogEvent(level, t, message.split("\n").head)))
 
-  override def events: Stream[F, LoggedEvent] =
+  override def events: Stream[F, LogEvent] =
     Stream.fromQueueUnterminated(loggedEvents)
 
   override def error(t: Throwable)(message: => String): F[Unit] =
@@ -71,5 +71,5 @@ object Logger {
   def apply[F[_]](using ev: Logger[F]): Logger[F] = ev
 
   def make[F[_]: Async]: F[Logger[F]] =
-    Queue.unbounded[F, LoggedEvent].map(q => LiveLogger[F](Slf4jLogger.getLogger[F], q))
+    Queue.unbounded[F, LogEvent].map(q => LiveLogger[F](Slf4jLogger.getLogger[F], q))
 }
