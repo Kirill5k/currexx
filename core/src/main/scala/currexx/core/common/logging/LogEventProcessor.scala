@@ -15,8 +15,10 @@ final private class LiveLogEventProcessor[F[_]](
     logger: Logger[F]
 ) extends LogEventProcessor[F] {
 
+  private val acceptedEvents = Set(LogLevel.Trace, LogLevel.Debug, LogLevel.Warn, LogLevel.Error)
+
   override def run: Stream[F, Unit] =
-    logger.events.evalMap(repository.save)
+    logger.events.filter(e => acceptedEvents.contains(e.level)).evalMap(repository.save)
 }
 
 object LogEventProcessor:
