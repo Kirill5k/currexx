@@ -5,6 +5,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.backtest.TestSettings
 import currexx.core.common.action.{Action, ActionDispatcher}
+import currexx.core.common.http.SearchParams
 import currexx.core.signal.SignalService
 import currexx.core.market.MarketService
 import currexx.core.trade.{TradeOrderPlacement, TradeService}
@@ -50,7 +51,7 @@ final class TestServices[F[_]] private (
   }
 
   def getAllOrders: F[List[TradeOrderPlacement]] =
-    tradeService.getAllOrders(settings.userId)
+    tradeService.getAllOrders(settings.userId, SearchParams(None, None, None))
 }
 
 object TestServices:

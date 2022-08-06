@@ -24,14 +24,14 @@ object Backtester extends IOApp.Simple {
 //        ValueTransformation.NMA(4, 23, 24.0, MovingAverage.Weighted)
         //          ValueTransformation.WMA(5),
 //        ValueTransformation.Kalman(0.83),
-        ValueTransformation.HMA(5),
+        ValueTransformation.HMA(12),
       )
     )
   )
 
   override val run: IO[Unit] =
     Stream
-      .emits(MarketDataProvider.euusDataset)
+      .emits(MarketDataProvider.completeDataset)
       .evalMap { filePath =>
         for
           _        <- logger.info(s"Processing $filePath")
