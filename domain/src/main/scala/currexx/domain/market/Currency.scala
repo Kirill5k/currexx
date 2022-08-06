@@ -22,6 +22,6 @@ object Currency {
     def code: String     = currency
     def toString: String = currency
 
-  inline given Decoder[Currency] = Decoder.decodeString.emap(c => Currency.from(c))
+  inline given Decoder[Currency] = Decoder.decodeString.emap[Currency](Currency.from)
   inline given Encoder[Currency] = Encoder.encodeString.contramap(_.code)
 }
