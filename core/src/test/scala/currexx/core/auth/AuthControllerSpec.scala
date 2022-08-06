@@ -12,7 +12,7 @@ import currexx.core.fixtures.{Sessions, Users}
 import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.implicits.*
 import org.http4s.{HttpDate, Method, Request, Status, Uri}
-import squants.market.USD
+import currexx.domain.market.Currency.USD
 
 class AuthControllerSpec extends ControllerSpec {
 

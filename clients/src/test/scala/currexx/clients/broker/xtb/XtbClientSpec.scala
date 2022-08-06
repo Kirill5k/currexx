@@ -8,7 +8,7 @@ import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, TradeOrder}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import squants.market.{CAD, EUR}
+import currexx.domain.market.Currency.{CAD, EUR}
 import sttp.capabilities.WebSockets
 import sttp.capabilities.fs2.Fs2Streams
 import sttp.client3.testing.SttpBackendStub

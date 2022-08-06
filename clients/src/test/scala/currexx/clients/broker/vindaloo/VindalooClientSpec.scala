@@ -6,7 +6,7 @@ import currexx.clients.broker.BrokerParameters
 import currexx.domain.market.{CurrencyPair, Interval, TradeOrder}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import squants.market.{GBP, USD}
+import currexx.domain.market.Currency.{GBP, USD}
 import sttp.client3.{Response, SttpBackend}
 
 class VindalooClientSpec extends ClientSpec {

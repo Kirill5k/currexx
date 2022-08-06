@@ -1,10 +1,8 @@
 package currexx.core.common.http
 
 import cats.syntax.option.*
-import currexx.domain.market.{Condition, Indicator, Interval, TradeOrder, Trend}
+import currexx.domain.market.{Condition, Currency, Indicator, Interval, TradeOrder, Trend}
 import eu.timepit.refined.types.string.NonEmptyString
-import squants.Money
-import squants.market.Currency
 import currexx.domain.validations.{EmailString, IdString}
 import currexx.domain.user.UserId
 import currexx.core.monitor.MonitorId
@@ -31,14 +29,4 @@ transparent trait TapirSchema extends SchemaDerivation {
   inline given Schema[TradeOrder.Position] = Schema.string
   inline given Schema[Indicator]           = Schema.string
   inline given Schema[Condition]           = Schema.string
-
-  inline given (using currencySchema: Schema[Currency]): Schema[Money] = Schema(
-    SProduct(
-      List(
-        SProductField(FieldName("currency"), currencySchema, _.currency.some),
-        SProductField(FieldName("amount"), Schema.schemaForDouble, _.value.some)
-      )
-    ),
-    Some(SName("Money"))
-  )
 }

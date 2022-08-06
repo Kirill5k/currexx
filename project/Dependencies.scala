@@ -11,7 +11,6 @@ object Dependencies {
     val http4s         = "0.23.12"
     val logback        = "1.2.11"
     val log4cats       = "2.4.0"
-    val squants        = "1.8.3"
     val bcrypt         = "4.3.0"
     val refined        = "0.10.1"
     val tapir          = "1.0.2"
@@ -26,7 +25,6 @@ object Dependencies {
   object Libraries {
     val fs2            = "co.fs2"               %% "fs2-core"               % Versions.fs2
     val catsFree       = "org.typelevel"        %% "cats-free"              % Versions.cats
-    val squants        = "org.typelevel"        %% "squants"                % Versions.squants
     val bcrypt         = "com.github.t3hnar"    %% "scala-bcrypt"           % Versions.bcrypt
     val jwt            = "com.github.jwt-scala" %% "jwt-circe"              % Versions.jwt
     val cronUtils      = "com.cronutils"         % "cron-utils"             % Versions.cronUtils
@@ -86,7 +84,6 @@ object Dependencies {
   }
 
   val domain = Seq(
-    Libraries.squants,
     Libraries.cronUtils,
     Libraries.taggedAdtCodec,
     Libraries.mongo4cats.core,

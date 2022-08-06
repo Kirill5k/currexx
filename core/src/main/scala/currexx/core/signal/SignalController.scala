@@ -15,7 +15,6 @@ import org.http4s.HttpRoutes
 import sttp.model.StatusCode
 import sttp.tapir.*
 import sttp.tapir.server.http4s.Http4sServerInterpreter
-import squants.market.Currency
 
 import java.time.Instant
 

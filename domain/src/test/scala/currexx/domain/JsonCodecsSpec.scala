@@ -1,21 +1,19 @@
 package currexx.domain
 
 import currexx.domain.session.SessionId
-import currexx.domain.market.Interval
-import io.circe.DecodingFailure
+import currexx.domain.market.{Currency, Interval}
+import io.circe.{DecodingFailure, Error}
 import io.circe.parser.*
 import io.circe.syntax.*
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import squants.Money
-import squants.market.{Currency, GBP}
 
 class JsonCodecsSpec extends AnyWordSpec with Matchers with JsonCodecs {
 
   "Interval codec" should {
     "decode and encode interval" in {
       val interval = Interval.H1
-      val json = interval.asJson.noSpaces
+      val json     = interval.asJson.noSpaces
 
       json mustBe """"H1""""
       decode[Interval](json) mustBe Right(Interval.H1)
@@ -23,35 +21,14 @@ class JsonCodecsSpec extends AnyWordSpec with Matchers with JsonCodecs {
   }
 
   "Currency codec" should {
-    "convert json to currency" in {
-      val currency = """"GBP""""
-      decode[Currency](currency) mustBe Right(GBP)
-    }
-
-    "convert money to json" in {
-      GBP.asInstanceOf[Currency].asJson.noSpaces mustBe """"GBP""""
-    }
-
-    "return error on unrecognized currency code" in {
-      val currency = """"FOO""""
-      decode[Currency](currency) mustBe Left(DecodingFailure("Code FOO cannot be matched against any context defined Currency. Available Currencies are CAD, CZK, GBP, MXN, CHF, CNY, RUB, NZD, HKD, AUD, SEK, TRY, BRL, KRW, ETH, CLP, INR, LTC, BTC, DKK, XAU, XAG, JPY, ARS, MYR, USD, NOK, NAD, EUR, ZAR", Nil))
-    }
-  }
-
-  "Money codec" should {
-    "convert json to money" in {
-      val money = """{"currency":"GBP","amount":1}"""
-      decode[Money](money) mustBe Right(GBP(BigDecimal(1.00)))
-    }
-
-    "convert money to json" in {
-      GBP(BigDecimal(1)).asJson.noSpaces mustBe """{"amount":1.00,"currency":"GBP"}"""
+    "convert currency to json" in {
+      Currency.GBP.asJson.noSpaces mustBe """"GBP""""
     }
   }
 
   "Id codec" should {
     "decode and encode ids" in {
-      val id = SessionId("FOO")
+      val id   = SessionId("FOO")
       val json = id.asJson.noSpaces
 
       json mustBe """"FOO""""
@@ -59,4 +36,3 @@ class JsonCodecsSpec extends AnyWordSpec with Matchers with JsonCodecs {
     }
   }
 }
-

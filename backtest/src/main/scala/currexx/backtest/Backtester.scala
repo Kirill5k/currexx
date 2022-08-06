@@ -8,7 +8,7 @@ import currexx.domain.market.{CurrencyPair, Indicator, MovingAverage, ValueSourc
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import fs2.Stream
-import squants.market.{EUR, GBP}
+import currexx.domain.market.Currency.{EUR, GBP}
 
 import scala.concurrent.duration.*
 

@@ -7,7 +7,7 @@ import currexx.core.signal.{SignalSettings, TriggerFrequency}
 import currexx.core.trade.{TradeSettings, TradeStrategy, TradingParameters}
 import currexx.domain.market.{CurrencyPair, Indicator, ValueSource, ValueTransformation}
 import mongo4cats.bson.ObjectId
-import squants.market.{EUR, GBP}
+import currexx.domain.market.Currency.{EUR, GBP}
 
 final case class TestSettings(
     userId: UserId,

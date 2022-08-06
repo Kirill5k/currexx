@@ -11,7 +11,7 @@ import currexx.backtest.optimizer.Optimisable.given
 import currexx.backtest.services.TestServices
 import currexx.core.trade.TradeStrategy
 import currexx.domain.market.{CurrencyPair, Indicator, MovingAverage, ValueSource, ValueTransformation}
-import squants.market.{EUR, GBP}
+import currexx.domain.market.Currency.{EUR, GBP}
 import fs2.Stream
 
 import scala.util.Random

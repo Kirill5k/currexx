@@ -2,7 +2,7 @@ package currexx.core.fixtures
 
 import currexx.core.signal.*
 import currexx.domain.market.{Condition, Indicator, Trend, ValueSource, ValueTransformation}
-import squants.market.{EUR, GBP}
+import currexx.domain.market.Currency.{EUR, GBP}
 
 import java.time.Instant
 import java.time.temporal.ChronoField

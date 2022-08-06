@@ -1,18 +1,17 @@
 package currexx.core.common.http
 
-import squants.market.{Currency, defaultMoneyContext}
 import sttp.tapir.Codec.PlainCodec
 import sttp.tapir.{Codec, DecodeResult, ValidationError, Validator}
 import currexx.core.common.time.*
 import currexx.domain.errors.AppError
-import currexx.domain.market.CurrencyPair
+import currexx.domain.market.{CurrencyPair, Currency}
 
 import java.time.Instant
 
 transparent trait TapirCodecs {
 
   private def decodeCurrency(code: String): DecodeResult[Currency] =
-    Currency(code)(defaultMoneyContext).fold(DecodeResult.Error(code, _), DecodeResult.Value.apply)
+    Currency.from(code).left.map(AppError.FailedValidation.apply).fold(DecodeResult.Error(code, _), DecodeResult.Value.apply)
 
   private def decodeCurrencyPair(cp: String): DecodeResult[CurrencyPair] =
     CurrencyPair.from(cp).left.map(AppError.FailedValidation.apply).fold(DecodeResult.Error(cp, _), DecodeResult.Value.apply)

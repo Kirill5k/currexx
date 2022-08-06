@@ -1,9 +1,9 @@
 package currexx.domain
 
+import currexx.domain.market.Currency
 import eu.timepit.refined.api.{Refined, RefinedTypeOps, Validate}
 import eu.timepit.refined.string.MatchesRegex
 import org.bson.types.ObjectId
-import squants.market.defaultMoneyContext
 
 object validations {
   type EmailString = String Refined MatchesRegex["^[a-zA-Z0-9.]+@[a-zA-Z0-9]+\\.[a-zA-Z]+$"]
@@ -21,7 +21,7 @@ object validations {
   final case class ValidCurrencyPair()
   inline given Validate[String, ValidCurrencyPair] =
     Validate.fromPredicate(
-      cp => cp.matches("^[A-Z]{3}\\/[A-Z]{3}$") && cp.split("\\/").forall(defaultMoneyContext.currencyMap.keySet.contains),
+      cp => cp.matches("^[A-Z]{3}\\/[A-Z]{3}$") && cp.split("\\/").forall(Currency.defaultSet.contains),
       cp => s"($cp is valid currency pair)",
       ValidCurrencyPair()
     )

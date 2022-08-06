@@ -19,7 +19,6 @@ import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
 import io.circe.Codec
 import io.circe.refined.*
 import org.http4s.HttpRoutes
-import squants.market.Currency
 import sttp.model.StatusCode
 import sttp.tapir.*
 import sttp.tapir.server.http4s.Http4sServerInterpreter
