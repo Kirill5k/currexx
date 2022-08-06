@@ -2,12 +2,14 @@ package currexx.clients.data.alphavantage
 
 import cats.data.NonEmptyList
 import cats.effect.Temporal
+import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.applicativeError.*
 import currexx.clients.data.MarketDataClient
 import currexx.clients.HttpClient
+import currexx.domain.cache.Cache
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import io.circe.{Codec, JsonObject}
@@ -24,7 +26,8 @@ private[clients] trait AlphaVantageClient[F[_]] extends MarketDataClient[F] with
 final private class LiveAlphaVantageClient[F[_]](
     private val config: AlphaVantageConfig,
     override protected val backend: SttpBackend[F, Any],
-    private val delayBetweenClientFailures: FiniteDuration
+    private val delayBetweenClientFailures: FiniteDuration,
+    private val cache: Cache[F, (CurrencyPair, Interval), MarketTimeSeriesData]
 )(using
     F: Temporal[F],
     logger: Logger[F]
@@ -38,6 +41,14 @@ final private class LiveAlphaVantageClient[F[_]](
     timeSeriesData(pair, Interval.M1).map(_.prices.head)
 
   override def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] =
+    cache
+      .get(pair -> interval)
+      .flatMap {
+        case Some(data) => data.pure[F]
+        case None       => fetchTimeSeriesData(pair, interval).flatTap(cache.put(pair -> interval, _))
+      }
+
+  private def fetchTimeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] =
     interval match
       case Interval.D1                                                           => dailyTimeSeriesData(pair)
       case Interval.M1 | Interval.M5 | Interval.M15 | Interval.M30 | Interval.H1 => intradayTimeSeriesData(pair, interval)
@@ -132,5 +143,7 @@ private[clients] object AlphaVantageClient {
       backend: SttpBackend[F, Any],
       delayBetweenClientFailures: FiniteDuration = 1.minute
   ): F[AlphaVantageClient[F]] =
-    Temporal[F].pure(LiveAlphaVantageClient(config, backend, delayBetweenClientFailures))
+    Cache
+      .make[F, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)
+      .map(cache => LiveAlphaVantageClient(config, backend, delayBetweenClientFailures, cache))
 }
