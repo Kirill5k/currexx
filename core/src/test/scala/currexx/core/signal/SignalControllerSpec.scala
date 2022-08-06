@@ -80,8 +80,7 @@ class SignalControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val responseBody =
-          """{"message":"Code FOO cannot be matched against any context defined Currency. Available Currencies are CAD, CZK, GBP, MXN, CHF, CNY, RUB, NZD, HKD, AUD, SEK, TRY, BRL, KRW, ETH, CLP, INR, LTC, BTC, DKK, XAU, XAG, JPY, ARS, MYR, USD, NOK, NAD, EUR, ZAR"}"""
+        val responseBody = """{"message":"Unknown currency code FOO; Available currencies are: PLN, CAD, AUD, GBP, DKK, JPY, USD, RUB, NZD, NOK, EUR"}"""
         verifyJsonResponse(res, Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
       }
