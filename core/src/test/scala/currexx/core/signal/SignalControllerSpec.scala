@@ -81,7 +81,7 @@ class SignalControllerSpec extends ControllerSpec {
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody =
-          """{"message":"Unknown currency code FOO; Available currencies are: PLN, CAD, AUD, GBP, DKK, JPY, USD, RUB, NZD, NOK, EUR"}"""
+          """{"message":"Unknown currency code FOO; Available currencies are: PLN, CAD, AUD, GBP, CHF, DKK, JPY, USD, RUB, NZD, NOK, EUR"}"""
         verifyJsonResponse(res, Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
       }
