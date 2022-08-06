@@ -10,7 +10,7 @@ object Currency {
   val GBP: Currency = "GBP"
   val USD: Currency = "USD"
 
-  val defaultSet: Set[String] = Set("AUD", "CAD", "DKK", "EUR", "GBP", "JPY", "NOK", "NZD", "PLN", "RUB", "USD")
+  val defaultSet: Set[String] = Set("AUD", "CAD", "CHF", "DKK", "EUR", "GBP", "JPY", "NOK", "NZD", "PLN", "RUB", "USD")
 
   def from(code: String): Either[String, Currency] = Either.cond(
     defaultSet.contains(code),
