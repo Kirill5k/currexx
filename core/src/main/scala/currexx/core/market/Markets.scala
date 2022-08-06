@@ -20,7 +20,7 @@ object Markets:
       dispatcher: ActionDispatcher[F]
   ): F[Markets[F]] =
     for
-      stateRepo    <- MarketStateRepository.make[F](database)
-      svc          <- MarketService.make[F](stateRepo, dispatcher)
-      ctrl         <- MarketController.make[F](svc)
+      stateRepo <- MarketStateRepository.make[F](database)
+      svc       <- MarketService.make[F](stateRepo, dispatcher)
+      ctrl      <- MarketController.make[F](svc)
     yield Markets[F](svc, ctrl)

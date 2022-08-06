@@ -16,7 +16,7 @@ final private class LiveActionDispatcher[F[_]: Functor](
 ) extends ActionDispatcher[F] {
 
   override def numberOfPendingActions: F[Int] = submittedActions.size
-  
+
   override def dispatch(action: Action): F[Unit] =
     submittedActions.offer(action)
 

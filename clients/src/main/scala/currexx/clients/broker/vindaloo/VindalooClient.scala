@@ -31,7 +31,7 @@ final private class LiveVindalooClient[F[_]](
     logger.info(s"Submitting $pair order $order to Vindaloo") >> {
       order match
         case enter: TradeOrder.Enter => enterMarketOrder(params.externalId, pair, enter)
-        case TradeOrder.Exit => exitMarketOrder(params.externalId, pair)
+        case TradeOrder.Exit         => exitMarketOrder(params.externalId, pair)
     }
 
   private def enterMarketOrder(externalId: String, currencyPair: CurrencyPair, order: TradeOrder.Enter): F[Unit] = {

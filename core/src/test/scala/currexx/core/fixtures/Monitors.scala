@@ -10,10 +10,10 @@ import java.time.Instant
 import scala.concurrent.duration.*
 
 object Monitors {
-  lazy val mid: MonitorId         = MonitorId(ObjectId.get())
-  lazy val queriedAt: Instant     = Instant.now
-  lazy val schedule: Schedule     = Schedule.Periodic(3.hours)
-  lazy val monitor: Monitor       = Monitor(mid, Users.uid, true, Markets.gbpeur, Interval.H1, schedule, Some(queriedAt))
+  lazy val mid: MonitorId     = MonitorId(ObjectId.get())
+  lazy val queriedAt: Instant = Instant.now
+  lazy val schedule: Schedule = Schedule.Periodic(3.hours)
+  lazy val monitor: Monitor   = Monitor(mid, Users.uid, true, Markets.gbpeur, Interval.H1, schedule, Some(queriedAt))
 
   def create(
       uid: UserId = Users.uid,

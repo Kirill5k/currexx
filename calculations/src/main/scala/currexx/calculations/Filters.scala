@@ -17,7 +17,7 @@ object Filters {
         val dk          = remainingValues.head - kf
         val smooth      = kf + dk * math.sqrt(gain * 2)
         val newVelocity = velocity + gain * dk
-        val newKf = smooth + newVelocity
+        val newKf       = smooth + newVelocity
         calc(remainingValues.tail, newKf, newVelocity, smooth :: result)
       }
 

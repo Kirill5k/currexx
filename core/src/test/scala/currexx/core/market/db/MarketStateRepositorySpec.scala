@@ -104,9 +104,8 @@ class MarketStateRepositorySpec extends MongoSpec {
     }
   }
 
-  extension (s: MarketState)
-    def withoutCreatedAt: MarketState = s.copy(createdAt = None)
-  
+  extension (s: MarketState) def withoutCreatedAt: MarketState = s.copy(createdAt = None)
+
   def withEmbeddedMongoDb[A](test: MongoDatabase[IO] => IO[A]): Future[A] =
     withRunningEmbeddedMongo {
       MongoClient

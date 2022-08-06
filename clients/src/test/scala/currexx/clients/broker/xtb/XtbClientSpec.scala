@@ -25,8 +25,7 @@ class XtbClientSpec extends ClientSpec {
 
   "A XtbClient" should {
     "return error on failed authentication" ignore {
-      val testingBackend: SttpBackend[IO, Fs2Streams[IO] with WebSockets] = backendStub
-        .whenAnyRequest
+      val testingBackend: SttpBackend[IO, Fs2Streams[IO] with WebSockets] = backendStub.whenAnyRequest
         .thenRespond(
           SttpBackendStub.RawStream(
             WebSocketStub

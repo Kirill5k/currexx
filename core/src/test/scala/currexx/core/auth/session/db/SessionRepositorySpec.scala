@@ -117,4 +117,3 @@ class SessionRepositorySpec extends MongoSpec {
         }
     }.unsafeToFuture()(IORuntime.global)
 }
-

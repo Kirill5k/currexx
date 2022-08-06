@@ -181,7 +181,7 @@ class MarketServiceSpec extends CatsSpec {
 
       "not emit update when indicator state hasn't changed" in {
         val (stateRepo, disp) = mocks
-        
+
         when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.stateWithSignal)))
         when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[String, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
 

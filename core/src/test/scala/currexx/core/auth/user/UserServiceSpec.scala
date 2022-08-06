@@ -148,4 +148,3 @@ class UserServiceSpec extends CatsSpec {
   def mocks: (UserRepository[IO], PasswordEncryptor[IO]) =
     (mock[UserRepository[IO]], mock[PasswordEncryptor[IO]])
 }
-

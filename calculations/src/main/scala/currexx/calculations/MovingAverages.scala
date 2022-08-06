@@ -72,7 +72,7 @@ object MovingAverages {
       else if (queue.size < n) calc(queue.addOne(remaining.head), remaining.tail, i)
       else {
         val updatedQueue = queue.drop(1).addOne(remaining.head)
-        wmas(i - 1) = updatedQueue.zipWithIndex.foldLeft(0d) { case (sum, (v, i)) => (sum + (n + i + 1 - n) * v) } / divider
+        wmas(i - 1) = updatedQueue.zipWithIndex.foldLeft(0d) { case (sum, (v, i)) => sum + (n + i + 1 - n) * v } / divider
         calc(updatedQueue, remaining.tail, i - 1)
       }
     calc(Queue.empty, values.reverse, values.size)

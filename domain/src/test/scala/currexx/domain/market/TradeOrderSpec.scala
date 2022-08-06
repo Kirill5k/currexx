@@ -21,4 +21,3 @@ class TradeOrderSpec extends AnyWordSpec with Matchers {
     }
   }
 }
-

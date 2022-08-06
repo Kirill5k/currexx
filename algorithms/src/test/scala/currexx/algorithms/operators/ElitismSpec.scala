@@ -24,4 +24,3 @@ class ElitismSpec extends CatsSpec {
     }
   }
 }
-

@@ -30,9 +30,9 @@ trait HttpClient[F[_]] {
         (if (attempt >= 50 && attempt % 10 == 0) logger.error(message) else logger.warn(message)) *>
           F.sleep(delayBetweenConnectionFailures) *> dispatchWithRetry(request, attempt + 1)
       }
-    
+
   extension (S: Stream.type)
     def logError[F[_]](message: String)(using logger: Logger[F]): Stream[F, Nothing] =
       S.eval(logger.error(message)).drain
-      
+
 }

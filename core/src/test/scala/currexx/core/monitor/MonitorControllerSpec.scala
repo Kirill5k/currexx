@@ -234,7 +234,11 @@ class MonitorControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT).withEntity(parseJson(requestBody))
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.BadRequest, Some("""{"message":"The id supplied in the path does not match with the id in the request body"}"""))
+        verifyJsonResponse(
+          res,
+          Status.BadRequest,
+          Some("""{"message":"The id supplied in the path does not match with the id in the request body"}""")
+        )
         verifyNoInteractions(svc)
       }
     }

@@ -27,7 +27,7 @@ object errors {
       override val message: String = s"$source response returned only $returnedCount data points"
 
     final case class FailedCalculation(message: String) extends BadData
-    
+
     final case class JsonParsingFailure(original: String, error: String) extends AppError:
       override val message: String = s"Failed to parse json response: $error\n$original"
 
@@ -68,7 +68,7 @@ object errors {
 
     final case class SessionDoesNotExist(id: SessionId) extends Forbidden:
       override val message: String = s"Session with id $id does not exist"
-    
+
     case object IdMismatch extends BadReq:
       override val message: String = "The id supplied in the path does not match with the id in the request body"
 

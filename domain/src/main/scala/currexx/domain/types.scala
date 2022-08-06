@@ -4,7 +4,7 @@ import mongo4cats.bson.ObjectId
 import io.circe.{Decoder, Encoder}
 
 object types {
-  
+
   trait IdType[Id]:
     def apply(id: String): Id   = id.asInstanceOf[Id]
     def apply(id: ObjectId): Id = apply(id.toHexString)
@@ -24,4 +24,3 @@ object types {
 
     extension (str: Str) def value: String = str.asInstanceOf[String]
 }
-

@@ -147,4 +147,3 @@ class UserRepositorySpec extends MongoSpec {
         }
     }.unsafeToFuture()(IORuntime.global)
 }
-

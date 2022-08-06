@@ -58,5 +58,5 @@ object Http:
       signals: Signals[F],
       monitors: Monitors[F],
       markets: Markets[F],
-      trades: Trades[F],
+      trades: Trades[F]
   ): F[Http[F]] = Monad[F].pure(new Http[F](health, auth, signals, monitors, markets, trades))

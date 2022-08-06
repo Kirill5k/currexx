@@ -19,10 +19,13 @@ class SignalServiceISpec extends CatsSpec {
     "detectTrendChange" should {
       "do some magic" ignore {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = FileReader.pricesFromResources("aud-jpy.json"))
-        val indicator = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.sequenced(
-          ValueTransformation.HMA(6),
-          ValueTransformation.Kalman(0.5),
-        ))
+        val indicator = Indicator.TrendChangeDetection(
+          ValueSource.Close,
+          ValueTransformation.sequenced(
+            ValueTransformation.HMA(6),
+            ValueTransformation.Kalman(0.5)
+          )
+        )
         val signal = SignalService.detectTrendChange(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.TrendChangeDetection])
 
         signal mustBe None
@@ -33,7 +36,7 @@ class SignalServiceISpec extends CatsSpec {
   def mocks: (SignalRepository[IO], SignalSettingsRepository[IO], ActionDispatcher[IO]) =
     (mock[SignalRepository[IO]], mock[SignalSettingsRepository[IO]], mock[ActionDispatcher[IO]])
 
-  extension[A] (nel: NonEmptyList[A])
+  extension [A](nel: NonEmptyList[A])
     def drop(n: Int): NonEmptyList[A] =
       NonEmptyList.fromListUnsafe(nel.toList.drop(n))
 }

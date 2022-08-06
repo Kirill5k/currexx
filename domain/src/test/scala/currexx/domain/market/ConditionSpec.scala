@@ -21,4 +21,3 @@ class ConditionSpec extends AnyWordSpec with Matchers {
     }
   }
 }
-

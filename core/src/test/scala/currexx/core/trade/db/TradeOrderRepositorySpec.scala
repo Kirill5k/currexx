@@ -45,7 +45,7 @@ class TradeOrderRepositorySpec extends MongoSpec {
           repo <- TradeOrderRepository.make(db)
           _    <- repo.save(Trades.order)
           sp = SearchParams(Some(Trades.ts.minusSeconds(10)), Some(Trades.ts.plusSeconds(10)), None)
-          res  <- repo.getAll(Users.uid, sp)
+          res <- repo.getAll(Users.uid, sp)
         yield res
 
         result.map(_ mustBe List(Trades.order))

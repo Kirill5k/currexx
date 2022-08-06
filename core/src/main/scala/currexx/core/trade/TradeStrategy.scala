@@ -54,6 +54,6 @@ object TradeStrategyExecutor {
       case TradeStrategy.TrendChangeAggressive => TrendChangeAggressive
 
   extension (state: MarketState)
-    def buying: Boolean      = state.currentPosition.map(_.position).contains(TradeOrder.Position.Buy)
-    def selling: Boolean     = state.currentPosition.map(_.position).contains(TradeOrder.Position.Sell)
+    def buying: Boolean  = state.currentPosition.map(_.position).contains(TradeOrder.Position.Buy)
+    def selling: Boolean = state.currentPosition.map(_.position).contains(TradeOrder.Position.Sell)
 }

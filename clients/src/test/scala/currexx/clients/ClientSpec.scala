@@ -19,7 +19,7 @@ import scala.io.Source
 
 trait ClientSpec extends AsyncWordSpec with Matchers {
   given Logger[IO] = Slf4jLogger.getLogger[IO]
-  
+
   extension [A](io: IO[A])
     def asserting(f: A => Assertion): Future[Assertion] =
       io.map(f).unsafeToFuture()(IORuntime.global)
