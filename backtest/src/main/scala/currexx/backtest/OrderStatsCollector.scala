@@ -3,6 +3,8 @@ package currexx.backtest
 import currexx.core.trade.TradeOrderPlacement
 import currexx.domain.market.TradeOrder
 
+import java.time.Instant
+
 final case class OrderStats(
     total: Int = 0,
     buys: Int = 0,
@@ -29,8 +31,7 @@ final case class OrderStats(
        |biggestLoss=$biggestLoss
        |)""".stripMargin.replaceAll("\n", "")
 
-object OrderStatsCollector {
-
+object OrderStatsCollector:
   def collect(orders: List[TradeOrderPlacement]): OrderStats =
     orders
       .foldRight[(OrderStats, Option[TradeOrderPlacement])]((OrderStats(), None)) { case (currentOrder, (stats, prevOrder)) =>
@@ -58,4 +59,3 @@ object OrderStatsCollector {
             (stats.close(prevOrder.get.currentPrice.close - currentOrder.currentPrice.close), None)
       }
       ._1
-}

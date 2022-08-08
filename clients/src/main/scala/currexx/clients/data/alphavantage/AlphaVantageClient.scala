@@ -2,7 +2,6 @@ package currexx.clients.data.alphavantage
 
 import cats.data.NonEmptyList
 import cats.effect.Temporal
-import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -44,7 +43,7 @@ final private class LiveAlphaVantageClient[F[_]](
     cache
       .get(pair -> interval)
       .flatMap {
-        case Some(data) => data.pure[F]
+        case Some(data) => F.pure(data)
         case None       => fetchTimeSeriesData(pair, interval).flatTap(cache.put(pair -> interval, _))
       }
 

@@ -34,8 +34,7 @@ object MarketDataProvider:
     "eur-gbp-1d.csv",
     "nzd-cad-1d.csv",
     "nzd-chf-1d.csv",
-    "usd-dkk-1d.csv",
-    "usd-pln-1d.csv"
+    "usd-dkk-1d.csv"
   )
   
   val audDataset = List(

@@ -116,8 +116,7 @@ object Optimizer extends IOApp.Simple {
   )
 
   val target = ValueTransformation.sequenced(
-//    ValueTransformation.Kalman(0.4),
-    ValueTransformation.HMA(20)
+    ValueTransformation.NMA(43, 12, 8.0d, MovingAverage.Weighted)
   )
 
   override def run: IO[Unit] =

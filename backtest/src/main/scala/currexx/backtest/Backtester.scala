@@ -21,17 +21,17 @@ object Backtester extends IOApp.Simple {
     Indicator.TrendChangeDetection(
       source = ValueSource.Close,
       transformation = ValueTransformation.sequenced(
-//        ValueTransformation.NMA(4, 23, 24.0, MovingAverage.Weighted)
+        ValueTransformation.NMA(12, 43, 24.0, MovingAverage.Weighted)
         //          ValueTransformation.WMA(5),
-//        ValueTransformation.Kalman(0.83),
-        ValueTransformation.HMA(12),
+//        ValueTransformation.HMA(12),
+//        ValueTransformation.Kalman(0.7),
       )
     )
   )
 
   override val run: IO[Unit] =
     Stream
-      .emits(MarketDataProvider.completeDataset)
+      .emits(MarketDataProvider.euusDataset)
       .evalMap { filePath =>
         for
           _        <- logger.info(s"Processing $filePath")
