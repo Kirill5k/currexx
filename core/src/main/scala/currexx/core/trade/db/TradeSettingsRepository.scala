@@ -27,7 +27,11 @@ final private class LiveTradeSettingsRepository[F[_]: Async](
     collection
       .updateOne(
         userIdEq(settings.userId),
-        Update.set("broker", settings.broker).set("trading", settings.trading).set("strategy", settings.strategy)
+        Update
+          .set("broker", settings.broker)
+          .set("trading", settings.trading)
+          .set("strategy", settings.strategy)
+          .set("comment", settings.comment)
       )
       .map(_.getMatchedCount)
       .flatMap {

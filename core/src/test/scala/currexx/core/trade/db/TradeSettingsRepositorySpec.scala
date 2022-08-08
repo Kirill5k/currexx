@@ -28,7 +28,7 @@ class TradeSettingsRepositorySpec extends MongoSpec {
         result.map(_ mustBe Trades.settings)
       }
 
-      "return error when market-settings do not exisst" in withEmbeddedMongoDb { db =>
+      "return error when market-settings do not exist" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- TradeSettingsRepository.make(db)
           res  <- repo.get(Users.uid)

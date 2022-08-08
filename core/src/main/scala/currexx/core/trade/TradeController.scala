@@ -30,7 +30,7 @@ final private class TradeController[F[_]](
       .serverLogic { session => _ =>
         service
           .getSettings(session.userId)
-          .mapResponse(s => TradeSettingsView(s.strategy, s.broker, s.trading))
+          .mapResponse(s => TradeSettingsView(s.strategy, s.broker, s.trading, s.comment))
       }
 
   private def updateTradeSettings(using auth: Authenticator[F]) =
@@ -74,9 +74,10 @@ object TradeController extends TapirSchema with TapirJson {
   final case class TradeSettingsView(
       strategy: TradeStrategy,
       broker: BrokerParameters,
-      trading: TradingParameters
+      trading: TradingParameters,
+      comment: Option[String]
   ) derives Codec.AsObject:
-    def toDomain(userId: UserId): TradeSettings = TradeSettings(userId, strategy, broker, trading)
+    def toDomain(userId: UserId): TradeSettings = TradeSettings(userId, strategy, broker, trading, comment)
 
   final case class TradeOrderView(
       currencyPair: CurrencyPair,

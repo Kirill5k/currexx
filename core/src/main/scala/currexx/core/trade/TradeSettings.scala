@@ -19,5 +19,6 @@ final case class TradeSettings(
     userId: UserId,
     strategy: TradeStrategy,
     broker: BrokerParameters,
-    trading: TradingParameters
+    trading: TradingParameters,
+    comment: Option[String]
 )

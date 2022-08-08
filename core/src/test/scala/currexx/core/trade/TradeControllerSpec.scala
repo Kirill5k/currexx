@@ -99,6 +99,7 @@ class TradeControllerSpec extends ControllerSpec {
         val responseBody =
           s"""{
              |"strategy": "disabled",
+             |"comment": "test",
              |"broker" : {
              |  "broker" : "vindaloo",
              |  "externalId" : "1"
@@ -135,6 +136,7 @@ class TradeControllerSpec extends ControllerSpec {
         val requestBody =
           s"""{
              |"strategy": "trend-change",
+             |"comment": "test",
              |"broker" : {
              |  "broker" : "vindaloo",
              |  "externalId" : "1"

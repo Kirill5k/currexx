@@ -12,10 +12,11 @@ final case class TradeSettingsEntity(
     userId: ObjectId,
     strategy: TradeStrategy,
     broker: BrokerParameters,
-    trading: TradingParameters
+    trading: TradingParameters,
+    comment: Option[String]
 ) derives Codec.AsObject:
-  def toDomain: TradeSettings = TradeSettings(UserId(userId), strategy, broker, trading)
+  def toDomain: TradeSettings = TradeSettings(UserId(userId), strategy, broker, trading, comment)
 
 object TradeSettingsEntity:
   def from(ts: TradeSettings): TradeSettingsEntity =
-    TradeSettingsEntity(ObjectId(), ts.userId.toObjectId, ts.strategy, ts.broker, ts.trading)
+    TradeSettingsEntity(ObjectId(), ts.userId.toObjectId, ts.strategy, ts.broker, ts.trading, ts.comment)
