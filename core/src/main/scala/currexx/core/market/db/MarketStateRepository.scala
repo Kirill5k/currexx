@@ -53,7 +53,7 @@ final private class LiveMarketStateRepository[F[_]](
   override def update(uid: UserId, pair: CurrencyPair, position: Option[PositionState]): F[MarketState] =
     runUpdate(
       userIdAndCurrencyPairEq(uid, pair),
-      Update.set("currentPosition", position.orNull),
+      Update.set("currentPosition", position),
       MarketStateEntity.make(uid, pair, currentPosition = position)
     )
 

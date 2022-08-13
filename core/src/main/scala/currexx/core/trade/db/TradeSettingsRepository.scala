@@ -31,7 +31,7 @@ final private class LiveTradeSettingsRepository[F[_]: Async](
           .set("broker", settings.broker)
           .set("trading", settings.trading)
           .set("strategy", settings.strategy)
-          .set("comment", settings.comment.orNull)
+          .set("comment", settings.comment)
       )
       .map(_.getMatchedCount)
       .flatMap {
