@@ -23,7 +23,8 @@ trait MarketStateRepository[F[_]] extends Repository[F]:
   def update(uid: UserId, pair: CurrencyPair, position: Option[PositionState]): F[MarketState]
   def getAll(uid: UserId): F[List[MarketState]]
   def deleteAll(uid: UserId): F[Unit]
-  def find(uid: UserId, pair: CurrencyPair): F[Option[MarketState]]
+  def delete(uid: UserId, cp: CurrencyPair): F[Unit]
+  def find(uid: UserId, cp: CurrencyPair): F[Option[MarketState]]
 
 final private class LiveMarketStateRepository[F[_]](
     private val collection: MongoCollection[F, MarketStateEntity]
@@ -36,11 +37,16 @@ final private class LiveMarketStateRepository[F[_]](
   override def deleteAll(uid: UserId): F[Unit] =
     collection.deleteMany(userIdEq(uid)).void
 
-  override def update(uid: UserId, pair: CurrencyPair, signals: Map[String, List[IndicatorState]]): F[MarketState] =
+  override def delete(uid: UserId, cp: CurrencyPair): F[Unit] =
+    collection
+      .deleteOne(userIdAndCurrencyPairEq(uid, cp))
+      .flatMap(errorIfNotDeleted(AppError.NotTracked(cp)))
+  
+  override def update(uid: UserId, cp: CurrencyPair, signals: Map[String, List[IndicatorState]]): F[MarketState] =
     runUpdate(
-      userIdAndCurrencyPairEq(uid, pair),
+      userIdAndCurrencyPairEq(uid, cp),
       Update.set("signals", Document.from(signals.asJson.noSpaces)),
-      MarketStateEntity.make(uid, pair, signals = signals)
+      MarketStateEntity.make(uid, cp, signals = signals)
     )
 
   override def update(uid: UserId, pair: CurrencyPair, price: PriceRange): F[MarketState] =

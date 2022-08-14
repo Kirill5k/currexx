@@ -5,6 +5,7 @@ import currexx.core.ControllerSpec
 import currexx.core.auth.Authenticator
 import currexx.core.fixtures.{Markets, Sessions, Signals, Users}
 import currexx.domain.errors.AppError
+import currexx.domain.market.CurrencyPair
 import currexx.domain.user.UserId
 import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.implicits.*
@@ -36,6 +37,17 @@ class MarketControllerSpec extends ControllerSpec {
 
         verifyJsonResponse(res, Status.NoContent, None)
         verify(svc).clearState(Users.uid, false)
+      }
+
+      "clear state of a single currency" in {
+        val svc = mock[MarketService[IO]]
+        when(svc.clearState(any[UserId], any[CurrencyPair], any[Boolean])).thenReturn(IO.unit)
+
+        val req = requestWithAuthHeader(uri"/market/state?closePendingOrders=false&dryRun=false&currencyPair=GBPEUR", Method.DELETE)
+        val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        verifyJsonResponse(res, Status.NoContent, None)
+        verify(svc).clearState(Users.uid, Markets.gbpeur, false)
       }
 
       "not do anything when dryRun is not provided" in {

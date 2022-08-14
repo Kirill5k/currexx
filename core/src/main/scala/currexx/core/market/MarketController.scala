@@ -7,7 +7,7 @@ import currexx.clients.broker.BrokerParameters
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema}
 import currexx.domain.errors.AppError
-import currexx.domain.market.PriceRange
+import currexx.domain.market.{CurrencyPair, PriceRange}
 import currexx.domain.user.UserId
 import io.circe.Codec
 import org.http4s.HttpRoutes
@@ -34,8 +34,12 @@ final private class MarketController[F[_]](
 
   private def clearMarketState(using auth: Authenticator[F]) =
     clearMarketStateEndpoint.withAuthenticatedSession
-      .serverLogic { session => (closePendingOrders, dryRun) =>
-        F.whenA(!dryRun)(service.clearState(session.userId, closePendingOrders)).voidResponse
+      .serverLogic { session => (closePendingOrders, dryRun, currencyPair) =>
+        F.whenA(!dryRun) {
+          currencyPair match
+            case Some(cp) => service.clearState(session.userId, cp, closePendingOrders)
+            case None     => service.clearState(session.userId, closePendingOrders)
+        }.voidResponse
       }
 
   def routes(using authenticator: Authenticator[F]): HttpRoutes[F] =
@@ -82,6 +86,7 @@ object MarketController extends TapirSchema with TapirJson with TapirCodecs {
         .default(true)
         .description("Close pending orders")
         .and(query[Boolean]("dryRun").default(true))
+        .and(query[Option[CurrencyPair]]("currencyPair"))
     )
     .out(statusCode(StatusCode.NoContent))
     .description("Clear all states of traded currencies")

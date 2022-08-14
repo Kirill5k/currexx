@@ -45,6 +45,9 @@ object errors {
     final case class NotSetup(entityName: String) extends NotFound:
       override val message: String = s"Current account doesn't have $entityName-settings set up"
 
+    final case class NotTracked(cp: CurrencyPair) extends NotFound :
+      override val message: String = s"Currency pair $cp is not being tracked"
+    
     case object InvalidEmailOrPassword extends Unauth:
       override val message: String = "Invalid email or password"
 

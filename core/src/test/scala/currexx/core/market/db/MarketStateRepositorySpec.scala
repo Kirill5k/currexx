@@ -5,6 +5,7 @@ import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
 import currexx.core.fixtures.{Markets, Users}
 import currexx.core.market.{IndicatorState, MarketState}
+import currexx.domain.errors.AppError
 import currexx.domain.market.{Condition, Indicator, TradeOrder}
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
@@ -100,6 +101,28 @@ class MarketStateRepositorySpec extends MongoSpec {
         yield res
 
         result.map(_ mustBe Nil)
+      }
+    }
+    
+    "delete" should {
+      "delete market currency state" in withEmbeddedMongoDb { db =>
+        val result = for
+          repo <- MarketStateRepository.make(db)
+          _ <- repo.update(Users.uid, Markets.gbpeur, Markets.priceRange)
+          _ <- repo.delete(Users.uid, Markets.gbpeur)
+          res <- repo.find(Users.uid, Markets.gbpeur)
+        yield res
+
+        result.map(_ mustBe None)
+      }
+
+      "return error when market state does not exist" in withEmbeddedMongoDb { db =>
+        val result = for
+          repo <- MarketStateRepository.make(db)
+          _ <- repo.delete(Users.uid, Markets.gbpeur)
+        yield ()
+
+        result.attempt.map(_ mustBe Left(AppError.NotTracked(Markets.gbpeur)))
       }
     }
   }

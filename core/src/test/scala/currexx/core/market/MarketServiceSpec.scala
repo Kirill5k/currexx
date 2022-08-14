@@ -49,6 +49,23 @@ class MarketServiceSpec extends CatsSpec {
           res mustBe ()
         }
       }
+
+      "delete existing market for a single currency" in {
+        val (stateRepo, disp) = mocks
+        when(stateRepo.delete(any[UserId], any[CurrencyPair])).thenReturn(IO.unit)
+        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+
+        val result = for
+          svc   <- MarketService.make[IO](stateRepo, disp)
+          state <- svc.clearState(Users.uid, Markets.gbpeur, true)
+        yield state
+
+        result.asserting { res =>
+          verify(stateRepo).delete(Users.uid, Markets.gbpeur)
+          verify(disp).dispatch(Action.CloseOpenOrders(Users.uid, Markets.gbpeur))
+          res mustBe ()
+        }
+      }
     }
 
     "getState" should {
