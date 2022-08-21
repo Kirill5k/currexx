@@ -35,7 +35,7 @@ final case class MonitorEntity(
 object MonitorEntity {
   def from(create: CreateMonitor): MonitorEntity =
     MonitorEntity(
-      ObjectId.get,
+      ObjectId.gen,
       create.userId.toObjectId,
       true,
       create.currencyPair,

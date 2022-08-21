@@ -17,4 +17,4 @@ final case class LogEventEntity(
 
 object LogEventEntity:
   def from(event: LogEvent): LogEventEntity =
-    LogEventEntity(ObjectId.get, event.level.toString.toUpperCase, event.time, event.message)
+    LogEventEntity(ObjectId.gen, event.level.toString.toUpperCase, event.time, event.message)

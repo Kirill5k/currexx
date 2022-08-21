@@ -24,7 +24,7 @@ final case class SignalSettingsEntity(
 object SignalSettingsEntity:
   def from(settings: SignalSettings): SignalSettingsEntity =
     SignalSettingsEntity(
-      ObjectId.get,
+      ObjectId.gen,
       settings.userId.toObjectId,
       settings.triggerFrequency.some,
       settings.indicators.toSet

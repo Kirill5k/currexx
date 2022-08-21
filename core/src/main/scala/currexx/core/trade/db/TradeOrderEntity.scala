@@ -31,4 +31,4 @@ final case class TradeOrderEntity(
 
 object TradeOrderEntity:
   def from(top: TradeOrderPlacement): TradeOrderEntity =
-    TradeOrderEntity(ObjectId.get, top.userId.toObjectId, top.currencyPair, top.order, top.broker, top.currentPrice, top.time)
+    TradeOrderEntity(ObjectId.gen, top.userId.toObjectId, top.currencyPair, top.order, top.broker, top.currentPrice, top.time)

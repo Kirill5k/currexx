@@ -23,7 +23,7 @@ object TestSettings:
       strategy: TradeStrategy,
       indicators: Indicator*
   ): TestSettings = {
-    val userId = UserId(ObjectId.get)
+    val userId = UserId(ObjectId.gen)
     TestSettings(
       userId = userId,
       currencyPair = currencyPair,
