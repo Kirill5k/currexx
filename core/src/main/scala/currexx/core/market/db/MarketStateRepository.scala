@@ -78,7 +78,7 @@ final private class LiveMarketStateRepository[F[_]](
     collection.find(userIdEq(uid)).all.map(_.map(_.toDomain).toList)
 
   override def find(uid: UserId, pair: CurrencyPair): F[Option[MarketState]] =
-    collection.find(userIdAndCurrencyPairEq(uid, pair)).first.map(_.map(_.toDomain))
+    collection.find(userIdAndCurrencyPairEq(uid, pair)).first.mapOption(_.toDomain)
 }
 
 object MarketStateRepository extends MongoJsonCodecs:

@@ -30,13 +30,13 @@ final private class LiveSettingsRepository[F[_]](
           .lookup("trade-settings", Field.UId, Field.UId, "trades")
           .project(
             Projection
-              .include("userId")
+              .include(Field.UId)
               .computed("trade", Document("$first" := "$trades"))
               .computed("signal", Document("$first" := "$signals"))
           )
       }
       .first
-      .map(_.map(_.toDomain))
+      .mapOption(_.toDomain)
 }
 
 object SettingsRepository extends MongoJsonCodecs:

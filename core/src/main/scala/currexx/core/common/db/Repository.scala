@@ -1,7 +1,8 @@
 package currexx.core.common.db
 
-import cats.MonadError
+import cats.{Functor, MonadError}
 import cats.syntax.option.*
+import cats.syntax.functor.*
 import com.mongodb.client.result.{DeleteResult, UpdateResult}
 import currexx.core.common.http.SearchParams
 import currexx.domain.market.CurrencyPair
@@ -50,4 +51,6 @@ trait Repository[F[_]] {
 
   protected def errorIfNoMatches(error: Throwable)(res: UpdateResult)(using F: MonadError[F, Throwable]): F[Unit] =
     F.raiseWhen(res.getMatchedCount == 0)(error)
+
+  extension [F[_], A](foa: F[Option[A]]) def mapOption[B](fab: A => B)(using F: Functor[F]): F[Option[B]] = foa.map(_.map(fab))
 }

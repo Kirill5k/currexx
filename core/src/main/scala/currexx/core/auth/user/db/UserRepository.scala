@@ -29,7 +29,7 @@ final private class LiveUserRepository[F[_]](
     collection
       .find(Filter.eq(Field.Email, email.value))
       .first
-      .map(_.map(_.toDomain))
+      .mapOption(_.toDomain)
 
   override def create(details: UserDetails, password: PasswordHash): F[UserId] =
     collection

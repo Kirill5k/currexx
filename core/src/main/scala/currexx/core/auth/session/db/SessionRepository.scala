@@ -32,7 +32,7 @@ final private class LiveSessionRepository[F[_]: Async](
   override def find(sid: SessionId): F[Option[Session]] =
     collection
       .findOneAndUpdate(idEq(sid.value), Update.currentDate(Field.LastAccessedAt))
-      .map(_.map(_.toDomain))
+      .mapOption(_.toDomain)
 
   override def unauth(sid: SessionId): F[Unit] =
     collection.updateOne(idEq(sid.value), logoutUpdate).void
