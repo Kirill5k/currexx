@@ -10,7 +10,7 @@ import mongo4cats.circe.given
 final case class SettingsEntity(
     _id: ObjectId,
     userId: ObjectId,
-    signal: List[SignalParameters],
-    trade: List[TradeParameters]
+    signal: Option[SignalParameters],
+    trade: Option[TradeParameters]
 ) derives Codec.AsObject:
-  def toDomain: Settings = Settings(UserId(userId), signal.headOption, trade.headOption)
+  def toDomain: Settings = Settings(UserId(userId), signal, trade)

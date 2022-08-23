@@ -5,6 +5,8 @@ import cats.syntax.functor.*
 import currexx.core.common.db.Repository
 import currexx.core.settings.Settings
 import currexx.domain.user.UserId
+import mongo4cats.bson.Document
+import mongo4cats.bson.syntax.*
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
 import mongo4cats.collection.operations.{Aggregate, Filter, Projection}
@@ -24,8 +26,14 @@ final private class LiveSettingsRepository[F[_]](
       .aggregate[SettingsEntity] {
         Aggregate
           .matchBy(userIdEq(uid))
-          .lookup("signal-settings", Field.UId, Field.UId, "signal")
-          .lookup("trade-settings", Field.UId, Field.UId, "trade")
+          .lookup("signal-settings", Field.UId, Field.UId, "signals")
+          .lookup("trade-settings", Field.UId, Field.UId, "trades")
+          .project(
+            Projection
+              .include("userId")
+              .computed("trade", Document("$first" := "$trades"))
+              .computed("signal", Document("$first" := "$signals"))
+          )
       }
       .first
       .map(_.map(_.toDomain))
