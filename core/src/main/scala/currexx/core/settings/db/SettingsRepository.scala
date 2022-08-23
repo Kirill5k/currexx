@@ -4,12 +4,10 @@ import cats.effect.Async
 import cats.syntax.functor.*
 import currexx.core.common.db.Repository
 import currexx.core.settings.Settings
-import currexx.core.signal.SignalSettings
-import currexx.core.trade.TradeSettings
 import currexx.domain.user.UserId
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
-import mongo4cats.collection.operations.{Aggregate, Filter}
+import mongo4cats.collection.operations.{Aggregate, Filter, Projection}
 import mongo4cats.database.MongoDatabase
 
 trait SettingsRepository[F[_]]:
@@ -36,4 +34,4 @@ final private class LiveSettingsRepository[F[_]](
 object SettingsRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[SettingsRepository[F]] =
     db.getCollectionWithCodec[SettingsEntity]("settings")
-      .map(coll => LiveSettingsRepository[F](coll.withAddedCodec[SignalSettings].withAddedCodec[TradeSettings]))
+      .map(coll => LiveSettingsRepository[F](coll))
