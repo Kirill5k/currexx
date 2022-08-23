@@ -23,7 +23,7 @@ trait SignalSettingsRepository[F[_]] extends Repository[F]:
 final private class LiveSignalSettingsRepository[F[_]: Async](
     private val collection: MongoCollection[F, SignalSettingsEntity]
 ) extends SignalSettingsRepository[F] {
-
+  
   override def update(settings: SignalSettings): F[Unit] =
     collection
       .updateOne(userIdEq(settings.userId), Update.set(Field.Indicators, settings.indicators))
@@ -41,7 +41,6 @@ final private class LiveSignalSettingsRepository[F[_]: Async](
 }
 
 object SignalSettingsRepository extends MongoJsonCodecs:
-
   def make[F[_]: Async](db: MongoDatabase[F]): F[SignalSettingsRepository[F]] =
     db.getCollectionWithCodec[SignalSettingsEntity]("signal-settings")
       .map(coll => LiveSignalSettingsRepository[F](coll.withAddedCodec[CurrencyPair].withAddedCodec[Indicator]))
