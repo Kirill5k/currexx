@@ -46,7 +46,7 @@ final private class LiveMonitorRepository[F[_]](
       .flatMap(maybeMon => F.fromOption(maybeMon.map(_.toDomain), AppError.EntityDoesNotExist("Monitor", id.value)))
 
   override def getAll(uid: UserId): F[List[Monitor]] =
-    collection.find(userIdEq(uid)).all.map(_.map(_.toDomain).toList)
+    collection.find(userIdEq(uid)).all.mapIterable(_.toDomain)
 
   override def create(mon: CreateMonitor): F[MonitorId] = {
     val entity = MonitorEntity.from(mon)

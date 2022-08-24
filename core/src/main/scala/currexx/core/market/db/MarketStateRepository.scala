@@ -75,7 +75,7 @@ final private class LiveMarketStateRepository[F[_]](
       }
 
   override def getAll(uid: UserId): F[List[MarketState]] =
-    collection.find(userIdEq(uid)).all.map(_.map(_.toDomain).toList)
+    collection.find(userIdEq(uid)).all.mapIterable(_.toDomain)
 
   override def find(uid: UserId, pair: CurrencyPair): F[Option[MarketState]] =
     collection.find(userIdAndCurrencyPairEq(uid, pair)).first.mapOption(_.toDomain)
