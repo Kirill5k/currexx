@@ -5,6 +5,7 @@ import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.core.common.db.Repository
 import currexx.core.settings.Settings
+import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
 import mongo4cats.bson.Document
 import mongo4cats.bson.syntax.*
@@ -14,7 +15,7 @@ import mongo4cats.collection.operations.{Aggregate, Projection}
 import mongo4cats.database.MongoDatabase
 
 trait SettingsRepository[F[_]]:
-  def get(uid: UserId): F[Option[Settings]]
+  def get(uid: UserId): F[Settings]
   def createFor(uid: UserId): F[Unit]
 
 final private class LiveSettingsRepository[F[_]](
@@ -23,7 +24,7 @@ final private class LiveSettingsRepository[F[_]](
     F: Async[F]
 ) extends SettingsRepository[F] with Repository[F] {
 
-  override def get(uid: UserId): F[Option[Settings]] =
+  override def get(uid: UserId): F[Settings] =
     collection
       .aggregate[SettingsEntity] {
         Aggregate
@@ -38,7 +39,10 @@ final private class LiveSettingsRepository[F[_]](
           )
       }
       .first
-      .mapOption(_.toDomain)
+      .flatMap {
+        case Some(settings) => F.pure(settings.toDomain)
+        case None           => F.raiseError(AppError.NotSetup("Global"))
+      }
 
   override def createFor(uid: UserId): F[Unit] =
     collection

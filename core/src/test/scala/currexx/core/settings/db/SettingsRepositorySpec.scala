@@ -6,6 +6,7 @@ import io.circe.syntax.given
 import currexx.core.fixtures.{Signals, Trades, Users}
 import currexx.core.MongoSpec
 import currexx.core.settings.{Settings, SignalParameters, TradeParameters}
+import currexx.domain.errors.AppError
 import mongo4cats.bson.Document
 import mongo4cats.bson.syntax.*
 import mongo4cats.circe.given
@@ -27,7 +28,7 @@ class SettingsRepositorySpec extends MongoSpec {
             res  <- repo.get(Users.uid2)
           } yield res
 
-          result.map(_ mustBe None)
+          result.attempt.map(_ mustBe Left(AppError.NotSetup("Global")))
         }
       }
 
@@ -36,7 +37,7 @@ class SettingsRepositorySpec extends MongoSpec {
           val result = for {
             repo <- SettingsRepository.make[IO](db)
             res  <- repo.get(Users.uid)
-          } yield res.get
+          } yield res
 
           result.map { settings =>
             settings mustBe Settings(
@@ -58,7 +59,7 @@ class SettingsRepositorySpec extends MongoSpec {
             res  <- repo.get(Users.uid2)
           } yield res
 
-          result.map(_.map(_.userId) mustBe Some(Users.uid2))
+          result.map(_.userId mustBe Users.uid2)
         }
       }
 
