@@ -10,6 +10,7 @@ import mongo4cats.bson.Document
 import mongo4cats.bson.syntax.*
 import mongo4cats.circe.given
 import mongo4cats.client.MongoClient
+import mongo4cats.collection.operations.Filter
 import mongo4cats.database.MongoDatabase
 
 import scala.concurrent.Future
@@ -44,6 +45,33 @@ class SettingsRepositorySpec extends MongoSpec {
               Some(TradeParameters(Trades.settings.strategy, Trades.settings.broker, Trades.settings.trading, Trades.settings.comment))
             )
           }
+        }
+      }
+    }
+
+    "createFor" should {
+      "create an entry in settings collection for a given user-id" in {
+        withEmbeddedMongoDb { db =>
+          val result = for {
+            repo <- SettingsRepository.make[IO](db)
+            _    <- repo.createFor(Users.uid2)
+            res  <- repo.get(Users.uid2)
+          } yield res
+
+          result.map(_.map(_.userId) mustBe Some(Users.uid2))
+        }
+      }
+
+      "not create a config if it already exists" in {
+        withEmbeddedMongoDb { db =>
+          val result = for {
+            repo <- SettingsRepository.make[IO](db)
+            _    <- repo.createFor(Users.uid2)
+            _    <- repo.createFor(Users.uid2)
+            res  <- db.getCollection("settings").flatMap(_.count(Filter.eq("userId", Users.uid2.toObjectId)))
+          } yield res
+
+          result.map(_ mustBe 1)
         }
       }
     }

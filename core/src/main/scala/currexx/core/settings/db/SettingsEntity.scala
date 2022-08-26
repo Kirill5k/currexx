@@ -6,6 +6,7 @@ import currexx.domain.user.UserId
 import io.circe.Codec
 import mongo4cats.bson.ObjectId
 import mongo4cats.circe.given
+import mongo4cats.codecs.MongoCodecProvider
 
 final case class SettingsEntity(
     _id: ObjectId,
@@ -14,3 +15,6 @@ final case class SettingsEntity(
     trade: Option[TradeParameters]
 ) derives Codec.AsObject:
   def toDomain: Settings = Settings(UserId(userId), signal, trade)
+
+object SettingsEntity:
+  def from(uid: UserId): SettingsEntity = SettingsEntity(ObjectId.gen, uid.toObjectId, None, None)
