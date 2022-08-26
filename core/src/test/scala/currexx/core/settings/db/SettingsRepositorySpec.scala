@@ -5,7 +5,7 @@ import cats.effect.unsafe.IORuntime
 import io.circe.syntax.given
 import currexx.core.fixtures.{Signals, Trades, Users}
 import currexx.core.MongoSpec
-import currexx.core.settings.{Settings, SignalParameters, TradeParameters}
+import currexx.core.settings.{GlobalSettings, SignalParameters, TradeParameters}
 import currexx.domain.errors.AppError
 import mongo4cats.bson.Document
 import mongo4cats.bson.syntax.*
@@ -40,7 +40,7 @@ class SettingsRepositorySpec extends MongoSpec {
           } yield res
 
           result.map { settings =>
-            settings mustBe Settings(
+            settings mustBe GlobalSettings(
               Users.uid,
               Some(SignalParameters(Signals.settings.triggerFrequency, Signals.settings.indicators)),
               Some(TradeParameters(Trades.settings.strategy, Trades.settings.broker, Trades.settings.trading, Trades.settings.comment))

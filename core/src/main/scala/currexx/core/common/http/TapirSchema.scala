@@ -1,11 +1,14 @@
 package currexx.core.common.http
 
 import cats.syntax.option.*
+import currexx.clients.broker.BrokerParameters
 import currexx.domain.market.{Condition, Currency, Indicator, Interval, TradeOrder, Trend}
 import eu.timepit.refined.types.string.NonEmptyString
 import currexx.domain.validations.{EmailString, IdString}
 import currexx.domain.user.UserId
 import currexx.core.monitor.MonitorId
+import currexx.core.signal.TriggerFrequency
+import currexx.core.trade.TradeStrategy
 import currexx.domain.monitor.Schedule
 import sttp.tapir.generic.auto.SchemaDerivation
 import sttp.tapir.{FieldName, Schema}
@@ -29,4 +32,7 @@ transparent trait TapirSchema extends SchemaDerivation {
   inline given Schema[TradeOrder.Position] = Schema.string
   inline given Schema[Indicator]           = Schema.string
   inline given Schema[Condition]           = Schema.string
+  inline given Schema[TriggerFrequency]    = Schema.string
+  inline given Schema[TradeStrategy]       = Schema.string
+  inline given Schema[BrokerParameters]    = Schema.string
 }

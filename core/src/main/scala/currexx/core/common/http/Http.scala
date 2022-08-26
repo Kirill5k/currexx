@@ -9,6 +9,7 @@ import currexx.core.health.Health
 import currexx.core.market.Markets
 import currexx.core.signal.Signals
 import currexx.core.monitor.Monitors
+import currexx.core.settings.Settings
 import currexx.core.trade.Trades
 import org.http4s.*
 import org.http4s.implicits.*
@@ -23,7 +24,8 @@ final class Http[F[_]: Async] private (
     private val signals: Signals[F],
     private val monitors: Monitors[F],
     private val markets: Markets[F],
-    private val trades: Trades[F]
+    private val trades: Trades[F],
+    private val settings: Settings[F]
 ) {
 
   private val apiRoutes: HttpRoutes[F] = {
@@ -32,7 +34,8 @@ final class Http[F[_]: Async] private (
       signals.controller.routes <+>
       monitors.controller.routes <+>
       markets.controller.routes <+>
-      trades.controller.routes
+      trades.controller.routes <+>
+      settings.controller.routes
     Router("/api" -> routes)
   }
 
@@ -58,5 +61,6 @@ object Http:
       signals: Signals[F],
       monitors: Monitors[F],
       markets: Markets[F],
-      trades: Trades[F]
-  ): F[Http[F]] = Monad[F].pure(new Http[F](health, auth, signals, monitors, markets, trades))
+      trades: Trades[F],
+      settings: Settings[F]
+  ): F[Http[F]] = Monad[F].pure(new Http[F](health, auth, signals, monitors, markets, trades, settings))

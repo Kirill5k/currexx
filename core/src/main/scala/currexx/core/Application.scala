@@ -12,6 +12,7 @@ import currexx.core.market.Markets
 import currexx.core.signal.Signals
 import currexx.core.trade.Trades
 import currexx.core.monitor.Monitors
+import currexx.core.settings.Settings
 
 object Application extends IOApp.Simple:
   override val run: IO[Unit] =
@@ -28,7 +29,8 @@ object Application extends IOApp.Simple:
             monitors        <- Monitors.make(res.mongo, clients, dispatcher)
             markets         <- Markets.make(res.mongo, dispatcher)
             trades          <- Trades.make(res.mongo, clients, dispatcher)
-            http            <- Http.make[IO](health, auth, signals, monitors, markets, trades)
+            settings        <- Settings.make(res.mongo)
+            http            <- Http.make[IO](health, auth, signals, monitors, markets, trades, settings)
             actionProcessor <- ActionProcessor.make[IO](dispatcher, monitors.service, signals.service, markets.service, trades.service)
             logProcessor    <- LogEventProcessor.make[IO](res.mongo)
             _ <- Server
