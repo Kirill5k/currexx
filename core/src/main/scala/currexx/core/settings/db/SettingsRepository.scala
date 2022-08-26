@@ -4,7 +4,7 @@ import cats.effect.Async
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.core.common.db.Repository
-import currexx.core.settings.Settings
+import currexx.core.settings.GlobalSettings
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
 import mongo4cats.bson.Document
@@ -15,18 +15,18 @@ import mongo4cats.collection.operations.{Aggregate, Projection}
 import mongo4cats.database.MongoDatabase
 
 trait SettingsRepository[F[_]]:
-  def get(uid: UserId): F[Settings]
+  def get(uid: UserId): F[GlobalSettings]
   def createFor(uid: UserId): F[Unit]
 
 final private class LiveSettingsRepository[F[_]](
-    private val collection: MongoCollection[F, SettingsEntity]
+    private val collection: MongoCollection[F, GlobalSettingsEntity]
 )(using
     F: Async[F]
 ) extends SettingsRepository[F] with Repository[F] {
 
-  override def get(uid: UserId): F[Settings] =
+  override def get(uid: UserId): F[GlobalSettings] =
     collection
-      .aggregate[SettingsEntity] {
+      .aggregate[GlobalSettingsEntity] {
         Aggregate
           .matchBy(userIdEq(uid))
           .lookup("signal-settings", Field.UId, Field.UId, "signals")
@@ -48,12 +48,11 @@ final private class LiveSettingsRepository[F[_]](
     collection
       .count(userIdEq(uid))
       .flatMap {
-        case 0 => collection.insertOne(SettingsEntity.from(uid)).void
+        case 0 => collection.insertOne(GlobalSettingsEntity.from(uid)).void
         case _ => F.unit
       }
 }
 
 object SettingsRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[SettingsRepository[F]] =
-    db.getCollectionWithCodec[SettingsEntity]("settings")
-      .map(coll => LiveSettingsRepository[F](coll))
+    db.getCollectionWithCodec[GlobalSettingsEntity]("settings").map(LiveSettingsRepository[F](_))

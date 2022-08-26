@@ -19,7 +19,7 @@ final case class TradeParameters(
     comment: Option[String]
 ) derives Codec.AsObject
 
-final case class Settings(
+final case class GlobalSettings(
     userId: UserId,
     signal: Option[SignalParameters],
     trade: Option[TradeParameters]

@@ -1,20 +1,19 @@
 package currexx.core.settings.db
 
 import currexx.clients.broker.BrokerParameters
-import currexx.core.settings.{Settings, SignalParameters, TradeParameters}
+import currexx.core.settings.{GlobalSettings, SignalParameters, TradeParameters}
 import currexx.domain.user.UserId
 import io.circe.Codec
 import mongo4cats.bson.ObjectId
 import mongo4cats.circe.given
-import mongo4cats.codecs.MongoCodecProvider
 
-final case class SettingsEntity(
+final case class GlobalSettingsEntity(
     _id: ObjectId,
     userId: ObjectId,
     signal: Option[SignalParameters],
     trade: Option[TradeParameters]
 ) derives Codec.AsObject:
-  def toDomain: Settings = Settings(UserId(userId), signal, trade)
+  def toDomain: GlobalSettings = GlobalSettings(UserId(userId), signal, trade)
 
-object SettingsEntity:
-  def from(uid: UserId): SettingsEntity = SettingsEntity(ObjectId.gen, uid.toObjectId, None, None)
+object GlobalSettingsEntity:
+  def from(uid: UserId): GlobalSettingsEntity = GlobalSettingsEntity(ObjectId.gen, uid.toObjectId, None, None)
