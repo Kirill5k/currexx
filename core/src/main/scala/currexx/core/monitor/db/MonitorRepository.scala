@@ -15,7 +15,7 @@ import currexx.domain.user.UserId
 import fs2.Stream
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
-import mongo4cats.collection.operations.{Filter, Update}
+import mongo4cats.operations.{Filter, Update}
 import mongo4cats.database.MongoDatabase
 
 import scala.concurrent.duration.FiniteDuration

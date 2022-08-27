@@ -9,7 +9,7 @@ import currexx.domain.market.CurrencyPair
 import currexx.domain.types.IdType
 import currexx.domain.user.UserId
 import mongo4cats.bson.ObjectId
-import mongo4cats.collection.operations.{Filter, Update}
+import mongo4cats.operations.{Filter, Update}
 
 import java.time.Instant
 

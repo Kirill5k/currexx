@@ -8,7 +8,8 @@ import currexx.core.common.db.Repository
 import currexx.core.common.logging.LogEvent
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
-import mongo4cats.database.{CreateCollectionOptions, MongoDatabase}
+import mongo4cats.models.database.CreateCollectionOptions
+import mongo4cats.database.MongoDatabase
 
 trait LogEventRepository[F[_]] extends Repository[F]:
   def save(event: LogEvent): F[Unit]

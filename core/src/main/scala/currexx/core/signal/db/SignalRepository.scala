@@ -12,8 +12,9 @@ import currexx.domain.market.{CurrencyPair, Indicator}
 import currexx.domain.user.UserId
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
-import mongo4cats.collection.operations.Filter
-import mongo4cats.database.{CreateCollectionOptions, MongoDatabase}
+import mongo4cats.operations.Filter
+import mongo4cats.models.database.CreateCollectionOptions
+import mongo4cats.database.MongoDatabase
 
 import java.time.Instant
 

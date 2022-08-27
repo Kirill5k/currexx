@@ -11,7 +11,7 @@ import mongo4cats.bson.Document
 import mongo4cats.bson.syntax.*
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
-import mongo4cats.collection.operations.{Aggregate, Projection}
+import mongo4cats.operations.{Aggregate, Projection}
 import mongo4cats.database.MongoDatabase
 
 trait SettingsRepository[F[_]]:

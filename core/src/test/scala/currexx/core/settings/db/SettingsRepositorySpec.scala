@@ -11,7 +11,7 @@ import mongo4cats.bson.Document
 import mongo4cats.bson.syntax.*
 import mongo4cats.circe.given
 import mongo4cats.client.MongoClient
-import mongo4cats.collection.operations.Filter
+import mongo4cats.operations.Filter
 import mongo4cats.database.MongoDatabase
 
 import scala.concurrent.Future

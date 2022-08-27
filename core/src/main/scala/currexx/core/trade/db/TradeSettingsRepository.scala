@@ -12,7 +12,7 @@ import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
-import mongo4cats.collection.operations.Update
+import mongo4cats.operations.Update
 import mongo4cats.database.MongoDatabase
 
 trait TradeSettingsRepository[F[_]] extends Repository[F]:

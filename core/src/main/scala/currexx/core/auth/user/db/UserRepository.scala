@@ -9,7 +9,7 @@ import currexx.domain.user.*
 import currexx.domain.errors.AppError.{AccountAlreadyExists, EntityDoesNotExist}
 import currexx.core.common.db.Repository
 import mongo4cats.circe.MongoJsonCodecs
-import mongo4cats.collection.operations.{Filter, Update}
+import mongo4cats.operations.{Filter, Update}
 import mongo4cats.collection.MongoCollection
 import mongo4cats.database.MongoDatabase
 

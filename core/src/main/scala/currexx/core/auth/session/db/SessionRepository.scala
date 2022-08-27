@@ -8,7 +8,7 @@ import currexx.domain.user.UserId
 import currexx.domain.json.given
 import mongo4cats.database.MongoDatabase
 import mongo4cats.circe.MongoJsonCodecs
-import mongo4cats.collection.operations.Update
+import mongo4cats.operations.Update
 import mongo4cats.collection.MongoCollection
 
 trait SessionRepository[F[_]] extends Repository[F]:

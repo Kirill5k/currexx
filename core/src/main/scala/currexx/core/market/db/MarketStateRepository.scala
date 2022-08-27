@@ -12,8 +12,9 @@ import currexx.domain.errors.AppError
 import currexx.core.common.db.Repository
 import currexx.core.market.{IndicatorState, MarketState, PositionState}
 import mongo4cats.circe.MongoJsonCodecs
-import mongo4cats.collection.{FindOneAndUpdateOptions, MongoCollection}
-import mongo4cats.collection.operations.{Filter, Update}
+import mongo4cats.models.collection.FindOneAndUpdateOptions
+import mongo4cats.collection.MongoCollection
+import mongo4cats.operations.{Filter, Update}
 import mongo4cats.database.MongoDatabase
 
 trait MarketStateRepository[F[_]] extends Repository[F]:

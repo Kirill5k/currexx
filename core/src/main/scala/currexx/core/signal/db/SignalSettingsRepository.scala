@@ -11,7 +11,7 @@ import currexx.core.signal.SignalSettings
 import currexx.domain.errors.AppError
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
-import mongo4cats.collection.operations.{Filter, Update}
+import mongo4cats.operations.{Filter, Update}
 import mongo4cats.database.MongoDatabase
 
 import scala.jdk.CollectionConverters.*
