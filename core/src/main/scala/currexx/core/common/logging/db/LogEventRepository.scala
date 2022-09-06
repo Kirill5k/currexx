@@ -28,11 +28,11 @@ final private class LiveLogEventRepository[F[_]](
 
 object LogEventRepository extends MongoJsonCodecs:
   private val collectionName    = "log-events"
-  private val collectionOptions = CreateCollectionOptions().capped(true).sizeInBytes(268435456L)
+  private val collectionOptions = CreateCollectionOptions(capped = true, sizeInBytes = 268435456L)
 
-  def make[F[_]: Async](db: MongoDatabase[F]): F[LogEventRepository[F]] =
+  def make[F[_]](db: MongoDatabase[F])(using F: Async[F]): F[LogEventRepository[F]] =
     for
       collNames <- db.listCollectionNames
-      _         <- if (collNames.toSet.contains(collectionName)) ().pure[F] else db.createCollection(collectionName, collectionOptions)
+      _         <- F.unlessA(collNames.toSet.contains(collectionName))(db.createCollection(collectionName, collectionOptions))
       coll      <- db.getCollectionWithCodec[LogEventEntity](collectionName)
     yield LiveLogEventRepository[F](coll)

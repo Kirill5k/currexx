@@ -7,7 +7,6 @@ import currexx.core.fixtures.{Markets, Monitors, Sessions, Users}
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
 import org.http4s.implicits.*
-import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.{Method, Status, Uri}
 
 class MonitorControllerSpec extends ControllerSpec {
@@ -22,15 +21,13 @@ class MonitorControllerSpec extends ControllerSpec {
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val requestBody = parseJson(
-          s"""{
+        val requestBody = s"""{
              |"currencyPair": "GBP/EUR",
              |"interval": "H1",
              |"schedule": {"kind":"periodic","period":"3 hours"}
              |}""".stripMargin
-        )
 
-        val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withEntity(requestBody)
+        val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.Created, Some(s"""{"id":"${Monitors.mid}"}"""))
@@ -43,15 +40,13 @@ class MonitorControllerSpec extends ControllerSpec {
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val requestBody = parseJson(
-          s"""{
+        val requestBody = s"""{
              |"currencyPair": "GBP/EUR",
              |"interval": "H1",
              |"schedule": {"kind":"periodic","period":"3 hours"}
              |}""".stripMargin
-        )
 
-        val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withEntity(requestBody)
+        val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.Conflict, Some("""{"message":"Monitor for currency pair GBPEUR already exists"}"""))
@@ -209,7 +204,7 @@ class MonitorControllerSpec extends ControllerSpec {
              |"lastQueriedAt": "${Monitors.queriedAt}"
              |}""".stripMargin
 
-        val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT).withEntity(parseJson(requestBody))
+        val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT).withJsonBody(parseJson(requestBody))
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.NoContent, None)
@@ -231,7 +226,7 @@ class MonitorControllerSpec extends ControllerSpec {
              |"lastQueriedAt": "${Monitors.queriedAt}"
              |}""".stripMargin
 
-        val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT).withEntity(parseJson(requestBody))
+        val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT).withJsonBody(parseJson(requestBody))
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(

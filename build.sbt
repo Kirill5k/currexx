@@ -1,7 +1,7 @@
 import com.typesafe.sbt.packager.docker._
 import sbtghactions.JavaSpec
 
-ThisBuild / scalaVersion                        := "3.1.3"
+ThisBuild / scalaVersion                        := "3.2.0"
 ThisBuild / version                             := scala.sys.process.Process("git rev-parse HEAD").!!.trim.slice(0, 7)
 ThisBuild / organization                        := "io.github.kirill5k"
 ThisBuild / githubWorkflowPublishTargetBranches := Nil

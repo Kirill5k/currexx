@@ -14,6 +14,10 @@ import scala.io.Source
 
 trait ControllerSpec extends AnyWordSpec with MockitoMatchers with Matchers {
 
+  extension (r: Request[IO])
+    def withBody(requestBody: String): Request[IO] = r.withBodyStream(fs2.Stream.emits(requestBody.getBytes().toList))
+    def withJsonBody(json: Json): Request[IO]      = withBody(json.noSpaces)
+
   def requestWithAuthHeader(
       uri: org.http4s.Uri,
       method: org.http4s.Method = Method.GET,

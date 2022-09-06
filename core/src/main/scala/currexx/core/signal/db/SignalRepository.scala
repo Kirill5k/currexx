@@ -46,11 +46,11 @@ final private class LiveSignalRepository[F[_]: Async](
 
 object SignalRepository extends MongoJsonCodecs:
   private val collectionName    = "signals"
-  private val collectionOptions = CreateCollectionOptions().capped(true).sizeInBytes(268435456L)
+  private val collectionOptions = CreateCollectionOptions(capped = true, sizeInBytes = 268435456L)
 
-  def make[F[_]: Async](db: MongoDatabase[F]): F[SignalRepository[F]] =
+  def make[F[_]](db: MongoDatabase[F])(using F: Async[F]): F[SignalRepository[F]] =
     for
       collNames <- db.listCollectionNames
-      _         <- if (collNames.toSet.contains(collectionName)) ().pure[F] else db.createCollection(collectionName, collectionOptions)
+      _         <- F.unlessA(collNames.toSet.contains(collectionName))(db.createCollection(collectionName, collectionOptions))
       coll      <- db.getCollectionWithCodec[SignalEntity](collectionName)
     yield LiveSignalRepository[F](coll.withAddedCodec[CurrencyPair].withAddedCodec[Indicator])

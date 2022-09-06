@@ -9,7 +9,6 @@ import currexx.domain.user.*
 import currexx.domain.errors.AppError.{AccountAlreadyExists, InvalidEmailOrPassword, SessionDoesNotExist}
 import currexx.core.auth.jwt.BearerToken
 import currexx.core.fixtures.{Sessions, Users}
-import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.implicits.*
 import org.http4s.{HttpDate, Method, Request, Status, Uri}
 import currexx.domain.market.Currency.USD
@@ -50,7 +49,7 @@ class AuthControllerSpec extends ControllerSpec {
 
         val reqBody = """{"newPassword":"new-pwd","currentPassword":"curr-pwd"}"""
         val req = requestWithAuthHeader(uri"/auth/user/60e70e87fb134e0c1a271122/password", Method.POST)
-          .withEntity(parseJson(reqBody))
+          .withJsonBody(parseJson(reqBody))
         val res = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.Forbidden, Some("""{"message":"The current session belongs to a different user"}"""))
@@ -66,7 +65,7 @@ class AuthControllerSpec extends ControllerSpec {
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
         val req = requestWithAuthHeader(Uri.unsafeFromString(s"/auth/user/${Users.uid}/password"), Method.POST)
-          .withEntity(parseJson("""{"newPassword":"new-pwd","currentPassword":"curr-pwd"}"""))
+          .withJsonBody(parseJson("""{"newPassword":"new-pwd","currentPassword":"curr-pwd"}"""))
         val res = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.NoContent, None)
@@ -83,7 +82,7 @@ class AuthControllerSpec extends ControllerSpec {
         when(usrSvc.create(any[UserDetails], any[Password])).thenReturn(IO.raiseError(AccountAlreadyExists(UserEmail("foo@bar.com"))))
 
         val reqBody = parseJson("""{"email":"foo@bar.com","password":"pwd","firstName":"John","lastName":"Bloggs"}""")
-        val req     = Request[IO](uri = uri"/auth/user", method = Method.POST).withEntity(reqBody)
+        val req     = Request[IO](uri = uri"/auth/user", method = Method.POST).withJsonBody(reqBody)
         val res     = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(
@@ -101,7 +100,7 @@ class AuthControllerSpec extends ControllerSpec {
         val (usrSvc, sessSvc) = mocks
 
         val reqBody = parseJson("""{"email":"foo@bar.com","password":"","firstName":"John","lastName":"Bloggs"}""")
-        val req     = Request[IO](uri = uri"/auth/user", method = Method.POST).withEntity(reqBody)
+        val req     = Request[IO](uri = uri"/auth/user", method = Method.POST).withJsonBody(reqBody)
         val res     = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(
@@ -118,7 +117,7 @@ class AuthControllerSpec extends ControllerSpec {
         when(usrSvc.create(any[UserDetails], any[Password])).thenReturn(IO.pure(Users.uid))
 
         val reqBody = parseJson("""{"email":"foo@bar.com","password":"pwd","firstName":"John","lastName":"Bloggs"}""")
-        val req     = Request[IO](uri = uri"/auth/user", method = Method.POST).withEntity(reqBody)
+        val req     = Request[IO](uri = uri"/auth/user", method = Method.POST).withJsonBody(reqBody)
         val res     = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.Created, Some(s"""{"id":"${Users.uid}"}"""))
@@ -137,10 +136,10 @@ class AuthControllerSpec extends ControllerSpec {
       "return 422 on invalid json" in {
         val (usrSvc, sessSvc) = mocks
 
-        val req = Request[IO](uri = uri"/auth/login", method = Method.POST).withEntity("""{foo}""")
+        val req = Request[IO](uri = uri"/auth/login", method = Method.POST).withBody("""{foo}""")
         val res = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
-        val responseBody = """{"message":"Invalid message body: Could not decode LoginRequest json"}"""
+        val responseBody = """{"message":"Invalid message body: Could not decode expected \" got 'foo}' (line 1, column 2) json"}"""
         verifyJsonResponse(res, Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(usrSvc, sessSvc)
       }
@@ -149,7 +148,7 @@ class AuthControllerSpec extends ControllerSpec {
         val (usrSvc, sessSvc) = mocks
 
         val reqBody  = parseJson("""{"email":"foo","password":""}""")
-        val res      = Request[IO](uri = uri"/auth/login", method = Method.POST).withEntity(reqBody)
+        val res      = Request[IO](uri = uri"/auth/login", method = Method.POST).withJsonBody(reqBody)
         val response = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(res))
 
         val resBody = """{"message":"foo is not a valid email, password must not be empty"}"""
@@ -163,7 +162,7 @@ class AuthControllerSpec extends ControllerSpec {
         when(usrSvc.login(any[Login])).thenReturn(IO.raiseError(InvalidEmailOrPassword))
 
         val reqBody = parseJson("""{"email":"foo@bar.com","password":"bar"}""")
-        val req     = Request[IO](uri = uri"/auth/login", method = Method.POST).withEntity(reqBody)
+        val req     = Request[IO](uri = uri"/auth/login", method = Method.POST).withJsonBody(reqBody)
         val res     = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.Unauthorized, Some("""{"message":"Invalid email or password"}"""))
@@ -177,7 +176,7 @@ class AuthControllerSpec extends ControllerSpec {
         when(sessSvc.create(any[CreateSession])).thenReturn(IO.pure(BearerToken("token")))
 
         val reqBody = parseJson("""{"email":"foo@bar.com","password":"bar"}""")
-        val req     = Request[IO](uri = uri"/auth/login", method = Method.POST).withEntity(reqBody)
+        val req     = Request[IO](uri = uri"/auth/login", method = Method.POST).withJsonBody(reqBody)
         val res     = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.Ok, Some(s"""{"access_token":"token","token_type":"Bearer"}"""))

@@ -2,19 +2,19 @@ import sbt._
 
 object Dependencies {
   object Versions {
-    val fs2            = "3.2.12"
+    val fs2            = "3.2.13"
     val cats           = "2.8.0"
-    val mongo4cats     = "0.6.0"
+    val mongo4cats     = "0.6.1"
     val pureConfig     = "0.17.1"
     val circe          = "0.14.2"
     val sttp           = "3.7.6"
     val http4s         = "0.23.12"
-    val logback        = "1.2.11"
+    val logback        = "1.4.0"
     val log4cats       = "2.4.0"
     val bcrypt         = "4.3.0"
     val refined        = "0.10.1"
     val tapir          = "1.0.6"
-    val jwt            = "9.1.0"
+    val jwt            = "9.1.1"
     val cronUtils      = "9.2.0"
     val taggedAdtCodec = "0.10.1"
 
@@ -75,8 +75,6 @@ object Dependencies {
 
     object http4s {
       val blaze = "org.http4s" %% "http4s-blaze-server" % Versions.http4s
-      val circe = "org.http4s" %% "http4s-circe"        % Versions.http4s
-      val all   = Seq(blaze, circe)
     }
 
     val scalaTest = "org.scalatest"     %% "scalatest"   % Versions.scalaTest
@@ -102,12 +100,12 @@ object Dependencies {
 
   val core = Seq(
     Libraries.pureconfig.core,
+    Libraries.http4s.blaze,
     Libraries.jwt,
     Libraries.bcrypt.cross(CrossVersion.for3Use2_13)
   ) ++
     Libraries.logging.all ++
-    Libraries.tapir.all ++
-    Libraries.http4s.all
+    Libraries.tapir.all
 
   val test = Seq(
     Libraries.scalaTest           % Test,

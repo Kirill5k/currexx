@@ -8,7 +8,6 @@ import currexx.domain.user.UserId
 import currexx.core.fixtures.{Markets, Sessions, Signals, Users}
 import currexx.domain.errors.AppError
 import currexx.domain.market.CurrencyPair
-import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.implicits.*
 import org.http4s.{Method, Request, Status, Uri}
 
@@ -24,12 +23,12 @@ class SignalControllerSpec extends ControllerSpec {
         val svc = mock[SignalService[IO]]
         when(svc.submit(any[Signal])).thenReturn(IO.unit)
 
-        val reqBody = parseJson(s"""{
+        val reqBody = s"""{
              |"currencyPair":"GBP/EUR",
              |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
              |"condition": {"kind":"crossing-up"}
-             |}""".stripMargin)
-        val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
+             |}""".stripMargin
+        val req = requestWithAuthHeader(uri"/signals", Method.POST).withJsonBody(parseJson(reqBody))
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.NoContent, None)
@@ -39,11 +38,11 @@ class SignalControllerSpec extends ControllerSpec {
       "return error on unrecognized indicator" in {
         val svc = mock[SignalService[IO]]
 
-        val reqBody = parseJson(s"""{
+        val reqBody = s"""{
              |  "currencyPair":"GBP/EUR",
              |  "triggeredBy": {"kind": "foo"}
-             |}""".stripMargin)
-        val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
+             |}""".stripMargin
+        val req = requestWithAuthHeader(uri"/signals", Method.POST).withJsonBody(parseJson(reqBody))
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody =
@@ -55,12 +54,12 @@ class SignalControllerSpec extends ControllerSpec {
       "return error on unrecognized condition" in {
         val svc = mock[SignalService[IO]]
 
-        val reqBody = parseJson(s"""{
+        val reqBody = s"""{
              |"currencyPair":"GBP/EUR",
              |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
              |"condition": {"kind":"foo","value":0.05}
-             |}""".stripMargin)
-        val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
+             |}""".stripMargin
+        val req = requestWithAuthHeader(uri"/signals", Method.POST).withJsonBody(parseJson(reqBody))
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody =
@@ -72,12 +71,12 @@ class SignalControllerSpec extends ControllerSpec {
       "return error on invalid currency pair signal" in {
         val svc = mock[SignalService[IO]]
 
-        val reqBody = parseJson(s"""{
+        val reqBody = s"""{
              |"currencyPair":"FOO/BAR",
              |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
              |"condition": {"kind":"crossing-up"}
-             |}""".stripMargin)
-        val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
+             |}""".stripMargin
+        val req = requestWithAuthHeader(uri"/signals", Method.POST).withJsonBody(parseJson(reqBody))
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody =
@@ -89,12 +88,12 @@ class SignalControllerSpec extends ControllerSpec {
       "return error on malformed currency pair signal" in {
         val svc = mock[SignalService[IO]]
 
-        val reqBody = parseJson(s"""{
+        val reqBody = s"""{
                |"currencyPair":"FOO-BAR",
                |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
                |"condition": {"kind":"crossing-up"}
-               |}""".stripMargin)
-        val req = requestWithAuthHeader(uri"/signals", Method.POST).withEntity(reqBody)
+               |}""".stripMargin
+        val req = requestWithAuthHeader(uri"/signals", Method.POST).withJsonBody(parseJson(reqBody))
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.UnprocessableEntity, Some("""{"message":"FOO-BAR is not valid currency pair representation"}"""))
@@ -185,7 +184,7 @@ class SignalControllerSpec extends ControllerSpec {
              |}
              |]}""".stripMargin
 
-        val req = requestWithAuthHeader(uri"/signals/settings", Method.PUT).withEntity(parseJson(requestBody))
+        val req = requestWithAuthHeader(uri"/signals/settings", Method.PUT).withJsonBody(parseJson(requestBody))
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.NoContent, None)

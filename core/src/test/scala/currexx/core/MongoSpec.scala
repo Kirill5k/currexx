@@ -16,12 +16,10 @@ trait MongoSpec extends EmbeddedMongo with CatsSpec {
       registrationDate: Instant = Instant.parse("2021-06-01T00:00:00Z")
   ): Document =
     Document(
-      Map(
-        "_id"              := ObjectId(id.value),
-        "email"            := email.value,
-        "password"         := password.value,
-        "name"             := Document.parse("""{"first":"John","last":"Bloggs"}"""),
-        "registrationDate" := registrationDate
-      )
+      "_id"              := ObjectId(id.value),
+      "email"            := email.value,
+      "password"         := password.value,
+      "name"             := Document.parse("""{"first":"John","last":"Bloggs"}"""),
+      "registrationDate" := registrationDate
     )
 }

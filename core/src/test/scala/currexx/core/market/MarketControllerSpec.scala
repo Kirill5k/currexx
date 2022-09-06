@@ -7,7 +7,6 @@ import currexx.core.fixtures.{Markets, Sessions, Signals, Users}
 import currexx.domain.errors.AppError
 import currexx.domain.market.CurrencyPair
 import currexx.domain.user.UserId
-import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.implicits.*
 import org.http4s.{Method, Request, Status, Uri}
 

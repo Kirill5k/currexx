@@ -39,11 +39,11 @@ final private class LiveTradeOrderRepository[F[_]: Async](
 
 object TradeOrderRepository extends MongoJsonCodecs:
   private val collectionName    = "trade-orders"
-  private val collectionOptions = CreateCollectionOptions().capped(true).sizeInBytes(268435456L)
+  private val collectionOptions = CreateCollectionOptions(capped = true, sizeInBytes = 268435456L)
 
-  def make[F[_]: Async](db: MongoDatabase[F]): F[TradeOrderRepository[F]] =
+  def make[F[_]](db: MongoDatabase[F])(using F: Async[F]): F[TradeOrderRepository[F]] =
     for
       collNames <- db.listCollectionNames
-      _         <- if (collNames.toSet.contains(collectionName)) ().pure[F] else db.createCollection(collectionName, collectionOptions)
+      _         <- F.unlessA(collNames.toSet.contains(collectionName))(db.createCollection(collectionName, collectionOptions))
       coll      <- db.getCollectionWithCodec[TradeOrderEntity](collectionName)
     yield LiveTradeOrderRepository[F](coll.withAddedCodec[CurrencyPair])

@@ -8,7 +8,6 @@ import currexx.core.fixtures.{Markets, Sessions, Trades, Users}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, TradeOrder}
 import currexx.domain.user.UserId
-import org.http4s.circe.CirceEntityCodec.*
 import org.http4s.implicits.*
 import org.http4s.{Method, Request, Status, Uri}
 
@@ -40,7 +39,7 @@ class TradeControllerSpec extends ControllerSpec {
              |""".stripMargin
 
         val req = requestWithAuthHeader(uri"/trade/orders?closePendingOrders=false", Method.POST)
-          .withEntity(parseJson(requestBody))
+          .withJsonBody(parseJson(requestBody))
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.Created, None)
@@ -150,7 +149,7 @@ class TradeControllerSpec extends ControllerSpec {
              |}
              |}""".stripMargin
 
-        val req = requestWithAuthHeader(uri"/trade/settings", Method.PUT).withEntity(parseJson(requestBody))
+        val req = requestWithAuthHeader(uri"/trade/settings", Method.PUT).withJsonBody(parseJson(requestBody))
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.NoContent, None)
