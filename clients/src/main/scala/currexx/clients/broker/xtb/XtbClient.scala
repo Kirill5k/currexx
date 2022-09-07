@@ -57,7 +57,6 @@ final private class LiveXtbClient[F[_]](
     initEmptyState.flatMap { state =>
       login(params) ++
         input
-          .evalTap(m => F.delay(println(s"received $m")))
           .map(parseXtbResponse)
           .rethrow
           .flatMap {
@@ -83,7 +82,6 @@ final private class LiveXtbClient[F[_]](
     initEmptyState.flatMap { state =>
       login(params) ++
         input
-          .evalTap(m => F.delay(println(s"received $m")))
           .map(parseXtbResponse)
           .rethrow
           .flatMap {
@@ -101,8 +99,13 @@ final private class LiveXtbClient[F[_]](
                     .map(td => XtbRequest.closeTransaction(sid, cp, td).asText)
                 }
             case XtbResponse.OrderPlacement(_) => Stream.emit(WebSocketFrame.close)
-            case error: XtbResponse.Error      => handError(error)
-            case _                             => Stream.empty
+            case XtbResponse.Error("SE199", _) =>
+              Stream
+                .eval(state.get.map(_.sessionId.toRight(AppError.ClientFailure(name, "no session id"))))
+                .rethrow
+                .map(sid => XtbRequest.currentTrades(sid).asText)
+            case error: XtbResponse.Error => handError(error)
+            case _                        => Stream.empty
           }
     }
   }
