@@ -19,10 +19,20 @@ object XtbResponse {
   final case class OrderData(order: Long) derives Codec.AsObject
   final case class OrderPlacement(returnData: OrderData) extends XtbResponse derives Codec.AsObject
 
+  final case class TradeData(
+      position: Long,
+      symbol: String,
+      close_price: BigDecimal,
+      closed: Boolean,
+      volume: BigDecimal
+  ) derives Codec.AsObject
+  final case class Trades(returnData: List[TradeData]) extends XtbResponse derives Codec.AsObject
+
   given Decoder[XtbResponse] = List[Decoder[XtbResponse]](
     Decoder[Error].widen,
     Decoder[OrderPlacement].widen,
     Decoder[SymbolInfo].widen,
+    Decoder[Trades].widen,
     Decoder[Login].widen
   ).reduceLeft(_ or _)
 

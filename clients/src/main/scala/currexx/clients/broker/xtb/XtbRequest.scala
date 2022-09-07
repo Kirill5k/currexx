@@ -15,12 +15,12 @@ object RequestArguments:
       derives Codec.AsObject
 
   final case class TradeTransInfo(
-      cmd: Int,
+      cmd: Option[Int],
       `type`: Int,
       symbol: String,
       customComment: String,
       price: BigDecimal,
-      volume: Option[BigDecimal] = None,
+      volume: BigDecimal,
       sl: Option[BigDecimal] = None,
       tp: Option[BigDecimal] = None,
       offset: Option[BigDecimal] = None,
@@ -28,9 +28,11 @@ object RequestArguments:
       expiration: Option[Long] = None
   ) derives Codec.AsObject
 
-  final case class Trade(tradeTransInfo: TradeTransInfo) extends RequestArguments derives Codec.AsObject
+  final case class Transaction(tradeTransInfo: TradeTransInfo) extends RequestArguments derives Codec.AsObject
 
   final case class SymbolInfo(symbol: String) extends RequestArguments derives Codec.AsObject
+
+  final case class Trades(openedOnly: Boolean) extends RequestArguments derives Codec.AsObject
 
 final case class XtbRequest[A <: RequestArguments](
     command: String,
@@ -42,14 +44,55 @@ object XtbRequest {
   def login(userId: String, password: String): XtbRequest[RequestArguments.Login] =
     XtbRequest("login", None, RequestArguments.Login(userId, password))
 
-  def trade(sessionId: String, cp: CurrencyPair, order: TradeOrder, price: SymbolData): XtbRequest[RequestArguments.Trade] =
+  def currentTrades(sessionId: String): XtbRequest[RequestArguments.Trades] =
+    XtbRequest(
+      "getTrades",
+      Some(sessionId),
+      RequestArguments.Trades(true)
+    )
+
+  def openTransaction(
+      sessionId: String,
+      cp: CurrencyPair,
+      order: TradeOrder.Enter,
+      price: SymbolData
+  ): XtbRequest[RequestArguments.Transaction] =
     XtbRequest(
       "tradeTransaction",
       Some(sessionId),
-      RequestArguments.Trade(
-        tradeTransInfo = order match
-          case TradeOrder.Exit         => exitMarket(cp, price)
-          case enter: TradeOrder.Enter => enterMarket(cp, enter, price)
+      RequestArguments.Transaction(
+        RequestArguments.TradeTransInfo(
+          `type` = 0,
+          cmd = Some(if (order.position == TradeOrder.Position.Buy) 0 else 1),
+          symbol = cp.toString,
+          customComment = s"Currexx - ${TradeOrder.Position.Buy.toString} $cp",
+          offset = order.trailingStopLoss,
+          volume = order.volume,
+          price = if (order.position == TradeOrder.Position.Buy) price.ask else price.bid,
+          sl = order.stopLoss,
+          tp = order.takeProfit,
+        )
+      )
+    )
+
+  def closeTransaction(
+      sessionId: String,
+      cp: CurrencyPair,
+      data: XtbResponse.TradeData
+  ): XtbRequest[RequestArguments.Transaction] =
+    XtbRequest(
+      "tradeTransaction",
+      Some(sessionId),
+      RequestArguments.Transaction(
+        RequestArguments.TradeTransInfo(
+          `type` = 2,
+          cmd = None,
+          symbol = cp.toString,
+          customComment = s"Currexx - Close $cp",
+          price = data.close_price,
+          volume = data.volume,
+          order = Some(data.position)
+        )
       )
     )
 
@@ -58,27 +101,5 @@ object XtbRequest {
       "getSymbol",
       Some(sessionId),
       RequestArguments.SymbolInfo(cp.toString)
-    )
-
-  private def enterMarket(cp: CurrencyPair, order: TradeOrder.Enter, price: SymbolData): RequestArguments.TradeTransInfo =
-    RequestArguments.TradeTransInfo(
-      `type` = 0,
-      cmd = if (order.position == TradeOrder.Position.Buy) 0 else 1,
-      symbol = cp.toString,
-      customComment = s"Currexx - ${TradeOrder.Position.Buy.toString} $cp",
-      offset = order.trailingStopLoss,
-      price = if (order.position == TradeOrder.Position.Buy) price.ask else price.bid,
-      sl = order.stopLoss,
-      tp = order.takeProfit,
-      volume = Some(order.volume)
-    )
-
-  private def exitMarket(cp: CurrencyPair, price: SymbolData): RequestArguments.TradeTransInfo =
-    RequestArguments.TradeTransInfo(
-      `type` = 2,
-      price = price.ask,
-      symbol = cp.toString,
-      customComment = s"Currexx - Close $cp",
-      cmd = 0
     )
 }
