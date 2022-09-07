@@ -32,7 +32,7 @@ final private class LiveMarketStateRepository[F[_]](
     F: Async[F]
 ) extends MarketStateRepository[F] {
 
-  private val updateOptions = FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER)
+  private val updateOptions = FindOneAndUpdateOptions(returnDocument = ReturnDocument.AFTER)
 
   override def deleteAll(uid: UserId): F[Unit] =
     collection.deleteMany(userIdEq(uid)).void
