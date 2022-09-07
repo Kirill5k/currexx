@@ -64,10 +64,7 @@ final private class LiveXtbClient[F[_]](
               Stream.eval(state.update(_.withSessionId(sessionId))).drain ++
                 Stream.emit(XtbRequest.symbolInfo(sessionId, pair).asText)
             case XtbResponse.SymbolInfo(price) =>
-              Stream
-                .eval(state.get.map(_.sessionId.toRight(AppError.ClientFailure(name, "no session id"))))
-                .rethrow
-                .map(sid => XtbRequest.openTransaction(sid, pair, order, price).asText)
+              obtainSessionId(state).map(sid => XtbRequest.openTransaction(sid, pair, order, price).asText)
             case XtbResponse.OrderPlacement(_) => Stream.emit(WebSocketFrame.close)
             case error: XtbResponse.Error      => handError(error)
             case _                             => Stream.empty
@@ -89,9 +86,7 @@ final private class LiveXtbClient[F[_]](
               Stream.eval(state.update(_.withSessionId(sessionId))).drain ++
                 Stream.emit(XtbRequest.currentTrades(sessionId).asText)
             case XtbResponse.Trades(trades) =>
-              Stream
-                .eval(state.get.map(_.sessionId.toRight(AppError.ClientFailure(name, "no session id"))))
-                .rethrow
+              obtainSessionId(state)
                 .flatMap { sid =>
                   Stream
                     .emits(trades)
@@ -99,13 +94,9 @@ final private class LiveXtbClient[F[_]](
                     .map(td => XtbRequest.closeTransaction(sid, cp, td).asText)
                 }
             case XtbResponse.OrderPlacement(_) => Stream.emit(WebSocketFrame.close)
-            case XtbResponse.Error("SE199", _) =>
-              Stream
-                .eval(state.get.map(_.sessionId.toRight(AppError.ClientFailure(name, "no session id"))))
-                .rethrow
-                .map(sid => XtbRequest.currentTrades(sid).asText)
-            case error: XtbResponse.Error => handError(error)
-            case _                        => Stream.empty
+            case XtbResponse.Error("SE199", _) => obtainSessionId(state).map(sid => XtbRequest.currentTrades(sid).asText)
+            case error: XtbResponse.Error      => handError(error)
+            case _                             => Stream.empty
           }
     }
   }
@@ -121,6 +112,9 @@ final private class LiveXtbClient[F[_]](
 
   private def initEmptyState: Stream[F, Ref[F, XtbClient.WsState]] =
     Stream.eval(Ref.of(XtbClient.WsState(None)))
+
+  private def obtainSessionId(state: Ref[F, XtbClient.WsState]): Stream[F, String] =
+    Stream.eval(state.get.map(_.sessionId.toRight(AppError.ClientFailure(name, "no session id")))).rethrow
 
   private def handError(error: XtbResponse.Error): Stream[F, WebSocketFrame] =
     error match
