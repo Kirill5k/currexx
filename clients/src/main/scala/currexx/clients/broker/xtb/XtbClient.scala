@@ -94,9 +94,10 @@ final private class LiveXtbClient[F[_]](
                     .map(td => XtbRequest.closeTransaction(sid, cp, td).asText)
                 }
             case XtbResponse.OrderPlacement(_) => Stream.emit(WebSocketFrame.close)
-            case XtbResponse.Error("SE199", _) => obtainSessionId(state).map(sid => XtbRequest.currentTrades(sid).asText)
-            case error: XtbResponse.Error      => handError(error)
-            case _                             => Stream.empty
+            case XtbResponse.Error("SE199", _) =>
+              obtainSessionId(state).delayBy(delayBetweenConnectionFailures).map(sid => XtbRequest.currentTrades(sid).asText)
+            case error: XtbResponse.Error => handError(error)
+            case _                        => Stream.empty
           }
     }
   }
