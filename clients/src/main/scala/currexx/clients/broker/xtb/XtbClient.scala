@@ -57,8 +57,7 @@ final private class LiveXtbClient[F[_]](
     initEmptyState.flatMap { state =>
       login(params) ++
         input
-          .map(parseXtbResponse)
-          .rethrow
+          .through(parseXtbResponse)
           .flatMap {
             case XtbResponse.Login(sessionId) =>
               Stream.eval(state.update(_.withSessionId(sessionId))).drain ++
@@ -66,7 +65,7 @@ final private class LiveXtbClient[F[_]](
             case XtbResponse.SymbolInfo(price) =>
               obtainSessionId(state).map(sid => XtbRequest.openTransaction(sid, pair, order, price).asText)
             case XtbResponse.OrderPlacement(_) => Stream.emit(WebSocketFrame.close)
-            case error: XtbResponse.Error      => handError(error)
+            case error: XtbResponse.Error      => handError(params.userId, error)
             case _                             => Stream.empty
           }
     }
@@ -79,8 +78,7 @@ final private class LiveXtbClient[F[_]](
     initEmptyState.flatMap { state =>
       login(params) ++
         input
-          .map(parseXtbResponse)
-          .rethrow
+          .through(parseXtbResponse)
           .flatMap {
             case XtbResponse.Login(sessionId) =>
               Stream.eval(state.update(_.withSessionId(sessionId))).drain ++
@@ -95,18 +93,19 @@ final private class LiveXtbClient[F[_]](
                 }
             case XtbResponse.OrderPlacement(_) => Stream.emit(WebSocketFrame.close)
             case XtbResponse.Error("SE199", _) =>
-              obtainSessionId(state).delayBy(delayBetweenConnectionFailures).map(sid => XtbRequest.currentTrades(sid).asText)
-            case error: XtbResponse.Error => handError(error)
+              Stream.logError(s"$name-client/server-${params.userId}: failed to close transaction for $cp") ++
+                obtainSessionId(state).delayBy(delayBetweenConnectionFailures).map(sid => XtbRequest.currentTrades(sid).asText)
+            case error: XtbResponse.Error => handError(params.userId, error)
             case _                        => Stream.empty
           }
     }
   }
 
-  private val parseXtbResponse: WebSocketFrame.Data[_] => Either[AppError, XtbResponse] = {
+  private val parseXtbResponse: Pipe[F, WebSocketFrame.Data[_], XtbResponse] = _.map {
     case WebSocketFrame.Text(jsonPayload, _, _) => XtbResponse.fromJson(jsonPayload)
     case WebSocketFrame.Binary(bytes, _, _)     => XtbResponse.fromJson(new String(bytes, StandardCharsets.UTF_8))
     case _ | null                               => Right(XtbResponse.Void)
-  }
+  }.rethrow
 
   private def login(params: BrokerParameters.Xtb): Stream[F, Text] =
     Stream.emit(XtbRequest.login(params.userId, params.password).asText)
@@ -117,15 +116,15 @@ final private class LiveXtbClient[F[_]](
   private def obtainSessionId(state: Ref[F, XtbClient.WsState]): Stream[F, String] =
     Stream.eval(state.get.map(_.sessionId.toRight(AppError.ClientFailure(name, "no session id")))).rethrow
 
-  private def handError(error: XtbResponse.Error): Stream[F, WebSocketFrame] =
+  private def handError(userId: String, error: XtbResponse.Error): Stream[F, WebSocketFrame] =
     error match
       case XtbResponse.Error("BE005", desc) =>
         Stream.emit(WebSocketFrame.close) ++
-          Stream.logError(s"$name-client/forbidden: $desc") ++
+          Stream.logError(s"$name-client/forbidden-$userId: $desc") ++
           Stream.raiseError(AppError.AccessDenied(s"Failed to authenticate with $name: $desc"))
       case XtbResponse.Error(code, desc) =>
         Stream.emit(WebSocketFrame.close) ++
-          Stream.logError(s"$name-client/error: $desc") ++
+          Stream.logError(s"$name-client/error-$userId: $desc") ++
           Stream.raiseError(AppError.ClientFailure(name, s"$code - $desc"))
 
   extension [A <: RequestArguments](req: XtbRequest[A])
