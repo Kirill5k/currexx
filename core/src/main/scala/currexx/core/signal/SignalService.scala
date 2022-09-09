@@ -57,12 +57,9 @@ final private class LiveSignalService[F[_]](
             settings.triggerFrequency match
               case TriggerFrequency.Continuously => F.pure(Some(signal))
               case TriggerFrequency.OncePerDay   => signalRepo.isFirstOfItsKindForThatDate(signal).map(Option.when(_)(signal))
-          }
+          }.map(_.flatten)
       }
-      .flatMap { maybeSignals =>
-        val signals = maybeSignals.flatten
-        F.whenA(signals.nonEmpty)(submit(signals))
-      }
+      .flatMap(signals => F.whenA(signals.nonEmpty)(submit(signals)))
 }
 
 object SignalService:
