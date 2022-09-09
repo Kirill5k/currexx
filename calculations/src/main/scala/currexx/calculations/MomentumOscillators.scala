@@ -1,13 +1,13 @@
 package currexx.calculations
 
 import scala.annotation.tailrec
-import scala.collection.mutable.Queue
+import scala.collection.mutable.{Queue => MQueue}
 
 object MomentumOscillators {
 
   def aroon(values: List[Double], length: Int): List[Double] = {
     val res = Array.ofDim[Double](values.size)
-    def calc(remainingValues: List[Double], i: Int, window: Queue[Double]): List[Double] =
+    def calc(remainingValues: List[Double], i: Int, window: MQueue[Double]): List[Double] =
       if (remainingValues.isEmpty) res.take(values.size - length).toList
       else if (window.size < length) calc(remainingValues.tail, i - 1, window.enqueue(remainingValues.head))
       else {
@@ -18,7 +18,7 @@ object MomentumOscillators {
         res(i) = up - down
         calc(remainingValues.tail, i - 1, window.drop(1).enqueue(remainingValues.head))
       }
-    calc(values.reverse, values.length - 1, Queue.empty)
+    calc(values.reverse, values.length - 1, MQueue.empty)
   }
 
   def relativeStrengthIndex(values: List[Double], length: Int): List[Double] = {
@@ -56,8 +56,8 @@ object MomentumOscillators {
     val lowsArr     = lows.toArray.reverse
     val closingsArr = closings.toArray.reverse
     val stochs      = Array.ofDim[Double](closings.size - length)
-    val hh          = Queue.empty[Double]
-    val ll          = Queue.empty[Double]
+    val hh          = MQueue.empty[Double]
+    val ll          = MQueue.empty[Double]
     var i           = 0
     while (i < closings.length) {
       hh.enqueue(highsArr(i))

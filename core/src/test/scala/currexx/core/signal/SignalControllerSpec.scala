@@ -26,7 +26,7 @@ class SignalControllerSpec extends ControllerSpec {
         val reqBody = s"""{
              |"currencyPair":"GBP/EUR",
              |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
-             |"condition": {"kind":"crossing-up"}
+             |"condition": {"kind":"trend-direction-change", "from":"downward", "to":"upward"}
              |}""".stripMargin
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withJsonBody(parseJson(reqBody))
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
@@ -74,7 +74,7 @@ class SignalControllerSpec extends ControllerSpec {
         val reqBody = s"""{
              |"currencyPair":"FOO/BAR",
              |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
-             |"condition": {"kind":"crossing-up"}
+             |"condition": {"kind":"trend-direction-change", "from":"downward", "to":"upward"}
              |}""".stripMargin
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withJsonBody(parseJson(reqBody))
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
@@ -91,7 +91,7 @@ class SignalControllerSpec extends ControllerSpec {
         val reqBody = s"""{
                |"currencyPair":"FOO-BAR",
                |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
-               |"condition": {"kind":"crossing-up"}
+               |"condition": {"kind":"trend-direction-change", "from":"downward", "to":"upward"}
                |}""".stripMargin
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withJsonBody(parseJson(reqBody))
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
