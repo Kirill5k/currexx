@@ -10,6 +10,7 @@ import org.scalatestplus.mockito.MockitoSugar
 
 trait MockitoMatchers extends MockitoSugar:
   def any[A]: A                                      = ArgumentMatchers.any[A]()
+  def anyList[A]: List[A]                            = ArgumentMatchers.any[List[A]]()
   def anyOpt[A]: Option[A]                           = ArgumentMatchers.any[Option[A]]()
   def eqTo[A](value: A): A                           = ArgumentMatchers.eq[A](value)
   def doAnswer[A](answer: Answer[A]): Stubber        = Mockito.doAnswer(answer)

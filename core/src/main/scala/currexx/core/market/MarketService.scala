@@ -3,6 +3,7 @@ package currexx.core.market
 import cats.Monad
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import cats.syntax.traverse.*
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.time.*
 import currexx.core.signal.Signal
@@ -17,6 +18,7 @@ trait MarketService[F[_]]:
   def clearState(uid: UserId, cp: CurrencyPair, closePendingOrders: Boolean): F[Unit]
   def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit]
   def processSignal(signal: Signal): F[Unit]
+  def processSignals(signals: List[Signal]): F[Unit]
   def processTradeOrderPlacement(top: TradeOrderPlacement): F[Unit]
 
 final private class LiveMarketService[F[_]](
@@ -62,6 +64,8 @@ final private class LiveMarketService[F[_]](
         case None        => F.unit
       }
 
+  override def processSignals(signals: List[Signal]): F[Unit] =
+    signals.traverse(processSignal).void
 }
 
 object MarketService:

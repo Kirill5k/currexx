@@ -56,7 +56,7 @@ class SignalServiceSpec extends CatsSpec {
     "submit" should {
       "store new signal in the repository and dispatch an action" in {
         val (signRepo, settRepo, disp) = mocks
-        when(signRepo.save(any[Signal])).thenReturn(IO.unit)
+        when(signRepo.saveAll(anyList[Signal])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
@@ -65,8 +65,8 @@ class SignalServiceSpec extends CatsSpec {
         yield ()
 
         result.asserting { res =>
-          verify(signRepo).save(Signals.trendDirectionChanged)
-          verify(disp).dispatch(Action.ProcessSignal(Signals.trendDirectionChanged))
+          verify(signRepo).saveAll(List(Signals.trendDirectionChanged))
+          verify(disp).dispatch(Action.ProcessSignals(List(Signals.trendDirectionChanged)))
           res mustBe ()
         }
       }
@@ -137,7 +137,7 @@ class SignalServiceSpec extends CatsSpec {
       "create signal when trend direction changes" in {
         val (signRepo, settRepo, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturn(IO.pure(Signals.settings.copy(triggerFrequency = TriggerFrequency.Continuously)))
-        when(signRepo.save(any[Signal])).thenReturn(IO.unit)
+        when(signRepo.saveAll(anyList[Signal])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
@@ -155,8 +155,8 @@ class SignalServiceSpec extends CatsSpec {
             timeSeriesData.prices.head.time
           )
           verify(settRepo).get(Users.uid)
-          verify(signRepo).save(expectedSignal)
-          verify(disp).dispatch(Action.ProcessSignal(expectedSignal))
+          verify(signRepo).saveAll(List(expectedSignal))
+          verify(disp).dispatch(Action.ProcessSignals(List(expectedSignal)))
           verifyNoMoreInteractions(signRepo)
           res mustBe ()
         }

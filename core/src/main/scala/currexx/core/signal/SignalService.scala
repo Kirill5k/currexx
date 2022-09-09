@@ -2,9 +2,9 @@ package currexx.core.signal
 
 import cats.Monad
 import cats.effect.Concurrent
-import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
+import cats.syntax.traverse.*
 import currexx.domain.user.UserId
 import currexx.calculations.{Filters, MomentumOscillators, MovingAverages}
 import currexx.core.common.action.{Action, ActionDispatcher}
@@ -26,7 +26,8 @@ import fs2.Stream
 import java.time.Instant
 
 trait SignalService[F[_]]:
-  def submit(signal: Signal): F[Unit]
+  def submit(signal: Signal): F[Unit] = submit(List(signal))
+  def submit(signals: List[Signal]): F[Unit]
   def getAll(uid: UserId, sp: SearchParams): F[List[Signal]]
   def getSettings(uid: UserId): F[SignalSettings]
   def updateSettings(settings: SignalSettings): F[Unit]
@@ -42,28 +43,26 @@ final private class LiveSignalService[F[_]](
   override def getSettings(uid: UserId): F[SignalSettings]            = settingsRepo.get(uid)
   override def updateSettings(settings: SignalSettings): F[Unit]      = settingsRepo.update(settings)
   override def getAll(uid: UserId, sp: SearchParams): F[List[Signal]] = signalRepo.getAll(uid, sp)
-  override def submit(signal: Signal): F[Unit] =
-    signalRepo.save(signal) >> dispatcher.dispatch(Action.ProcessSignal(signal))
+  override def submit(signals: List[Signal]): F[Unit] =
+    signalRepo.saveAll(signals) >> dispatcher.dispatch(Action.ProcessSignals(signals))
 
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
-    Stream
-      .eval(getSettings(uid))
+    getSettings(uid)
       .flatMap { settings =>
-        Stream
-          .emits(
-            settings.indicators.flatMap { case trendChangeDetection: Indicator.TrendChangeDetection =>
-              SignalService.detectTrendChange(uid, data, trendChangeDetection)
-            }
-          )
-          .evalFilter { signal =>
+        settings.indicators
+          .flatMap { case tcd: Indicator.TrendChangeDetection =>
+            SignalService.detectTrendChange(uid, data, tcd)
+          }
+          .traverse { signal =>
             settings.triggerFrequency match
-              case TriggerFrequency.Continuously => F.pure(true)
-              case TriggerFrequency.OncePerDay   => signalRepo.isFirstOfItsKindForThatDate(signal)
+              case TriggerFrequency.Continuously => F.pure(Some(signal))
+              case TriggerFrequency.OncePerDay   => signalRepo.isFirstOfItsKindForThatDate(signal).map(Option.when(_)(signal))
           }
       }
-      .evalMap(submit)
-      .compile
-      .drain
+      .flatMap { maybeSignals =>
+        val signals = maybeSignals.flatten
+        F.whenA(signals.nonEmpty)(submit(signals))
+      }
 }
 
 object SignalService:

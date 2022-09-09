@@ -17,17 +17,17 @@ class ActionProcessorSpec extends CatsSpec {
     "process submitted signals" in {
       val (monsvc, sigsvc, marksvc, tradesvc) = mocks
 
-      when(marksvc.processSignal(any[Signal])).thenReturn(IO.unit)
+      when(marksvc.processSignals(anyList[Signal])).thenReturn(IO.unit)
 
       val result = for {
         dispatcher <- ActionDispatcher.make[IO]
         processor  <- ActionProcessor.make[IO](dispatcher, monsvc, sigsvc, marksvc, tradesvc)
-        _          <- dispatcher.dispatch(Action.ProcessSignal(Signals.trendDirectionChanged))
+        _          <- dispatcher.dispatch(Action.ProcessSignals(List(Signals.trendDirectionChanged)))
         res        <- processor.run.interruptAfter(2.second).compile.drain
       } yield res
 
       result.unsafeToFuture().map { r =>
-        verify(marksvc).processSignal(Signals.trendDirectionChanged)
+        verify(marksvc).processSignals(List(Signals.trendDirectionChanged))
         r mustBe ()
       }
     }

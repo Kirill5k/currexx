@@ -45,8 +45,8 @@ final private class LiveActionProcessor[F[_]](
       case Action.ProcessMarketData(uid, data) =>
         logger.info(s"processing market data for ${data.currencyPair}") *>
           marketService.processMarketData(uid, data) *> signalService.processMarketData(uid, data)
-      case Action.ProcessSignal(signal) =>
-        logger.info(s"processing submitted signal $signal") *> marketService.processSignal(signal)
+      case Action.ProcessSignals(signals) =>
+        logger.info(s"processing submitted signals $signals") *> marketService.processSignals(signals)
       case Action.ProcessMarketStateUpdate(state, indicator) =>
         logger.info(s"processing market state update triggered by $indicator") *> tradeService.processMarketStateUpdate(state, indicator)
       case Action.ProcessTradeOrderPlacement(order) =>

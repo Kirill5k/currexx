@@ -19,7 +19,7 @@ import mongo4cats.database.MongoDatabase
 import java.time.Instant
 
 trait SignalRepository[F[_]] extends Repository[F]:
-  def save(signal: Signal): F[Unit]
+  def saveAll(signals: List[Signal]): F[Unit]
   def isFirstOfItsKindForThatDate(signal: Signal): F[Boolean]
   def getAll(userId: UserId, sp: SearchParams): F[List[Signal]]
 
@@ -27,8 +27,8 @@ final private class LiveSignalRepository[F[_]: Async](
     private val collection: MongoCollection[F, SignalEntity]
 ) extends SignalRepository[F] {
 
-  override def save(signal: Signal): F[Unit] =
-    collection.insertOne(SignalEntity.from(signal)).void
+  override def saveAll(signals: List[Signal]): F[Unit] =
+    collection.insertMany(signals.map(SignalEntity.from)).void
 
   override def isFirstOfItsKindForThatDate(signal: Signal): F[Boolean] =
     collection

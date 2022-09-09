@@ -10,7 +10,6 @@ import mongo4cats.circe.given
 import java.time.Instant
 
 final case class SignalEntity(
-    _id: ObjectId,
     userId: ObjectId,
     currencyPair: CurrencyPair,
     condition: Condition,
@@ -21,4 +20,4 @@ final case class SignalEntity(
 
 object SignalEntity:
   def from(signal: Signal): SignalEntity =
-    SignalEntity(ObjectId(), signal.userId.toObjectId, signal.currencyPair, signal.condition, signal.triggeredBy, signal.time)
+    SignalEntity(signal.userId.toObjectId, signal.currencyPair, signal.condition, signal.triggeredBy, signal.time)
