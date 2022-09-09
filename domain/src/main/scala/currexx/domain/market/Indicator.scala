@@ -78,11 +78,18 @@ enum Indicator(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTa
       source: ValueSource,
       transformation: ValueTransformation
   ) extends Indicator("trend-change-detection")
+  case ThresholdCrossing(
+      source: ValueSource,
+      transformation: ValueTransformation,
+      upperBoundary: BigDecimal,
+      lowerBoundary: BigDecimal
+  ) extends Indicator("threshold-crossing")
 
 object Indicator:
   given JsonTaggedAdt.Config[Indicator] = JsonTaggedAdt.Config.Values[Indicator](
     mappings = Map(
-      "trend-change-detection" -> JsonTaggedAdt.tagged[Indicator.TrendChangeDetection]
+      "trend-change-detection" -> JsonTaggedAdt.tagged[Indicator.TrendChangeDetection],
+      "threshold-crossing"     -> JsonTaggedAdt.tagged[Indicator.ThresholdCrossing]
     ),
     strict = true,
     typeFieldName = "kind"

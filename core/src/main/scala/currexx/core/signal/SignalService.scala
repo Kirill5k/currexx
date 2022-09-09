@@ -48,8 +48,9 @@ final private class LiveSignalService[F[_]](
     getSettings(uid)
       .flatMap { settings =>
         settings.indicators
-          .flatMap { case tcd: Indicator.TrendChangeDetection =>
-            SignalService.detectTrendChange(uid, data, tcd)
+          .flatMap {
+            case tcd: Indicator.TrendChangeDetection => SignalService.detectTrendChange(uid, data, tcd)
+            case tc: Indicator.ThresholdCrossing     => None
           }
           .traverse { signal =>
             settings.triggerFrequency match
