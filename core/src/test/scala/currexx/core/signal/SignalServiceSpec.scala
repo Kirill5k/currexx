@@ -183,9 +183,10 @@ class SignalServiceSpec extends CatsSpec {
     }
 
     "detectTrendChange" should {
+      val indicator = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.NMA(16, 8, 4.2d, MovingAverage.Weighted))
+
       "create signal when trend direction changes" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
-        val indicator      = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.NMA(16, 8, 4.2d, MovingAverage.Weighted))
         val signal = SignalService.detectTrendChange(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.TrendChangeDetection])
 
         val expectedCondition = Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, Some(1))
@@ -194,8 +195,27 @@ class SignalServiceSpec extends CatsSpec {
 
       "not do anything when trend hasn't changed" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
-        val indicator      = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.NMA(16, 8, 4.2d, MovingAverage.Weighted))
         val signal = SignalService.detectTrendChange(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.TrendChangeDetection])
+
+        signal mustBe None
+      }
+    }
+
+    "detectThresholdCrossing" should {
+      val lowerBoundary = BigDecimal(20)
+      val upperBoundary = BigDecimal(80)
+      val indicator     = Indicator.ThresholdCrossing(ValueSource.Close, ValueTransformation.STOCH(14, 3, 3), upperBoundary, lowerBoundary)
+      "create signal when current value is below threshold" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
+        val signal = SignalService.detectThresholdCrossing(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.ThresholdCrossing])
+
+        val expectedCondition = Condition.BelowThreshold(lowerBoundary, BigDecimal(18.94698816942126))
+        signal mustBe Some(Signal(Users.uid, Markets.gbpeur, expectedCondition, indicator, timeSeriesData.prices.head.time))
+      }
+
+      "not do anything when current value is within limits" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(10))
+        val signal = SignalService.detectThresholdCrossing(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.ThresholdCrossing])
 
         signal mustBe None
       }
