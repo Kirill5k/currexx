@@ -11,8 +11,8 @@ import currexx.core.signal.{Signal, SignalService, SignalSettings}
 import currexx.domain.user.UserId
 
 final private class TestSignalRepository[F[_]](using F: Monad[F]) extends SignalRepository[F]:
-  override def save(signal: Signal): F[Unit]                           = F.unit
-  override def isFirstOfItsKindForThatDate(signal: Signal): F[Boolean] = F.pure(true)
+  override def saveAll(signals: List[Signal]): F[Unit]                   = F.unit
+  override def isFirstOfItsKindForThatDate(signal: Signal): F[Boolean]   = F.pure(true)
   override def getAll(userId: UserId, sp: SearchParams): F[List[Signal]] = F.pure(Nil)
 
 final private class TestSignalSettingsRepository[F[_]: Async](

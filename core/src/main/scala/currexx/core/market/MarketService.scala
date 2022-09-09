@@ -17,8 +17,7 @@ trait MarketService[F[_]]:
   def clearState(uid: UserId, closePendingOrders: Boolean): F[Unit]
   def clearState(uid: UserId, cp: CurrencyPair, closePendingOrders: Boolean): F[Unit]
   def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit]
-  def processSignal(signal: Signal): F[Unit]
-  def processSignals(signals: List[Signal]): F[Unit]
+  def processSignals(uid: UserId, cp: CurrencyPair, signals: List[Signal]): F[Unit]
   def processTradeOrderPlacement(top: TradeOrderPlacement): F[Unit]
 
 final private class LiveMarketService[F[_]](
@@ -44,28 +43,27 @@ final private class LiveMarketService[F[_]](
     stateRepo.update(top.userId, top.currencyPair, position.map(p => PositionState(p, top.time, top.currentPrice))).void
   }
 
-  override def processSignal(signal: Signal): F[Unit] =
-    stateRepo
-      .find(signal.userId, signal.currencyPair)
-      .flatMap { state =>
-        val signals           = state.fold(Map.empty[String, List[IndicatorState]])(_.signals)
-        val indicatorStates   = signals.getOrElse(signal.triggeredBy.kind, Nil)
+  // TODO: tests for multiple signals
+  override def processSignals(uid: UserId, cp: CurrencyPair, signals: List[Signal]): F[Unit] =
+    stateRepo.find(uid, cp).flatMap { state =>
+      val existingSignals = state.fold(Map.empty[String, List[IndicatorState]])(_.signals)
+
+      val updatedSignals = signals.foldLeft(existingSignals) { (current, signal) =>
+        val indicatorStates   = current.getOrElse(signal.triggeredBy.kind, Nil)
         val newIndicatorState = IndicatorState(signal.condition, signal.time, signal.triggeredBy)
         val updatedIndicatorStates =
           if (indicatorStates.isEmpty) List(newIndicatorState)
           else if (indicatorStates.head.time.hasSameDateAs(signal.time)) newIndicatorState :: indicatorStates.tail
-          else newIndicatorState :: indicatorStates
-        stateRepo
-          .update(signal.userId, signal.currencyPair, signals + (signal.triggeredBy.kind -> updatedIndicatorStates.take(10)))
-          .map(s => Option.when(updatedIndicatorStates != indicatorStates)(s))
-      }
-      .flatMap {
-        case Some(state) => dispatcher.dispatch(Action.ProcessMarketStateUpdate(state, signal.triggeredBy))
-        case None        => F.unit
+          else newIndicatorState :: indicatorStates.take(5)
+        current + (signal.triggeredBy.kind -> updatedIndicatorStates)
       }
 
-  override def processSignals(signals: List[Signal]): F[Unit] =
-    signals.traverse(processSignal).void
+      if (existingSignals == updatedSignals) F.pure(None)
+      else stateRepo.update(uid, cp, updatedSignals).map(Some(_))
+    }.flatMap {
+      case Some(state) => dispatcher.dispatch(Action.ProcessMarketStateUpdate(state, signals.map(_.triggeredBy).toSet))
+      case None => F.unit
+    }
 }
 
 object MarketService:

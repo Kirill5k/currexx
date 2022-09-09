@@ -36,7 +36,7 @@ final class TestServices[F[_]] private (
       data <- dataStream
       _    <- Stream.eval(marketService.processMarketData(settings.userId, data) >> signalService.processMarketData(settings.userId, data))
       _ <- pendingActions.evalMap {
-        case Action.ProcessSignal(signal) => marketService.processSignal(signal)
+        case Action.ProcessSignals(uid, cp, signals) => marketService.processSignals(uid, cp, signals)
         case _                            => F.unit
       }
       _ <- pendingActions.evalMap {

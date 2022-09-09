@@ -45,10 +45,10 @@ final private class LiveActionProcessor[F[_]](
       case Action.ProcessMarketData(uid, data) =>
         logger.info(s"processing market data for ${data.currencyPair}") *>
           marketService.processMarketData(uid, data) *> signalService.processMarketData(uid, data)
-      case Action.ProcessSignals(signals) =>
-        logger.info(s"processing submitted signals $signals") *> marketService.processSignals(signals)
-      case Action.ProcessMarketStateUpdate(state, indicator) =>
-        logger.info(s"processing market state update triggered by $indicator") *> tradeService.processMarketStateUpdate(state, indicator)
+      case Action.ProcessSignals(uid, cp, signals) =>
+        logger.info(s"processing submitted signals for $cp") *> marketService.processSignals(uid, cp, signals)
+      case Action.ProcessMarketStateUpdate(state, indicators) =>
+        logger.info(s"processing market state update triggered by $indicators") *> tradeService.processMarketStateUpdate(state, indicators)
       case Action.ProcessTradeOrderPlacement(order) =>
         logger.info(s"processing trade order placement $order") *> marketService.processTradeOrderPlacement(order)
     ).handleErrorWith {

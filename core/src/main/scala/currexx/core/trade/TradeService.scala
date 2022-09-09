@@ -23,7 +23,7 @@ trait TradeService[F[_]]:
   def getSettings(uid: UserId): F[TradeSettings]
   def updateSettings(settings: TradeSettings): F[Unit]
   def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]]
-  def processMarketStateUpdate(state: MarketState, trigger: Indicator): F[Unit]
+  def processMarketStateUpdate(state: MarketState, triggers: Set[Indicator]): F[Unit]
   def placeOrder(uid: UserId, cp: CurrencyPair, order: TradeOrder, closePendingOrders: Boolean): F[Unit]
   def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
   def closeOpenOrders(uid: UserId): F[Unit]
@@ -78,10 +78,10 @@ final private class LiveTradeService[F[_]](
         case _ => F.unit
       }
 
-  override def processMarketStateUpdate(state: MarketState, trigger: Indicator): F[Unit] =
+  override def processMarketStateUpdate(state: MarketState, triggers: Set[Indicator]): F[Unit] =
     (settingsRepository.get(state.userId), F.realTimeInstant)
       .mapN { (settings, time) =>
-        (state.latestPrice, TradeStrategyExecutor.get(settings.strategy).analyze(state, trigger)).mapN { (price, result) =>
+        (state.latestPrice, TradeStrategyExecutor.get(settings.strategy).analyze(state, triggers.head)).mapN { (price, result) =>
           val order = result match
             case Decision.Buy   => settings.trading.toOrder(state.currencyPair, TradeOrder.Position.Buy)
             case Decision.Sell  => settings.trading.toOrder(state.currencyPair, TradeOrder.Position.Sell)

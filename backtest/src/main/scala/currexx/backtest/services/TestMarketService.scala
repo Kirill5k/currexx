@@ -13,7 +13,8 @@ import currexx.domain.user.UserId
 final private class TestMarketStateRepository[F[_]: Monad](
     private val state: Ref[F, MarketState]
 ) extends MarketStateRepository[F]:
-  override def deleteAll(uid: UserId): F[Unit] = Monad[F].unit
+  override def delete(uid: UserId, cp: CurrencyPair): F[Unit] = Monad[F].unit
+  override def deleteAll(uid: UserId): F[Unit]                = Monad[F].unit
   override def update(uid: UserId, pair: CurrencyPair, signals: Map[String, List[IndicatorState]]): F[MarketState] =
     state.updateAndGet(_.copy(signals = signals))
   override def update(uid: UserId, pair: CurrencyPair, price: PriceRange): F[MarketState] =
@@ -22,6 +23,7 @@ final private class TestMarketStateRepository[F[_]: Monad](
     state.updateAndGet(_.copy(currentPosition = position))
   override def getAll(uid: UserId): F[List[MarketState]] =
     state.get.map(List(_))
+
   override def find(uid: UserId, pair: CurrencyPair): F[Option[MarketState]] =
     state.get.map(Some(_))
 

@@ -66,7 +66,7 @@ class SignalServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(signRepo).saveAll(List(Signals.trendDirectionChanged))
-          verify(disp).dispatch(Action.ProcessSignals(List(Signals.trendDirectionChanged)))
+          verify(disp).dispatch(Action.ProcessSignals(Users.uid, Markets.gbpeur, List(Signals.trendDirectionChanged)))
           res mustBe ()
         }
       }
@@ -156,7 +156,7 @@ class SignalServiceSpec extends CatsSpec {
           )
           verify(settRepo).get(Users.uid)
           verify(signRepo).saveAll(List(expectedSignal))
-          verify(disp).dispatch(Action.ProcessSignals(List(expectedSignal)))
+          verify(disp).dispatch(Action.ProcessSignals(Users.uid, Markets.gbpeur, List(expectedSignal)))
           verifyNoMoreInteractions(signRepo)
           res mustBe ()
         }

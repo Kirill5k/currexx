@@ -26,8 +26,7 @@ import fs2.Stream
 import java.time.Instant
 
 trait SignalService[F[_]]:
-  def submit(signal: Signal): F[Unit] = submit(List(signal))
-  def submit(signals: List[Signal]): F[Unit]
+  def submit(signal: Signal): F[Unit]
   def getAll(uid: UserId, sp: SearchParams): F[List[Signal]]
   def getSettings(uid: UserId): F[SignalSettings]
   def updateSettings(settings: SignalSettings): F[Unit]
@@ -43,8 +42,7 @@ final private class LiveSignalService[F[_]](
   override def getSettings(uid: UserId): F[SignalSettings]            = settingsRepo.get(uid)
   override def updateSettings(settings: SignalSettings): F[Unit]      = settingsRepo.update(settings)
   override def getAll(uid: UserId, sp: SearchParams): F[List[Signal]] = signalRepo.getAll(uid, sp)
-  override def submit(signals: List[Signal]): F[Unit] =
-    signalRepo.saveAll(signals) >> dispatcher.dispatch(Action.ProcessSignals(signals))
+  override def submit(signal: Signal): F[Unit]                        = save(signal.userId, signal.currencyPair, List(signal))
 
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
     getSettings(uid)
@@ -57,9 +55,13 @@ final private class LiveSignalService[F[_]](
             settings.triggerFrequency match
               case TriggerFrequency.Continuously => F.pure(Some(signal))
               case TriggerFrequency.OncePerDay   => signalRepo.isFirstOfItsKindForThatDate(signal).map(Option.when(_)(signal))
-          }.map(_.flatten)
+          }
+          .map(_.flatten)
       }
-      .flatMap(signals => F.whenA(signals.nonEmpty)(submit(signals)))
+      .flatMap(signals => F.whenA(signals.nonEmpty)(save(uid, data.currencyPair, signals)))
+
+  private def save(uid: UserId, cp: CurrencyPair, signals: List[Signal]) =
+    signalRepo.saveAll(signals) >> dispatcher.dispatch(Action.ProcessSignals(uid, cp, signals))
 }
 
 object SignalService:
