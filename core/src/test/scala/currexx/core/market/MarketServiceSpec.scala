@@ -194,7 +194,7 @@ class MarketServiceSpec extends CatsSpec {
           )
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
-          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, List(Markets.trendChangeDetection, Markets.thresholdCrossing)))
+          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, List(Markets.thresholdCrossing, Markets.trendChangeDetection)))
           res mustBe ()
         }
       }
