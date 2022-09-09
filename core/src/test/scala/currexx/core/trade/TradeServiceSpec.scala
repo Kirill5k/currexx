@@ -225,7 +225,7 @@ class TradeServiceSpec extends CatsSpec {
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.processMarketStateUpdate(Markets.state, Set(Markets.trendChangeDetection))
+          _   <- svc.processMarketStateUpdate(Markets.state, List(Markets.trendChangeDetection))
         yield ()
 
         result.asserting { res =>
@@ -247,7 +247,7 @@ class TradeServiceSpec extends CatsSpec {
           currentState = Markets.stateWithSignal.copy(currentPosition =
             Some(Markets.positionState.copy(position = TradeOrder.Position.Sell))
           )
-          _ <- svc.processMarketStateUpdate(currentState, Set(Markets.trendChangeDetection))
+          _ <- svc.processMarketStateUpdate(currentState, List(Markets.trendChangeDetection))
         yield ()
 
         result.asserting { res =>

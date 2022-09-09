@@ -20,25 +20,25 @@ class TradeStrategyExecutorSpec extends AnyWordSpec with Matchers {
         currentPosition = None
       )
 
-      TradeStrategyExecutor.get(TradeStrategy.TrendChange).analyze(state, indicator) mustBe Some(TradeStrategyExecutor.Decision.Buy)
+      TradeStrategyExecutor.get(TradeStrategy.TrendChange).analyze(state, List(indicator)) mustBe Some(TradeStrategyExecutor.Decision.Buy)
     }
 
     "make Sell decision when trend changes to Downward" in {
       val condition = Condition.TrendDirectionChange(Trend.Consolidation, Trend.Downward)
       val state     = Markets.state.copy(signals = Map(indicator.kind -> List(IndicatorState(condition, Markets.ts, indicator))))
 
-      TradeStrategyExecutor.get(TradeStrategy.TrendChange).analyze(state, indicator) mustBe Some(TradeStrategyExecutor.Decision.Sell)
+      TradeStrategyExecutor.get(TradeStrategy.TrendChange).analyze(state, List(indicator)) mustBe Some(TradeStrategyExecutor.Decision.Sell)
     }
 
     "make Close decision when trend goes into Consolidation from Upward" in {
       val condition = Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation)
       val state     = Markets.state.copy(signals = Map(indicator.kind -> List(IndicatorState(condition, Markets.ts, indicator))))
 
-      TradeStrategyExecutor.get(TradeStrategy.TrendChange).analyze(state, indicator) mustBe Some(TradeStrategyExecutor.Decision.Close)
+      TradeStrategyExecutor.get(TradeStrategy.TrendChange).analyze(state, List(indicator)) mustBe Some(TradeStrategyExecutor.Decision.Close)
     }
 
     "not do anything when there are no relevant signals in state" in {
-      TradeStrategyExecutor.get(TradeStrategy.TrendChange).analyze(Markets.state, indicator) mustBe None
+      TradeStrategyExecutor.get(TradeStrategy.TrendChange).analyze(Markets.state, List(indicator)) mustBe None
     }
 
     "not do anything if state already has opened position" in {
@@ -48,7 +48,7 @@ class TradeStrategyExecutorSpec extends AnyWordSpec with Matchers {
         currentPosition = Some(PositionState(TradeOrder.Position.Sell, Markets.ts, Markets.priceRange))
       )
 
-      TradeStrategyExecutor.get(TradeStrategy.TrendChange).analyze(state, indicator) mustBe None
+      TradeStrategyExecutor.get(TradeStrategy.TrendChange).analyze(state, List(indicator)) mustBe None
     }
   }
 }

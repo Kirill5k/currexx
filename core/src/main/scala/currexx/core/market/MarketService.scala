@@ -61,7 +61,7 @@ final private class LiveMarketService[F[_]](
       if (existingSignals == updatedSignals) F.pure(None)
       else stateRepo.update(uid, cp, updatedSignals).map(Some(_))
     }.flatMap {
-      case Some(state) => dispatcher.dispatch(Action.ProcessMarketStateUpdate(state, signals.map(_.triggeredBy).toSet))
+      case Some(state) => dispatcher.dispatch(Action.ProcessMarketStateUpdate(state, signals.map(_.triggeredBy)))
       case None => F.unit
     }
 }

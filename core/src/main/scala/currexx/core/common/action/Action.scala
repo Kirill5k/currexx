@@ -15,7 +15,7 @@ enum Action:
   case ScheduleMonitor(uid: UserId, mid: MonitorId, period: FiniteDuration)
   case ProcessMarketData(uid: UserId, data: MarketTimeSeriesData)
   case ProcessSignals(uid: UserId, currencyPair: CurrencyPair, signals: List[Signal])
-  case ProcessMarketStateUpdate(state: MarketState, triggers: Set[Indicator])
+  case ProcessMarketStateUpdate(state: MarketState, triggers: List[Indicator])
   case ProcessTradeOrderPlacement(order: TradeOrderPlacement)
   case CloseOpenOrders(uid: UserId, currencyPair: CurrencyPair)
   case CloseAllOpenOrders(uid: UserId)

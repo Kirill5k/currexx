@@ -139,7 +139,7 @@ class MarketServiceSpec extends CatsSpec {
           val indState = IndicatorState(Signals.trendDirectionChanged.condition, Signals.ts, Markets.trendChangeDetection)
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, Map(Markets.trendChangeDetection.kind -> List(indState)))
-          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, Set(Markets.trendChangeDetection)))
+          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, List(Markets.trendChangeDetection)))
           res mustBe ()
         }
       }
@@ -167,7 +167,7 @@ class MarketServiceSpec extends CatsSpec {
           )
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
-          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, Set(Markets.trendChangeDetection)))
+          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, List(Markets.trendChangeDetection)))
           res mustBe ()
         }
       }
@@ -194,7 +194,7 @@ class MarketServiceSpec extends CatsSpec {
           )
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
-          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, Set(Markets.trendChangeDetection, Markets.thresholdCrossing)))
+          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, List(Markets.trendChangeDetection, Markets.thresholdCrossing)))
           res mustBe ()
         }
       }
@@ -218,7 +218,7 @@ class MarketServiceSpec extends CatsSpec {
           val finalSignalState = Map(Markets.trendChangeDetection.kind -> List(currentIndState.copy(time = Signals.ts)))
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
-          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, Set(Markets.trendChangeDetection)))
+          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, List(Markets.trendChangeDetection)))
           res mustBe ()
         }
       }

@@ -16,38 +16,38 @@ object TradeStrategy:
   inline given Decoder[TradeStrategy] = Decoder[String].emap(s => from(s).toRight(s"Unrecognized strategy $s"))
 
 trait TradeStrategyExecutor:
-  def analyze(state: MarketState, trigger: Indicator): Option[TradeStrategyExecutor.Decision]
+  def analyze(state: MarketState, triggers: List[Indicator]): Option[TradeStrategyExecutor.Decision]
 
 object TradeStrategyExecutor {
   enum Decision:
     case Buy, Sell, Close
 
   private case object Disabled extends TradeStrategyExecutor:
-    def analyze(state: MarketState, trigger: Indicator): Option[TradeStrategyExecutor.Decision] = None
+    def analyze(state: MarketState, triggers: List[Indicator]): Option[TradeStrategyExecutor.Decision] = None
 
   private case object TrendChange extends TradeStrategyExecutor:
-    def analyze(state: MarketState, trigger: Indicator): Option[TradeStrategyExecutor.Decision] =
-      trigger match
-        case _: Indicator.TrendChangeDetection =>
-          state.signals.getOrElse(trigger.kind, Nil).headOption.map(_.condition).collect {
+    def analyze(state: MarketState, triggers: List[Indicator]): Option[TradeStrategyExecutor.Decision] =
+      triggers.collectFirst {
+        case t: Indicator.TrendChangeDetection =>
+          state.signals.getOrElse(t.kind, Nil).headOption.map(_.condition).collect {
             case Condition.TrendDirectionChange(Trend.Downward, Trend.Consolidation, _) => Decision.Close
-            case Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, _)   => Decision.Close
-            case Condition.TrendDirectionChange(_, Trend.Upward, _) if !state.buying    => Decision.Buy
+            case Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, _) => Decision.Close
+            case Condition.TrendDirectionChange(_, Trend.Upward, _) if !state.buying => Decision.Buy
             case Condition.TrendDirectionChange(_, Trend.Downward, _) if !state.selling => Decision.Sell
           }
-        case _ => None
+      }.flatten
 
   private case object TrendChangeAggressive extends TradeStrategyExecutor:
-    def analyze(state: MarketState, trigger: Indicator): Option[TradeStrategyExecutor.Decision] =
-      trigger match
-        case _: Indicator.TrendChangeDetection =>
-          state.signals.getOrElse(trigger.kind, Nil).headOption.map(_.condition).collect {
+    def analyze(state: MarketState, triggers: List[Indicator]): Option[TradeStrategyExecutor.Decision] =
+      triggers.collectFirst {
+        case t: Indicator.TrendChangeDetection =>
+          state.signals.getOrElse(t.kind, Nil).headOption.map(_.condition).collect {
             case Condition.TrendDirectionChange(Trend.Downward, Trend.Consolidation, _) => Decision.Buy
-            case Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, _)   => Decision.Sell
-            case Condition.TrendDirectionChange(_, Trend.Upward, _) if !state.buying    => Decision.Buy
+            case Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, _) => Decision.Sell
+            case Condition.TrendDirectionChange(_, Trend.Upward, _) if !state.buying => Decision.Buy
             case Condition.TrendDirectionChange(_, Trend.Downward, _) if !state.selling => Decision.Sell
           }
-        case _ => None
+      }.flatten
 
   def get(strategy: TradeStrategy): TradeStrategyExecutor =
     strategy match
