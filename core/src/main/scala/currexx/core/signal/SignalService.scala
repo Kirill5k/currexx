@@ -50,7 +50,7 @@ final private class LiveSignalService[F[_]](
         settings.indicators
           .flatMap {
             case tcd: Indicator.TrendChangeDetection => SignalService.detectTrendChange(uid, data, tcd)
-            case tc: Indicator.ThresholdCrossing     => None
+            case tc: Indicator.ThresholdCrossing     => SignalService.detectThresholdCrossing(uid, data, tc)
           }
           .traverse { signal =>
             settings.triggerFrequency match
@@ -75,9 +75,9 @@ object SignalService:
         case ValueSource.HL2   => data.prices.map(_.high.toDouble).zip(data.prices.map(_.low.toDouble)).map((h, l) => (h + l) / 2).toList
 
   extension (vt: ValueTransformation)
-    def transform(data: List[Double]): List[Double] =
+    def transform(data: List[Double], highs: List[Double], lows: List[Double]): List[Double] =
       vt match
-        case ValueTransformation.Sequenced(transformations) => transformations.foldLeft(data)((d, t) => t.transform(d))
+        case ValueTransformation.Sequenced(transformations) => transformations.foldLeft(data)((d, t) => t.transform(d, highs, lows))
         case ValueTransformation.Kalman(gain)               => Filters.kalman(data, gain)
         case ValueTransformation.WMA(length)                => MovingAverages.weighted(data, length)
         case ValueTransformation.SMA(length)                => MovingAverages.simple(data, length)
@@ -85,6 +85,7 @@ object SignalService:
         case ValueTransformation.HMA(length)                => MovingAverages.hull(data, length)
         case ValueTransformation.NMA(length, signalLength, lambda, ma) =>
           MovingAverages.nyquist(data, length, signalLength, lambda, ma.calculation)
+        case ValueTransformation.STOCH(length, slowK, slowD) => MomentumOscillators.stochastic(data, highs, lows, length, slowK, slowD)._1
 
   extension (ma: MovingAverage)
     def calculation: (List[Double], Int) => List[Double] =
@@ -93,9 +94,24 @@ object SignalService:
         case MovingAverage.Simple      => MovingAverages.simple
         case MovingAverage.Weighted    => MovingAverages.weighted
 
+  private def transformData(data: MarketTimeSeriesData, vs: ValueSource, vt: ValueTransformation): List[Double] =
+    val source = vs.extract(data)
+    val highs  = data.prices.map(_.high.toDouble).toList
+    val lows   = data.prices.map(_.low.toDouble).toList
+    vt.transform(source, highs, lows)
+
+  def detectThresholdCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.ThresholdCrossing): Option[Signal] = {
+    val transformed  = transformData(data, indicator.source, indicator.transformation)
+    val currentValue = BigDecimal(transformed.head)
+    val condition =
+      if (indicator.upperBoundary < currentValue) Some(Condition.AboveThreshold(indicator.upperBoundary, currentValue))
+      else if (indicator.lowerBoundary > currentValue) Some(Condition.BelowThreshold(indicator.lowerBoundary, currentValue))
+      else None
+    condition.map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))
+  }
+
   def detectTrendChange(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.TrendChangeDetection): Option[Signal] = {
-    val source      = indicator.source.extract(data)
-    val transformed = indicator.transformation.transform(source)
+    val transformed = transformData(data, indicator.source, indicator.transformation)
     val res         = identifyTrends(transformed)
     val prevTrend   = res.drop(1).head
     Option

@@ -172,6 +172,33 @@ class MarketServiceSpec extends CatsSpec {
         }
       }
 
+      "update signal state with multiple signals" in {
+        val (stateRepo, disp) = mocks
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state)))
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[String, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
+        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+
+        val result = for
+          svc   <- MarketService.make[IO](stateRepo, disp)
+          state <- svc.processSignals(Users.uid, Markets.gbpeur, List(Signals.thresholdCrossing, Signals.trendDirectionChanged))
+        yield state
+
+        result.asserting { res =>
+          val finalSignalState = Map(
+            Markets.trendChangeDetection.kind -> List(
+              IndicatorState(Signals.trendDirectionChanged.condition, Signals.ts, Markets.trendChangeDetection)
+            ),
+            Markets.thresholdCrossing.kind -> List(
+              IndicatorState(Signals.thresholdCrossing.condition, Signals.ts, Markets.thresholdCrossing)
+            )
+          )
+          verify(stateRepo).find(Users.uid, Markets.gbpeur)
+          verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
+          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, Set(Markets.trendChangeDetection, Markets.thresholdCrossing)))
+          res mustBe ()
+        }
+      }
+
       "replace latest indicator state if new signal has same date" in {
         val (stateRepo, disp) = mocks
         val currentIndState =

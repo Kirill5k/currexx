@@ -18,5 +18,13 @@ object Signals {
     ts
   )
 
+  lazy val thresholdCrossing = Signal(
+    Users.uid,
+    Markets.gbpeur,
+    Condition.AboveThreshold(BigDecimal(80), 95),
+    Markets.thresholdCrossing,
+    ts
+  )
+
   lazy val settings = SignalSettings(Users.uid, TriggerFrequency.OncePerDay, List(Markets.trendChangeDetection))
 }

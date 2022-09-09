@@ -54,6 +54,7 @@ enum ValueTransformation(val kind: String) derives JsonTaggedAdt.EncoderWithConf
       lambda: Double,
       maCalc: MovingAverage
   ) extends ValueTransformation("nma")
+  case STOCH(length: Int, slowKLength: Int, slowDLength: Int) extends ValueTransformation("stoch")
 
 object ValueTransformation:
   def sequenced(sequence: ValueTransformation*): ValueTransformation =
