@@ -53,7 +53,7 @@ enum ValueTransformation(val kind: String) derives JsonTaggedAdt.EncoderWithConf
       signalLength: Int,
       lambda: Double,
       maCalc: MovingAverage
-  ) extends ValueTransformation("nma")
+  )                                                           extends ValueTransformation("nma")
   case STOCH(length: Int, slowKLength: Int, slowDLength: Int) extends ValueTransformation("stoch")
 
 object ValueTransformation:
@@ -68,7 +68,8 @@ object ValueTransformation:
       "hma"       -> JsonTaggedAdt.tagged[ValueTransformation.HMA],
       "nma"       -> JsonTaggedAdt.tagged[ValueTransformation.NMA],
       "sma"       -> JsonTaggedAdt.tagged[ValueTransformation.SMA],
-      "wma"       -> JsonTaggedAdt.tagged[ValueTransformation.WMA]
+      "wma"       -> JsonTaggedAdt.tagged[ValueTransformation.WMA],
+      "stoch"     -> JsonTaggedAdt.tagged[ValueTransformation.STOCH]
     ),
     strict = true,
     typeFieldName = "kind"

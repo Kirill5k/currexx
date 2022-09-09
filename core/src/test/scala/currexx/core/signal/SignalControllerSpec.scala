@@ -46,7 +46,7 @@ class SignalControllerSpec extends ControllerSpec {
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody =
-          """{"message":"Missing required field, Received unknown type: 'foo'. Exists only types: trend-change-detection."}"""
+          """{"message":"Missing required field, Received unknown type: 'foo'. Exists only types: threshold-crossing, trend-change-detection."}"""
         verifyJsonResponse(res, Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
       }
