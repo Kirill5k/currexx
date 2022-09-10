@@ -41,6 +41,8 @@ object Optimisable:
             signalLength.toBinaryArray(5),
             lambda.toInt.toBinaryArray(7)
           )
+        case stoch @ ValueTransformation.STOCH(length, slowKLength, slowDLength) =>
+          Array(Array(stoch.ordinal), length.toBinaryArray(6), slowKLength.toBinaryArray(3), slowDLength.toBinaryArray(3))
 
     override def fromGenome(genome: Array[Array[Int]]): ValueTransformation = {
       def go(remaining: Array[Array[Int]], transformations: Vector[ValueTransformation]): Vector[ValueTransformation] =
@@ -60,6 +62,7 @@ object Optimisable:
                 MovingAverage.Weighted
               )
               go(remaining.drop(4), transformations :+ nma)
+            case 7 => go(remaining.drop(2), transformations :+ ValueTransformation.STOCH(remaining(1).toInt, remaining(2).toInt, remaining(3).toInt))
         }
       ValueTransformation.Sequenced(go(genome, Vector.empty).toList)
     }

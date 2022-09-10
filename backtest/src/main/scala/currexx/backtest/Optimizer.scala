@@ -35,6 +35,7 @@ object Optimizer extends IOApp.Simple {
           case ValueTransformation.HMA(_)              => ValueTransformation.HMA(rand.nextInt(23) + 2)
           case ValueTransformation.NMA(_, _, _, _) =>
             ValueTransformation.NMA(rand.nextInt(43) + 2, rand.nextInt(23) + 2, rand.nextInt(61).toDouble, MovingAverage.Weighted)
+          case ValueTransformation.STOCH(_, _, _) => ValueTransformation.STOCH(rand.nextInt(23) + 2, 3, 3)
       IO(randomise(opt.fromGenome(individual))).map(opt.toGenome)
     }
 
