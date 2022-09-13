@@ -7,6 +7,17 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class IndicatorSpec extends AnyWordSpec with Matchers {
 
+  "MovingAverage codecs" should {
+    "encode and decode MA from json" in {
+      val ma = MovingAverage.Weighted
+
+      val json = """"weighted""""
+
+      ma.asJson.noSpaces mustBe json
+      decode[MovingAverage](json) mustBe Right(ma)
+    }
+  }
+
   "Indicator codecs" should {
     "encode and decode indicator with single transformation from json" in {
       val indicator = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.NMA(9, 3, 4.2d, MovingAverage.Weighted))
