@@ -4,23 +4,17 @@ import currexx.domain.market.MarketTimeSeriesData
 import currexx.domain.types.EnumType
 import org.latestbit.circe.adt.codec.*
 
-enum MovingAverage(val kind: String):
-  case Weighted    extends MovingAverage("weighted")
-  case Exponential extends MovingAverage("exponential")
-  case Simple      extends MovingAverage("simple")
-object MovingAverage extends EnumType[MovingAverage](() => MovingAverage.values, _.kind)
+object MovingAverage extends EnumType[MovingAverage](() => MovingAverage.values, _.toString.toLowerCase)
+enum MovingAverage:
+  case Weighted, Exponential, Simple
 
-enum CompositeMovingAverage(val kind: String):
-  case Triple  extends CompositeMovingAverage("triple")
-  case Hull    extends CompositeMovingAverage("hull")
-  case Nyquist extends CompositeMovingAverage("nyquist")
-object CompositeMovingAverage extends EnumType[CompositeMovingAverage](() => CompositeMovingAverage.values, _.kind)
+object CompositeMovingAverage extends EnumType[CompositeMovingAverage](() => CompositeMovingAverage.values, _.toString.toLowerCase)
+enum CompositeMovingAverage:
+  case Triple, Hull, Nyquist
 
-enum ValueSource(val kind: String):
-  case Close extends ValueSource("close")
-  case Open  extends ValueSource("open")
-  case HL2   extends ValueSource("hl2")
-object ValueSource extends EnumType[ValueSource](() => ValueSource.values, _.kind)
+object ValueSource extends EnumType[ValueSource](() => ValueSource.values, _.toString.toLowerCase)
+enum ValueSource:
+  case Close, Open, HL2
 
 enum ValueTransformation(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Sequenced(sequence: List[ValueTransformation]) extends ValueTransformation("sequenced")
