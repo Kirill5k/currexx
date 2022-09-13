@@ -20,8 +20,16 @@ import currexx.domain.market.{
 import java.time.Instant
 
 object Markets {
-  lazy val trendChangeDetection: Indicator = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(16))
-  lazy val thresholdCrossing: Indicator    = Indicator.ThresholdCrossing(ValueSource.Close, ValueTransformation.STOCH(14, 3, 3), BigDecimal(80), BigDecimal(20))
+  lazy val trendChangeDetection: Indicator = Indicator.TrendChangeDetection(
+    ValueSource.Close,
+    ValueTransformation.SingleOutput.HMA(16)
+  )
+  lazy val thresholdCrossing: Indicator = Indicator.ThresholdCrossing(
+    ValueSource.Close,
+    ValueTransformation.DoubleOutput.STOCH(14, 3, 3),
+    BigDecimal(80),
+    BigDecimal(20)
+  )
 
   lazy val gbpeur: CurrencyPair = CurrencyPair(GBP, EUR)
   lazy val gbpusd: CurrencyPair = CurrencyPair(GBP, USD)

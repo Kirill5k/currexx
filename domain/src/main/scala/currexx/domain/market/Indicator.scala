@@ -1,7 +1,10 @@
 package currexx.domain.market
 
+import cats.syntax.functor.*
 import currexx.domain.market.MarketTimeSeriesData
 import currexx.domain.types.EnumType
+import io.circe.{Decoder, Encoder}
+import io.circe.syntax.*
 import org.latestbit.circe.adt.codec.*
 
 object MovingAverage extends EnumType[MovingAverage](() => MovingAverage.values, _.toString.toLowerCase)
@@ -16,44 +19,62 @@ object ValueSource extends EnumType[ValueSource](() => ValueSource.values, _.toS
 enum ValueSource:
   case Close, Open, HL2
 
-enum ValueTransformation(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
-  case Sequenced(sequence: List[ValueTransformation]) extends ValueTransformation("sequenced")
-  case Kalman(gain: Double)                           extends ValueTransformation("kalman")
-  case WMA(length: Int)                               extends ValueTransformation("wma")
-  case SMA(length: Int)                               extends ValueTransformation("sma")
-  case EMA(length: Int)                               extends ValueTransformation("ema")
-  case HMA(length: Int)                               extends ValueTransformation("hma")
-  case NMA(
-      length: Int,
-      signalLength: Int,
-      lambda: Double,
-      maCalc: MovingAverage
-  )                                                           extends ValueTransformation("nma")
-  case STOCH(length: Int, slowKLength: Int, slowDLength: Int) extends ValueTransformation("stoch")
+sealed trait ValueTransformation
 
-object ValueTransformation:
-  def sequenced(sequence: ValueTransformation*): ValueTransformation =
-    ValueTransformation.Sequenced(sequence.toList)
+object ValueTransformation {
+  enum SingleOutput(val kind: String) extends ValueTransformation derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+    case Sequenced(sequence: List[SingleOutput])                                    extends SingleOutput("sequenced")
+    case Kalman(gain: Double)                                                       extends SingleOutput("kalman")
+    case WMA(length: Int)                                                           extends SingleOutput("wma")
+    case SMA(length: Int)                                                           extends SingleOutput("sma")
+    case EMA(length: Int)                                                           extends SingleOutput("ema")
+    case HMA(length: Int)                                                           extends SingleOutput("hma")
+    case NMA(length: Int, signalLength: Int, lambda: Double, maCalc: MovingAverage) extends SingleOutput("nma")
 
-  given JsonTaggedAdt.Config[ValueTransformation] = JsonTaggedAdt.Config.Values[ValueTransformation](
-    mappings = Map(
-      "sequenced" -> JsonTaggedAdt.tagged[ValueTransformation.Sequenced],
-      "kalman"    -> JsonTaggedAdt.tagged[ValueTransformation.Kalman],
-      "ema"       -> JsonTaggedAdt.tagged[ValueTransformation.EMA],
-      "hma"       -> JsonTaggedAdt.tagged[ValueTransformation.HMA],
-      "nma"       -> JsonTaggedAdt.tagged[ValueTransformation.NMA],
-      "sma"       -> JsonTaggedAdt.tagged[ValueTransformation.SMA],
-      "wma"       -> JsonTaggedAdt.tagged[ValueTransformation.WMA],
-      "stoch"     -> JsonTaggedAdt.tagged[ValueTransformation.STOCH]
-    ),
-    strict = true,
-    typeFieldName = "kind"
-  )
+  object SingleOutput:
+    def sequenced(sequence: SingleOutput*): SingleOutput = SingleOutput.Sequenced(sequence.toList)
+
+    given JsonTaggedAdt.Config[SingleOutput] = JsonTaggedAdt.Config.Values[SingleOutput](
+      mappings = Map(
+        "sequenced" -> JsonTaggedAdt.tagged[SingleOutput.Sequenced],
+        "kalman"    -> JsonTaggedAdt.tagged[SingleOutput.Kalman],
+        "ema"       -> JsonTaggedAdt.tagged[SingleOutput.EMA],
+        "hma"       -> JsonTaggedAdt.tagged[SingleOutput.HMA],
+        "nma"       -> JsonTaggedAdt.tagged[SingleOutput.NMA],
+        "sma"       -> JsonTaggedAdt.tagged[SingleOutput.SMA],
+        "wma"       -> JsonTaggedAdt.tagged[SingleOutput.WMA]
+      ),
+      strict = true,
+      typeFieldName = "kind"
+    )
+
+  enum DoubleOutput(val kind: String) extends ValueTransformation derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+    case STOCH(length: Int, slowKLength: Int, slowDLength: Int) extends DoubleOutput("stoch")
+
+  object DoubleOutput:
+    given JsonTaggedAdt.Config[DoubleOutput] = JsonTaggedAdt.Config.Values[DoubleOutput](
+      mappings = Map(
+        "stoch" -> JsonTaggedAdt.tagged[DoubleOutput.STOCH]
+      ),
+      strict = true,
+      typeFieldName = "kind"
+    )
+
+  given Encoder[ValueTransformation] = Encoder.instance {
+    case vt: SingleOutput => vt.asJson
+    case vt: DoubleOutput => vt.asJson
+  }
+
+  given Decoder[ValueTransformation] = List[Decoder[ValueTransformation]](
+    Decoder[SingleOutput].widen,
+    Decoder[DoubleOutput].widen
+  ).reduceLeft(_ or _)
+}
 
 enum Indicator(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case TrendChangeDetection(
       source: ValueSource,
-      transformation: ValueTransformation
+      transformation: ValueTransformation.SingleOutput
   ) extends Indicator("trend-change-detection")
   case ThresholdCrossing(
       source: ValueSource,

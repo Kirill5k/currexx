@@ -14,6 +14,9 @@ object types {
     def from(kind: String): Either[String, E] =
       enums().find(unwrap(_) == kind).toRight(s"Unrecognized kind $kind for enum ${implicitly[ClassTag[E]].runtimeClass.getSimpleName}")
 
+    extension (e: E)
+      def print: String = e.toString.replaceAll("(?<=[a-z])(?=[A-Z])", "-").toLowerCase
+
   transparent trait IdType[Id]:
     def apply(id: String): Id   = id.asInstanceOf[Id]
     def apply(id: ObjectId): Id = apply(id.toHexString)

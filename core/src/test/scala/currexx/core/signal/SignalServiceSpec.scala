@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import currexx.core.{CatsSpec, FileReader}
 import currexx.domain.user.UserId
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, MovingAverage, PriceRange, Trend, ValueSource, ValueTransformation}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, MovingAverage, PriceRange, Trend, ValueSource, ValueTransformation as VT}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Signals, Users}
@@ -183,7 +183,7 @@ class SignalServiceSpec extends CatsSpec {
     }
 
     "detectTrendChange" should {
-      val indicator = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.NMA(16, 8, 4.2d, MovingAverage.Weighted))
+      val indicator = Indicator.TrendChangeDetection(ValueSource.Close, VT.SingleOutput.NMA(16, 8, 4.2d, MovingAverage.Weighted))
 
       "create signal when trend direction changes" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
@@ -204,7 +204,7 @@ class SignalServiceSpec extends CatsSpec {
     "detectThresholdCrossing" should {
       val lowerBoundary = BigDecimal(20)
       val upperBoundary = BigDecimal(80)
-      val indicator     = Indicator.ThresholdCrossing(ValueSource.Close, ValueTransformation.STOCH(14, 3, 3), upperBoundary, lowerBoundary)
+      val indicator     = Indicator.ThresholdCrossing(ValueSource.Close, VT.DoubleOutput.STOCH(14, 3, 3), upperBoundary, lowerBoundary)
       "create signal when current value is below threshold" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val signal = SignalService.detectThresholdCrossing(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.ThresholdCrossing])

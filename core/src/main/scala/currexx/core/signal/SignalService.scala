@@ -19,7 +19,7 @@ import currexx.domain.market.{
   MovingAverage,
   Trend,
   ValueSource,
-  ValueTransformation
+  ValueTransformation as VT
 }
 import fs2.Stream
 
@@ -74,18 +74,17 @@ object SignalService:
         case ValueSource.Open  => data.prices.map(_.open.toDouble).toList
         case ValueSource.HL2   => data.prices.map(_.high.toDouble).zip(data.prices.map(_.low.toDouble)).map((h, l) => (h + l) / 2).toList
 
-  extension (vt: ValueTransformation)
-    def transform(data: List[Double], highs: List[Double], lows: List[Double]): List[Double] =
+  extension (vt: VT.SingleOutput)
+    def transform(data: List[Double]): List[Double] =
       vt match
-        case ValueTransformation.Sequenced(transformations) => transformations.foldLeft(data)((d, t) => t.transform(d, highs, lows))
-        case ValueTransformation.Kalman(gain)               => Filters.kalman(data, gain)
-        case ValueTransformation.WMA(length)                => MovingAverages.weighted(data, length)
-        case ValueTransformation.SMA(length)                => MovingAverages.simple(data, length)
-        case ValueTransformation.EMA(length)                => MovingAverages.exponential(data, length)
-        case ValueTransformation.HMA(length)                => MovingAverages.hull(data, length)
-        case ValueTransformation.NMA(length, signalLength, lambda, ma) =>
+        case VT.SingleOutput.Sequenced(transformations) => transformations.foldLeft(data)((d, t) => t.transform(d))
+        case VT.SingleOutput.Kalman(gain)               => Filters.kalman(data, gain)
+        case VT.SingleOutput.WMA(length)                => MovingAverages.weighted(data, length)
+        case VT.SingleOutput.SMA(length)                => MovingAverages.simple(data, length)
+        case VT.SingleOutput.EMA(length)                => MovingAverages.exponential(data, length)
+        case VT.SingleOutput.HMA(length)                => MovingAverages.hull(data, length)
+        case VT.SingleOutput.NMA(length, signalLength, lambda, ma) =>
           MovingAverages.nyquist(data, length, signalLength, lambda, ma.calculation)
-        case ValueTransformation.STOCH(length, slowK, slowD) => MomentumOscillators.stochastic(data, highs, lows, length, slowK, slowD)._1
 
   extension (ma: MovingAverage)
     def calculation: (List[Double], Int) => List[Double] =
@@ -94,14 +93,14 @@ object SignalService:
         case MovingAverage.Simple      => MovingAverages.simple
         case MovingAverage.Weighted    => MovingAverages.weighted
 
-  private def transformData(data: MarketTimeSeriesData, vs: ValueSource, vt: ValueTransformation): List[Double] =
-    val source = vs.extract(data)
-    val highs  = data.prices.map(_.high.toDouble).toList
-    val lows   = data.prices.map(_.low.toDouble).toList
-    vt.transform(source, highs, lows)
-
   def detectThresholdCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.ThresholdCrossing): Option[Signal] = {
-    val transformed  = transformData(data, indicator.source, indicator.transformation)
+    val source = indicator.source.extract(data)
+    val transformed = indicator.transformation match
+      case so: VT.SingleOutput => so.transform(source)
+      case VT.DoubleOutput.STOCH(length, slowK, slowD) =>
+        val highs = data.prices.map(_.high.toDouble).toList
+        val lows  = data.prices.map(_.low.toDouble).toList
+        MomentumOscillators.stochastic(source, highs, lows, length, slowK, slowD)._1
     val currentValue = BigDecimal(transformed.head)
     val condition =
       if (indicator.upperBoundary < currentValue) Some(Condition.AboveThreshold(indicator.upperBoundary, currentValue))
@@ -111,7 +110,8 @@ object SignalService:
   }
 
   def detectTrendChange(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.TrendChangeDetection): Option[Signal] = {
-    val transformed = transformData(data, indicator.source, indicator.transformation)
+    val source      = indicator.source.extract(data)
+    val transformed = indicator.transformation.transform(source)
     val res         = identifyTrends(transformed)
     val prevTrend   = res.drop(1).head
     Option

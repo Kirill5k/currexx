@@ -27,7 +27,7 @@ class SignalSettingsRepositorySpec extends MongoSpec {
       }
 
       "update existing signal-settings" in withEmbeddedMongoDb { db =>
-        val ema = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.EMA(16))
+        val ema = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.EMA(16))
         val result = for
           repo <- SignalSettingsRepository.make(db)
           _    <- repo.update(Signals.settings)
