@@ -1,26 +1,35 @@
 package currexx.domain.market
 
 import currexx.domain.market.MarketTimeSeriesData
-import currexx.domain.types.{EnumType, Kinded}
+import currexx.domain.types.EnumType
 import org.latestbit.circe.adt.codec.*
 
-enum MovingAverage(val kind: String) extends Kinded(kind):
+enum MovingAverage(val kind: String):
   case Weighted    extends MovingAverage("weighted")
   case Exponential extends MovingAverage("exponential")
   case Simple      extends MovingAverage("simple")
-object MovingAverage extends EnumType[MovingAverage](MovingAverage.values)
+object MovingAverage extends EnumType[MovingAverage]:
+  def unwrap(ma: MovingAverage): String = ma.kind
+  def from(name: String): Either[String, MovingAverage] =
+    MovingAverage.values.find(_.kind == name).toRight(s"Unrecognized moving average kind $name")
 
-enum CompositeMovingAverage(val kind: String) extends Kinded(kind):
+enum CompositeMovingAverage(val kind: String):
   case Triple  extends CompositeMovingAverage("triple")
   case Hull    extends CompositeMovingAverage("hull")
   case Nyquist extends CompositeMovingAverage("nyquist")
-object CompositeMovingAverage extends EnumType[CompositeMovingAverage](CompositeMovingAverage.values)
+object CompositeMovingAverage extends EnumType[CompositeMovingAverage]:
+  def unwrap(ma: CompositeMovingAverage): String = ma.kind
+  def from(name: String): Either[String, CompositeMovingAverage] =
+    CompositeMovingAverage.values.find(_.kind == name).toRight(s"Unrecognized composite moving average kind $name")
 
-enum ValueSource(val kind: String) extends Kinded(kind):
+enum ValueSource(val kind: String):
   case Close extends ValueSource("close")
   case Open  extends ValueSource("open")
   case HL2   extends ValueSource("hl2")
-object ValueSource extends EnumType[ValueSource](ValueSource.values)
+object ValueSource extends EnumType[ValueSource]:
+  def unwrap(vs: ValueSource): String = vs.kind
+  def from(name: String): Either[String, ValueSource] =
+    ValueSource.values.find(_.kind == name).toRight(s"Unrecognized value source kind $name")
 
 enum ValueTransformation(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Sequenced(sequence: List[ValueTransformation]) extends ValueTransformation("sequenced")

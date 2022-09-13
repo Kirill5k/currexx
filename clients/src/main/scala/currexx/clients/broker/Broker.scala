@@ -1,13 +1,16 @@
 package currexx.clients.broker
 
 import currexx.clients.broker
-import currexx.domain.types.{EnumType, Kinded}
+import currexx.domain.types.EnumType
 import org.latestbit.circe.adt.codec.*
 
-enum Broker(val kind: String) extends Kinded(kind):
+enum Broker(val kind: String):
   case Vindaloo extends Broker("vindaloo")
   case Xtb      extends Broker("xtb")
-object Broker extends EnumType[Broker](Broker.values)
+object Broker extends EnumType[Broker]:
+  def unwrap(ma: Broker): String = ma.kind
+  def from(name: String): Either[String, Broker] =
+    Broker.values.find(_.kind == name).toRight(s"Unrecognized broker kind $name")
 
 enum BrokerParameters(val broker: Broker) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Vindaloo(externalId: String)                         extends BrokerParameters(Broker.Vindaloo)
