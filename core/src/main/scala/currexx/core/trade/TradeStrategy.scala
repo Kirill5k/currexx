@@ -54,21 +54,13 @@ object TradeStrategyExecutor {
       val conditions = triggers.flatMap(t => state.signals.getOrElse(t.kind, Nil).headOption.map(t.kind -> _.condition)).toMap
 
       (conditions.get("trend-change-detection"), conditions.get("threshold-crossing")) match
-        case (Some(Condition.TrendDirectionChange(Trend.Downward, Trend.Consolidation, _)), Some(Condition.BelowThreshold(_, _))) =>
+        case (Some(Condition.TrendDirectionChange(Trend.Downward, _, _)), Some(Condition.BelowThreshold(_, _))) =>
           Some(Decision.Buy)
-        case (Some(Condition.TrendDirectionChange(Trend.Downward, Trend.Upward, _)), Some(Condition.BelowThreshold(_, _))) =>
-          Some(Decision.Buy)
-        case (Some(Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, _)), Some(Condition.AboveThreshold(_, _))) =>
+        case (Some(Condition.TrendDirectionChange(Trend.Upward, _, _)), Some(Condition.AboveThreshold(_, _))) =>
           Some(Decision.Sell)
-        case (Some(Condition.TrendDirectionChange(Trend.Upward, Trend.Downward, _)), Some(Condition.AboveThreshold(_, _))) =>
-          Some(Decision.Sell)
-        case (Some(Condition.TrendDirectionChange(Trend.Downward, Trend.Consolidation, _)), _) =>
+        case (Some(Condition.TrendDirectionChange(Trend.Downward, _, _)), _) =>
           Some(Decision.Close)
-        case (Some(Condition.TrendDirectionChange(Trend.Downward, Trend.Upward, _)), _) =>
-          Some(Decision.Close)
-        case (Some(Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, _)), _) =>
-          Some(Decision.Close)
-        case (Some(Condition.TrendDirectionChange(Trend.Upward, Trend.Downward, _)), _) =>
+        case (Some(Condition.TrendDirectionChange(Trend.Upward, _, _)), _) =>
           Some(Decision.Close)
         case _ => None
     }
