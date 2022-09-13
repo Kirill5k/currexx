@@ -1,45 +1,26 @@
 package currexx.domain.market
 
 import currexx.domain.market.MarketTimeSeriesData
+import currexx.domain.types.{EnumType, Kinded}
 import org.latestbit.circe.adt.codec.*
 
-enum MovingAverage(val kind: String) derives JsonTaggedAdt.PureEncoderWithConfig, JsonTaggedAdt.PureDecoderWithConfig:
+enum MovingAverage(val kind: String) extends Kinded(kind):
   case Weighted    extends MovingAverage("weighted")
   case Exponential extends MovingAverage("exponential")
   case Simple      extends MovingAverage("simple")
-object MovingAverage:
-  given JsonTaggedAdt.PureConfig[MovingAverage] = JsonTaggedAdt.PureConfig.Values[MovingAverage](
-    mappings = Map(
-      MovingAverage.Weighted.kind    -> JsonTaggedAdt.tagged[MovingAverage.Weighted.type],
-      MovingAverage.Exponential.kind -> JsonTaggedAdt.tagged[MovingAverage.Exponential.type],
-      MovingAverage.Simple.kind      -> JsonTaggedAdt.tagged[MovingAverage.Simple.type]
-    )
-  )
+object MovingAverage extends EnumType[MovingAverage](MovingAverage.values)
 
-enum CompositeMovingAverage(val kind: String) derives JsonTaggedAdt.PureEncoderWithConfig, JsonTaggedAdt.PureDecoderWithConfig:
+enum CompositeMovingAverage(val kind: String) extends Kinded(kind):
   case Triple  extends CompositeMovingAverage("triple")
   case Hull    extends CompositeMovingAverage("hull")
   case Nyquist extends CompositeMovingAverage("nyquist")
-object CompositeMovingAverage:
-  given JsonTaggedAdt.PureConfig[CompositeMovingAverage] = JsonTaggedAdt.PureConfig.Values[CompositeMovingAverage](
-    mappings = Map(
-      CompositeMovingAverage.Triple.kind  -> JsonTaggedAdt.tagged[CompositeMovingAverage.Triple.type],
-      CompositeMovingAverage.Hull.kind    -> JsonTaggedAdt.tagged[CompositeMovingAverage.Hull.type],
-      CompositeMovingAverage.Nyquist.kind -> JsonTaggedAdt.tagged[CompositeMovingAverage.Nyquist.type]
-    )
-  )
+object CompositeMovingAverage extends EnumType[CompositeMovingAverage](CompositeMovingAverage.values)
 
-enum ValueSource(val kind: String) derives JsonTaggedAdt.PureEncoderWithConfig, JsonTaggedAdt.PureDecoderWithConfig:
+enum ValueSource(val kind: String) extends Kinded(kind):
   case Close extends ValueSource("close")
   case Open  extends ValueSource("open")
   case HL2   extends ValueSource("hl2")
-object ValueSource:
-  given JsonTaggedAdt.PureConfig[ValueSource] = JsonTaggedAdt.PureConfig.Values[ValueSource](
-    mappings = Map(
-      ValueSource.Close.kind -> JsonTaggedAdt.tagged[ValueSource.Close.type],
-      ValueSource.Open.kind  -> JsonTaggedAdt.tagged[ValueSource.Open.type]
-    )
-  )
+object ValueSource extends EnumType[ValueSource](ValueSource.values)
 
 enum ValueTransformation(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Sequenced(sequence: List[ValueTransformation]) extends ValueTransformation("sequenced")

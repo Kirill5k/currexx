@@ -3,19 +3,14 @@ package currexx.core.trade
 import cats.syntax.applicative.*
 import currexx.core.market.MarketState
 import currexx.domain.market.{Condition, Indicator, TradeOrder, Trend}
-import io.circe.{Decoder, Encoder}
+import currexx.domain.types.{EnumType, Kinded}
 
-enum TradeStrategy(val name: String):
+enum TradeStrategy(val name: String) extends Kinded(name):
   case Disabled                    extends TradeStrategy("disabled")
   case TrendChange                 extends TradeStrategy("trend-change")
   case TrendChangeAggressive       extends TradeStrategy("trend-change-aggressive")
   case TrendChangeWithConfirmation extends TradeStrategy("trend-change-with-confirmation")
-
-object TradeStrategy:
-  def from(name: String): Option[TradeStrategy] = TradeStrategy.values.find(_.name == name)
-
-  inline given Encoder[TradeStrategy] = Encoder[String].contramap(_.name)
-  inline given Decoder[TradeStrategy] = Decoder[String].emap(s => from(s).toRight(s"Unrecognized strategy $s"))
+object TradeStrategy extends EnumType[TradeStrategy](TradeStrategy.values)
 
 trait TradeStrategyExecutor:
   def analyze(state: MarketState, triggers: List[Indicator]): Option[TradeStrategyExecutor.Decision]
