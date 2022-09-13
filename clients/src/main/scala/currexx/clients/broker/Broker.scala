@@ -1,18 +1,13 @@
 package currexx.clients.broker
 
 import currexx.clients.broker
+import currexx.domain.types.{EnumType, Kinded}
 import org.latestbit.circe.adt.codec.*
 
-enum Broker(val kind: String) derives JsonTaggedAdt.PureEncoderWithConfig, JsonTaggedAdt.PureDecoderWithConfig:
+enum Broker(val kind: String) extends Kinded(kind):
   case Vindaloo extends Broker("vindaloo")
   case Xtb      extends Broker("xtb")
-
-object Broker:
-  given JsonTaggedAdt.PureConfig[Broker] = JsonTaggedAdt.PureConfig.Values[Broker](
-    mappings = Map(
-      Broker.Vindaloo.kind -> JsonTaggedAdt.tagged[Broker.Vindaloo.type]
-    )
-  )
+object Broker extends EnumType[Broker](Broker.values)
 
 enum BrokerParameters(val broker: Broker) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Vindaloo(externalId: String)                         extends BrokerParameters(Broker.Vindaloo)
