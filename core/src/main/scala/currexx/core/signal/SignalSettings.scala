@@ -1,19 +1,13 @@
 package currexx.core.signal
 
 import currexx.domain.market.Indicator
-import org.latestbit.circe.adt.codec.*
+import currexx.domain.types.EnumType
 import currexx.domain.user.UserId
 
-enum TriggerFrequency derives JsonTaggedAdt.PureEncoderWithConfig, JsonTaggedAdt.PureDecoderWithConfig:
-  case Continuously, OncePerDay
-
-object TriggerFrequency:
-  given JsonTaggedAdt.PureConfig[TriggerFrequency] = JsonTaggedAdt.PureConfig.Values[TriggerFrequency](
-    mappings = Map(
-      "continuously" -> JsonTaggedAdt.tagged[TriggerFrequency.Continuously.type],
-      "once-per-day" -> JsonTaggedAdt.tagged[TriggerFrequency.OncePerDay.type]
-    )
-  )
+enum TriggerFrequency(val kind: String):
+  case Continuously extends TriggerFrequency("continuously")
+  case OncePerDay   extends TriggerFrequency("once-per-day")
+object TriggerFrequency extends EnumType[TriggerFrequency](() => TriggerFrequency.values, _.kind)
 
 final case class SignalSettings(
     userId: UserId,
