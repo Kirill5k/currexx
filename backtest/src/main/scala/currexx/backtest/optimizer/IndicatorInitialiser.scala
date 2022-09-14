@@ -36,8 +36,8 @@ object IndicatorInitialiser {
             Indicator.ThresholdCrossing(
               source,
               randomise(transformation),
-              BigDecimal(rand.nextInt(49) + 50),
-              BigDecimal(rand.nextInt(49) + 1)
+              rand.nextInt(49) + 50,
+              rand.nextInt(49) + 1
             )
       }
     }

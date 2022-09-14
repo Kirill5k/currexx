@@ -93,7 +93,7 @@ object SignalService:
         val highs = data.prices.map(_.high.toDouble).toList
         val lows  = data.prices.map(_.low.toDouble).toList
         MomentumOscillators.stochastic(source, highs, lows, length, slowK, slowD)._1
-    val currentValue = BigDecimal(transformed.head)
+    val currentValue = transformed.head
     val condition =
       if (indicator.upperBoundary < currentValue) Some(Condition.AboveThreshold(indicator.upperBoundary, currentValue))
       else if (indicator.lowerBoundary > currentValue) Some(Condition.BelowThreshold(indicator.lowerBoundary, currentValue))

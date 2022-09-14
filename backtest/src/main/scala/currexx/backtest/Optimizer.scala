@@ -32,19 +32,14 @@ object Optimizer extends IOApp.Simple {
     )
   )
 
-  val target = Indicator.ThresholdCrossing(
-    ValueSource.Close,
-    ValueTransformation.DoubleOutput.STOCH(15, 3, 3),
-    BigDecimal(80),
-    BigDecimal(20)
-  )
+  val target = Indicator.ThresholdCrossing(ValueSource.Close, ValueTransformation.DoubleOutput.STOCH(15, 3, 3), 80, 20)
 
   override def run: IO[Unit] = for
     startTs <- IO.realTime
     init    <- IndicatorInitialiser.make[IO]
     cross   <- IndicatorCrossover.make[IO]
     mut     <- IndicatorMutator.make[IO]
-    eval    <- IndicatorEvaluator.make[IO]("eur-gbp-1d.csv", TradeStrategy.TrendChangeWithConfirmation, otherIndicators)
+    eval    <- IndicatorEvaluator.make[IO]("eur-chf-1d.csv", TradeStrategy.TrendChangeWithConfirmation, otherIndicators)
     sel     <- Selector.rouletteWheel[IO, Indicator]
     elit    <- Elitism.simple[IO, Indicator]
     updateFn = (currentGen: Int, maxGen: Int) => IO.whenA(currentGen % 10 == 0)(IO.println(s"$currentGen out of $maxGen"))

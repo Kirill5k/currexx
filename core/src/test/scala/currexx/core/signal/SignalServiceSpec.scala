@@ -202,9 +202,7 @@ class SignalServiceSpec extends CatsSpec {
     }
 
     "detectThresholdCrossing" should {
-      val lowerBoundary = BigDecimal(20)
-      val upperBoundary = BigDecimal(80)
-      val indicator     = Indicator.ThresholdCrossing(ValueSource.Close, VT.DoubleOutput.STOCH(14, 3, 3), upperBoundary, lowerBoundary)
+      val indicator     = Indicator.ThresholdCrossing(ValueSource.Close, VT.DoubleOutput.STOCH(14, 3, 3), 80D, 20D)
       "create signal when current value is below threshold" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val signal = SignalService.detectThresholdCrossing(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.ThresholdCrossing])

@@ -53,8 +53,8 @@ object IndicatorMutator {
               Indicator.ThresholdCrossing(
                 vs,
                 mutateVt(vt),
-                BigDecimal(mutateInt(ub.toInt - 50, 49) + 50),
-                BigDecimal(mutateInt(lb.toInt, 49))
+                mutateInt(ub.toInt - 50, 49) + 50,
+                mutateInt(lb.toInt, 49)
               )
         }
       }

@@ -62,7 +62,7 @@ object IndicatorCrossover {
                 .map { t =>
                   val ub = math.min(crossInt(ub1.toInt - 50, ub2.toInt - 50), 50)
                   val lb = math.min(crossInt(lb1.toInt, lb2.toInt), 50)
-                  Indicator.ThresholdCrossing(s, t, BigDecimal(ub + 50), BigDecimal(lb))
+                  Indicator.ThresholdCrossing(s, t, ub + 50, lb)
                 }
             case _ =>
               F.raiseError(new IllegalArgumentException("both parents must be of the same type"))
