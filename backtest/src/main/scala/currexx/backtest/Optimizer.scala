@@ -2,15 +2,11 @@ package currexx.backtest
 
 import cats.Show
 import cats.effect.{IO, IOApp}
-import cats.syntax.traverse.*
-import cats.syntax.option.*
-import currexx.algorithms.{Fitness, Parameters}
-import currexx.algorithms.operators.{Crossover, Elitism, Evaluator, Initialiser, Mutator, Selector}
+import currexx.algorithms.Parameters
+import currexx.algorithms.operators.{Elitism, Selector}
 import currexx.backtest.optimizer.{IndicatorCrossover, IndicatorEvaluator, IndicatorInitialiser, IndicatorMutator, OptimisationAlgorithm}
-import currexx.backtest.services.TestServices
 import currexx.core.trade.TradeStrategy
-import currexx.domain.market.{CurrencyPair, Indicator, MovingAverage, ValueSource, ValueTransformation}
-import currexx.domain.market.Currency.{EUR, GBP}
+import currexx.domain.market.{Indicator, MovingAverage, ValueSource, ValueTransformation}
 import fs2.Stream
 
 import scala.util.Random
