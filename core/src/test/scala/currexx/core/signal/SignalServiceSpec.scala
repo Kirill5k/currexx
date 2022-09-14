@@ -207,7 +207,7 @@ class SignalServiceSpec extends CatsSpec {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val signal = SignalService.detectThresholdCrossing(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.ThresholdCrossing])
 
-        val expectedCondition = Condition.BelowThreshold(lowerBoundary, BigDecimal(18.94698816942126))
+        val expectedCondition = Condition.BelowThreshold(20D, BigDecimal(18.94698816942126))
         signal mustBe Some(Signal(Users.uid, Markets.gbpeur, expectedCondition, indicator, timeSeriesData.prices.head.time))
       }
 
