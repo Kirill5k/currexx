@@ -33,8 +33,10 @@ object IndicatorInitialiser {
 
       F.delay {
         ind match
-          case Indicator.TrendChangeDetection(source, transformation) => Indicator.TrendChangeDetection(source, randomiseSo(transformation))
-          case Indicator.ThresholdCrossing(source, transformation, upperBoundary, lowerBoundary) => ???
+          case Indicator.TrendChangeDetection(source, transformation) => 
+            Indicator.TrendChangeDetection(source, randomiseSo(transformation))
+          case Indicator.ThresholdCrossing(source, transformation, _, _) => 
+            Indicator.ThresholdCrossing(source, randomise(transformation), BigDecimal(rand.nextInt(49) + 50), BigDecimal(rand.nextInt(49) + 1))
       }
     }
 }

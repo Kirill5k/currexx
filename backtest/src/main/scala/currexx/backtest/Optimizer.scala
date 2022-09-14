@@ -21,13 +21,22 @@ object Optimizer extends IOApp.Simple {
     crossoverProbability = 0.7,
     mutationProbability = 0.2,
     elitismRatio = 0.2,
-    shuffle = false
+    shuffle = true
   )
 
-  val target = Indicator.TrendChangeDetection(
+  val otherIndicators = List(
+    Indicator.TrendChangeDetection(
+      ValueSource.Close,
+      //    ValueTransformation.SingleOutput.HMA(25)
+      ValueTransformation.SingleOutput.NMA(45, 5, 11.0d, MovingAverage.Weighted)
+    )
+  )
+
+  val target = Indicator.ThresholdCrossing(
     ValueSource.Close,
-//    ValueTransformation.SingleOutput.HMA(25)
-    ValueTransformation.SingleOutput.NMA(20, 5, 2.0d, MovingAverage.Weighted)
+    ValueTransformation.DoubleOutput.STOCH(15, 3, 3),
+    BigDecimal(80),
+    BigDecimal(20)
   )
 
   override def run: IO[Unit] = for
@@ -35,7 +44,7 @@ object Optimizer extends IOApp.Simple {
     init    <- IndicatorInitialiser.make[IO]
     cross   <- IndicatorCrossover.make[IO]
     mut     <- IndicatorMutator.make[IO]
-    eval    <- IndicatorEvaluator.make[IO]("eur-gbp-1d.csv", TradeStrategy.TrendChangeAggressive)
+    eval    <- IndicatorEvaluator.make[IO]("eur-gbp-1d.csv", TradeStrategy.TrendChangeWithConfirmation, otherIndicators)
     sel     <- Selector.rouletteWheel[IO, Indicator]
     elit    <- Elitism.simple[IO, Indicator]
     updateFn = (currentGen: Int, maxGen: Int) => IO.whenA(currentGen % 10 == 0)(IO.println(s"$currentGen out of $maxGen"))

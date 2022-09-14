@@ -5,7 +5,7 @@ import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import cats.syntax.applicativeError.*
 import currexx.algorithms.operators.Crossover
-import currexx.domain.market.{Indicator, ValueTransformation as VS}
+import currexx.domain.market.{Indicator, ValueTransformation as VT}
 import currexx.backtest.optimizer.syntax.*
 
 import scala.util.Random
@@ -19,8 +19,8 @@ object IndicatorCrossover {
       override def cross(par1: Indicator, par2: Indicator)(using r: Random): F[Indicator] = {
 
         def crossDouble(d1: Double, d2: Double, stepSize: Double): Double = {
-          val i1 = d1 * 100
-          val i2 = d2 * 100
+          val i1     = d1 * 100
+          val i2     = d2 * 100
           val result = crossInt(i1.toInt, i2.toInt).toDouble / 100
           result - (result % stepSize)
         }
@@ -30,24 +30,39 @@ object IndicatorCrossover {
           threeWaySplitCrossover.cross(i1.toBinaryArray(max), i2.toBinaryArray(max)).toInt
         }
 
-        def crossSo(so1: VS.SingleOutput, so2: VS.SingleOutput): Either[Throwable, VS.SingleOutput] = (so1, so2) match
-          case (VS.SingleOutput.HMA(l1), VS.SingleOutput.HMA(l2))       => Right(VS.SingleOutput.HMA(crossInt(l1, l2)))
-          case (VS.SingleOutput.SMA(l1), VS.SingleOutput.SMA(l2))       => Right(VS.SingleOutput.SMA(crossInt(l1, l2)))
-          case (VS.SingleOutput.WMA(l1), VS.SingleOutput.WMA(l2))       => Right(VS.SingleOutput.WMA(crossInt(l1, l2)))
-          case (VS.SingleOutput.EMA(l1), VS.SingleOutput.EMA(l2))       => Right(VS.SingleOutput.EMA(crossInt(l1, l2)))
-          case (VS.SingleOutput.Kalman(g1), VS.SingleOutput.Kalman(g2)) => Right(VS.SingleOutput.Kalman(crossDouble(g1, g2, 0.05)))
-          case (VS.SingleOutput.NMA(l1, sl1, d1, ma1), VS.SingleOutput.NMA(l2, sl2, d2, _)) =>
-            Right(VS.SingleOutput.NMA(crossInt(l1, l2), crossInt(sl1, sl2), crossDouble(d1, d2, 0.5), ma1))
-          case (VS.SingleOutput.Sequenced(s1), VS.SingleOutput.Sequenced(s2)) =>
-            s1.zip(s2).traverse(crossSo(_, _)).map(VS.SingleOutput.Sequenced(_))
+        def crossSo(so1: VT.SingleOutput, so2: VT.SingleOutput): Either[Throwable, VT.SingleOutput] = (so1, so2) match
+          case (VT.SingleOutput.HMA(l1), VT.SingleOutput.HMA(l2))       => Right(VT.SingleOutput.HMA(crossInt(l1, l2)))
+          case (VT.SingleOutput.SMA(l1), VT.SingleOutput.SMA(l2))       => Right(VT.SingleOutput.SMA(crossInt(l1, l2)))
+          case (VT.SingleOutput.WMA(l1), VT.SingleOutput.WMA(l2))       => Right(VT.SingleOutput.WMA(crossInt(l1, l2)))
+          case (VT.SingleOutput.EMA(l1), VT.SingleOutput.EMA(l2))       => Right(VT.SingleOutput.EMA(crossInt(l1, l2)))
+          case (VT.SingleOutput.Kalman(g1), VT.SingleOutput.Kalman(g2)) => Right(VT.SingleOutput.Kalman(crossDouble(g1, g2, 0.05)))
+          case (VT.SingleOutput.NMA(l1, sl1, d1, ma1), VT.SingleOutput.NMA(l2, sl2, d2, _)) =>
+            Right(VT.SingleOutput.NMA(crossInt(l1, l2), crossInt(sl1, sl2), crossDouble(d1, d2, 0.5), ma1))
+          case (VT.SingleOutput.Sequenced(s1), VT.SingleOutput.Sequenced(s2)) =>
+            s1.zip(s2).traverse(crossSo(_, _)).map(VT.SingleOutput.Sequenced(_))
           case _ => Left(new IllegalArgumentException("both parents must be of the same type"))
+
+        def crossDo(do1: VT.DoubleOutput, do2: VT.DoubleOutput): Either[Throwable, VT.DoubleOutput] = (do1, do2) match
+          case (VT.DoubleOutput.STOCH(l1, sk1, sd1), VT.DoubleOutput.STOCH(l2, sk2, sd2)) =>
+            Right(VT.DoubleOutput.STOCH(crossInt(l1, l2), crossInt(sk1, sk2), crossInt(sd1, sd2)))
+          case _ => Left(new IllegalArgumentException("both parents must be of the same type"))
+
+        def crossVt(vt1: VT, vt2: VT): Either[Throwable, VT] = (vt1, vt2) match
+          case (so1: VT.SingleOutput, so2: VT.SingleOutput) => crossSo(so1, so2)
+          case (do1: VT.DoubleOutput, do2: VT.DoubleOutput) => crossDo(do1, do2)
+          case _                                            => Left(new IllegalArgumentException("both parents must be of the same type"))
 
         F.defer {
           (par1, par2) match
-            case (i1: Indicator.TrendChangeDetection, i2: Indicator.TrendChangeDetection) =>
-              F.fromEither(crossSo(i1.transformation, i2.transformation)).map(t => Indicator.TrendChangeDetection(i1.source, t))
-            case (i1: Indicator.ThresholdCrossing, i2: Indicator.ThresholdCrossing) =>
-              ???
+            case (Indicator.TrendChangeDetection(s, t1), Indicator.TrendChangeDetection(_, t2)) =>
+              F.fromEither(crossSo(t1, t2)).map(t => Indicator.TrendChangeDetection(s, t))
+            case (Indicator.ThresholdCrossing(s, t1, ub1, lb1), Indicator.ThresholdCrossing(_, t2, ub2, lb2)) =>
+              F.fromEither(crossVt(t1, t2))
+                .map { t =>
+                  val ub = math.min(crossInt(ub1.toInt - 50, ub2.toInt - 50), 50)
+                  val lb = math.min(crossInt(lb1.toInt, lb2.toInt), 50)
+                  Indicator.ThresholdCrossing(s, t, BigDecimal(ub + 50), BigDecimal(lb))
+                }
             case _ =>
               F.raiseError(new IllegalArgumentException("both parents must be of the same type"))
         }
