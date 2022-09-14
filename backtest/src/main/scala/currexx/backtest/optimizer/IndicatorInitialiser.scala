@@ -20,7 +20,7 @@ object IndicatorInitialiser {
           case VT.SingleOutput.EMA(_)              => VT.SingleOutput.EMA(rand.nextInt(41) + 2)
           case VT.SingleOutput.HMA(_)              => VT.SingleOutput.HMA(rand.nextInt(41) + 2)
           case VT.SingleOutput.NMA(_, _, _, _) =>
-            VT.SingleOutput.NMA(rand.nextInt(61) + 2, rand.nextInt(41) + 2, rand.nextInt(80) * 0.25D, MovingAverage.Weighted)
+            VT.SingleOutput.NMA(rand.nextInt(48) + 2, rand.nextInt(28) + 2, rand.nextInt(80) * 0.25D, MovingAverage.Weighted)
 
       def randomiseDo(transformation: VT.DoubleOutput): VT.DoubleOutput =
         transformation match

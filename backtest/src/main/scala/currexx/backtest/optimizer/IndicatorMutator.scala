@@ -14,8 +14,9 @@ object IndicatorMutator {
     new Mutator[F, Indicator] {
       val bitFlitMutator = Mutator.pureBitFlip
       override def mutate(ind: Indicator, mutationProbability: Double)(using r: Random): F[Indicator] =
-        def mutateInt(int: Int, maxValue: Int = 100): Int =
-          bitFlitMutator.mutate(int.toBinaryArray(maxValue), mutationProbability).toInt
+        def mutateInt(int: Int, maxValue: Int = 100): Int = {
+          math.min(bitFlitMutator.mutate(int.toBinaryArray(maxValue), mutationProbability).toInt, maxValue)
+        }
 
         def mutateDouble(dbl: Double, maxValue: Double = 1d, stepSize: Double = 0.05d): Double = {
           val max      = (maxValue / stepSize).toInt
@@ -34,7 +35,7 @@ object IndicatorMutator {
             case SingleOutput.EMA(length)         => SingleOutput.EMA(mutateInt(length, 45))
             case SingleOutput.HMA(length)         => SingleOutput.HMA(mutateInt(length, 45))
             case SingleOutput.NMA(length, signalLength, lambda, maCalc) =>
-              SingleOutput.NMA(mutateInt(length, 65), mutateInt(signalLength, 40), mutateDouble(lambda, 15d, 0.5d), maCalc)
+              SingleOutput.NMA(mutateInt(length, 50), mutateInt(signalLength, 31), mutateDouble(lambda, 15d, 0.5d), maCalc)
 
         F.delay {
           ind match
