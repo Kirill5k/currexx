@@ -43,7 +43,6 @@ final private class LiveMarketService[F[_]](
     stateRepo.update(top.userId, top.currencyPair, position.map(p => PositionState(p, top.time, top.currentPrice))).void
   }
 
-  // TODO: tests for multiple signals
   override def processSignals(uid: UserId, cp: CurrencyPair, signals: List[Signal]): F[Unit] =
     stateRepo.find(uid, cp).flatMap { state =>
       val existingSignals = state.fold(Map.empty[String, List[IndicatorState]])(_.signals)

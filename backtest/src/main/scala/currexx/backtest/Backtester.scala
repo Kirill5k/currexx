@@ -20,15 +20,15 @@ object Backtester extends IOApp.Simple {
     TradeStrategy.TrendChangeWithConfirmation,
     Indicator.TrendChangeDetection(
       source = ValueSource.Close,
-      transformation = ValueTransformation.sequenced(
+      transformation = ValueTransformation.SingleOutput.sequenced(
 //        ValueTransformation.NMA(45, 4, 11.0, MovingAverage.Weighted)
-        ValueTransformation.HMA(5),
+        ValueTransformation.SingleOutput.HMA(5),
 //        ValueTransformation.Kalman(0.7),
       )
     ),
     Indicator.ThresholdCrossing(
       source = ValueSource.Close,
-      transformation = ValueTransformation.STOCH(20, 3, 3),
+      transformation = ValueTransformation.DoubleOutput.STOCH(20, 3, 3),
       upperBoundary = BigDecimal(75),
       lowerBoundary = BigDecimal(25)
     )

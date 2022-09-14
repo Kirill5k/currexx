@@ -8,20 +8,19 @@ import currexx.algorithms.{Alg, Algorithm, Fitness, Op, Parameters}
 import scala.reflect.ClassTag
 import scala.util.Random
 
-trait OptimisationAlgorithm[F[_], A <: Alg, P <: Parameters[A]]:
-  def optimise[T: Optimisable](target: T, params: P)(using rand: Random): F[(T, Fitness)]
+trait OptimisationAlgorithm[F[_], A <: Alg, P <: Parameters[A], T]:
+  def optimise(target: T, params: P)(using rand: Random): F[(T, Fitness)]
 
 object OptimisationAlgorithm:
-  def ga[F[_]: Async](
-      initialiser: Initialiser[F, Array[Array[Int]]],
-      crossover: Crossover[F, Array[Array[Int]]],
-      mutator: Mutator[F, Array[Array[Int]]],
-      evaluator: Evaluator[F, Array[Array[Int]]],
-      selector: Selector[F, Array[Array[Int]]],
-      elitism: Elitism[F, Array[Array[Int]]]
-  ): OptimisationAlgorithm[F, Alg.GA, Parameters.GA] = new OptimisationAlgorithm[F, Alg.GA, Parameters.GA]:
-    override def optimise[T: Optimisable](target: T, params: Parameters.GA)(using rand: Random): F[(T, Fitness)] =
+  def ga[F[_]: Async, T](
+      initialiser: Initialiser[F, T],
+      crossover: Crossover[F, T],
+      mutator: Mutator[F, T],
+      evaluator: Evaluator[F, T],
+      selector: Selector[F, T],
+      elitism: Elitism[F, T]
+  ): OptimisationAlgorithm[F, Alg.GA, Parameters.GA, T] = new OptimisationAlgorithm[F, Alg.GA, Parameters.GA, T]:
+    override def optimise(target: T, params: Parameters.GA)(using rand: Random): F[(T, Fitness)] =
       Algorithm.GA
-        .optimise[Array[Array[Int]]](Optimisable[T].toGenome(target), params)
-        .foldMap(Op.ioInterpreter[F, Array[Array[Int]]](initialiser, crossover, mutator, evaluator, selector, elitism, None))
-        .map((res, fit) => (Optimisable[T].fromGenome(res), fit))
+        .optimise[T](target, params)
+        .foldMap(Op.ioInterpreter[F, T](initialiser, crossover, mutator, evaluator, selector, elitism, None))

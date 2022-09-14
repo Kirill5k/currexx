@@ -1,0 +1,40 @@
+package currexx.backtest.optimizer
+
+import cats.effect.Sync
+import currexx.algorithms.operators.Initialiser
+import currexx.domain.market.{Indicator, MovingAverage, ValueTransformation as VT}
+
+import scala.util.Random
+
+object IndicatorInitialiser {
+
+  def make[F[_]](using F: Sync[F], rand: Random): F[Initialiser[F, Indicator]] =
+    Initialiser.simple[F, Indicator] { ind =>
+
+      def randomiseSo(transformation: VT.SingleOutput): VT.SingleOutput =
+        transformation match
+          case VT.SingleOutput.Sequenced(sequence) => VT.SingleOutput.Sequenced(sequence.map(randomiseSo))
+          case VT.SingleOutput.Kalman(_)           => VT.SingleOutput.Kalman(rand.nextInt(20) * 0.05D)
+          case VT.SingleOutput.WMA(_)              => VT.SingleOutput.WMA(rand.nextInt(41) + 2)
+          case VT.SingleOutput.SMA(_)              => VT.SingleOutput.SMA(rand.nextInt(41) + 2)
+          case VT.SingleOutput.EMA(_)              => VT.SingleOutput.EMA(rand.nextInt(41) + 2)
+          case VT.SingleOutput.HMA(_)              => VT.SingleOutput.HMA(rand.nextInt(41) + 2)
+          case VT.SingleOutput.NMA(_, _, _, _) =>
+            VT.SingleOutput.NMA(rand.nextInt(61) + 2, rand.nextInt(41) + 2, rand.nextInt(80) * 0.25D, MovingAverage.Weighted)
+
+      def randomiseDo(transformation: VT.DoubleOutput): VT.DoubleOutput =
+        transformation match
+          case VT.DoubleOutput.STOCH(_, _, _) => VT.DoubleOutput.STOCH(rand.nextInt(60) + 3, rand.nextInt(4) + 1, rand.nextInt(4) + 1)
+
+      def randomise(transformation: VT): VT =
+        transformation match
+          case vtso: VT.SingleOutput => randomiseSo(vtso)
+          case vtdo: VT.DoubleOutput => randomiseDo(vtdo)
+
+      F.delay {
+        ind match
+          case Indicator.TrendChangeDetection(source, transformation) => Indicator.TrendChangeDetection(source, randomiseSo(transformation))
+          case Indicator.ThresholdCrossing(source, transformation, upperBoundary, lowerBoundary) => ???
+      }
+    }
+}
