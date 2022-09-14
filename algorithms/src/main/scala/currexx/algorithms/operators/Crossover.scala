@@ -23,7 +23,7 @@ object Crossover:
   def pureThreeWaySplit[G: ClassTag] = new Crossover[Id, Array[G]] {
     override def cross(par1: Array[G], par2: Array[G])(using r: Random): Id[Array[G]] =
       val child  = Array.ofDim[G](par1.length)
-      val middle = par1.length / 2
+      val middle = math.max(par1.length / 2, 1)
       val point1 = r.nextInt(middle)
       val point2 = r.nextInt(middle) + middle
       var i      = 0
