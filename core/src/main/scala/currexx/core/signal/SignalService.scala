@@ -11,19 +11,11 @@ import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{
-  Condition,
-  CurrencyPair,
-  Indicator,
-  MarketTimeSeriesData,
-  MovingAverage,
-  Trend,
-  ValueSource,
-  ValueTransformation as VT
-}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, MarketTimeSeriesData, MovingAverage, Trend, ValueSource, ValueTransformation as VT}
 import fs2.Stream
 
 import java.time.Instant
+import scala.util.{Failure, Success, Try}
 
 trait SignalService[F[_]]:
   def submit(signal: Signal): F[Unit]

@@ -25,9 +25,10 @@ object IndicatorCrossover {
           result - (result % stepSize)
         }
 
-        def crossInt(i1: Int, i2: Int): Int = {
+        def crossInt(i1: Int, i2: Int, minValue: Option[Int] = None): Int = {
           val max = math.max(i1, i2)
-          threeWaySplitCrossover.cross(i1.toBinaryArray(max), i2.toBinaryArray(max)).toInt
+          val result = threeWaySplitCrossover.cross(i1.toBinaryArray(max), i2.toBinaryArray(max)).toInt
+          minValue.fold(result)(math.max(_, result))
         }
 
         def crossSo(so1: VT.SingleOutput, so2: VT.SingleOutput): Either[Throwable, VT.SingleOutput] = (so1, so2) match
