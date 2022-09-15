@@ -24,22 +24,28 @@ object Optimizer extends IOApp.Simple {
     shuffle = true
   )
 
-  val otherIndicators = List(
-    Indicator.TrendChangeDetection(
-      ValueSource.Close,
-      //    ValueTransformation.SingleOutput.HMA(25)
-      ValueTransformation.SingleOutput.NMA(45, 5, 11.0d, MovingAverage.Weighted)
-    )
+  val thresholdCrossing = Indicator.ThresholdCrossing(
+    ValueSource.Close,
+    ValueTransformation.DoubleOutput.STOCH(15, 3, 3),
+    80,
+    20
+  )
+  val trendChangeDetection = Indicator.TrendChangeDetection(
+    ValueSource.Close,
+//    ValueTransformation.SingleOutput.HMA(25)
+    ValueTransformation.SingleOutput.NMA(45, 5, 11.0d, MovingAverage.Weighted)
   )
 
-  val target = Indicator.ThresholdCrossing(ValueSource.Close, ValueTransformation.DoubleOutput.STOCH(15, 3, 3), 80, 20)
+  val strategy        = TradeStrategy.TrendChangeWithConfirmation
+  val target          = trendChangeDetection
+  val otherIndicators = List(thresholdCrossing)
 
   override def run: IO[Unit] = for
     startTs <- IO.realTime
     init    <- IndicatorInitialiser.make[IO]
     cross   <- IndicatorCrossover.make[IO]
     mut     <- IndicatorMutator.make[IO]
-    eval    <- IndicatorEvaluator.make[IO]("eur-chf-1d.csv", TradeStrategy.TrendChangeWithConfirmation, otherIndicators)
+    eval    <- IndicatorEvaluator.make[IO]("eur-chf-1d.csv", strategy, otherIndicators)
     sel     <- Selector.rouletteWheel[IO, Indicator]
     elit    <- Elitism.simple[IO, Indicator]
     updateFn = (currentGen: Int, maxGen: Int) => IO.whenA(currentGen % 10 == 0)(IO.println(s"$currentGen out of $maxGen"))
