@@ -1,6 +1,11 @@
 package currexx.domain.market
 
+import currexx.domain.types.EnumType
 import org.latestbit.circe.adt.codec.*
+
+object Trend extends EnumType[Trend](() => Trend.values, _.print)
+enum Trend:
+  case Upward, Downward, Consolidation
 
 enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case CrossingUp
