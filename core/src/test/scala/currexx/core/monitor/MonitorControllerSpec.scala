@@ -23,8 +23,7 @@ class MonitorControllerSpec extends ControllerSpec {
 
         val requestBody = s"""{
              |"currencyPair": "GBP/EUR",
-             |"interval": "H1",
-             |"schedule": {"kind":"periodic","period":"3 hours"}
+             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}}
              |}""".stripMargin
 
         val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
@@ -42,8 +41,7 @@ class MonitorControllerSpec extends ControllerSpec {
 
         val requestBody = s"""{
              |"currencyPair": "GBP/EUR",
-             |"interval": "H1",
-             |"schedule": {"kind":"periodic","period":"3 hours"}
+             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}}
              |}""".stripMargin
 
         val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
@@ -127,7 +125,7 @@ class MonitorControllerSpec extends ControllerSpec {
     "POST /monitors/:id/query" should {
       "manually query the monitor" in {
         val svc = mock[MonitorService[IO]]
-        when(svc.query(any[UserId], any[MonitorId], any[Boolean])).thenReturn(IO.unit)
+        when(svc.queryPrice(any[UserId], any[MonitorId], any[Boolean])).thenReturn(IO.unit)
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
@@ -135,7 +133,7 @@ class MonitorControllerSpec extends ControllerSpec {
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.NoContent, None)
-        verify(svc).query(Users.uid, Monitors.mid, true)
+        verify(svc).queryPrice(Users.uid, Monitors.mid, true)
       }
     }
 
@@ -154,9 +152,7 @@ class MonitorControllerSpec extends ControllerSpec {
              |"id": "${Monitors.mid}",
              |"active": true,
              |"currencyPair": "${Markets.gbpeur}",
-             |"interval": "H1",
-             |"schedule": {"kind":"periodic","period":"3 hours"},
-             |"lastQueriedAt": "${Monitors.queriedAt}"
+             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
              |}]""".stripMargin
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
         verify(svc).getAll(Users.uid)
@@ -178,9 +174,7 @@ class MonitorControllerSpec extends ControllerSpec {
              |"id": "${Monitors.mid}",
              |"active": true,
              |"currencyPair": "${Markets.gbpeur}",
-             |"interval": "H1",
-             |"schedule": {"kind":"periodic","period":"3 hours"},
-             |"lastQueriedAt": "${Monitors.queriedAt}"
+             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
              |}""".stripMargin
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
         verify(svc).get(Users.uid, Monitors.mid)
@@ -199,9 +193,7 @@ class MonitorControllerSpec extends ControllerSpec {
              |"id": "${Monitors.mid}",
              |"active": true,
              |"currencyPair": "${Markets.gbpeur}",
-             |"interval": "H1",
-             |"schedule": {"kind":"periodic","period":"3 hours"},
-             |"lastQueriedAt": "${Monitors.queriedAt}"
+             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
              |}""".stripMargin
 
         val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT).withJsonBody(parseJson(requestBody))
@@ -221,9 +213,7 @@ class MonitorControllerSpec extends ControllerSpec {
              |"id": "foo",
              |"active": true,
              |"currencyPair": "${Markets.gbpeur}",
-             |"interval": "H1",
-             |"schedule": {"kind":"periodic","period":"3 hours"},
-             |"lastQueriedAt": "${Monitors.queriedAt}"
+             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
              |}""".stripMargin
 
         val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT).withJsonBody(parseJson(requestBody))

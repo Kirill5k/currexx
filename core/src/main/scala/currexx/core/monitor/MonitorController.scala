@@ -62,7 +62,7 @@ final private class MonitorController[F[_]](
     queryMonitorEndpoint.withAuthenticatedSession
       .serverLogic { session => mid =>
         service
-          .query(session.userId, mid, true)
+          .queryPrice(session.userId, mid, true)
           .voidResponse
       }
 
@@ -110,10 +110,9 @@ object MonitorController extends TapirSchema with TapirJson {
 
   final case class CreateMonitorRequest(
       currencyPair: CurrencyPair,
-      interval: Interval,
-      schedule: Schedule
+      price: PriceMonitorSchedule
   ) derives Codec.AsObject:
-    def toDomain(uid: UserId): CreateMonitor = CreateMonitor(uid, currencyPair, interval, schedule)
+    def toDomain(uid: UserId): CreateMonitor = CreateMonitor(uid, currencyPair, price)
 
   final case class CreateMonitorResponse(id: MonitorId) derives Codec.AsObject
 
@@ -121,14 +120,12 @@ object MonitorController extends TapirSchema with TapirJson {
       id: String,
       active: Boolean,
       currencyPair: CurrencyPair,
-      interval: Interval,
-      schedule: Schedule,
-      lastQueriedAt: Option[Instant]
+      price: PriceMonitorSchedule
   ) derives Codec.AsObject:
-    def toDomain(uid: UserId): Monitor = Monitor(MonitorId(id), uid, active, currencyPair, interval, schedule, lastQueriedAt)
+    def toDomain(uid: UserId): Monitor = Monitor(MonitorId(id), uid, active, currencyPair, price)
 
   object MonitorView:
-    def from(m: Monitor): MonitorView = MonitorView(m.id.value, m.active, m.currencyPair, m.interval, m.schedule, m.lastQueriedAt)
+    def from(m: Monitor): MonitorView = MonitorView(m.id.value, m.active, m.currencyPair, m.price)
 
   private val basePath = "monitors"
   private val monitorIdPath = basePath / path[String]

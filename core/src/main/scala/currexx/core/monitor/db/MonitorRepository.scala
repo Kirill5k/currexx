@@ -6,7 +6,7 @@ import cats.syntax.applicativeError.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.common.db.Repository
-import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId}
+import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId, PriceMonitorSchedule}
 import currexx.domain.JsonCodecs
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval}
@@ -28,7 +28,7 @@ trait MonitorRepository[F[_]] extends Repository[F]:
   def create(monitor: CreateMonitor): F[MonitorId]
   def activate(uid: UserId, id: MonitorId, active: Boolean): F[Monitor]
   def update(mon: Monitor): F[Monitor]
-  def updateQueriedTimestamp(uid: UserId, id: MonitorId): F[Monitor]
+  def updatePriceQueriedTimestamp(uid: UserId, id: MonitorId): F[Monitor]
 
 final private class LiveMonitorRepository[F[_]](
     private val collection: MongoCollection[F, MonitorEntity]
@@ -61,8 +61,8 @@ final private class LiveMonitorRepository[F[_]](
   override def activate(uid: UserId, id: MonitorId, active: Boolean): F[Monitor] =
     runUpdate(uid, id)(Update.set(Field.Active, active))
 
-  override def updateQueriedTimestamp(uid: UserId, id: MonitorId): F[Monitor] =
-    runUpdate(uid, id)(Update.currentDate(Field.LastQueriedAt))
+  override def updatePriceQueriedTimestamp(uid: UserId, id: MonitorId): F[Monitor] =
+    runUpdate(uid, id)(Update.currentDate(s"price.${Field.LastQueriedAt}"))
 
   private def runUpdate(uid: UserId, id: MonitorId)(update: Update): F[Monitor] =
     collection
@@ -83,8 +83,7 @@ final private class LiveMonitorRepository[F[_]](
             Update
               .set(Field.Active, mon.active)
               .set(Field.CurrencyPair, mon.currencyPair)
-              .set("interval", mon.interval)
-              .set("schedule", mon.schedule)
+              .set("price", PriceMonitor.from(mon.price))
           }
         case _ =>
           AppError.AlreadyBeingMonitored(mon.currencyPair).raiseError[F, Monitor]
@@ -94,5 +93,5 @@ final private class LiveMonitorRepository[F[_]](
 object MonitorRepository extends MongoJsonCodecs with JsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[MonitorRepository[F]] =
     db.getCollectionWithCodec[MonitorEntity]("monitors")
-      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[Interval].withAddedCodec[Schedule])
+      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[PriceMonitor])
       .map(coll => LiveMonitorRepository[F](coll))

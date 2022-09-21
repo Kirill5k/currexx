@@ -1,5 +1,6 @@
 package currexx.core.monitor
 
+import cats.Applicative
 import cats.effect.IO
 import currexx.clients.data.MarketDataClient
 import currexx.core.CatsSpec
@@ -10,6 +11,7 @@ import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.monitor.Schedule
 import currexx.domain.user.UserId
 import fs2.Stream
+import org.mockito.Mockito
 
 import java.time.Instant
 import scala.concurrent.duration.*
@@ -125,7 +127,7 @@ class MonitorServiceSpec extends CatsSpec {
         result.asserting { mid =>
           verifyNoInteractions(client)
           verify(repo).create(Monitors.create())
-          verify(disp).dispatch(Action.QueryMonitor(Users.uid, Monitors.mid))
+          verify(disp).dispatch(Action.SchedulePriceMonitor(Users.uid, Monitors.mid, 0.seconds))
           mid mustBe Monitors.mid
         }
       }
@@ -135,16 +137,16 @@ class MonitorServiceSpec extends CatsSpec {
         when(repo.create(any[CreateMonitor])).thenReturn(IO.pure(Monitors.mid))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
-        val schedule = Schedule.Cron("0 7,20 * * 1-5").value
+        val priceMonitorSchedule = Monitors.priceMonitorSchedule.copy(schedule = Schedule.Cron("0 7,20 * * 1-5").value)
         val result = for
           svc <- MonitorService.make[IO](repo, disp, client)
-          mid <- svc.create(Monitors.create(schedule = schedule))
+          mid <- svc.create(Monitors.create(price = priceMonitorSchedule))
         yield mid
 
         result.asserting { mid =>
           verifyNoInteractions(client)
-          verify(repo).create(Monitors.create(schedule = schedule))
-          verify(disp).dispatch(any[Action.ScheduleMonitor])
+          verify(repo).create(Monitors.create(price = priceMonitorSchedule))
+          verify(disp).dispatch(any[Action.SchedulePriceMonitor])
           mid mustBe Monitors.mid
         }
       }
@@ -153,7 +155,8 @@ class MonitorServiceSpec extends CatsSpec {
     "rescheduleAll" should {
       "schedule monitors without lastQueriedAt to start immediately" in {
         val (repo, disp, client) = mocks
-        when(repo.stream).thenReturn(Stream(Monitors.monitor.copy(lastQueriedAt = None)))
+        val schedule             = Monitors.priceMonitorSchedule.copy(lastQueriedAt = None)
+        when(repo.stream).thenReturn(Stream(Monitors.monitor.copy(price = schedule)))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
@@ -163,7 +166,7 @@ class MonitorServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(repo).stream
-          verify(disp).dispatch(Action.QueryMonitor(Users.uid, Monitors.mid))
+          verify(disp).dispatch(Action.SchedulePriceMonitor(Users.uid, Monitors.mid, 0.seconds))
           verifyNoInteractions(client)
           res mustBe ()
         }
@@ -171,7 +174,8 @@ class MonitorServiceSpec extends CatsSpec {
 
       "schedule monitors with old lastQueriedAt to start immediately" in {
         val (repo, disp, client) = mocks
-        when(repo.stream).thenReturn(Stream(Monitors.monitor.copy(lastQueriedAt = Some(Instant.parse("2020-01-01T00:00:00Z")))))
+        val schedule             = Monitors.priceMonitorSchedule.copy(lastQueriedAt = Some(Instant.parse("2020-01-01T00:00:00Z")))
+        when(repo.stream).thenReturn(Stream(Monitors.monitor.copy(price = schedule)))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
@@ -181,7 +185,7 @@ class MonitorServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(repo).stream
-          verify(disp).dispatch(Action.QueryMonitor(Users.uid, Monitors.mid))
+          verify(disp).dispatch(Action.SchedulePriceMonitor(Users.uid, Monitors.mid, 0.seconds))
           verifyNoInteractions(client)
           res mustBe ()
         }
@@ -189,7 +193,8 @@ class MonitorServiceSpec extends CatsSpec {
 
       "schedule monitors with recent lastQueriedAt to wait" in {
         val (repo, disp, client) = mocks
-        when(repo.stream).thenReturn(Stream(Monitors.monitor.copy(lastQueriedAt = Some(Instant.now.minusSeconds(50)))))
+        val schedule             = Monitors.priceMonitorSchedule.copy(lastQueriedAt = Some(Instant.now.minusSeconds(50)))
+        when(repo.stream).thenReturn(Stream(Monitors.monitor.copy(price = schedule)))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
@@ -199,7 +204,7 @@ class MonitorServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(repo).stream
-          verify(disp).dispatch(any[Action.ScheduleMonitor])
+          verify(disp).dispatch(any[Action.SchedulePriceMonitor])
           verifyNoInteractions(client)
           res mustBe ()
         }
@@ -210,21 +215,21 @@ class MonitorServiceSpec extends CatsSpec {
       "get market data for active monitor" in {
         val (repo, disp, client) = mocks
         when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.monitor))
-        when(repo.updateQueriedTimestamp(any[UserId], any[MonitorId])).thenReturn(IO.unit)
+        when(repo.updatePriceQueriedTimestamp(any[UserId], any[MonitorId])).thenReturn(IO.unit)
         when(client.timeSeriesData(any[CurrencyPair], any[Interval])).thenReturn(IO.pure(Markets.timeSeriesData))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp, client)
-          res <- svc.query(Users.uid, Monitors.mid)
+          res <- svc.queryPrice(Users.uid, Monitors.mid)
         yield res
 
         result.asserting { res =>
           verify(repo).find(Users.uid, Monitors.mid)
           verify(client).timeSeriesData(Markets.gbpeur, Interval.H1)
-          verify(disp).dispatch(Action.ProcessMarketData(Users.uid, Markets.timeSeriesData))
-          verify(repo).updateQueriedTimestamp(Users.uid, Monitors.mid)
-          verify(disp).dispatch(Action.ScheduleMonitor(Users.uid, Monitors.mid, 3.hours))
+//          verify(disp).dispatch(eqTo(Action.ProcessMarketData(Users.uid, Markets.timeSeriesData)))
+          verify(repo).updatePriceQueriedTimestamp(Users.uid, Monitors.mid)
+          verify(disp, Mockito.times(2)).dispatch(any[Action])
           verifyNoMoreInteractions(repo, client, disp)
           res mustBe ()
         }
@@ -233,20 +238,20 @@ class MonitorServiceSpec extends CatsSpec {
       "not reschedule monitor in case of manual query" in {
         val (repo, disp, client) = mocks
         when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.monitor))
-        when(repo.updateQueriedTimestamp(any[UserId], any[MonitorId])).thenReturn(IO.unit)
+        when(repo.updatePriceQueriedTimestamp(any[UserId], any[MonitorId])).thenReturn(IO.unit)
         when(client.timeSeriesData(any[CurrencyPair], any[Interval])).thenReturn(IO.pure(Markets.timeSeriesData))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp, client)
-          res <- svc.query(Users.uid, Monitors.mid, true)
+          res <- svc.queryPrice(Users.uid, Monitors.mid, true)
         yield res
 
         result.asserting { res =>
           verify(repo).find(Users.uid, Monitors.mid)
           verify(client).timeSeriesData(Markets.gbpeur, Interval.H1)
           verify(disp).dispatch(Action.ProcessMarketData(Users.uid, Markets.timeSeriesData))
-          verify(repo).updateQueriedTimestamp(Users.uid, Monitors.mid)
+          verify(repo).updatePriceQueriedTimestamp(Users.uid, Monitors.mid)
           verifyNoMoreInteractions(repo, client, disp)
           res mustBe ()
         }
@@ -259,12 +264,12 @@ class MonitorServiceSpec extends CatsSpec {
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp, client)
-          res <- svc.query(Users.uid, Monitors.mid)
+          res <- svc.queryPrice(Users.uid, Monitors.mid)
         yield res
 
         result.asserting { res =>
           verify(repo).find(Users.uid, Monitors.mid)
-          verify(disp).dispatch(Action.ScheduleMonitor(Users.uid, Monitors.mid, 3.hours))
+          verify(disp).dispatch(any[Action.SchedulePriceMonitor])
           verifyNoInteractions(client)
           verifyNoMoreInteractions(repo, disp)
           res mustBe ()

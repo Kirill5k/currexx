@@ -13,7 +13,8 @@ import currexx.domain.monitor.Schedule
 import currexx.domain.user.UserId
 import fs2.Stream
 
-import scala.concurrent.duration.Duration
+import java.time.Instant
+import scala.concurrent.duration.{Duration, FiniteDuration}
 
 trait MonitorService[F[_]]:
   def rescheduleAll: F[Unit]
@@ -24,7 +25,7 @@ trait MonitorService[F[_]]:
   def delete(uid: UserId, id: MonitorId): F[Unit]
   def pause(uid: UserId, id: MonitorId): F[Unit]
   def resume(uid: UserId, id: MonitorId): F[Unit]
-  def query(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit]
+  def queryPrice(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit]
 
 final private class LiveMonitorService[F[_]](
     private val repository: MonitorRepository[F],
@@ -45,48 +46,37 @@ final private class LiveMonitorService[F[_]](
     }
 
   override def create(cm: CreateMonitor): F[MonitorId] =
-    repository.create(cm).flatTap(scheduleNew(cm.schedule, cm.userId))
+    repository.create(cm).flatTap(schedulePriceMonitor(cm.price, cm.userId))
 
-  private def scheduleNew(schedule: Schedule, uid: UserId)(mid: MonitorId): F[Unit] =
-    schedule match
-      case _: Schedule.Periodic => actionDispatcher.dispatch(Action.QueryMonitor(uid, mid))
-      case _: Schedule.Cron     => reschedule(uid, mid, schedule)
-
-  override def query(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit] =
+  override def queryPrice(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit] =
     for
       mon <- get(uid, id)
       _ <- F.whenA(mon.active) {
         marketDataClient
-          .timeSeriesData(mon.currencyPair, mon.interval)
+          .timeSeriesData(mon.currencyPair, mon.price.interval)
           .flatMap(tsd => actionDispatcher.dispatch(Action.ProcessMarketData(uid, tsd)))
-          .flatTap(_ => repository.updateQueriedTimestamp(uid, id))
+          .flatTap(_ => repository.updatePriceQueriedTimestamp(uid, id))
       }
-      _ <- F.whenA(!manual)(reschedule(uid, id, mon.schedule))
-    yield ()
-
-  private def reschedule(uid: UserId, mid: MonitorId, schedule: Schedule): F[Unit] =
-    for
-      now <- F.realTimeInstant
-      next = schedule.nextExecutionTime(now)
-      _ <- actionDispatcher.dispatch(Action.ScheduleMonitor(uid, mid, now.durationBetween(next)))
+      _ <- F.unlessA(manual)(schedulePriceMonitor(mon.price, uid)(id))
     yield ()
 
   override def rescheduleAll: F[Unit] =
     F.realTimeInstant.flatMap { now =>
       repository.stream
         .map { mon =>
-          mon.lastQueriedAt
-            .map(mon.schedule.nextExecutionTime)
-            .filter(_.isAfter(now))
-            .map(now.durationBetween(_)) match
-            case Some(db) => actionDispatcher.dispatch(Action.ScheduleMonitor(mon.userId, mon.id, db))
-            case None     => scheduleNew(mon.schedule, mon.userId)(mon.id)
+          val db = mon.price.durationBetweenNextQuery(now)
+          actionDispatcher.dispatch(Action.SchedulePriceMonitor(mon.userId, mon.id, db))
         }
         .map(Stream.eval)
         .parJoinUnbounded
         .compile
         .drain
     }
+
+  private def schedulePriceMonitor(ms: MonitorSchedule, uid: UserId)(mid: MonitorId): F[Unit] =
+    F.realTimeInstant
+      .map(ms.durationBetweenNextQuery)
+      .flatMap(db => actionDispatcher.dispatch(Action.SchedulePriceMonitor(uid, mid, db)))
 }
 
 object MonitorService:

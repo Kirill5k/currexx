@@ -2,7 +2,7 @@ package currexx.core.monitor.db
 
 import io.circe.Codec
 import currexx.domain.market.{CurrencyPair, Interval}
-import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId}
+import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId, PriceMonitorSchedule}
 import currexx.domain.user.UserId
 import currexx.domain.json.given
 import currexx.domain.monitor.Schedule
@@ -12,14 +12,22 @@ import mongo4cats.circe.given
 import java.time.Instant
 import scala.concurrent.duration.FiniteDuration
 
+final case class PriceMonitor(
+    interval: Interval,
+    schedule: Schedule,
+    lastQueriedAt: Option[Instant]
+) derives Codec.AsObject:
+  def toDomain: PriceMonitorSchedule = PriceMonitorSchedule(interval, schedule, lastQueriedAt)
+
+object PriceMonitor:
+  def from(pms: PriceMonitorSchedule): PriceMonitor = PriceMonitor(pms.interval, pms.schedule, pms.lastQueriedAt)
+
 final case class MonitorEntity(
     _id: ObjectId,
     userId: ObjectId,
     active: Boolean,
     currencyPair: CurrencyPair,
-    interval: Interval,
-    schedule: Schedule,
-    lastQueriedAt: Option[Instant]
+    price: PriceMonitor
 ) derives Codec.AsObject:
   def toDomain: Monitor =
     Monitor(
@@ -27,9 +35,7 @@ final case class MonitorEntity(
       UserId(userId),
       active,
       currencyPair,
-      interval,
-      schedule,
-      lastQueriedAt
+      price.toDomain
     )
 
 object MonitorEntity {
@@ -39,8 +45,6 @@ object MonitorEntity {
       create.userId.toObjectId,
       true,
       create.currencyPair,
-      create.interval,
-      create.schedule,
-      None
+      PriceMonitor.from(create.price)
     )
 }

@@ -4,7 +4,7 @@ import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
 import currexx.core.fixtures.{Markets, Monitors, Users}
-import currexx.core.monitor.Monitor
+import currexx.core.monitor.{Monitor, PriceMonitorSchedule}
 import currexx.domain.errors.AppError
 import currexx.domain.market.Interval
 import mongo4cats.client.MongoClient
@@ -27,7 +27,7 @@ class MonitorRepositorySpec extends MongoSpec {
         yield (mid, mon)
 
         result.map { (mid, mon) =>
-          mon mustBe Monitor(mid, Users.uid, true, Markets.gbpeur, Interval.H1, Monitors.schedule, None)
+          mon mustBe Monitor(mid, Users.uid, true, Markets.gbpeur, Monitors.priceMonitorSchedule.copy(lastQueriedAt = None))
         }
       }
 
@@ -163,14 +163,15 @@ class MonitorRepositorySpec extends MongoSpec {
     "update" should {
       "update monitor in db and return previous monitor" in withEmbeddedMongoDb { client =>
         val result = for
-          repo   <- MonitorRepository.make(client)
-          mid    <- repo.create(Monitors.create())
-          oldMon <- repo.update(Monitors.monitor.copy(id = mid, interval = Interval.M1, currencyPair = Markets.gbpusd))
+          repo <- MonitorRepository.make(client)
+          mid  <- repo.create(Monitors.create())
+          newPriceMonitorSchedule = Monitors.monitor.price.copy(interval = Interval.M1)
+          oldMon <- repo.update(Monitors.monitor.copy(id = mid, price = newPriceMonitorSchedule, currencyPair = Markets.gbpusd))
           updMon <- repo.find(Users.uid, mid)
         yield (oldMon, updMon)
 
         result.map { case (oldMon, updMon) =>
-          updMon.interval mustBe Interval.M1
+          updMon.price.interval mustBe Interval.M1
           updMon.currencyPair mustBe Markets.gbpusd
 
           oldMon.currencyPair mustBe Markets.gbpeur
@@ -188,6 +189,22 @@ class MonitorRepositorySpec extends MongoSpec {
 
         result.attempt.map { res =>
           res mustBe Left(AppError.AlreadyBeingMonitored(Markets.gbpusd))
+        }
+      }
+    }
+
+    "updatePriceQueriedTimestamp" should {
+      "update last queried at timestamp in price monitor schedule" in withEmbeddedMongoDb { client =>
+        val result = for
+          repo <- MonitorRepository.make(client)
+          priceMonitorSchedule = Monitors.priceMonitorSchedule.copy(lastQueriedAt = None)
+          mid    <- repo.create(Monitors.create(price = priceMonitorSchedule))
+          _      <- repo.updatePriceQueriedTimestamp(Users.uid, mid)
+          updMon <- repo.find(Users.uid, mid)
+        yield updMon
+
+        result.map { updMon =>
+          updMon.price.lastQueriedAt mustBe defined
         }
       }
     }

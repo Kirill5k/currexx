@@ -31,6 +31,9 @@ object Schedule {
 
     def apply(expression: String): Either[Throwable, Cron] =
       Try(parser.parse(expression)).map(Cron.apply).toEither
+
+    def unsafe(expression: String): Cron =
+      Cron(parser.parse(expression))
   }
 
   private val discriminatorField: String = "kind"
