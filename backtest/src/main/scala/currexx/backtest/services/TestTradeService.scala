@@ -27,17 +27,14 @@ final private class TestTradeOrderRepository[F[_]: Async](
   override def getAll(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]]         = orders.get
   override def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]] = Async[F].pure(None)
 
-final private class TestBrokerClient[F[_]](using F: Monad[F]) extends BrokerClient[F]:
-  override def submit(pair: CurrencyPair, parameters: BrokerParameters, order: TradeOrder): F[Unit] = F.unit
-
-final private class TestMarketDataClient[F[_]](using F: Monad[F]) extends MarketDataClient[F]:
-  override def timeSeriesData(currencyPair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] = ???
-  override def latestPrice(currencyPair: CurrencyPair): F[PriceRange]                                  = ???
-
 object TestTradeService:
-  def make[F[_]: Async](initialSettings: TradeSettings, dispatcher: ActionDispatcher[F]): F[TradeService[F]] =
+  def make[F[_]: Async](
+      initialSettings: TradeSettings,
+      clients: TestClients[F],
+      dispatcher: ActionDispatcher[F]
+  ): F[TradeService[F]] =
     for
       settingsRepo <- Ref.of(initialSettings).map(s => TestTradeSettingsRepository[F](s))
       ordersRepo   <- Ref.of(List.empty[TradeOrderPlacement]).map(o => TestTradeOrderRepository[F](o))
-      svc          <- TradeService.make(settingsRepo, ordersRepo, TestBrokerClient[F], TestMarketDataClient[F], dispatcher)
+      svc          <- TradeService.make(settingsRepo, ordersRepo, clients.broker, clients.data, dispatcher)
     yield svc

@@ -18,6 +18,7 @@ final class TestServices[F[_]] private (
     private val signalService: SignalService[F],
     private val marketService: MarketService[F],
     private val tradeService: TradeService[F],
+    private val clients: TestClients[F],
     private val dispatcher: ActionDispatcher[F]
 )(using
     F: Async[F]
@@ -34,10 +35,10 @@ final class TestServices[F[_]] private (
   def processMarketData: Pipe[F, MarketTimeSeriesData, Unit] = { dataStream =>
     for
       data <- dataStream
-      _    <- Stream.eval(marketService.processMarketData(settings.userId, data) >> signalService.processMarketData(settings.userId, data))
+      _    <- Stream.eval(clients.data.setPrice(data.prices.head) >> signalService.processMarketData(settings.userId, data))
       _ <- pendingActions.evalMap {
         case Action.ProcessSignals(uid, cp, signals) => marketService.processSignals(uid, cp, signals)
-        case _                            => F.unit
+        case _                                       => F.unit
       }
       _ <- pendingActions.evalMap {
         case Action.ProcessMarketStateUpdate(state, triggeredBy) => tradeService.processMarketStateUpdate(state, triggeredBy)
@@ -58,7 +59,8 @@ object TestServices:
   def make[F[_]: Async](settings: TestSettings): F[TestServices[F]] =
     for
       dispatcher <- ActionDispatcher.make[F]
+      clients    <- TestClients.make[F]
       market     <- TestMarketService.make[F](settings.marketState, dispatcher)
-      trade      <- TestTradeService.make[F](settings.trade, dispatcher)
+      trade      <- TestTradeService.make[F](settings.trade, clients, dispatcher)
       signal     <- TestSignalService.make[F](settings.signal, dispatcher)
-    yield TestServices[F](settings, signal, market, trade, dispatcher)
+    yield TestServices[F](settings, signal, market, trade, clients, dispatcher)
