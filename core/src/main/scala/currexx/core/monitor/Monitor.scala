@@ -22,12 +22,11 @@ trait MonitorSchedule {
       .map(schedule.nextExecutionTime)
       .filter(_.isAfter(now))
       .map(now.durationBetween)
-      .getOrElse(nextSchedulingPeriodForNewMonitor(now))
-
-  private def nextSchedulingPeriodForNewMonitor(now: Instant): FiniteDuration =
-    schedule match
-      case _: Schedule.Periodic => Duration.Zero
-      case _: Schedule.Cron     => now.durationBetween(schedule.nextExecutionTime(now))
+      .getOrElse {
+        schedule match
+          case _: Schedule.Periodic => Duration.Zero
+          case _: Schedule.Cron     => now.durationBetween(schedule.nextExecutionTime(now))
+      }
 }
 
 final case class PriceMonitorSchedule(
