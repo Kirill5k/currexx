@@ -26,7 +26,7 @@ object Application extends IOApp.Simple:
             health          <- Health.make[IO]
             auth            <- Auth.make(config.auth, res.mongo)
             signals         <- Signals.make(res.mongo, dispatcher)
-            monitors        <- Monitors.make(res.mongo, clients, dispatcher)
+            monitors        <- Monitors.make(res.mongo, dispatcher)
             markets         <- Markets.make(res.mongo, dispatcher)
             trades          <- Trades.make(res.mongo, clients, dispatcher)
             settings        <- Settings.make(res.mongo)

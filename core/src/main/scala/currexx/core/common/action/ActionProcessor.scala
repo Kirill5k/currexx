@@ -40,6 +40,8 @@ final private class LiveActionProcessor[F[_]](
         logger.info(s"closing opened order for $pair currency pair") *> tradeService.closeOpenOrders(uid, pair)
       case Action.SchedulePriceMonitor(uid, mid, period) =>
         F.sleep(period) *> logger.info(s"querying price monitor $mid") *> monitorService.queryPrice(uid, mid)
+      case Action.FetchMarketData(uid, cp, interval) =>
+        logger.info(s"fetching market data for $cp") *> tradeService.fetchMarketData(uid, cp, interval)
       case Action.ProcessMarketData(uid, data) =>
         logger.info(s"processing market data for ${data.currencyPair}") *> signalService.processMarketData(uid, data)
       case Action.ProcessSignals(uid, cp, signals) =>

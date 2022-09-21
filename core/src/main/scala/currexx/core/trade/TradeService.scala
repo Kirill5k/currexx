@@ -13,7 +13,7 @@ import currexx.core.common.http.SearchParams
 import currexx.core.market.{MarketState, PositionState}
 import currexx.core.trade.TradeStrategyExecutor.Decision
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
-import currexx.domain.market.{CurrencyPair, Indicator, TradeOrder}
+import currexx.domain.market.{CurrencyPair, Indicator, Interval, TradeOrder}
 import currexx.domain.user.UserId
 import fs2.Stream
 
@@ -27,6 +27,7 @@ trait TradeService[F[_]]:
   def placeOrder(uid: UserId, cp: CurrencyPair, order: TradeOrder, closePendingOrders: Boolean): F[Unit]
   def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
   def closeOpenOrders(uid: UserId): F[Unit]
+  def fetchMarketData(uid: UserId, cp: CurrencyPair, interval: Interval): F[Unit]
 
 final private class LiveTradeService[F[_]](
     private val settingsRepository: TradeSettingsRepository[F],
@@ -40,6 +41,9 @@ final private class LiveTradeService[F[_]](
   override def getSettings(uid: UserId): F[TradeSettings]                                = settingsRepository.get(uid)
   override def updateSettings(settings: TradeSettings): F[Unit]                          = settingsRepository.update(settings)
   override def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]] = orderRepository.getAll(uid, sp)
+
+  override def fetchMarketData(uid: UserId, cp: CurrencyPair, interval: Interval): F[Unit] =
+    marketDataClient.timeSeriesData(cp, interval).flatMap(data => dispatcher.dispatch(Action.ProcessMarketData(uid, data)))
 
   override def placeOrder(uid: UserId, cp: CurrencyPair, order: TradeOrder, closePendingOrders: Boolean): F[Unit] =
     (F.realTimeInstant, marketDataClient.latestPrice(cp), settingsRepository.get(uid))

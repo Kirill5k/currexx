@@ -29,8 +29,7 @@ trait MonitorService[F[_]]:
 
 final private class LiveMonitorService[F[_]](
     private val repository: MonitorRepository[F],
-    private val actionDispatcher: ActionDispatcher[F],
-    private val marketDataClient: MarketDataClient[F]
+    private val actionDispatcher: ActionDispatcher[F]
 )(using
     F: Temporal[F]
 ) extends MonitorService[F] {
@@ -52,9 +51,8 @@ final private class LiveMonitorService[F[_]](
     for
       mon <- get(uid, id)
       _ <- F.whenA(mon.active) {
-        marketDataClient
-          .timeSeriesData(mon.currencyPair, mon.price.interval)
-          .flatMap(tsd => actionDispatcher.dispatch(Action.ProcessMarketData(uid, tsd)))
+        actionDispatcher
+          .dispatch(Action.FetchMarketData(uid, mon.currencyPair, mon.price.interval))
           .flatTap(_ => repository.updatePriceQueriedTimestamp(uid, id))
       }
       _ <- F.unlessA(manual)(schedulePriceMonitor(mon.price, uid)(id))
@@ -82,7 +80,6 @@ final private class LiveMonitorService[F[_]](
 object MonitorService:
   def make[F[_]: Temporal](
       repository: MonitorRepository[F],
-      actionDispatcher: ActionDispatcher[F],
-      marketDataClient: MarketDataClient[F]
+      actionDispatcher: ActionDispatcher[F]
   ): F[MonitorService[F]] =
-    Monad[F].pure(LiveMonitorService(repository, actionDispatcher, marketDataClient))
+    Monad[F].pure(LiveMonitorService(repository, actionDispatcher))

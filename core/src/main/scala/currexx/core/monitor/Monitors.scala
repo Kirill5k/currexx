@@ -17,11 +17,10 @@ final class Monitors[F[_]] private (
 object Monitors:
   def make[F[_]: Async](
       database: MongoDatabase[F],
-      clients: Clients[F],
       dispatcher: ActionDispatcher[F]
   ): F[Monitors[F]] =
     for
       repo <- MonitorRepository.make[F](database)
-      svc  <- MonitorService.make[F](repo, dispatcher, clients.marketData)
+      svc  <- MonitorService.make[F](repo, dispatcher)
       ctrl <- MonitorController.make[F](svc)
     yield Monitors[F](svc, ctrl)
