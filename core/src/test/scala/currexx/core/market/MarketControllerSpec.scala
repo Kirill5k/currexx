@@ -84,14 +84,6 @@ class MarketControllerSpec extends ControllerSpec {
              |        "time": "${Markets.ts}"
              |      }
              |    },
-             |    "latestPrice": {
-             |      "open": 2,
-             |      "high": 4,
-             |      "low": 1,
-             |      "close": 3,
-             |      "volume": 1000,
-             |      "time": "${Markets.ts}"
-             |    },
              |    "signals": {
              |      "trend-change-detection": [
              |        {

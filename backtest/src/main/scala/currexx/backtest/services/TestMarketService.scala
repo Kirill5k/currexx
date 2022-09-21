@@ -17,8 +17,6 @@ final private class TestMarketStateRepository[F[_]: Monad](
   override def deleteAll(uid: UserId): F[Unit]                = Monad[F].unit
   override def update(uid: UserId, pair: CurrencyPair, signals: Map[String, List[IndicatorState]]): F[MarketState] =
     state.updateAndGet(_.copy(signals = signals))
-  override def update(uid: UserId, pair: CurrencyPair, price: PriceRange): F[MarketState] =
-    state.updateAndGet(_.copy(latestPrice = Some(price)))
   override def update(uid: UserId, pair: CurrencyPair, position: Option[PositionState]): F[MarketState] =
     state.updateAndGet(_.copy(currentPosition = position))
   override def getAll(uid: UserId): F[List[MarketState]] =

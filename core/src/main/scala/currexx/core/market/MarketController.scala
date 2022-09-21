@@ -55,7 +55,6 @@ object MarketController extends TapirSchema with TapirJson with TapirCodecs {
 
   final case class MarketStateView(
       currentPosition: Option[PositionState],
-      latestPrice: Option[PriceRange],
       signals: Map[String, List[IndicatorState]],
       lastUpdatedAt: Option[Instant],
       createdAt: Option[Instant]
@@ -65,7 +64,6 @@ object MarketController extends TapirSchema with TapirJson with TapirCodecs {
     def from(ms: MarketState): MarketStateView =
       MarketStateView(
         ms.currentPosition,
-        ms.latestPrice,
         ms.signals,
         ms.lastUpdatedAt,
         ms.createdAt

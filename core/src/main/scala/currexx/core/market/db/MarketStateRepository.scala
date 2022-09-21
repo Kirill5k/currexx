@@ -19,7 +19,6 @@ import mongo4cats.database.MongoDatabase
 
 trait MarketStateRepository[F[_]] extends Repository[F]:
   def update(uid: UserId, pair: CurrencyPair, signals: Map[String, List[IndicatorState]]): F[MarketState]
-  def update(uid: UserId, pair: CurrencyPair, price: PriceRange): F[MarketState]
   def update(uid: UserId, pair: CurrencyPair, position: Option[PositionState]): F[MarketState]
   def getAll(uid: UserId): F[List[MarketState]]
   def deleteAll(uid: UserId): F[Unit]
@@ -47,13 +46,6 @@ final private class LiveMarketStateRepository[F[_]](
       userIdAndCurrencyPairEq(uid, cp),
       Update.set("signals", signals),
       MarketStateEntity.make(uid, cp, signals = signals)
-    )
-
-  override def update(uid: UserId, pair: CurrencyPair, price: PriceRange): F[MarketState] =
-    runUpdate(
-      userIdAndCurrencyPairEq(uid, pair),
-      Update.set("latestPrice", price),
-      MarketStateEntity.make(uid, pair, latestPrice = Some(price))
     )
 
   override def update(uid: UserId, pair: CurrencyPair, position: Option[PositionState]): F[MarketState] =
@@ -85,5 +77,5 @@ final private class LiveMarketStateRepository[F[_]](
 object MarketStateRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[MarketStateRepository[F]] =
     db.getCollectionWithCodec[MarketStateEntity]("market-state")
-      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[IndicatorState].withAddedCodec[PriceRange].withAddedCodec[PositionState])
+      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[IndicatorState].withAddedCodec[PositionState])
       .map(coll => LiveMarketStateRepository[F](coll))

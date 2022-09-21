@@ -27,7 +27,7 @@ object TestSettings:
     TestSettings(
       userId = userId,
       currencyPair = currencyPair,
-      marketState = MarketState(userId, currencyPair, None, None, Map.empty, None, None),
+      marketState = MarketState(userId, currencyPair, None, Map.empty, None, None),
       signal = SignalSettings(userId, TriggerFrequency.OncePerDay, indicators),
       trade = TradeSettings(userId, strategy, BrokerParameters.Vindaloo("1"), TradingParameters(BigDecimal(0.1)), None)
     )

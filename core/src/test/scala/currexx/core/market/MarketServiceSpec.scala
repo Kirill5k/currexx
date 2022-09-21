@@ -86,24 +86,6 @@ class MarketServiceSpec extends CatsSpec {
       }
     }
 
-    "processMarketData" should {
-      "update state with latest received prices" in {
-        val (stateRepo, disp) = mocks
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[PriceRange])).thenReturn(IO.unit)
-
-        val result = for
-          svc   <- MarketService.make[IO](stateRepo, disp)
-          state <- svc.processMarketData(Users.uid, Markets.timeSeriesData)
-        yield state
-
-        result.asserting { res =>
-          verify(stateRepo).update(Users.uid, Markets.gbpeur, Markets.priceRange)
-          verifyNoInteractions(disp)
-          res mustBe ()
-        }
-      }
-    }
-
     "processTradeOrderPlacement" should {
       "update state with current position" in {
         val (stateRepo, disp) = mocks

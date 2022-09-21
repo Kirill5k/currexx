@@ -42,7 +42,6 @@ object Markets {
     Users.uid,
     gbpeur,
     Some(positionState),
-    Some(priceRange),
     Map.empty,
     Some(ts),
     Some(ts)

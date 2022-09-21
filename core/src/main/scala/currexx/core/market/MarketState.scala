@@ -22,7 +22,6 @@ final case class MarketState(
     userId: UserId,
     currencyPair: CurrencyPair,
     currentPosition: Option[PositionState],
-    latestPrice: Option[PriceRange],
     signals: Map[String, List[IndicatorState]],
     lastUpdatedAt: Option[Instant],
     createdAt: Option[Instant]

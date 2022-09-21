@@ -16,7 +16,6 @@ trait MarketService[F[_]]:
   def getState(uid: UserId): F[List[MarketState]]
   def clearState(uid: UserId, closePendingOrders: Boolean): F[Unit]
   def clearState(uid: UserId, cp: CurrencyPair, closePendingOrders: Boolean): F[Unit]
-  def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit]
   def processSignals(uid: UserId, cp: CurrencyPair, signals: List[Signal]): F[Unit]
   def processTradeOrderPlacement(top: TradeOrderPlacement): F[Unit]
 
@@ -32,10 +31,7 @@ final private class LiveMarketService[F[_]](
 
   override def clearState(uid: UserId, cp: CurrencyPair, closePendingOrders: Boolean): F[Unit] =
     stateRepo.delete(uid, cp) >> F.whenA(closePendingOrders)(dispatcher.dispatch(Action.CloseOpenOrders(uid, cp)))
-
-  override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
-    stateRepo.update(uid, data.currencyPair, data.prices.head).void
-
+  
   override def processTradeOrderPlacement(top: TradeOrderPlacement): F[Unit] = {
     val position = top.order match
       case enter: TradeOrder.Enter => Some(enter.position)
