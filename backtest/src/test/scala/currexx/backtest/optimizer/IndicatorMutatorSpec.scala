@@ -39,6 +39,20 @@ class IndicatorMutatorSpec extends CatsSpec {
           ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.HMA(30))
         }
       }
+
+      "not return 0" in {
+        given Random = Random(1)
+
+        val result = for
+          mutator <- IndicatorMutator.make[IO]
+          ind = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.HMA(0))
+          res <- mutator.mutate(ind, 0.2d)
+        yield res
+
+        result.asserting { ind =>
+          ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.HMA(1))
+        }
+      }
     }
 
     "mutating trend-change-detection with sequenced transformations" should {

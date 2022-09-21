@@ -21,14 +21,14 @@ object TestSettings:
   def make(
       currencyPair: CurrencyPair,
       strategy: TradeStrategy,
-      indicators: Indicator*
+      indicators: List[Indicator]
   ): TestSettings = {
     val userId = UserId(ObjectId.gen)
     TestSettings(
       userId = userId,
       currencyPair = currencyPair,
       marketState = MarketState(userId, currencyPair, None, None, Map.empty, None, None),
-      signal = SignalSettings(userId, TriggerFrequency.OncePerDay, indicators.toList),
+      signal = SignalSettings(userId, TriggerFrequency.OncePerDay, indicators),
       trade = TradeSettings(userId, strategy, BrokerParameters.Vindaloo("1"), TradingParameters(BigDecimal(0.1)), None)
     )
   }

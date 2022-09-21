@@ -16,28 +16,42 @@ object Optimizer extends IOApp.Simple {
   given Random = Random()
 
   val gaParameters = Parameters.GA(
-    populationSize = 100,
+    populationSize = 120,
     maxGen = 200,
     crossoverProbability = 0.7,
     mutationProbability = 0.2,
-    elitismRatio = 0.4,
+    elitismRatio = 0.2,
     shuffle = true
   )
 
-  val target = Indicator.TrendChangeDetection(
+  val thresholdCrossing = Indicator.ThresholdCrossing(
     ValueSource.Close,
-    ValueTransformation.SingleOutput.HMA(25)
-//    ValueTransformation.SingleOutput.NMA(43, 12, 8.0d, MovingAverage.Weighted)
+    ValueTransformation.DoubleOutput.STOCH(15, 3, 3),
+    80,
+    20
+  )
+  val trendChangeDetection = Indicator.TrendChangeDetection(
+    ValueSource.Close,
+//    ValueTransformation.SingleOutput.HMA(25)
+    ValueTransformation.SingleOutput.NMA(45, 5, 11.0d, MovingAverage.Weighted)
   )
 
+  val strategy        = TradeStrategy.TrendChangeWithConfirmation
+  val target          = trendChangeDetection
+  val otherIndicators = List(thresholdCrossing)
+
   override def run: IO[Unit] = for
-    init  <- IndicatorInitialiser.make[IO]
-    cross <- IndicatorCrossover.make[IO]
-    mut   <- IndicatorMutator.make[IO]
-    eval  <- IndicatorEvaluator.make[IO]("eur-gbp-1d.csv", TradeStrategy.TrendChangeAggressive)
-    sel   <- Selector.rouletteWheel[IO, Indicator]
-    elit  <- Elitism.simple[IO, Indicator]
-    res   <- OptimisationAlgorithm.ga[IO, Indicator](init, cross, mut, eval, sel, elit).optimise(target, gaParameters)
+    startTs <- IO.realTime
+    init    <- IndicatorInitialiser.make[IO]
+    cross   <- IndicatorCrossover.make[IO]
+    mut     <- IndicatorMutator.make[IO]
+    eval    <- IndicatorEvaluator.make[IO]("eur-chf-1d.csv", strategy, otherIndicators)
+    sel     <- Selector.rouletteWheel[IO, Indicator]
+    elit    <- Elitism.simple[IO, Indicator]
+    updateFn = (currentGen: Int, maxGen: Int) => IO.whenA(currentGen % 10 == 0)(IO.println(s"$currentGen out of $maxGen"))
+    res   <- OptimisationAlgorithm.ga[IO, Indicator](init, cross, mut, eval, sel, elit, updateFn).optimise(target, gaParameters)
+    endTs <- IO.realTime
+    _     <- IO.println(s"Total duration: ${(endTs - startTs).toMinutes}m")
     _     <- IO.println(s"${res._1} - ${res._2}")
   yield ()
 }

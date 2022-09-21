@@ -11,19 +11,11 @@ import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{
-  Condition,
-  CurrencyPair,
-  Indicator,
-  MarketTimeSeriesData,
-  MovingAverage,
-  Trend,
-  ValueSource,
-  ValueTransformation as VT
-}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, MarketTimeSeriesData, MovingAverage, Trend, ValueSource, ValueTransformation as VT}
 import fs2.Stream
 
 import java.time.Instant
+import scala.util.{Failure, Success, Try}
 
 trait SignalService[F[_]]:
   def submit(signal: Signal): F[Unit]
@@ -101,7 +93,7 @@ object SignalService:
         val highs = data.prices.map(_.high.toDouble).toList
         val lows  = data.prices.map(_.low.toDouble).toList
         MomentumOscillators.stochastic(source, highs, lows, length, slowK, slowD)._1
-    val currentValue = BigDecimal(transformed.head)
+    val currentValue = transformed.head
     val condition =
       if (indicator.upperBoundary < currentValue) Some(Condition.AboveThreshold(indicator.upperBoundary, currentValue))
       else if (indicator.lowerBoundary > currentValue) Some(Condition.BelowThreshold(indicator.lowerBoundary, currentValue))

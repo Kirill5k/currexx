@@ -79,8 +79,8 @@ enum Indicator(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTa
   case ThresholdCrossing(
       source: ValueSource,
       transformation: ValueTransformation,
-      upperBoundary: BigDecimal,
-      lowerBoundary: BigDecimal
+      upperBoundary: Double,
+      lowerBoundary: Double
   ) extends Indicator("threshold-crossing")
 
 object Indicator:
