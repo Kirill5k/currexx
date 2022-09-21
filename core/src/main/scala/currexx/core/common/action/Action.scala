@@ -11,8 +11,10 @@ import scala.concurrent.duration.FiniteDuration
 
 enum Action:
   case RescheduleAllMonitors
+  case ScheduleProfitMonitor(uid: UserId, mid: MonitorId, period: FiniteDuration)
   case SchedulePriceMonitor(uid: UserId, mid: MonitorId, period: FiniteDuration)
   case FetchMarketData(uid: UserId, cp: CurrencyPair, interval: Interval)
+  case AssertProfit(uid: UserId, cp: CurrencyPair, min: Option[BigDecimal], max: Option[BigDecimal])
   case ProcessMarketData(uid: UserId, data: MarketTimeSeriesData)
   case ProcessSignals(uid: UserId, currencyPair: CurrencyPair, signals: List[Signal])
   case ProcessMarketStateUpdate(state: MarketState, triggers: List[Indicator])

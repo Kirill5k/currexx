@@ -45,9 +45,9 @@ object errors {
     final case class NotSetup(entityName: String) extends NotFound:
       override val message: String = s"Current account doesn't have $entityName-settings set up"
 
-    final case class NotTracked(cp: CurrencyPair) extends NotFound :
+    final case class NotTracked(cp: CurrencyPair) extends NotFound:
       override val message: String = s"Currency pair $cp is not being tracked"
-    
+
     case object InvalidEmailOrPassword extends Unauth:
       override val message: String = "Invalid email or password"
 
@@ -81,6 +81,9 @@ object errors {
     final case class InvalidJwtToken(message: String) extends Forbidden
 
     final case class FailedValidation(message: String) extends Unprocessable
+
+    final case class NotScheduled(scheduleKind: String) extends AppError:
+      override val message = s"Missing schedule configuration for $scheduleKind"
 
     case object InvalidDateRange extends Unprocessable:
       override val message: String = "Date 'from' must be before date 'to'"

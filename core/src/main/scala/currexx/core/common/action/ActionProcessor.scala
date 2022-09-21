@@ -38,8 +38,12 @@ final private class LiveActionProcessor[F[_]](
         logger.info(s"closing all opened orders") *> tradeService.closeOpenOrders(uid)
       case Action.CloseOpenOrders(uid, pair) =>
         logger.info(s"closing opened order for $pair currency pair") *> tradeService.closeOpenOrders(uid, pair)
+      case Action.ScheduleProfitMonitor(uid, mid, period) =>
+        F.sleep(period) *> logger.info(s"scheduling profit monitor $mid") *> monitorService.scheduleProfit(uid, mid)
+      case Action.AssertProfit(uid, cp, min, max) =>
+        logger.info(s"verifying current position for $cp")
       case Action.SchedulePriceMonitor(uid, mid, period) =>
-        F.sleep(period) *> logger.info(s"querying price monitor $mid") *> monitorService.queryPrice(uid, mid)
+        F.sleep(period) *> logger.info(s"scheduling price monitor $mid") *> monitorService.schedulePrice(uid, mid)
       case Action.FetchMarketData(uid, cp, interval) =>
         logger.info(s"fetching market data for $cp") *> tradeService.fetchMarketData(uid, cp, interval)
       case Action.ProcessMarketData(uid, data) =>
@@ -54,7 +58,7 @@ final private class LiveActionProcessor[F[_]](
       case error: AppError =>
         logger.warn(error)(s"domain error while processing action $action")
       case error =>
-        logger.error(error)(s"unexpected error processing action $action") *>
+        logger.error(error)(s"unexpected error while processing action $action") *>
           F.sleep(1.second) *> dispatcher.dispatch(action)
     }
 }

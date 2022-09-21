@@ -147,7 +147,7 @@ class MonitorControllerSpec extends ControllerSpec {
     "POST /monitors/:id/query" should {
       "manually query the monitor" in {
         val svc = mock[MonitorService[IO]]
-        when(svc.queryPrice(any[UserId], any[MonitorId], any[Boolean])).thenReturn(IO.unit)
+        when(svc.schedulePrice(any[UserId], any[MonitorId], any[Boolean])).thenReturn(IO.unit)
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
@@ -155,7 +155,7 @@ class MonitorControllerSpec extends ControllerSpec {
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.NoContent, None)
-        verify(svc).queryPrice(Users.uid, Monitors.mid, true)
+        verify(svc).schedulePrice(Users.uid, Monitors.mid, true)
       }
     }
 
