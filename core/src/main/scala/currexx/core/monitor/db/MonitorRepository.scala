@@ -29,6 +29,7 @@ trait MonitorRepository[F[_]] extends Repository[F]:
   def activate(uid: UserId, id: MonitorId, active: Boolean): F[Monitor]
   def update(mon: Monitor): F[Monitor]
   def updatePriceQueriedTimestamp(uid: UserId, id: MonitorId): F[Monitor]
+  def updateProfitQueriedTimestamp(uid: UserId, id: MonitorId): F[Monitor]
 
 final private class LiveMonitorRepository[F[_]](
     private val collection: MongoCollection[F, MonitorEntity]
@@ -64,6 +65,9 @@ final private class LiveMonitorRepository[F[_]](
   override def updatePriceQueriedTimestamp(uid: UserId, id: MonitorId): F[Monitor] =
     runUpdate(uid, id)(Update.currentDate(s"price.${Field.LastQueriedAt}"))
 
+  override def updateProfitQueriedTimestamp(uid: UserId, id: MonitorId): F[Monitor] =
+    runUpdate(uid, id)(Update.currentDate(s"profit.${Field.LastQueriedAt}"))
+  
   private def runUpdate(uid: UserId, id: MonitorId)(update: Update): F[Monitor] =
     collection
       .findOneAndUpdate(idEq(id.value) && userIdEq(uid), update.currentDate(Field.LastUpdatedAt))
@@ -84,6 +88,7 @@ final private class LiveMonitorRepository[F[_]](
               .set(Field.Active, mon.active)
               .set(Field.CurrencyPair, mon.currencyPair)
               .set("price", PriceMonitor.from(mon.price))
+              .set("profit", mon.profit.map(ProfitMonitor.from))
           }
         case _ =>
           AppError.AlreadyBeingMonitored(mon.currencyPair).raiseError[F, Monitor]
@@ -93,5 +98,5 @@ final private class LiveMonitorRepository[F[_]](
 object MonitorRepository extends MongoJsonCodecs with JsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[MonitorRepository[F]] =
     db.getCollectionWithCodec[MonitorEntity]("monitors")
-      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[PriceMonitor])
+      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[PriceMonitor].withAddedCodec[ProfitMonitor])
       .map(coll => LiveMonitorRepository[F](coll))

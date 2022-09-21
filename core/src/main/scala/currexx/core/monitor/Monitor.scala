@@ -34,18 +34,29 @@ final case class PriceMonitorSchedule(
     interval: Interval,
     schedule: Schedule,
     lastQueriedAt: Option[Instant]
-) extends MonitorSchedule derives Codec.AsObject
+) extends MonitorSchedule
+    derives Codec.AsObject
+
+final case class ProfitMonitorSchedule(
+    min: Option[BigDecimal],
+    max: Option[BigDecimal],
+    schedule: Schedule,
+    lastQueriedAt: Option[Instant]
+) extends MonitorSchedule
+    derives Codec.AsObject
 
 final case class Monitor(
     id: MonitorId,
     userId: UserId,
     active: Boolean,
     currencyPair: CurrencyPair,
-    price: PriceMonitorSchedule
+    price: PriceMonitorSchedule,
+    profit: Option[ProfitMonitorSchedule]
 )
 
 final case class CreateMonitor(
     userId: UserId,
     currencyPair: CurrencyPair,
-    price: PriceMonitorSchedule
+    price: PriceMonitorSchedule,
+    profit: Option[ProfitMonitorSchedule]
 )

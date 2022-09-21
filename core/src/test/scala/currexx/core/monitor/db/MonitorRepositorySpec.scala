@@ -27,7 +27,14 @@ class MonitorRepositorySpec extends MongoSpec {
         yield (mid, mon)
 
         result.map { (mid, mon) =>
-          mon mustBe Monitor(mid, Users.uid, true, Markets.gbpeur, Monitors.priceMonitorSchedule.copy(lastQueriedAt = None))
+          mon mustBe Monitor(
+            mid,
+            Users.uid,
+            true,
+            Markets.gbpeur,
+            Monitors.priceMonitorSchedule.copy(lastQueriedAt = None),
+            Some(Monitors.profitMonitorSchedule.copy(lastQueriedAt = None))
+          )
         }
       }
 
@@ -205,6 +212,22 @@ class MonitorRepositorySpec extends MongoSpec {
 
         result.map { updMon =>
           updMon.price.lastQueriedAt mustBe defined
+        }
+      }
+    }
+
+    "updateProfitQueriedTimestamp" should {
+      "update last queried at timestamp in profit monitor schedule" in withEmbeddedMongoDb { client =>
+        val result = for
+          repo <- MonitorRepository.make(client)
+          profitMonitorSchedule = Monitors.profitMonitorSchedule.copy(lastQueriedAt = None)
+          mid <- repo.create(Monitors.create(profit = Some(profitMonitorSchedule)))
+          _ <- repo.updateProfitQueriedTimestamp(Users.uid, mid)
+          updMon <- repo.find(Users.uid, mid)
+        yield updMon
+
+        result.map { updMon =>
+          updMon.profit.flatMap(_.lastQueriedAt) mustBe defined
         }
       }
     }

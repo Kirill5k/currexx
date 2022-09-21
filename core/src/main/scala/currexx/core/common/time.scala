@@ -19,7 +19,7 @@ object time:
     def atStartOfDay: Instant  = toLocalDate.atStartOfDay().toInstant(ZoneOffset.UTC)
     def atEndOfDay: Instant    = toLocalDate.plusDays(1).atStartOfDay().minusSeconds(1).toInstant(ZoneOffset.UTC)
     def durationBetween(otherTs: Instant): FiniteDuration =
-      math.abs(ts.toEpochMilli - otherTs.toEpochMilli).millis
+      math.abs(otherTs.toEpochMilli - ts.toEpochMilli).millis
     def hasSameDateAs(otherTs: Instant): Boolean =
       ts.toString.slice(0, 10) == otherTs.toString.slice(0, 10)
 

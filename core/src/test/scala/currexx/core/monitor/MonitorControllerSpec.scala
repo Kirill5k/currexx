@@ -23,7 +23,8 @@ class MonitorControllerSpec extends ControllerSpec {
 
         val requestBody = s"""{
              |"currencyPair": "GBP/EUR",
-             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}}
+             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}},
+             |"profit": {"min": "-10","max": "150","schedule": {"kind":"periodic","period":"3 hours"}}
              |}""".stripMargin
 
         val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
@@ -41,7 +42,8 @@ class MonitorControllerSpec extends ControllerSpec {
 
         val requestBody = s"""{
              |"currencyPair": "GBP/EUR",
-             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}}
+             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}},
+             |"profit": {"min": "-10","max": "150","schedule": {"kind":"periodic","period":"3 hours"}}
              |}""".stripMargin
 
         val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
@@ -49,6 +51,26 @@ class MonitorControllerSpec extends ControllerSpec {
 
         verifyJsonResponse(res, Status.Conflict, Some("""{"message":"Monitor for currency pair GBPEUR already exists"}"""))
         verify(svc).create(Monitors.create())
+      }
+
+      "validation error when profit monitor schedule has missing boundaries" in {
+        val svc = mock[MonitorService[IO]]
+        when(svc.create(any[CreateMonitor])).thenReturn(IO.pure(Monitors.mid))
+
+        given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
+
+        val requestBody =
+          s"""{
+             |"currencyPair": "GBP/EUR",
+             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}},
+             |"profit": {"schedule": {"kind":"periodic","period":"3 hours"}}
+             |}""".stripMargin
+
+        val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
+        val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        verifyJsonResponse(res, Status.UnprocessableEntity, Some(s"""{"message":"Profit monitor schedule needs to have min or max boundary specified"}"""))
+        verifyNoInteractions(svc)
       }
     }
 
@@ -152,7 +174,8 @@ class MonitorControllerSpec extends ControllerSpec {
              |"id": "${Monitors.mid}",
              |"active": true,
              |"currencyPair": "${Markets.gbpeur}",
-             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
+             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"},
+             |"profit": {"min": -10,"max": 150,"schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
              |}]""".stripMargin
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
         verify(svc).getAll(Users.uid)
@@ -174,7 +197,8 @@ class MonitorControllerSpec extends ControllerSpec {
              |"id": "${Monitors.mid}",
              |"active": true,
              |"currencyPair": "${Markets.gbpeur}",
-             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
+             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"},
+             |"profit": {"min": -10,"max": 150,"schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
              |}""".stripMargin
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
         verify(svc).get(Users.uid, Monitors.mid)
@@ -193,7 +217,8 @@ class MonitorControllerSpec extends ControllerSpec {
              |"id": "${Monitors.mid}",
              |"active": true,
              |"currencyPair": "${Markets.gbpeur}",
-             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
+             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"},
+             |"profit": {"min": "-10","max": "150","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
              |}""".stripMargin
 
         val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT).withJsonBody(parseJson(requestBody))
@@ -213,7 +238,8 @@ class MonitorControllerSpec extends ControllerSpec {
              |"id": "foo",
              |"active": true,
              |"currencyPair": "${Markets.gbpeur}",
-             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
+             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"},
+             |"profit": {"min": "-10","max": "150","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
              |}""".stripMargin
 
         val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT).withJsonBody(parseJson(requestBody))

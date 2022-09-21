@@ -29,8 +29,8 @@ final private class MonitorController[F[_]](
   private def setupNewMonitor(using authenticator: Authenticator[F]) =
     setupNewMonitorEndpoint.withAuthenticatedSession
       .serverLogic { session => req =>
-        service
-          .create(req.toDomain(session.userId))
+        F.fromEither(req.toDomain(session.userId))
+          .flatMap(service.create)
           .mapResponse(mid => CreateMonitorResponse(mid))
       }
 
@@ -78,8 +78,8 @@ final private class MonitorController[F[_]](
     updateMonitorEndpoint.withAuthenticatedSession
       .serverLogic { session => (mid, mon) =>
         F.raiseWhen(mid.value != mon.id)(AppError.IdMismatch) >>
-          service
-            .update(mon.toDomain(session.userId))
+          F.fromEither(mon.toDomain(session.userId))
+            .flatMap(service.update)
             .voidResponse
       }
 
@@ -108,11 +108,21 @@ final private class MonitorController[F[_]](
 
 object MonitorController extends TapirSchema with TapirJson {
 
+  private def validate(pms: ProfitMonitorSchedule): Either[AppError, Unit] =
+    Either.cond(
+      pms.min.isDefined || pms.max.isDefined,
+      (),
+      AppError.FailedValidation("Profit monitor schedule needs to have min or max boundary specified")
+    )
+
   final case class CreateMonitorRequest(
       currencyPair: CurrencyPair,
-      price: PriceMonitorSchedule
+      price: PriceMonitorSchedule,
+      profit: Option[ProfitMonitorSchedule]
   ) derives Codec.AsObject:
-    def toDomain(uid: UserId): CreateMonitor = CreateMonitor(uid, currencyPair, price)
+    def toDomain(uid: UserId): Either[AppError, CreateMonitor] =
+      for _ <- profit.map(validate).getOrElse(Right(()))
+      yield CreateMonitor(uid, currencyPair, price, profit)
 
   final case class CreateMonitorResponse(id: MonitorId) derives Codec.AsObject
 
@@ -120,12 +130,15 @@ object MonitorController extends TapirSchema with TapirJson {
       id: String,
       active: Boolean,
       currencyPair: CurrencyPair,
-      price: PriceMonitorSchedule
+      price: PriceMonitorSchedule,
+      profit: Option[ProfitMonitorSchedule]
   ) derives Codec.AsObject:
-    def toDomain(uid: UserId): Monitor = Monitor(MonitorId(id), uid, active, currencyPair, price)
+    def toDomain(uid: UserId): Either[AppError, Monitor] =
+      for _ <- profit.map(validate).getOrElse(Right(()))
+      yield Monitor(MonitorId(id), uid, active, currencyPair, price, profit)
 
   object MonitorView:
-    def from(m: Monitor): MonitorView = MonitorView(m.id.value, m.active, m.currencyPair, m.price)
+    def from(m: Monitor): MonitorView = MonitorView(m.id.value, m.active, m.currencyPair, m.price, m.profit)
 
   private val basePath = "monitors"
   private val monitorIdPath = basePath / path[String]
