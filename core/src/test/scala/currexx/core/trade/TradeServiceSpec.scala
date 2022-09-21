@@ -222,6 +222,7 @@ class TradeServiceSpec extends CatsSpec {
       "not do anything when trading strategy is disabled" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings.copy(strategy = TradeStrategy.Disabled)))
+        when(dataClient.latestPrice(any[CurrencyPair])).thenReturn(IO.pure(Markets.priceRange))
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
@@ -230,7 +231,8 @@ class TradeServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(settRepo).get(Users.uid)
-          verifyNoInteractions(orderRepo, brokerClient, dataClient, disp)
+          verify(dataClient).latestPrice(Markets.gbpeur)
+          verifyNoInteractions(orderRepo, brokerClient, disp)
           res mustBe ()
         }
       }
@@ -240,6 +242,7 @@ class TradeServiceSpec extends CatsSpec {
         when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings.copy(strategy = TradeStrategy.TrendChange)))
         when(brokerClient.submit(any[CurrencyPair], any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
+        when(dataClient.latestPrice(any[CurrencyPair])).thenReturn(IO.pure(Markets.priceRange))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
@@ -258,6 +261,7 @@ class TradeServiceSpec extends CatsSpec {
             Trades.broker,
             Trades.settings.trading.toOrder(Markets.gbpeur, TradeOrder.Position.Buy)
           )
+          verify(dataClient).latestPrice(Markets.gbpeur)
           verify(orderRepo).save(any[TradeOrderPlacement])
           verify(disp).dispatch(any[Action])
           res mustBe ()

@@ -79,15 +79,17 @@ final private class LiveTradeService[F[_]](
       }
 
   override def processMarketStateUpdate(state: MarketState, triggers: List[Indicator]): F[Unit] =
-    (settingsRepository.get(state.userId), F.realTimeInstant)
-      .mapN { (settings, time) =>
-        (state.latestPrice, TradeStrategyExecutor.get(settings.strategy).analyze(state, triggers)).mapN { (price, result) =>
-          val order = result match
+    (settingsRepository.get(state.userId), marketDataClient.latestPrice(state.currencyPair), F.realTimeInstant)
+      .mapN { (settings, price, time) =>
+        TradeStrategyExecutor
+          .get(settings.strategy)
+          .analyze(state, triggers)
+          .map {
             case Decision.Buy   => settings.trading.toOrder(state.currencyPair, TradeOrder.Position.Buy)
             case Decision.Sell  => settings.trading.toOrder(state.currencyPair, TradeOrder.Position.Sell)
             case Decision.Close => TradeOrder.Exit
-          TradeOrderPlacement(state.userId, state.currencyPair, order, settings.broker, price, time)
-        }
+          }
+          .map(order => TradeOrderPlacement(state.userId, state.currencyPair, order, settings.broker, price, time))
       }
       .flatMap {
         case Some(top) =>
