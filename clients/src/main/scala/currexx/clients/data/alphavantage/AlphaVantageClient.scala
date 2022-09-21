@@ -37,7 +37,7 @@ final private class LiveAlphaVantageClient[F[_]](
   override protected val delayBetweenConnectionFailures: FiniteDuration = 5.seconds
 
   override def latestPrice(pair: CurrencyPair): F[PriceRange] =
-    timeSeriesData(pair, Interval.M1).map(_.prices.head)
+    timeSeriesData(pair, Interval.D1).map(_.prices.head)
 
   override def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] =
     cache

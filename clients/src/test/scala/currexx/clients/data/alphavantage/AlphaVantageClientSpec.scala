@@ -110,7 +110,7 @@ class AlphaVantageClientSpec extends ClientSpec {
       val testingBackend: SttpBackend[IO, Any] = backendStub
         .whenRequestMatchesPartial {
           case r if r.isGet && r.isGoingTo("alpha-vantage.com/query") =>
-            Response.ok(json("alphavantage/gbp-usd-hourly-prices-response.json"))
+            Response.ok(json("alphavantage/gbp-usd-daily-prices-response.json"))
           case _ => throw new RuntimeException()
         }
 
@@ -121,12 +121,12 @@ class AlphaVantageClientSpec extends ClientSpec {
 
       result.asserting { price =>
         price mustBe PriceRange(
-          BigDecimal(1.30370),
-          BigDecimal(1.30505),
+          BigDecimal(1.31211),
+          BigDecimal(1.31472),
           BigDecimal(1.30320),
-          BigDecimal(1.30438),
+          BigDecimal(1.30395),
           BigDecimal(0),
-          Instant.parse("2022-04-14T15:00:00Z")
+          Instant.parse("2022-04-14T14:10:00Z")
         )
       }
     }

@@ -11,13 +11,13 @@ final class TestBrokerClient[F[_]](using F: Monad[F]) extends BrokerClient[F]:
   override def submit(pair: CurrencyPair, parameters: BrokerParameters, order: TradeOrder): F[Unit] = F.unit
 
 final class TestMarketDataClient[F[_]](
-    private val priceRef: Ref[F, Option[PriceRange]]
+    private val priceRef: Ref[F, Option[MarketTimeSeriesData]]
 )(using F: Monad[F])
     extends MarketDataClient[F]:
-  override def timeSeriesData(currencyPair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] = ???
-  override def latestPrice(currencyPair: CurrencyPair): F[PriceRange]                                  = priceRef.get.map(_.get)
+  override def timeSeriesData(currencyPair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] = priceRef.get.map(_.get)
+  override def latestPrice(currencyPair: CurrencyPair): F[PriceRange]                                  = priceRef.get.map(_.get.prices.head)
 
-  def setPrice(price: PriceRange): F[Unit] = priceRef.set(Some(price))
+  def setData(tsd: MarketTimeSeriesData): F[Unit] = priceRef.set(Some(tsd))
 
 final class TestClients[F[_]](
     val broker: TestBrokerClient[F],
@@ -26,7 +26,7 @@ final class TestClients[F[_]](
 
 object TestClients {
   def make[F[_]: Concurrent]: F[TestClients[F]] =
-    Ref.of[F, Option[PriceRange]](None).map { price =>
+    Ref.of[F, Option[MarketTimeSeriesData]](None).map { price =>
       TestClients[F](
         TestBrokerClient[F],
         TestMarketDataClient[F](price)
