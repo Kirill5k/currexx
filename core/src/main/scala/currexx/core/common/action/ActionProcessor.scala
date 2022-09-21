@@ -39,11 +39,11 @@ final private class LiveActionProcessor[F[_]](
       case Action.CloseOpenOrders(uid, pair) =>
         logger.info(s"closing opened order for $pair currency pair") *> tradeService.closeOpenOrders(uid, pair)
       case Action.ScheduleProfitMonitor(uid, mid, period) =>
-        F.sleep(period) *> logger.info(s"scheduling profit monitor $mid") *> monitorService.scheduleProfit(uid, mid)
+        F.sleep(period) *> logger.info(s"triggering profit monitor $mid") *> monitorService.triggerProfitMonitor(uid, mid)
       case Action.AssertProfit(uid, cp, min, max) =>
         logger.info(s"verifying current position for $cp")
       case Action.SchedulePriceMonitor(uid, mid, period) =>
-        F.sleep(period) *> logger.info(s"scheduling price monitor $mid") *> monitorService.schedulePrice(uid, mid)
+        F.sleep(period) *> logger.info(s"triggering price monitor $mid") *> monitorService.triggerPriceMonitor(uid, mid)
       case Action.FetchMarketData(uid, cp, interval) =>
         logger.info(s"fetching market data for $cp") *> tradeService.fetchMarketData(uid, cp, interval)
       case Action.ProcessMarketData(uid, data) =>

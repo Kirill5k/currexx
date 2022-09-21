@@ -243,7 +243,7 @@ class MonitorServiceSpec extends CatsSpec {
       }
     }
 
-    "scheduleProfit" should {
+    "triggerProfitMonitor" should {
       "submit assert profit action for active monitor" in {
         val (repo, disp) = mocks
         when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.monitor))
@@ -252,7 +252,7 @@ class MonitorServiceSpec extends CatsSpec {
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
-          res <- svc.scheduleProfit(Users.uid, Monitors.mid)
+          res <- svc.triggerProfitMonitor(Users.uid, Monitors.mid)
         yield res
 
         result.asserting { res =>
@@ -270,7 +270,7 @@ class MonitorServiceSpec extends CatsSpec {
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
-          res <- svc.scheduleProfit(Users.uid, Monitors.mid)
+          res <- svc.triggerProfitMonitor(Users.uid, Monitors.mid)
         yield res
 
         result.attempt.asserting { res =>
@@ -281,7 +281,7 @@ class MonitorServiceSpec extends CatsSpec {
       }
     }
 
-    "schedulePrice" should {
+    "triggerPriceMonitor" should {
       "submit fetch market data action for active monitor" in {
         val (repo, disp) = mocks
         when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.monitor))
@@ -290,7 +290,7 @@ class MonitorServiceSpec extends CatsSpec {
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
-          res <- svc.schedulePrice(Users.uid, Monitors.mid)
+          res <- svc.triggerPriceMonitor(Users.uid, Monitors.mid)
         yield res
 
         result.asserting { res =>
@@ -311,7 +311,7 @@ class MonitorServiceSpec extends CatsSpec {
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
-          res <- svc.schedulePrice(Users.uid, Monitors.mid, true)
+          res <- svc.triggerPriceMonitor(Users.uid, Monitors.mid, true)
         yield res
 
         result.asserting { res =>
@@ -330,7 +330,7 @@ class MonitorServiceSpec extends CatsSpec {
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
-          res <- svc.schedulePrice(Users.uid, Monitors.mid)
+          res <- svc.triggerPriceMonitor(Users.uid, Monitors.mid)
         yield res
 
         result.asserting { res =>

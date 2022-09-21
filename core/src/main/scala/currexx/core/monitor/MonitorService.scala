@@ -26,8 +26,8 @@ trait MonitorService[F[_]]:
   def delete(uid: UserId, id: MonitorId): F[Unit]
   def pause(uid: UserId, id: MonitorId): F[Unit]
   def resume(uid: UserId, id: MonitorId): F[Unit]
-  def schedulePrice(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit]
-  def scheduleProfit(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit]
+  def triggerPriceMonitor(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit]
+  def triggerProfitMonitor(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit]
 
 final private class LiveMonitorService[F[_]](
     private val repository: MonitorRepository[F],
@@ -56,7 +56,7 @@ final private class LiveMonitorService[F[_]](
       _   <- F.whenA(cm.profit.isDefined)(scheduleProfitMonitor(mid, cm.userId, cm.profit.get))
     yield mid
 
-  override def schedulePrice(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit] =
+  override def triggerPriceMonitor(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit] =
     for
       mon <- get(uid, id)
       _ <- F.whenA(mon.active) {
@@ -67,7 +67,7 @@ final private class LiveMonitorService[F[_]](
       _ <- F.unlessA(manual)(schedulePriceMonitor(id, uid, mon.price))
     yield ()
 
-  override def scheduleProfit(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit] =
+  override def triggerProfitMonitor(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit] =
     for
       mon    <- get(uid, id)
       profit <- F.fromOption(mon.profit, AppError.NotScheduled("profit"))

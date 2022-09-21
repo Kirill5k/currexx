@@ -62,7 +62,7 @@ final private class MonitorController[F[_]](
     queryMonitorEndpoint.withAuthenticatedSession
       .serverLogic { session => mid =>
         service
-          .schedulePrice(session.userId, mid, true)
+          .triggerPriceMonitor(session.userId, mid, true)
           .voidResponse
       }
 
