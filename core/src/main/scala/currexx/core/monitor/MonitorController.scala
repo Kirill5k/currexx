@@ -1,6 +1,7 @@
 package currexx.core.monitor
 
 import cats.Monad
+import cats.data.NonEmptySet
 import cats.effect.Async
 import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
@@ -88,15 +89,18 @@ final private class MonitorController[F[_]](
   private def compoundUpdateMonitor(using authenticator: Authenticator[F]) =
     compoundUpdateMonitorEndpoint.withAuthenticatedSession
       .serverLogic { session => req =>
-        (for
+        for
+          _        <- F.fromEither(req.validated)
           monitors <- service.getAll(session.userId)
-          trackedCurrencies = monitors.map(_.currencyPair).toSet
-          _ <- F.raiseWhen(!req.currencyPairs.subsetOf(trackedCurrencies))(AppError.NotTracked(req.currencyPairs.diff(trackedCurrencies)))
-          _ <- monitors
-            .filter(m => req.currencyPairs(m.currencyPair))
+          updatedPairs = req.currencyPairs
+          trackedPairs = monitors.map(_.currencyPair).toSet
+          _ <- F.raiseWhen(!updatedPairs.subsetOf(trackedPairs))(AppError.NotTracked(updatedPairs.diff(trackedPairs)))
+          res <- monitors
+            .filter(m => updatedPairs(m.currencyPair))
             .map(_.copy(profit = req.profit, price = req.price, active = req.active))
             .traverse(service.update)
-        yield ()).voidResponse
+            .voidResponse
+        yield res
       }
 
   private def getAllMonitors(using authenticator: Authenticator[F]) =
@@ -137,7 +141,12 @@ object MonitorController extends TapirSchema with TapirJson {
       active: Boolean,
       price: PriceMonitorSchedule,
       profit: Option[ProfitMonitorSchedule]
-  ) derives Codec.AsObject
+  ) derives Codec.AsObject:
+    def validated: Either[AppError, Unit] =
+      for
+        _ <- profit.map(validate).getOrElse(Right(()))
+        _ <- Either.cond(currencyPairs.nonEmpty, (), AppError.FailedValidation("Currency pairs must not be empty"))
+      yield ()
 
   final case class CreateMonitorRequest(
       currencyPair: CurrencyPair,
