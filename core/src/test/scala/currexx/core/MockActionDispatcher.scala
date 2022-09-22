@@ -16,11 +16,11 @@ final private class MockActionDispatcher[F[_]](
     submittedActions.addOne(action)
     F.unit
   }
+
+  override def pendingActions: F[List[Action]] = F.pure(submittedActions.toList)
+
   override def actions: fs2.Stream[F, Action] =
     Stream.emits(submittedActions)
-
-  override def numberOfPendingActions: F[Int] =
-    F.pure(submittedActions.size)
 
 object MockActionDispatcher {
   def make[F[_]: Monad] = new MockActionDispatcher[F](ListBuffer.empty)

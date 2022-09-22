@@ -68,8 +68,7 @@ final private class LiveTradeService[F[_]](
   override def closeOpenOrders(uid: UserId): F[Unit] =
     Stream
       .evalSeq(orderRepository.getAllTradedCurrencies(uid))
-      .map(cp => Stream.eval(closeOpenOrders(uid, cp)))
-      .parJoinUnbounded
+      .evalMap(cp => closeOpenOrders(uid, cp))
       .compile
       .drain
 

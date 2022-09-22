@@ -3,6 +3,7 @@ package currexx.backtest.services
 import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import cats.syntax.traverse.*
 import currexx.backtest.TestSettings
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
@@ -24,31 +25,28 @@ final class TestServices[F[_]] private (
     F: Async[F]
 ) {
 
-  private def pendingActions: Stream[F, Action] =
-    Stream
-      .eval(dispatcher.numberOfPendingActions)
-      .flatMap {
-        case 0 => Stream.empty
-        case n => dispatcher.actions.take(n)
-      }
+  private def collectPendingActions(pf: PartialFunction[Action, F[Unit]]): F[Unit] =
+    for
+      actions <- dispatcher.pendingActions
+      _       <- actions.collect(pf).sequence
+    yield ()
 
   def processMarketData: Pipe[F, MarketTimeSeriesData, Unit] = { dataStream =>
-    for
-      data <- dataStream
-      _    <- Stream.eval(clients.data.setData(data) >> signalService.processMarketData(settings.userId, data))
-      _ <- pendingActions.evalMap {
-        case Action.ProcessSignals(uid, cp, signals) => marketService.processSignals(uid, cp, signals)
-        case _                                       => F.unit
-      }
-      _ <- pendingActions.evalMap {
-        case Action.ProcessMarketStateUpdate(state, triggeredBy) => tradeService.processMarketStateUpdate(state, triggeredBy)
-        case _                                                   => F.unit
-      }
-      _ <- pendingActions.evalMap {
-        case Action.ProcessTradeOrderPlacement(top) => marketService.processTradeOrderPlacement(top)
-        case _                                      => F.unit
-      }
-    yield ()
+    dataStream.evalMap { data =>
+      for
+        _ <- clients.data.setData(data)
+        _ <- signalService.processMarketData(settings.userId, data)
+        _ <- collectPendingActions { case Action.ProcessSignals(uid, cp, signals) =>
+          marketService.processSignals(uid, cp, signals)
+        }
+        _ <- collectPendingActions { case Action.ProcessMarketStateUpdate(state, triggeredBy) =>
+          tradeService.processMarketStateUpdate(state, triggeredBy)
+        }
+        _ <- collectPendingActions { case Action.ProcessTradeOrderPlacement(top) =>
+          marketService.processTradeOrderPlacement(top)
+        }
+      yield ()
+    }
   }
 
   def getAllOrders: F[List[TradeOrderPlacement]] =

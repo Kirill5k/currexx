@@ -1,21 +1,24 @@
 package currexx.core.common.action
 
-import cats.Functor
+import cats.Monad
 import cats.effect.Concurrent
 import cats.effect.std.Queue
 import cats.syntax.functor.*
+import cats.syntax.flatMap.*
+import cats.syntax.traverse.*
 import fs2.Stream
 
 trait ActionDispatcher[F[_]]:
   def dispatch(action: Action): F[Unit]
   def actions: Stream[F, Action]
-  def numberOfPendingActions: F[Int]
+  def pendingActions: F[List[Action]]
 
-final private class LiveActionDispatcher[F[_]: Functor](
+final private class LiveActionDispatcher[F[_]: Monad](
     private val submittedActions: Queue[F, Action]
 ) extends ActionDispatcher[F] {
 
-  override def numberOfPendingActions: F[Int] = submittedActions.size
+  override def pendingActions: F[List[Action]] =
+    submittedActions.size.flatMap(n => List.fill(n)(submittedActions.take).sequence)
 
   override def dispatch(action: Action): F[Unit] =
     submittedActions.offer(action)
