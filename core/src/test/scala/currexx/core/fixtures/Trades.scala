@@ -1,7 +1,7 @@
 package currexx.core.fixtures
 
 import currexx.clients.broker.BrokerParameters
-import currexx.domain.market.TradeOrder
+import currexx.domain.market.{OpenedTradeOrder, TradeOrder}
 import currexx.core.trade.{TradeOrderPlacement, TradeSettings, TradeStrategy, TradingParameters}
 
 import java.time.Instant
@@ -27,5 +27,15 @@ object Trades {
     broker,
     Markets.priceRange.close,
     ts
+  )
+  
+  lazy val openedOrder = OpenedTradeOrder(
+    Markets.gbpeur,
+    TradeOrder.Position.Buy,
+    Markets.priceRange.close,
+    Markets.priceRange.close,
+    ts,
+    BigDecimal(0.1),
+    BigDecimal(100)
   )
 }

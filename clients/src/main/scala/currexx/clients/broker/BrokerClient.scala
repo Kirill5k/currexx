@@ -9,16 +9,16 @@ import currexx.domain.market.{CurrencyPair, OpenedTradeOrder, TradeOrder}
 
 trait BrokerClient[F[_]]:
   def submit(cp: CurrencyPair, parameters: BrokerParameters, order: TradeOrder): F[Unit]
-  def getCurrentOrder(cp: CurrencyPair, parameters: BrokerParameters): F[Option[OpenedTradeOrder]]
+  def find(cp: CurrencyPair, parameters: BrokerParameters): F[Option[OpenedTradeOrder]]
 
 final private class LiveBrokerClient[F[_]](
     private val vindalooClient: VindalooClient[F],
     private val xtbClient: XtbClient[F]
 ) extends BrokerClient[F]:
-  override def getCurrentOrder(cp: CurrencyPair, parameters: BrokerParameters): F[Option[OpenedTradeOrder]] =
+  override def find(cp: CurrencyPair, parameters: BrokerParameters): F[Option[OpenedTradeOrder]] =
     parameters match
       case params: BrokerParameters.Vindaloo => vindalooClient.getCurrentOrder(params, cp)
-      case params: BrokerParameters.Xtb => xtbClient.getCurrentOrder(params, cp)
+      case params: BrokerParameters.Xtb      => xtbClient.getCurrentOrder(params, cp)
 
   override def submit(cp: CurrencyPair, parameters: BrokerParameters, order: TradeOrder): F[Unit] =
     parameters match

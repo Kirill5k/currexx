@@ -13,6 +13,7 @@ import currexx.core.common.http.SearchParams
 import currexx.core.market.{MarketState, PositionState}
 import currexx.core.trade.TradeStrategyExecutor.Decision
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
+import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Indicator, Interval, TradeOrder}
 import currexx.domain.user.UserId
 import fs2.Stream
@@ -25,8 +26,9 @@ trait TradeService[F[_]]:
   def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]]
   def processMarketStateUpdate(state: MarketState, triggers: List[Indicator]): F[Unit]
   def placeOrder(uid: UserId, cp: CurrencyPair, order: TradeOrder, closePendingOrders: Boolean): F[Unit]
-  def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
   def closeOpenOrders(uid: UserId): F[Unit]
+  def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
+  def closeOpenOrdersIfProfitIsOutsideRange(uid: UserId, cp: CurrencyPair, min: Option[BigDecimal], max: Option[BigDecimal]): F[Unit]
   def fetchMarketData(uid: UserId, cp: CurrencyPair, interval: Interval): F[Unit]
 
 final private class LiveTradeService[F[_]](
@@ -81,6 +83,22 @@ final private class LiveTradeService[F[_]](
             .flatMap(submitOrderPlacement)
         case _ => F.unit
       }
+
+  override def closeOpenOrdersIfProfitIsOutsideRange(
+      uid: UserId,
+      cp: CurrencyPair,
+      min: Option[BigDecimal],
+      max: Option[BigDecimal]
+  ): F[Unit] =
+    for
+      settings    <- settingsRepository.get(uid)
+      foundOrder  <- brokerClient.find(cp, settings.broker)
+      openedOrder <- F.fromOption(foundOrder, AppError.NoOpenedPositions(uid, cp, settings.broker.broker.print))
+      time        <- F.realTimeInstant
+      _ <- F.whenA(min.exists(_ > openedOrder.profit) || max.exists(_ < openedOrder.profit)) {
+        submitOrderPlacement(TradeOrderPlacement(uid, cp, TradeOrder.Exit, settings.broker, openedOrder.currentPrice, time))
+      }
+    yield ()
 
   override def processMarketStateUpdate(state: MarketState, triggers: List[Indicator]): F[Unit] =
     (settingsRepository.get(state.userId), marketDataClient.latestPrice(state.currencyPair), F.realTimeInstant)

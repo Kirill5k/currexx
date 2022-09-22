@@ -85,6 +85,9 @@ object errors {
     final case class NotScheduled(scheduleKind: String) extends AppError:
       override val message = s"Missing schedule configuration for $scheduleKind"
 
+    final case class NoOpenedPositions(uid: UserId, cp: CurrencyPair, brokerName: String) extends AppError:
+      override val message = s"User $uid has no opened position for currency pair $cp with $brokerName"
+      
     case object InvalidDateRange extends Unprocessable:
       override val message: String = "Date 'from' must be before date 'to'"
   }

@@ -218,6 +218,96 @@ class TradeServiceSpec extends CatsSpec {
       }
     }
 
+    "closeOpenOrdersIfProfitIsOutsideRange" should {
+      "submit close order if profit is above max" in {
+        val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
+        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
+        when(brokerClient.find(any[CurrencyPair], any[BrokerParameters])).thenReturn(IO.pure(Some(Trades.openedOrder)))
+        when(brokerClient.submit(any[CurrencyPair], any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
+        when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
+        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
+          _   <- svc.closeOpenOrdersIfProfitIsOutsideRange(Users.uid, Markets.gbpeur, None, Some(BigDecimal(10)))
+        yield ()
+
+        result.asserting { res =>
+          verifyNoInteractions(dataClient)
+          verify(settRepo).get(Users.uid)
+          verify(brokerClient).find(Markets.gbpeur, Trades.broker)
+          verify(brokerClient).submit(Markets.gbpeur, Trades.broker, TradeOrder.Exit)
+          verify(orderRepo).save(any[TradeOrderPlacement])
+          verify(disp).dispatch(any[Action])
+          res mustBe ()
+        }
+      }
+
+      "submit close order if profit is below min" in {
+        val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
+        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
+        when(brokerClient.find(any[CurrencyPair], any[BrokerParameters]))
+          .thenReturn(IO.pure(Some(Trades.openedOrder.copy(profit = BigDecimal(-100)))))
+        when(brokerClient.submit(any[CurrencyPair], any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
+        when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
+        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
+          _   <- svc.closeOpenOrdersIfProfitIsOutsideRange(Users.uid, Markets.gbpeur, Some(BigDecimal(-10)), Some(BigDecimal(10)))
+        yield ()
+
+        result.asserting { res =>
+          verifyNoInteractions(dataClient)
+          verify(settRepo).get(Users.uid)
+          verify(brokerClient).find(Markets.gbpeur, Trades.broker)
+          verify(brokerClient).submit(Markets.gbpeur, Trades.broker, TradeOrder.Exit)
+          verify(orderRepo).save(any[TradeOrderPlacement])
+          verify(disp).dispatch(any[Action])
+          res mustBe ()
+        }
+      }
+
+      "not do anything if profit is within range" in {
+        val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
+        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
+        when(brokerClient.find(any[CurrencyPair], any[BrokerParameters]))
+          .thenReturn(IO.pure(Some(Trades.openedOrder.copy(profit = BigDecimal(0)))))
+
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
+          _   <- svc.closeOpenOrdersIfProfitIsOutsideRange(Users.uid, Markets.gbpeur, Some(BigDecimal(-10)), Some(BigDecimal(10)))
+        yield ()
+
+        result.asserting { res =>
+          verifyNoInteractions(dataClient, orderRepo, disp)
+          verify(settRepo).get(Users.uid)
+          verify(brokerClient).find(Markets.gbpeur, Trades.broker)
+          verifyNoMoreInteractions(brokerClient)
+          res mustBe ()
+        }
+      }
+
+      "return error if order cannot be found" in {
+        val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
+        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
+        when(brokerClient.find(any[CurrencyPair], any[BrokerParameters])).thenReturn(IO.pure(None))
+
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
+          _   <- svc.closeOpenOrdersIfProfitIsOutsideRange(Users.uid, Markets.gbpeur, Some(BigDecimal(-10)), Some(BigDecimal(10)))
+        yield ()
+
+        result.attempt.asserting { res =>
+          verifyNoInteractions(dataClient, orderRepo, disp)
+          verify(settRepo).get(Users.uid)
+          verify(brokerClient).find(Markets.gbpeur, Trades.broker)
+          verifyNoMoreInteractions(brokerClient)
+          res mustBe Left(AppError.NoOpenedPositions(Users.uid, Markets.gbpeur, Trades.broker.broker.print))
+        }
+      }
+    }
+
     "processMarketStateUpdate" should {
       "not do anything when trading strategy is disabled" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
