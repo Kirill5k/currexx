@@ -28,7 +28,7 @@ trait TradeService[F[_]]:
   def placeOrder(uid: UserId, cp: CurrencyPair, order: TradeOrder, closePendingOrders: Boolean): F[Unit]
   def closeOpenOrders(uid: UserId): F[Unit]
   def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
-  def closeOpenOrdersIfProfitIsOutsideRange(uid: UserId, cp: CurrencyPair, min: Option[BigDecimal], max: Option[BigDecimal]): F[Unit]
+  def closeOrderIfProfitIsOutsideRange(uid: UserId, cp: CurrencyPair, min: Option[BigDecimal], max: Option[BigDecimal]): F[Unit]
   def fetchMarketData(uid: UserId, cp: CurrencyPair, interval: Interval): F[Unit]
 
 final private class LiveTradeService[F[_]](
@@ -84,7 +84,7 @@ final private class LiveTradeService[F[_]](
         case _ => F.unit
       }
 
-  override def closeOpenOrdersIfProfitIsOutsideRange(
+  override def closeOrderIfProfitIsOutsideRange(
       uid: UserId,
       cp: CurrencyPair,
       min: Option[BigDecimal],

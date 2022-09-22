@@ -41,7 +41,7 @@ final private class LiveActionProcessor[F[_]](
       case Action.ScheduleProfitMonitor(uid, mid, period) =>
         F.sleep(period) *> logger.info(s"triggering profit monitor $mid") *> monitorService.triggerProfitMonitor(uid, mid)
       case Action.AssertProfit(uid, cp, min, max) =>
-        logger.info(s"verifying current position for $cp") *> tradeService.closeOpenOrdersIfProfitIsOutsideRange(uid, cp, min, max)
+        logger.info(s"verifying current position for $cp") *> tradeService.closeOrderIfProfitIsOutsideRange(uid, cp, min, max)
       case Action.SchedulePriceMonitor(uid, mid, period) =>
         F.sleep(period) *> logger.info(s"triggering price monitor $mid") *> monitorService.triggerPriceMonitor(uid, mid)
       case Action.FetchMarketData(uid, cp, interval) =>

@@ -26,15 +26,15 @@ trait TradeOrderRepository[F[_]] extends Repository[F]:
 final private class LiveTradeOrderRepository[F[_]: Async](
     private val collection: MongoCollection[F, TradeOrderEntity]
 ) extends TradeOrderRepository[F]:
-  
+
   def save(top: TradeOrderPlacement): F[Unit] =
     collection.insertOne(TradeOrderEntity.from(top)).void
-    
+
   def getAllTradedCurrencies(uid: UserId): F[List[CurrencyPair]] =
     collection.distinct[CurrencyPair](Field.CurrencyPair).filter(userIdEq(uid)).all.map(_.toList)
 
   def getAll(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]] =
-    collection.find(searchBy(uid, sp)).sortByDesc(Field.Time).all.mapIterable(_.toDomain)
+    collection.find(searchBy(uid, sp)).sortByDesc(Field.Time).limit(sp.limit.getOrElse(Int.MaxValue)).all.mapIterable(_.toDomain)
 
   def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]] =
     collection.find(userIdAndCurrencyPairEq(uid, cp)).sortByDesc(Field.Time).first.mapOption(_.toDomain)

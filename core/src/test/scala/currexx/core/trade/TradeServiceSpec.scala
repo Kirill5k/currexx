@@ -218,7 +218,7 @@ class TradeServiceSpec extends CatsSpec {
       }
     }
 
-    "closeOpenOrdersIfProfitIsOutsideRange" should {
+    "closeOrderIfProfitIsOutsideRange" should {
       "submit close order if profit is above max" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
@@ -229,7 +229,7 @@ class TradeServiceSpec extends CatsSpec {
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOpenOrdersIfProfitIsOutsideRange(Users.uid, Markets.gbpeur, None, Some(BigDecimal(10)))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, Markets.gbpeur, None, Some(BigDecimal(10)))
         yield ()
 
         result.asserting { res =>
@@ -254,7 +254,7 @@ class TradeServiceSpec extends CatsSpec {
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOpenOrdersIfProfitIsOutsideRange(Users.uid, Markets.gbpeur, Some(BigDecimal(-10)), Some(BigDecimal(10)))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, Markets.gbpeur, Some(BigDecimal(-10)), Some(BigDecimal(10)))
         yield ()
 
         result.asserting { res =>
@@ -276,7 +276,7 @@ class TradeServiceSpec extends CatsSpec {
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOpenOrdersIfProfitIsOutsideRange(Users.uid, Markets.gbpeur, Some(BigDecimal(-10)), Some(BigDecimal(10)))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, Markets.gbpeur, Some(BigDecimal(-10)), Some(BigDecimal(10)))
         yield ()
 
         result.asserting { res =>
@@ -295,7 +295,7 @@ class TradeServiceSpec extends CatsSpec {
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOpenOrdersIfProfitIsOutsideRange(Users.uid, Markets.gbpeur, Some(BigDecimal(-10)), Some(BigDecimal(10)))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, Markets.gbpeur, Some(BigDecimal(-10)), Some(BigDecimal(10)))
         yield ()
 
         result.attempt.asserting { res =>

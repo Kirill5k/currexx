@@ -33,7 +33,8 @@ final case class ErrorResponse(message: String) derives Codec.AsObject
 final case class SearchParams(
     from: Option[Instant],
     to: Option[Instant],
-    currencyPair: Option[CurrencyPair]
+    currencyPair: Option[CurrencyPair],
+    limit: Option[Int]
 )
 
 trait Controller[F[_]] extends TapirJson with TapirSchema {
@@ -65,7 +66,8 @@ object Controller extends TapirSchema with TapirJson with TapirCodecs {
   val searchParams: EndpointInput[SearchParams] = query[Option[Instant]]("from")
     .and(query[Option[Instant]]("to"))
     .and(query[Option[CurrencyPair]]("currencyPair"))
-    .map((f, t, cp) => SearchParams(f, t, cp))(sp => (sp.from, sp.to, sp.currencyPair))
+    .and(query[Option[Int]]("limit"))
+    .map((f, t, cp, l) => SearchParams(f, t, cp, l))(sp => (sp.from, sp.to, sp.currencyPair, sp.limit))
 
   val publicEndpoint: PublicEndpoint[Unit, (StatusCode, ErrorResponse), Unit, Any] =
     endpoint.errorOut(error)
