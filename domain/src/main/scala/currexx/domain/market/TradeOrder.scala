@@ -3,6 +3,7 @@ package currexx.domain.market
 import currexx.domain.types.EnumType
 import org.latestbit.circe.adt.codec.*
 
+import java.time.Instant
 import scala.util.Try
 
 enum TradeOrder derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
@@ -19,7 +20,7 @@ object TradeOrder {
   object Position extends EnumType[Position](() => Position.values, _.toString.toLowerCase)
   enum Position:
     case Buy, Sell
-  
+
   given JsonTaggedAdt.Config[TradeOrder] = JsonTaggedAdt.Config.Values[TradeOrder](
     mappings = Map(
       "exit"  -> JsonTaggedAdt.tagged[TradeOrder.Exit.type],
@@ -29,3 +30,13 @@ object TradeOrder {
     typeFieldName = "kind"
   )
 }
+
+final case class OpenedTradeOrder(
+    currencyPair: CurrencyPair,
+    position: TradeOrder.Position,
+    currentPrice: BigDecimal,
+    openPrice: BigDecimal,
+    openedAt: Instant,
+    volume: BigDecimal,
+    profit: BigDecimal
+)

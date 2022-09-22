@@ -5,10 +5,11 @@ import cats.effect.{Concurrent, Ref}
 import cats.syntax.functor.*
 import currexx.clients.broker.{BrokerClient, BrokerParameters}
 import currexx.clients.data.MarketDataClient
-import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange, TradeOrder}
+import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, OpenedTradeOrder, PriceRange, TradeOrder}
 
 final class TestBrokerClient[F[_]](using F: Monad[F]) extends BrokerClient[F]:
-  override def submit(pair: CurrencyPair, parameters: BrokerParameters, order: TradeOrder): F[Unit] = F.unit
+  override def getCurrentOrder(cp: CurrencyPair, parameters: BrokerParameters): F[Option[OpenedTradeOrder]] = F.pure(None)
+  override def submit(pair: CurrencyPair, parameters: BrokerParameters, order: TradeOrder): F[Unit]         = F.unit
 
 final class TestMarketDataClient[F[_]](
     private val priceRef: Ref[F, Option[MarketTimeSeriesData]]
