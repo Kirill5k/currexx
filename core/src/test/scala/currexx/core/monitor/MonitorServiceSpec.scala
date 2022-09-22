@@ -2,7 +2,7 @@ package currexx.core.monitor
 
 import cats.Applicative
 import cats.effect.IO
-import currexx.core.CatsSpec
+import currexx.core.{CatsSpec, MockActionDispatcher}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.fixtures.{Markets, Monitors, Users}
 import currexx.core.monitor.db.MonitorRepository
@@ -30,8 +30,8 @@ class MonitorServiceSpec extends CatsSpec {
         yield res
 
         result.asserting { res =>
-          verifyNoInteractions(disp)
           verify(repo).update(Monitors.monitor)
+          disp.submittedActions mustBe empty
           res mustBe ()
         }
       }
@@ -39,7 +39,6 @@ class MonitorServiceSpec extends CatsSpec {
       "close open orders when currency pair has changed" in {
         val (repo, disp) = mocks
         when(repo.update(any[Monitor])).thenReturn(IO.pure(Monitors.monitor))
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val updated = Monitors.monitor.copy(currencyPair = Markets.gbpusd)
         val result = for
@@ -48,7 +47,7 @@ class MonitorServiceSpec extends CatsSpec {
         yield res
 
         result.asserting { res =>
-          verify(disp).dispatch(Action.CloseOpenOrders(Users.uid, Markets.gbpeur))
+          disp.submittedActions mustBe List(Action.CloseOpenOrders(Users.uid, Markets.gbpeur))
           verify(repo).update(updated)
           res mustBe ()
         }
@@ -57,7 +56,6 @@ class MonitorServiceSpec extends CatsSpec {
       "close open orders when monitor has been deactivated" in {
         val (repo, disp) = mocks
         when(repo.update(any[Monitor])).thenReturn(IO.pure(Monitors.monitor))
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val updated = Monitors.monitor.copy(active = false)
         val result = for
@@ -66,7 +64,7 @@ class MonitorServiceSpec extends CatsSpec {
         yield res
 
         result.asserting { res =>
-          verify(disp).dispatch(Action.CloseOpenOrders(Users.uid, Markets.gbpeur))
+          disp.submittedActions mustBe List(Action.CloseOpenOrders(Users.uid, Markets.gbpeur))
           verify(repo).update(updated)
           res mustBe ()
         }
@@ -75,7 +73,6 @@ class MonitorServiceSpec extends CatsSpec {
       "reschedule profit monitor it it was previously undefined" in {
         val (repo, disp) = mocks
         when(repo.update(any[Monitor])).thenReturn(IO.pure(Monitors.monitor.copy(profit = None)))
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -84,8 +81,9 @@ class MonitorServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(repo).update(Monitors.monitor)
-          verify(disp).dispatch(any[Action.ScheduleProfitMonitor])
-          verifyNoMoreInteractions(disp)
+          disp.submittedActions must have size 1
+          disp.submittedActions.head mustBe an[Action.ScheduleProfitMonitor]
+          // verify(disp).dispatch(any[Action.ScheduleProfitMonitor])
           res mustBe ()
         }
       }
@@ -102,8 +100,8 @@ class MonitorServiceSpec extends CatsSpec {
         yield res
 
         result.asserting { res =>
-          verifyNoInteractions(disp)
           verify(repo).activate(Users.uid, Monitors.mid, true)
+          disp.submittedActions mustBe empty
           res mustBe ()
         }
       }
@@ -113,7 +111,6 @@ class MonitorServiceSpec extends CatsSpec {
       "set active to false" in {
         val (repo, disp) = mocks
         when(repo.activate(any[UserId], any[MonitorId], any[Boolean])).thenReturn(IO.pure(Monitors.monitor))
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -122,7 +119,7 @@ class MonitorServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(repo).activate(Users.uid, Monitors.mid, false)
-          verify(disp).dispatch(Action.CloseOpenOrders(Users.uid, Markets.gbpeur))
+          disp.submittedActions mustBe List(Action.CloseOpenOrders(Users.uid, Markets.gbpeur))
           res mustBe ()
         }
       }
@@ -132,7 +129,6 @@ class MonitorServiceSpec extends CatsSpec {
       "store monitor in db and submit query monitor action when schedule is periodic" in {
         val (repo, disp) = mocks
         when(repo.create(any[CreateMonitor])).thenReturn(IO.pure(Monitors.mid))
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -141,8 +137,10 @@ class MonitorServiceSpec extends CatsSpec {
 
         result.asserting { mid =>
           verify(repo).create(Monitors.create())
-          verify(disp).dispatch(Action.SchedulePriceMonitor(Users.uid, Monitors.mid, 0.seconds))
-          verify(disp).dispatch(Action.ScheduleProfitMonitor(Users.uid, Monitors.mid, 0.seconds))
+          disp.submittedActions mustBe List(
+            Action.SchedulePriceMonitor(Users.uid, Monitors.mid, 0.seconds),
+            Action.ScheduleProfitMonitor(Users.uid, Monitors.mid, 0.seconds)
+          )
           mid mustBe Monitors.mid
         }
       }
@@ -150,7 +148,6 @@ class MonitorServiceSpec extends CatsSpec {
       "not schedule profit monitor if it is not defined" in {
         val (repo, disp) = mocks
         when(repo.create(any[CreateMonitor])).thenReturn(IO.pure(Monitors.mid))
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -159,8 +156,7 @@ class MonitorServiceSpec extends CatsSpec {
 
         result.asserting { mid =>
           verify(repo).create(Monitors.create(profit = None))
-          verify(disp).dispatch(Action.SchedulePriceMonitor(Users.uid, Monitors.mid, 0.seconds))
-          verifyNoMoreInteractions(disp)
+          disp.submittedActions mustBe List(Action.SchedulePriceMonitor(Users.uid, Monitors.mid, 0.seconds))
           mid mustBe Monitors.mid
         }
       }
@@ -168,7 +164,6 @@ class MonitorServiceSpec extends CatsSpec {
       "store monitor in db and reschedule when schedule is cron" in {
         val (repo, disp) = mocks
         when(repo.create(any[CreateMonitor])).thenReturn(IO.pure(Monitors.mid))
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val priceMonitorSchedule = Monitors.priceMonitorSchedule.copy(schedule = Schedule.Cron("0 7,20 * * 1-5").value)
         val result = for
@@ -178,7 +173,8 @@ class MonitorServiceSpec extends CatsSpec {
 
         result.asserting { mid =>
           verify(repo).create(Monitors.create(price = priceMonitorSchedule, profit = None))
-          verify(disp).dispatch(any[Action.SchedulePriceMonitor])
+          disp.submittedActions must have size 1
+          disp.submittedActions.head mustBe an[Action.SchedulePriceMonitor]
           mid mustBe Monitors.mid
         }
       }
@@ -190,7 +186,6 @@ class MonitorServiceSpec extends CatsSpec {
         val priceSchedule  = Monitors.priceMonitorSchedule.copy(lastQueriedAt = None)
         val profitSchedule = Monitors.profitMonitorSchedule.copy(lastQueriedAt = None)
         when(repo.stream).thenReturn(Stream(Monitors.monitor.copy(price = priceSchedule, profit = Some(profitSchedule))))
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -199,8 +194,10 @@ class MonitorServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(repo).stream
-          verify(disp).dispatch(Action.SchedulePriceMonitor(Users.uid, Monitors.mid, 0.seconds))
-          verify(disp).dispatch(Action.ScheduleProfitMonitor(Users.uid, Monitors.mid, 0.seconds))
+          disp.submittedActions mustBe List(
+            Action.SchedulePriceMonitor(Users.uid, Monitors.mid, 0.seconds),
+            Action.ScheduleProfitMonitor(Users.uid, Monitors.mid, 0.seconds)
+          )
           res mustBe ()
         }
       }
@@ -209,7 +206,6 @@ class MonitorServiceSpec extends CatsSpec {
         val (repo, disp) = mocks
         val schedule     = Monitors.priceMonitorSchedule.copy(lastQueriedAt = Some(Instant.parse("2020-01-01T00:00:00Z")))
         when(repo.stream).thenReturn(Stream(Monitors.monitor.copy(price = schedule, profit = None)))
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -218,8 +214,7 @@ class MonitorServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(repo).stream
-          verify(disp).dispatch(Action.SchedulePriceMonitor(Users.uid, Monitors.mid, 0.seconds))
-          verifyNoMoreInteractions(disp)
+          disp.submittedActions mustBe List(Action.SchedulePriceMonitor(Users.uid, Monitors.mid, 0.seconds))
           res mustBe ()
         }
       }
@@ -228,7 +223,6 @@ class MonitorServiceSpec extends CatsSpec {
         val (repo, disp) = mocks
         val schedule     = Monitors.priceMonitorSchedule.copy(lastQueriedAt = Some(Instant.now.minusSeconds(50)))
         when(repo.stream).thenReturn(Stream(Monitors.monitor.copy(price = schedule, profit = None)))
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -237,7 +231,8 @@ class MonitorServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(repo).stream
-          verify(disp).dispatch(any[Action.SchedulePriceMonitor])
+          disp.submittedActions must have size 1
+          disp.submittedActions.head mustBe an[Action.SchedulePriceMonitor]
           res mustBe ()
         }
       }
@@ -248,7 +243,6 @@ class MonitorServiceSpec extends CatsSpec {
         val (repo, disp) = mocks
         when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.monitor))
         when(repo.updateProfitQueriedTimestamp(any[UserId], any[MonitorId])).thenReturn(IO.unit)
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -258,8 +252,10 @@ class MonitorServiceSpec extends CatsSpec {
         result.asserting { res =>
           verify(repo).find(Users.uid, Monitors.mid)
           verify(repo).updateProfitQueriedTimestamp(Users.uid, Monitors.mid)
-          verify(disp, Mockito.times(2)).dispatch(any[Action])
-          verifyNoMoreInteractions(repo, disp)
+          verifyNoMoreInteractions(repo)
+          disp.submittedActions must have size 2
+          disp.submittedActions.head mustBe Action.AssertProfit(Users.uid, Markets.gbpeur, Some(BigDecimal(-10)), Some(BigDecimal(150)))
+          disp.submittedActions.last mustBe an[Action.ScheduleProfitMonitor]
           res mustBe ()
         }
       }
@@ -275,7 +271,7 @@ class MonitorServiceSpec extends CatsSpec {
 
         result.attempt.asserting { res =>
           verify(repo).find(Users.uid, Monitors.mid)
-          verifyNoInteractions(disp)
+          disp.submittedActions mustBe empty
           res mustBe Left(AppError.NotScheduled("profit"))
         }
       }
@@ -286,7 +282,6 @@ class MonitorServiceSpec extends CatsSpec {
         val (repo, disp) = mocks
         when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.monitor))
         when(repo.updatePriceQueriedTimestamp(any[UserId], any[MonitorId])).thenReturn(IO.unit)
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -295,10 +290,11 @@ class MonitorServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(repo).find(Users.uid, Monitors.mid)
-//          verify(disp).dispatch(eqTo(Action.ProcessMarketData(Users.uid, Markets.timeSeriesData)))
           verify(repo).updatePriceQueriedTimestamp(Users.uid, Monitors.mid)
-          verify(disp, Mockito.times(2)).dispatch(any[Action])
-          verifyNoMoreInteractions(repo, disp)
+          verifyNoMoreInteractions(repo)
+          disp.submittedActions must have size 2
+          disp.submittedActions.head mustBe Action.FetchMarketData(Users.uid, Markets.gbpeur, Interval.H1)
+          disp.submittedActions.last mustBe an[Action.SchedulePriceMonitor]
           res mustBe ()
         }
       }
@@ -307,7 +303,6 @@ class MonitorServiceSpec extends CatsSpec {
         val (repo, disp) = mocks
         when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.monitor))
         when(repo.updatePriceQueriedTimestamp(any[UserId], any[MonitorId])).thenReturn(IO.unit)
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -316,17 +311,16 @@ class MonitorServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(repo).find(Users.uid, Monitors.mid)
-          verify(disp).dispatch(Action.FetchMarketData(Users.uid, Markets.gbpeur, Interval.H1))
           verify(repo).updatePriceQueriedTimestamp(Users.uid, Monitors.mid)
-          verifyNoMoreInteractions(repo, disp)
+          verifyNoMoreInteractions(repo)
+          disp.submittedActions mustBe List(Action.FetchMarketData(Users.uid, Markets.gbpeur, Interval.H1))
           res mustBe ()
         }
       }
 
-      "not submit fetch market data action for inactive monitor" in {
+      "not submit fetch market data and assert profit actions for inactive monitor" in {
         val (repo, disp) = mocks
         when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.monitor.copy(active = false)))
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -335,14 +329,15 @@ class MonitorServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(repo).find(Users.uid, Monitors.mid)
-          verify(disp).dispatch(any[Action.SchedulePriceMonitor])
-          verifyNoMoreInteractions(repo, disp)
+          verifyNoMoreInteractions(repo)
+          disp.submittedActions must have size 1
+          disp.submittedActions.head mustBe an[Action.SchedulePriceMonitor]
           res mustBe ()
         }
       }
     }
   }
 
-  def mocks: (MonitorRepository[IO], ActionDispatcher[IO]) =
-    (mock[MonitorRepository[IO]], mock[ActionDispatcher[IO]])
+  def mocks: (MonitorRepository[IO], MockActionDispatcher[IO]) =
+    (mock[MonitorRepository[IO]], MockActionDispatcher.make[IO])
 }
