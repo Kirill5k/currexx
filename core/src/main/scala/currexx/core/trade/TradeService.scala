@@ -93,7 +93,7 @@ final private class LiveTradeService[F[_]](
     for
       settings    <- settingsRepository.get(uid)
       foundOrder  <- brokerClient.find(cp, settings.broker)
-      openedOrder <- F.fromOption(foundOrder, AppError.NoOpenedPositions(uid, cp, settings.broker.broker.print))
+      openedOrder <- F.fromOption(foundOrder, AppError.NoOpenedPositions(uid, cp, settings.broker.broker.toString))
       time        <- F.realTimeInstant
       _ <- F.whenA(min.exists(_ > openedOrder.profit) || max.exists(_ < openedOrder.profit)) {
         submitOrderPlacement(TradeOrderPlacement(uid, cp, TradeOrder.Exit, settings.broker, openedOrder.currentPrice, time))
