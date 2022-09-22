@@ -46,25 +46,24 @@ final private class LiveMonitorService[F[_]](
     for
       old <- repository.update(mon)
       _   <- F.whenA(old.currencyPair != mon.currencyPair || (old.active && !mon.active))(closeOpenOrders(old))
-      _   <- F.whenA(old.profit.isEmpty && mon.profit.isDefined)(scheduleProfitMonitor(mon.id, mon.userId, mon.profit.get))
+      _ <- F.whenA(old.profit.isEmpty && mon.profit.isDefined)(scheduleProfitMonitor(mon.id, mon.userId, mon.profit.get, F.realTimeInstant))
     yield ()
 
   override def create(cm: CreateMonitor): F[MonitorId] =
     for
       mid <- repository.create(cm)
-      _   <- schedulePriceMonitor(mid, cm.userId, cm.price)
-      _   <- F.whenA(cm.profit.isDefined)(scheduleProfitMonitor(mid, cm.userId, cm.profit.get))
+      _   <- schedulePriceMonitor(mid, cm.userId, cm.price, F.realTimeInstant)
+      _   <- F.whenA(cm.profit.isDefined)(scheduleProfitMonitor(mid, cm.userId, cm.profit.get, F.realTimeInstant))
     yield mid
 
   override def triggerPriceMonitor(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit] =
     for
       mon <- get(uid, id)
       _ <- F.whenA(mon.active) {
-        actionDispatcher
-          .dispatch(Action.FetchMarketData(uid, mon.currencyPair, mon.price.interval))
-          .flatTap(_ => repository.updatePriceQueriedTimestamp(uid, id))
+        repository.updatePriceQueriedTimestamp(uid, id) >>
+          actionDispatcher.dispatch(Action.FetchMarketData(uid, mon.currencyPair, mon.price.interval))
       }
-      _ <- F.unlessA(manual)(schedulePriceMonitor(id, uid, mon.price))
+      _ <- F.unlessA(manual)(schedulePriceMonitor(id, uid, mon.price, F.realTimeInstant))
     yield ()
 
   override def triggerProfitMonitor(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit] =
@@ -72,23 +71,18 @@ final private class LiveMonitorService[F[_]](
       mon    <- get(uid, id)
       profit <- F.fromOption(mon.profit, AppError.NotScheduled("profit"))
       _ <- F.whenA(mon.active) {
-        actionDispatcher
-          .dispatch(Action.AssertProfit(uid, mon.currencyPair, profit.min, profit.max))
-          .flatTap(_ => repository.updateProfitQueriedTimestamp(uid, id))
+        repository.updateProfitQueriedTimestamp(uid, id) >>
+          actionDispatcher.dispatch(Action.AssertProfit(uid, mon.currencyPair, profit.min, profit.max))
       }
-      _ <- F.unlessA(manual)(scheduleProfitMonitor(id, uid, profit))
+      _ <- F.unlessA(manual)(scheduleProfitMonitor(id, uid, profit, F.realTimeInstant))
     yield ()
 
   override def rescheduleAll: F[Unit] =
     F.realTimeInstant.flatMap { now =>
       repository.stream
         .map { mon =>
-          val db = mon.price.durationBetweenNextQuery(now)
-          actionDispatcher.dispatch(Action.SchedulePriceMonitor(mon.userId, mon.id, db)) >>
-            F.whenA(mon.profit.isDefined) {
-              val db = mon.profit.get.durationBetweenNextQuery(now)
-              actionDispatcher.dispatch(Action.ScheduleProfitMonitor(mon.userId, mon.id, db))
-            }
+          schedulePriceMonitor(mon.id, mon.userId, mon.price, F.pure(now)) >>
+            F.whenA(mon.profit.isDefined)(scheduleProfitMonitor(mon.id, mon.userId, mon.profit.get, F.pure(now)))
         }
         .map(Stream.eval)
         .parJoinUnbounded
@@ -96,13 +90,13 @@ final private class LiveMonitorService[F[_]](
         .drain
     }
 
-  private def schedulePriceMonitor(mid: MonitorId, uid: UserId, ms: MonitorSchedule): F[Unit] =
-    F.realTimeInstant
+  private def schedulePriceMonitor(mid: MonitorId, uid: UserId, ms: MonitorSchedule, now: => F[Instant]): F[Unit] =
+    now
       .map(ms.durationBetweenNextQuery)
       .flatMap(db => actionDispatcher.dispatch(Action.SchedulePriceMonitor(uid, mid, db)))
 
-  private def scheduleProfitMonitor(mid: MonitorId, uid: UserId, ms: MonitorSchedule): F[Unit] =
-    F.realTimeInstant
+  private def scheduleProfitMonitor(mid: MonitorId, uid: UserId, ms: MonitorSchedule, now: => F[Instant]): F[Unit] =
+    now
       .map(ms.durationBetweenNextQuery)
       .flatMap(db => actionDispatcher.dispatch(Action.ScheduleProfitMonitor(uid, mid, db)))
 }
