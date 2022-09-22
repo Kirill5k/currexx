@@ -303,7 +303,7 @@ class TradeServiceSpec extends CatsSpec {
           verify(settRepo).get(Users.uid)
           verify(brokerClient).find(Markets.gbpeur, Trades.broker)
           verifyNoMoreInteractions(brokerClient)
-          res mustBe Left(AppError.NoOpenedPositions(Users.uid, Markets.gbpeur, Trades.broker.broker.print))
+          res mustBe Left(AppError.NoOpenedPositions(Users.uid, Markets.gbpeur, Trades.broker.broker.toString))
         }
       }
     }
