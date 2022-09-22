@@ -25,11 +25,11 @@ class TradeServiceSpec extends CatsSpec {
 
         val result = for
           svc    <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          orders <- svc.getAllOrders(Users.uid, SearchParams(None, Some(Trades.ts), None))
+          orders <- svc.getAllOrders(Users.uid, SearchParams(None, Some(Trades.ts)))
         yield orders
 
         result.asserting { res =>
-          verify(orderRepo).getAll(Users.uid, SearchParams(None, Some(Trades.ts), None))
+          verify(orderRepo).getAll(Users.uid, SearchParams(None, Some(Trades.ts)))
           verifyNoInteractions(settRepo, brokerClient, dataClient, disp)
           res mustBe List(Trades.order)
         }
@@ -288,7 +288,7 @@ class TradeServiceSpec extends CatsSpec {
         }
       }
 
-      "return error if order cannot be found" in {
+      "not do anything if there are no opened positions" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
         when(brokerClient.find(any[CurrencyPair], any[BrokerParameters])).thenReturn(IO.pure(None))
@@ -298,12 +298,12 @@ class TradeServiceSpec extends CatsSpec {
           _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, Markets.gbpeur, Some(BigDecimal(-10)), Some(BigDecimal(10)))
         yield ()
 
-        result.attempt.asserting { res =>
+        result.asserting { res =>
           verifyNoInteractions(dataClient, orderRepo, disp)
           verify(settRepo).get(Users.uid)
           verify(brokerClient).find(Markets.gbpeur, Trades.broker)
           verifyNoMoreInteractions(brokerClient)
-          res mustBe Left(AppError.NoOpenedPositions(Users.uid, Markets.gbpeur, Trades.broker.broker.toString))
+          res mustBe ()
         }
       }
     }

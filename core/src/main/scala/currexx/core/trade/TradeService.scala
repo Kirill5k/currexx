@@ -91,13 +91,13 @@ final private class LiveTradeService[F[_]](
       max: Option[BigDecimal]
   ): F[Unit] =
     for
-      settings    <- settingsRepository.get(uid)
-      foundOrder  <- brokerClient.find(cp, settings.broker)
-      openedOrder <- F.fromOption(foundOrder, AppError.NoOpenedPositions(uid, cp, settings.broker.broker.toString))
-      time        <- F.realTimeInstant
-      _ <- F.whenA(min.exists(_ > openedOrder.profit) || max.exists(_ < openedOrder.profit)) {
-        submitOrderPlacement(TradeOrderPlacement(uid, cp, TradeOrder.Exit, settings.broker, openedOrder.currentPrice, time))
-      }
+      settings   <- settingsRepository.get(uid)
+      foundOrder <- brokerClient.find(cp, settings.broker)
+      time       <- F.realTimeInstant
+      _ <- foundOrder match
+        case Some(o) if min.exists(_ > o.profit) || max.exists(_ < o.profit) =>
+          submitOrderPlacement(TradeOrderPlacement(uid, cp, TradeOrder.Exit, settings.broker, o.currentPrice, time))
+        case _ => F.unit
     yield ()
 
   override def processMarketStateUpdate(state: MarketState, triggers: List[Indicator]): F[Unit] =

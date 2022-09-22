@@ -13,7 +13,7 @@ import scala.concurrent.Future
 class TradeOrderRepositorySpec extends MongoSpec {
   override protected val mongoPort: Int = 12351
 
-  val emptySearchParams = SearchParams(None, None, None)
+  val emptySearchParams = SearchParams()
 
   "A TradeOrderRepository" when {
     "save" should {
@@ -44,7 +44,7 @@ class TradeOrderRepositorySpec extends MongoSpec {
         val result = for
           repo <- TradeOrderRepository.make(db)
           _    <- repo.save(Trades.order)
-          sp = SearchParams(Some(Trades.ts.minusSeconds(10)), Some(Trades.ts.plusSeconds(10)), None)
+          sp = SearchParams(Some(Trades.ts.minusSeconds(10)), Some(Trades.ts.plusSeconds(10)))
           res <- repo.getAll(Users.uid, sp)
         yield res
 

@@ -66,7 +66,7 @@ class SignalRepositorySpec extends MongoSpec {
         val result = for
           repo <- SignalRepository.make(db)
           _    <- repo.saveAll(List(Signals.trendDirectionChanged))
-          sp = SearchParams(None, None, Some(Markets.gbpusd))
+          sp = SearchParams(currencyPair = Some(Markets.gbpusd))
           res <- repo.getAll(Users.uid, sp)
         yield res
 

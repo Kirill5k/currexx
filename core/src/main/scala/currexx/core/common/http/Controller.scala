@@ -31,10 +31,10 @@ import java.time.Instant
 final case class ErrorResponse(message: String) derives Codec.AsObject
 
 final case class SearchParams(
-    from: Option[Instant],
-    to: Option[Instant],
-    currencyPair: Option[CurrencyPair],
-    limit: Option[Int]
+    from: Option[Instant] = None,
+    to: Option[Instant] = None,
+    currencyPair: Option[CurrencyPair] = None,
+    limit: Option[Int] = None
 )
 
 trait Controller[F[_]] extends TapirJson with TapirSchema {
