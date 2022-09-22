@@ -32,7 +32,7 @@ object Markets {
   lazy val priceRange: PriceRange = PriceRange(BigDecimal(2.0), BigDecimal(4.0), BigDecimal(1.0), BigDecimal(3.0), BigDecimal(1000), ts)
   lazy val timeSeriesData: MarketTimeSeriesData = MarketTimeSeriesData(gbpeur, Interval.H1, NonEmptyList.one(priceRange))
 
-  lazy val positionState: PositionState = PositionState(TradeOrder.Position.Buy, ts, priceRange)
+  lazy val positionState: PositionState = PositionState(TradeOrder.Position.Buy, ts, priceRange.close)
 
   lazy val indicatorState: IndicatorState =
     IndicatorState(Signals.trendDirectionChanged.condition, Signals.trendDirectionChanged.time, trendChangeDetection)

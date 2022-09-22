@@ -25,7 +25,7 @@ object Trades {
     Markets.gbpeur,
     TradeOrder.Enter(TradeOrder.Position.Buy, BigDecimal(0.1), Some(BigDecimal(25)), None, None),
     broker,
-    Markets.priceRange,
+    Markets.priceRange.close,
     ts
   )
 }

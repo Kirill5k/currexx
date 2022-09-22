@@ -47,15 +47,15 @@ object OrderStatsCollector:
           case (Some(TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _, _)), TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _, _)) =>
             (stats, prevOrder)
           case (Some(TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _, _)), TradeOrder.Enter(TradeOrder.Position.Sell, _, _, _, _)) =>
-            (stats.incSell.close(currentOrder.currentPrice.close - prevOrder.get.currentPrice.close), Some(currentOrder))
+            (stats.incSell.close(currentOrder.price - prevOrder.get.price), Some(currentOrder))
           case (Some(TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _, _)), TradeOrder.Exit) =>
-            (stats.close(currentOrder.currentPrice.close - prevOrder.get.currentPrice.close), None)
+            (stats.close(currentOrder.price - prevOrder.get.price), None)
 
           case (Some(TradeOrder.Enter(TradeOrder.Position.Sell, _, _, _, _)), TradeOrder.Enter(TradeOrder.Position.Sell, _, _, _, _)) =>
             (stats, prevOrder)
           case (Some(TradeOrder.Enter(TradeOrder.Position.Sell, _, _, _, _)), TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _, _)) =>
-            (stats.incBuy.close(prevOrder.get.currentPrice.close - currentOrder.currentPrice.close), Some(currentOrder))
+            (stats.incBuy.close(prevOrder.get.price - currentOrder.price), Some(currentOrder))
           case (Some(TradeOrder.Enter(TradeOrder.Position.Sell, _, _, _, _)), TradeOrder.Exit) =>
-            (stats.close(prevOrder.get.currentPrice.close - currentOrder.currentPrice.close), None)
+            (stats.close(prevOrder.get.price - currentOrder.price), None)
       }
       ._1

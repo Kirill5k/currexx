@@ -16,8 +16,10 @@ final case class TradeOrderEntity(
     currencyPair: CurrencyPair,
     order: TradeOrder,
     broker: BrokerParameters,
-    currentPrice: PriceRange,
-    time: Instant
+    price: Option[BigDecimal],
+    time: Instant,
+    // TODO: remove later
+    currentPrice: Option[PriceRange],
 ) derives Codec.AsObject:
   def toDomain: TradeOrderPlacement =
     TradeOrderPlacement(
@@ -25,10 +27,10 @@ final case class TradeOrderEntity(
       currencyPair,
       order,
       broker,
-      currentPrice,
+      price.getOrElse(currentPrice.map(_.close).get),
       time
     )
 
 object TradeOrderEntity:
   def from(top: TradeOrderPlacement): TradeOrderEntity =
-    TradeOrderEntity(ObjectId.gen, top.userId.toObjectId, top.currencyPair, top.order, top.broker, top.currentPrice, top.time)
+    TradeOrderEntity(ObjectId.gen, top.userId.toObjectId, top.currencyPair, top.order, top.broker, Some(top.price), top.time, None)

@@ -71,14 +71,7 @@ class TradeControllerSpec extends ControllerSpec {
              |    "broker" : "vindaloo",
              |    "externalId" : "1"
              |  },
-             |  "currentPrice" : {
-             |    "open" : 2.0,
-             |    "high" : 4.0,
-             |    "low" : 1.0,
-             |    "close" : 3.0,
-             |    "volume" : 1000,
-             |    "time" : "${Markets.ts}"
-             |  },
+             |  "price" : 3.0,
              |  "time" : "${Trades.ts}"
              |}
              |]""".stripMargin

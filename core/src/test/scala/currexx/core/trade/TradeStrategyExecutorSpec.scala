@@ -45,7 +45,7 @@ class TradeStrategyExecutorSpec extends AnyWordSpec with Matchers {
       val condition = Condition.TrendDirectionChange(Trend.Consolidation, Trend.Downward)
       val state = Markets.state.copy(
         signals = Map(indicator.kind -> List(IndicatorState(condition, Markets.ts, indicator))),
-        currentPosition = Some(PositionState(TradeOrder.Position.Sell, Markets.ts, Markets.priceRange))
+        currentPosition = Some(PositionState(TradeOrder.Position.Sell, Markets.ts, Markets.priceRange.close))
       )
 
       TradeStrategyExecutor.get(TradeStrategy.TrendChange).analyze(state, List(indicator)) mustBe None

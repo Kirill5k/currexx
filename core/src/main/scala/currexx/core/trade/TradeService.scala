@@ -53,12 +53,12 @@ final private class LiveTradeService[F[_]](
             .findLatestBy(uid, cp)
             .map {
               case Some(top) if top.order.isEnter =>
-                Some(top.copy(time = time, currentPrice = price, order = TradeOrder.Exit))
+                Some(top.copy(time = time, price = price.close, order = TradeOrder.Exit))
               case _ => None
             }
         } else F.pure(None)
 
-        pendingClose.map(_.toVector :+ TradeOrderPlacement(uid, cp, order, sett.broker, price, time))
+        pendingClose.map(_.toVector :+ TradeOrderPlacement(uid, cp, order, sett.broker, price.close, time))
       }
       .flatten
       .flatMap(_.traverse(submitOrderPlacement).void)
@@ -77,7 +77,7 @@ final private class LiveTradeService[F[_]](
       .flatMap {
         case Some(top) if top.order.isEnter =>
           (F.realTimeInstant, marketDataClient.latestPrice(cp))
-            .mapN((time, price) => top.copy(time = time, currentPrice = price, order = TradeOrder.Exit))
+            .mapN((time, price) => top.copy(time = time, price = price.close, order = TradeOrder.Exit))
             .flatMap(submitOrderPlacement)
         case _ => F.unit
       }
@@ -93,7 +93,7 @@ final private class LiveTradeService[F[_]](
             case Decision.Sell  => settings.trading.toOrder(state.currencyPair, TradeOrder.Position.Sell)
             case Decision.Close => TradeOrder.Exit
           }
-          .map(order => TradeOrderPlacement(state.userId, state.currencyPair, order, settings.broker, price, time))
+          .map(order => TradeOrderPlacement(state.userId, state.currencyPair, order, settings.broker, price.close, time))
       }
       .flatMap {
         case Some(top) =>

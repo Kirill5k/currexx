@@ -75,14 +75,7 @@ class MarketControllerSpec extends ControllerSpec {
              |    "currentPosition": {
              |      "position": "buy",
              |      "openedAt": "${Markets.ts}",
-             |      "price": {
-             |        "open": 2,
-             |        "high": 4,
-             |        "low": 1,
-             |        "close": 3,
-             |        "volume": 1000,
-             |        "time": "${Markets.ts}"
-             |      }
+             |      "openPrice": 3
              |    },
              |    "signals": {
              |      "trend-change-detection": [

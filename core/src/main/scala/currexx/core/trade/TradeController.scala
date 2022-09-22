@@ -83,13 +83,13 @@ object TradeController extends TapirSchema with TapirJson {
       currencyPair: CurrencyPair,
       order: TradeOrder,
       broker: BrokerParameters,
-      currentPrice: PriceRange,
+      price: BigDecimal,
       time: Instant
   ) derives Codec.AsObject
 
   object TradeOrderView:
     def from(top: TradeOrderPlacement): TradeOrderView =
-      TradeOrderView(top.currencyPair, top.order, top.broker, top.currentPrice, top.time)
+      TradeOrderView(top.currencyPair, top.order, top.broker, top.price, top.time)
 
   final case class TradeOrderPlacementRequest(
       currencyPair: CurrencyPair,

@@ -11,6 +11,6 @@ final case class TradeOrderPlacement(
     currencyPair: CurrencyPair,
     order: TradeOrder,
     broker: BrokerParameters,
-    currentPrice: PriceRange,
+    price: BigDecimal,
     time: Instant
 )

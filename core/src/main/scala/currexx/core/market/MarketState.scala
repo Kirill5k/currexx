@@ -15,7 +15,7 @@ final case class IndicatorState(
 final case class PositionState(
     position: TradeOrder.Position,
     openedAt: Instant,
-    price: PriceRange
+    openPrice: BigDecimal,
 ) derives Codec.AsObject
 
 final case class MarketState(
