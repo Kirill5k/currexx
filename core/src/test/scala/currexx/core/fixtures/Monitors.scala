@@ -24,4 +24,14 @@ object Monitors {
       price: PriceMonitorSchedule = priceMonitorSchedule.copy(lastQueriedAt = None),
       profit: Option[ProfitMonitorSchedule] = Some(profitMonitorSchedule.copy(lastQueriedAt = None))
   ): CreateMonitor = CreateMonitor(uid, pair, price, profit)
+
+  def gen(
+      mid: MonitorId = MonitorId(ObjectId.gen),
+      uid: UserId = Users.uid,
+      pair: CurrencyPair = Markets.gbpeur,
+      price: PriceMonitorSchedule = priceMonitorSchedule,
+      profit: Option[ProfitMonitorSchedule] = Some(profitMonitorSchedule)
+  ): Monitor =
+    Monitor(mid, uid, true, pair, price, profit)
+
 }

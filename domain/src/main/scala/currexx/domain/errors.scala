@@ -4,6 +4,8 @@ import currexx.domain.market.CurrencyPair
 import currexx.domain.session.SessionId
 import currexx.domain.user.{UserEmail, UserId}
 
+import scala.collection.immutable.Iterable
+
 object errors {
 
   sealed trait AppError extends Throwable {
@@ -45,8 +47,10 @@ object errors {
     final case class NotSetup(entityName: String) extends NotFound:
       override val message: String = s"Current account doesn't have $entityName-settings set up"
 
-    final case class NotTracked(cp: CurrencyPair) extends NotFound:
-      override val message: String = s"Currency pair $cp is not being tracked"
+    final case class NotTracked(cps: Iterable[CurrencyPair]) extends NotFound:
+      override val message: String =
+        if (cps.size == 1) s"Currency pair ${cps.head} is not being tracked"
+        else s"Currency pairs ${cps.mkString(", ")} are not being tracked"
 
     case object InvalidEmailOrPassword extends Unauth:
       override val message: String = "Invalid email or password"

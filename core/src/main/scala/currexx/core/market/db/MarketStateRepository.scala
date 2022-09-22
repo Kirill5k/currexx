@@ -39,7 +39,7 @@ final private class LiveMarketStateRepository[F[_]](
   override def delete(uid: UserId, cp: CurrencyPair): F[Unit] =
     collection
       .deleteOne(userIdAndCurrencyPairEq(uid, cp))
-      .flatMap(errorIfNotDeleted(AppError.NotTracked(cp)))
+      .flatMap(errorIfNotDeleted(AppError.NotTracked(List(cp))))
 
   override def update(uid: UserId, cp: CurrencyPair, signals: Map[String, List[IndicatorState]]): F[MarketState] =
     runUpdate(

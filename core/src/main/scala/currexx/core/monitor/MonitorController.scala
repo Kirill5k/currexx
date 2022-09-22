@@ -4,6 +4,8 @@ import cats.Monad
 import cats.effect.Async
 import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
+import cats.syntax.functor.*
+import cats.syntax.traverse.*
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
 import currexx.domain.errors.AppError
@@ -83,6 +85,20 @@ final private class MonitorController[F[_]](
             .voidResponse
       }
 
+  private def compoundUpdateMonitor(using authenticator: Authenticator[F]) =
+    compoundUpdateMonitorEndpoint.withAuthenticatedSession
+      .serverLogic { session => req =>
+        (for
+          monitors <- service.getAll(session.userId)
+          trackedCurrencies = monitors.map(_.currencyPair).toSet
+          _ <- F.raiseWhen(!req.currencyPairs.subsetOf(trackedCurrencies))(AppError.NotTracked(req.currencyPairs.diff(trackedCurrencies)))
+          _ <- monitors
+            .filter(m => req.currencyPairs(m.currencyPair))
+            .map(_.copy(profit = req.profit, price = req.price))
+            .traverse(service.update)
+        yield ()).voidResponse
+      }
+
   private def getAllMonitors(using authenticator: Authenticator[F]) =
     getAllMonitorsEndpoint.withAuthenticatedSession
       .serverLogic { session => _ =>
@@ -94,6 +110,7 @@ final private class MonitorController[F[_]](
   override def routes(using authenticator: Authenticator[F]): HttpRoutes[F] =
     Http4sServerInterpreter[F](Controller.serverOptions).toRoutes(
       List(
+        compoundUpdateMonitor,
         setupNewMonitor,
         pauseMonitor,
         resumeMonitor,
@@ -114,6 +131,12 @@ object MonitorController extends TapirSchema with TapirJson {
       (),
       AppError.FailedValidation("Profit monitor schedule needs to have min or max boundary specified")
     )
+
+  final case class CompoundMonitorRequest(
+      currencyPairs: Set[CurrencyPair],
+      price: PriceMonitorSchedule,
+      profit: Option[ProfitMonitorSchedule]
+  ) derives Codec.AsObject
 
   final case class CreateMonitorRequest(
       currencyPair: CurrencyPair,
@@ -145,6 +168,7 @@ object MonitorController extends TapirSchema with TapirJson {
     .validate(Controller.validId)
     .map((s: String) => MonitorId(s))(_.value)
     .name("monitor-id")
+  private val compoundPath = basePath / "compound"
 
   val setupNewMonitorEndpoint = Controller.securedEndpoint.post
     .in(basePath)
@@ -187,6 +211,12 @@ object MonitorController extends TapirSchema with TapirJson {
     .in(jsonBody[MonitorView])
     .out(statusCode(StatusCode.NoContent))
     .description("Update monitor")
+
+  val compoundUpdateMonitorEndpoint = Controller.securedEndpoint.put
+    .in(compoundPath)
+    .in(jsonBody[CompoundMonitorRequest])
+    .out(statusCode(StatusCode.NoContent))
+    .description("Update multiple monitors")
 
   def make[F[_]: Async](monitorService: MonitorService[F]): F[Controller[F]] =
     Monad[F].pure(MonitorController[F](monitorService))

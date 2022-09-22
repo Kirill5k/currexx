@@ -69,7 +69,11 @@ class MonitorControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.UnprocessableEntity, Some(s"""{"message":"Profit monitor schedule needs to have min or max boundary specified"}"""))
+        verifyJsonResponse(
+          res,
+          Status.UnprocessableEntity,
+          Some(s"""{"message":"Profit monitor schedule needs to have min or max boundary specified"}""")
+        )
         verifyNoInteractions(svc)
       }
     }
@@ -251,6 +255,53 @@ class MonitorControllerSpec extends ControllerSpec {
           Some("""{"message":"The id supplied in the path does not match with the id in the request body"}""")
         )
         verifyNoInteractions(svc)
+      }
+    }
+
+    "PUT /monitors/compound" should {
+      "return an error when trying to update nonexisting monitor" in {
+        val svc = mock[MonitorService[IO]]
+        when(svc.getAll(any[UserId])).thenReturn(IO.pure(List(Monitors.monitor)))
+
+        given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
+
+        val requestBody =
+          s"""{
+             |"currencyPairs": ["GBPUSD", "EURDKK", "GBPEUR"],
+             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"},
+             |"profit": {"min": "-10","max": "150","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
+             |}""".stripMargin
+
+        val req = requestWithAuthHeader(uri"/monitors/compound", method = Method.PUT).withJsonBody(parseJson(requestBody))
+        val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        verifyJsonResponse(res, Status.NotFound, Some("""{"message":"Currency pairs GBPUSD, EURDKK are not being tracked"}"""))
+        verify(svc).getAll(Users.uid)
+        verifyNoMoreInteractions(svc)
+      }
+
+      "update multiple monitors at once" in {
+        val svc = mock[MonitorService[IO]]
+
+        val monitors = List(Monitors.gen(profit = None), Monitors.gen(pair = Markets.gbpusd, profit = None))
+        when(svc.getAll(any[UserId])).thenReturn(IO.pure(monitors))
+        when(svc.update(any[Monitor])).thenReturn(IO.unit)
+
+        given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
+
+        val requestBody =
+          s"""{
+             |"currencyPairs": ["GBPUSD", "GBPEUR"],
+             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"},
+             |"profit": null
+             |}""".stripMargin
+
+        val req = requestWithAuthHeader(uri"/monitors/compound", method = Method.PUT).withJsonBody(parseJson(requestBody))
+        val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        verifyJsonResponse(res, Status.NoContent, None)
+        verify(svc).getAll(Users.uid)
+        monitors.foreach(m => verify(svc).update(m.copy(profit = None)))
       }
     }
   }

@@ -111,7 +111,7 @@ class MarketStateRepositorySpec extends MongoSpec {
           _ <- repo.delete(Users.uid, Markets.gbpeur)
         yield ()
 
-        result.attempt.map(_ mustBe Left(AppError.NotTracked(Markets.gbpeur)))
+        result.attempt.map(_ mustBe Left(AppError.NotTracked(List(Markets.gbpeur))))
       }
     }
   }
