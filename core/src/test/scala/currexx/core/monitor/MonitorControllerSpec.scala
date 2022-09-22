@@ -267,7 +267,8 @@ class MonitorControllerSpec extends ControllerSpec {
 
         val requestBody =
           s"""{
-             |"currencyPairs": ["GBPUSD", "EURDKK", "GBPEUR"],
+             |"currencyPairs": ["GBPUSD", "EURDKK"],
+             |"active": true,
              |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"},
              |"profit": {"min": "-10","max": "150","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
              |}""".stripMargin
@@ -292,6 +293,7 @@ class MonitorControllerSpec extends ControllerSpec {
         val requestBody =
           s"""{
              |"currencyPairs": ["GBPUSD", "GBPEUR"],
+             |"active": true,
              |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"},
              |"profit": null
              |}""".stripMargin

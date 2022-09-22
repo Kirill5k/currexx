@@ -94,7 +94,7 @@ final private class MonitorController[F[_]](
           _ <- F.raiseWhen(!req.currencyPairs.subsetOf(trackedCurrencies))(AppError.NotTracked(req.currencyPairs.diff(trackedCurrencies)))
           _ <- monitors
             .filter(m => req.currencyPairs(m.currencyPair))
-            .map(_.copy(profit = req.profit, price = req.price))
+            .map(_.copy(profit = req.profit, price = req.price, active = req.active))
             .traverse(service.update)
         yield ()).voidResponse
       }
@@ -132,8 +132,9 @@ object MonitorController extends TapirSchema with TapirJson {
       AppError.FailedValidation("Profit monitor schedule needs to have min or max boundary specified")
     )
 
-  final case class CompoundMonitorRequest(
+  final case class CompoundUpdateMonitorRequest(
       currencyPairs: Set[CurrencyPair],
+      active: Boolean,
       price: PriceMonitorSchedule,
       profit: Option[ProfitMonitorSchedule]
   ) derives Codec.AsObject
@@ -214,7 +215,7 @@ object MonitorController extends TapirSchema with TapirJson {
 
   val compoundUpdateMonitorEndpoint = Controller.securedEndpoint.put
     .in(compoundPath)
-    .in(jsonBody[CompoundMonitorRequest])
+    .in(jsonBody[CompoundUpdateMonitorRequest])
     .out(statusCode(StatusCode.NoContent))
     .description("Update multiple monitors")
 
