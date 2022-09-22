@@ -94,7 +94,7 @@ final private class MonitorController[F[_]](
           monitors <- service.getAll(session.userId)
           updatedPairs = req.currencyPairs
           trackedPairs = monitors.map(_.currencyPair).toSet
-          _ <- F.raiseWhen(!updatedPairs.subsetOf(trackedPairs))(AppError.NotTracked(updatedPairs.diff(trackedPairs)))
+          _ <- F.raiseUnless(updatedPairs.subsetOf(trackedPairs))(AppError.NotTracked(updatedPairs.diff(trackedPairs)))
           res <- monitors
             .filter(m => updatedPairs(m.currencyPair))
             .map(_.copy(profit = req.profit, price = req.price, active = req.active))
