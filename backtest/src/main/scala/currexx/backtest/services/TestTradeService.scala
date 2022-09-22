@@ -22,10 +22,10 @@ final private class TestTradeSettingsRepository[F[_]](
 final private class TestTradeOrderRepository[F[_]: Async](
     private val orders: Ref[F, List[TradeOrderPlacement]]
 ) extends TradeOrderRepository[F]:
-  override def getAllTradedCurrencies(uid: UserId): F[List[CurrencyPair]]                  = Async[F].pure(Nil)
-  override def save(top: TradeOrderPlacement): F[Unit]                                     = orders.update(top :: _)
-  override def getAll(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]]         = orders.get
-  override def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]] = Async[F].pure(None)
+  override def getAllTradedCurrencies(uid: UserId): F[List[CurrencyPair]]          = orders.get.map(_.headOption.map(_.currencyPair).toList)
+  override def save(top: TradeOrderPlacement): F[Unit]                             = orders.update(top :: _)
+  override def getAll(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]] = orders.get
+  override def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]] = orders.get.map(_.headOption)
 
 object TestTradeService:
   def make[F[_]: Async](
