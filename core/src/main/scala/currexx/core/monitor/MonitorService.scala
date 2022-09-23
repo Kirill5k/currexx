@@ -63,7 +63,8 @@ final private class LiveMonitorService[F[_]](
         repository.updatePriceQueriedTimestamp(uid, id) >>
           actionDispatcher.dispatch(Action.FetchMarketData(uid, mon.currencyPair, mon.price.interval))
       }
-      _ <- F.unlessA(manual)(schedulePriceMonitor(id, uid, mon.price, F.realTimeInstant))
+      now <- F.realTimeInstant
+      _   <- F.unlessA(manual)(schedulePriceMonitor(id, uid, mon.price.copy(lastQueriedAt = Some(now)), F.pure(now)))
     yield ()
 
   override def triggerProfitMonitor(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit] =
@@ -74,7 +75,8 @@ final private class LiveMonitorService[F[_]](
         repository.updateProfitQueriedTimestamp(uid, id) >>
           actionDispatcher.dispatch(Action.AssertProfit(uid, mon.currencyPair, profit.min, profit.max))
       }
-      _ <- F.unlessA(manual)(scheduleProfitMonitor(id, uid, profit, F.realTimeInstant))
+      now <- F.realTimeInstant
+      _   <- F.unlessA(manual)(scheduleProfitMonitor(id, uid, profit.copy(lastQueriedAt = Some(now)), F.pure(now)))
     yield ()
 
   override def rescheduleAll: F[Unit] =
@@ -90,12 +92,12 @@ final private class LiveMonitorService[F[_]](
         .drain
     }
 
-  private def schedulePriceMonitor(mid: MonitorId, uid: UserId, ms: MonitorSchedule, now: => F[Instant]): F[Unit] =
+  private def schedulePriceMonitor(mid: MonitorId, uid: UserId, ms: PriceMonitorSchedule, now: => F[Instant]): F[Unit] =
     now
       .map(ms.durationBetweenNextQuery)
       .flatMap(db => actionDispatcher.dispatch(Action.SchedulePriceMonitor(uid, mid, db)))
 
-  private def scheduleProfitMonitor(mid: MonitorId, uid: UserId, ms: MonitorSchedule, now: => F[Instant]): F[Unit] =
+  private def scheduleProfitMonitor(mid: MonitorId, uid: UserId, ms: ProfitMonitorSchedule, now: => F[Instant]): F[Unit] =
     now
       .map(ms.durationBetweenNextQuery)
       .flatMap(db => actionDispatcher.dispatch(Action.ScheduleProfitMonitor(uid, mid, db)))
