@@ -2,24 +2,24 @@ import sbt._
 
 object Dependencies {
   object Versions {
-    val fs2            = "3.2.13"
+    val fs2            = "3.3.0"
     val cats           = "2.8.0"
-    val mongo4cats     = "0.6.2"
+    val mongo4cats     = "0.6.3"
     val pureConfig     = "0.17.1"
-    val circe          = "0.14.2"
-    val sttp           = "3.7.6"
+    val circe          = "0.14.3"
+    val sttp           = "3.8.0"
     val http4s         = "0.23.12"
-    val logback        = "1.4.0"
-    val log4cats       = "2.4.0"
+    val logback        = "1.4.1"
+    val log4cats       = "2.5.0"
     val bcrypt         = "4.3.0"
     val refined        = "0.10.1"
-    val tapir          = "1.0.6"
+    val tapir          = "1.1.1"
     val jwt            = "9.1.1"
     val cronUtils      = "9.2.0"
     val taggedAdtCodec = "0.10.1"
 
     val scalaTest = "3.2.13"
-    val mockito   = "3.2.10.0"
+    val mockito   = "3.2.13.0"
   }
 
   object Libraries {
@@ -78,7 +78,7 @@ object Dependencies {
     }
 
     val scalaTest = "org.scalatest"     %% "scalatest"   % Versions.scalaTest
-    val mockito   = "org.scalatestplus" %% "mockito-3-4" % Versions.mockito
+    val mockito   = "org.scalatestplus" %% "mockito-4-6" % Versions.mockito
   }
 
   val domain = Seq(

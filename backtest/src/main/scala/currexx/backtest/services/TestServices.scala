@@ -31,22 +31,20 @@ final class TestServices[F[_]] private (
       _       <- actions.collect(pf).sequence
     yield ()
 
-  def processMarketData: Pipe[F, MarketTimeSeriesData, Unit] = { dataStream =>
-    dataStream.evalMap { data =>
-      for
-        _ <- clients.data.setData(data)
-        _ <- signalService.processMarketData(settings.userId, data)
-        _ <- collectPendingActions { case Action.ProcessSignals(uid, cp, signals) =>
-          marketService.processSignals(uid, cp, signals)
-        }
-        _ <- collectPendingActions { case Action.ProcessMarketStateUpdate(state, triggeredBy) =>
-          tradeService.processMarketStateUpdate(state, triggeredBy)
-        }
-        _ <- collectPendingActions { case Action.ProcessTradeOrderPlacement(top) =>
-          marketService.processTradeOrderPlacement(top)
-        }
-      yield ()
-    }
+  def processMarketData: Pipe[F, MarketTimeSeriesData, Unit] = _.evalMap { data =>
+    for
+      _ <- clients.data.setData(data)
+      _ <- signalService.processMarketData(settings.userId, data)
+      _ <- collectPendingActions { case Action.ProcessSignals(uid, cp, signals) =>
+        marketService.processSignals(uid, cp, signals)
+      }
+      _ <- collectPendingActions { case Action.ProcessMarketStateUpdate(state, triggeredBy) =>
+        tradeService.processMarketStateUpdate(state, triggeredBy)
+      }
+      _ <- collectPendingActions { case Action.ProcessTradeOrderPlacement(top) =>
+        marketService.processTradeOrderPlacement(top)
+      }
+    yield ()
   }
 
   def getAllOrders: F[List[TradeOrderPlacement]] =
