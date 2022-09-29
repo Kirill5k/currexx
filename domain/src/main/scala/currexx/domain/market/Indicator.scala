@@ -9,11 +9,11 @@ import org.latestbit.circe.adt.codec.*
 
 object MovingAverage extends EnumType[MovingAverage](() => MovingAverage.values, _.toString.toLowerCase)
 enum MovingAverage:
-  case Weighted, Exponential, Simple
+  case Weighted, Exponential, Simple, Hull
 
 object CompositeMovingAverage extends EnumType[CompositeMovingAverage](() => CompositeMovingAverage.values, _.toString.toLowerCase)
 enum CompositeMovingAverage:
-  case Triple, Hull, Nyquist
+  case Triple, Nyquist, Jurik
 
 object ValueSource extends EnumType[ValueSource](() => ValueSource.values, _.toString.toLowerCase)
 enum ValueSource:
@@ -30,6 +30,7 @@ object ValueTransformation {
     case EMA(length: Int)                                                           extends SingleOutput("ema")
     case HMA(length: Int)                                                           extends SingleOutput("hma")
     case NMA(length: Int, signalLength: Int, lambda: Double, maCalc: MovingAverage) extends SingleOutput("nma")
+    case JMA(length: Int, phase: Int, power: Int)                                   extends SingleOutput("jma")
 
   object SingleOutput:
     def sequenced(sequence: SingleOutput*): SingleOutput = SingleOutput.Sequenced(sequence.toList)
@@ -42,7 +43,8 @@ object ValueTransformation {
         "hma"       -> JsonTaggedAdt.tagged[SingleOutput.HMA],
         "nma"       -> JsonTaggedAdt.tagged[SingleOutput.NMA],
         "sma"       -> JsonTaggedAdt.tagged[SingleOutput.SMA],
-        "wma"       -> JsonTaggedAdt.tagged[SingleOutput.WMA]
+        "wma"       -> JsonTaggedAdt.tagged[SingleOutput.WMA],
+        "jma"       -> JsonTaggedAdt.tagged[SingleOutput.JMA]
       ),
       strict = true,
       typeFieldName = "kind"

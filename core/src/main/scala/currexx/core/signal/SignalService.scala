@@ -11,7 +11,16 @@ import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, MarketTimeSeriesData, MovingAverage, Trend, ValueSource, ValueTransformation as VT}
+import currexx.domain.market.{
+  Condition,
+  CurrencyPair,
+  Indicator,
+  MarketTimeSeriesData,
+  MovingAverage,
+  Trend,
+  ValueSource,
+  ValueTransformation as VT
+}
 import fs2.Stream
 
 import java.time.Instant
@@ -75,6 +84,7 @@ object SignalService:
         case VT.SingleOutput.SMA(length)                => MovingAverages.simple(data, length)
         case VT.SingleOutput.EMA(length)                => MovingAverages.exponential(data, length)
         case VT.SingleOutput.HMA(length)                => MovingAverages.hull(data, length)
+        case VT.SingleOutput.JMA(length, phase, power)  => MovingAverages.jurikSimplified(data, length, phase, power)
         case VT.SingleOutput.NMA(length, signalLength, lambda, ma) =>
           MovingAverages.nyquist(data, length, signalLength, lambda, ma.calculation)
 
@@ -84,6 +94,7 @@ object SignalService:
         case MovingAverage.Exponential => (values, length) => MovingAverages.exponential(values, length)
         case MovingAverage.Simple      => MovingAverages.simple
         case MovingAverage.Weighted    => MovingAverages.weighted
+        case MovingAverage.Hull        => MovingAverages.hull
 
   def detectThresholdCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.ThresholdCrossing): Option[Signal] = {
     val source = indicator.source.extract(data)
