@@ -34,7 +34,7 @@ object Application extends IOApp.Simple:
             actionProcessor <- ActionProcessor.make[IO](dispatcher, monitors.service, signals.service, markets.service, trades.service)
             logProcessor    <- LogEventProcessor.make[IO](res.mongo)
             _ <- Server
-              .serve[IO](config.server, http.app, runtime.compute)
+              .serve[IO](config.server, http.app)
               .concurrently(actionProcessor.run)
               .concurrently(logProcessor.run)
               .compile

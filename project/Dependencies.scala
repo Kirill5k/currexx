@@ -8,7 +8,7 @@ object Dependencies {
     val pureConfig     = "0.17.1"
     val circe          = "0.14.3"
     val sttp           = "3.8.0"
-    val http4s         = "0.23.12"
+    val http4s         = "0.23.16"
     val logback        = "1.4.1"
     val log4cats       = "2.5.0"
     val bcrypt         = "4.3.0"
@@ -18,8 +18,8 @@ object Dependencies {
     val cronUtils      = "9.2.0"
     val taggedAdtCodec = "0.10.1"
 
-    val scalaTest = "3.2.13"
-    val mockito   = "3.2.13.0"
+    val scalaTest = "3.2.14"
+    val mockito   = "3.2.14.0"
   }
 
   object Libraries {
@@ -74,7 +74,7 @@ object Dependencies {
     }
 
     object http4s {
-      val blaze = "org.http4s" %% "http4s-blaze-server" % Versions.http4s
+      val emberServer = "org.http4s" %% "http4s-ember-server" % Versions.http4s
     }
 
     val scalaTest = "org.scalatest"     %% "scalatest"   % Versions.scalaTest
@@ -100,7 +100,7 @@ object Dependencies {
 
   val core = Seq(
     Libraries.pureconfig.core,
-    Libraries.http4s.blaze,
+    Libraries.http4s.emberServer,
     Libraries.jwt,
     Libraries.bcrypt.cross(CrossVersion.for3Use2_13)
   ) ++
