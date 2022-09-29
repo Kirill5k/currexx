@@ -113,4 +113,56 @@ object MovingAverages {
     val nwma2 = maCalc(nwma1, n2)
     nwma1.zip(nwma2).map { case (v1, v2) => (1 + alpha) * v1 - alpha * v2 }
   }
+
+  def jurik(
+      values: List[Double],
+      length: Int,
+      phase: Int,
+      power: Int
+  ): List[Double] = {
+    // periodic ratio
+    val beta = 0.45 * (length - 1) / (0.45 * (length - 1) + 2)
+    // phase ratio
+    val pr = if (phase < -100) 0.5 else if (phase > 100) 2.5 else phase / 100 + 1.5
+    // additional periodic factor
+    val len1  = math.max(math.log(math.sqrt(length)) / math.log(2.0) + 2, 0d)
+    val pow1  = math.max(len1 - 2, 0.5)
+    val alpha = ???
+    ???
+  }
+
+  def jurikSimplified(
+      values: List[Double],
+      length: Int,
+      phase: Int,
+      power: Int
+  ): List[Double] = {
+    // periodic ratio
+    val beta = 0.45 * (length - 1) / (0.45 * (length - 1) + 2)
+    // phase ratio
+    val pr = if (phase < -100) 0.5 else if (phase > 100) 2.5 else phase / 100 + 1.5
+    // dynamic factor
+    val alpha = math.pow(beta, power)
+
+    @tailrec
+    def go(
+        remaining: List[Double],
+        result: List[Double],
+        prevMa1: Double,
+        prevDet0: Double,
+        prevDet1: Double,
+        prevJma: Double
+    ): List[Double] =
+      if (remaining.isEmpty) result
+      else {
+        val price = remaining.head
+        val ma1   = (1 - alpha) * price + alpha * prevMa1
+        val det0  = (price - ma1) * (1 - beta) + beta * prevDet0
+        val ma2   = ma1 + pr * det0
+        val det1  = (ma2 - prevJma) * math.pow(1 - alpha, 2) + math.pow(alpha, 2) * prevDet1
+        val jma   = prevJma + det1
+        go(remaining.tail, jma :: result, ma1, det0, det1, jma)
+      }
+    go(values.reverse, Nil, 0d, 0d, 0d, 0d)
+  }
 }
