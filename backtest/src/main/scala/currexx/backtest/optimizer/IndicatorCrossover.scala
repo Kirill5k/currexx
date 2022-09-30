@@ -26,7 +26,7 @@ object IndicatorCrossover {
         }
 
         def crossInt(i1: Int, i2: Int, minValue: Option[Int] = None): Int = {
-          val max = math.max(i1, i2)
+          val max    = math.max(i1, i2)
           val result = threeWaySplitCrossover.cross(i1.toBinaryArray(max), i2.toBinaryArray(max)).toInt
           minValue.fold(result)(math.max(_, result))
         }
@@ -37,6 +37,8 @@ object IndicatorCrossover {
           case (VT.SingleOutput.WMA(l1), VT.SingleOutput.WMA(l2))       => Right(VT.SingleOutput.WMA(crossInt(l1, l2)))
           case (VT.SingleOutput.EMA(l1), VT.SingleOutput.EMA(l2))       => Right(VT.SingleOutput.EMA(crossInt(l1, l2)))
           case (VT.SingleOutput.Kalman(g1), VT.SingleOutput.Kalman(g2)) => Right(VT.SingleOutput.Kalman(crossDouble(g1, g2, 0.05)))
+          case (VT.SingleOutput.JMA(l1, ph1, po1), VT.SingleOutput.JMA(l2, ph2, po2)) =>
+            Right(VT.SingleOutput.JMA(crossInt(l1, l2), crossInt(ph1 + 100, ph2 + 100)- 100, crossInt(po1, po2)))
           case (VT.SingleOutput.NMA(l1, sl1, d1, ma1), VT.SingleOutput.NMA(l2, sl2, d2, _)) =>
             Right(VT.SingleOutput.NMA(crossInt(l1, l2), crossInt(sl1, sl2), crossDouble(d1, d2, 0.5), ma1))
           case (VT.SingleOutput.Sequenced(s1), VT.SingleOutput.Sequenced(s2)) =>
