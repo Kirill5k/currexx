@@ -49,7 +49,7 @@ final private class LiveXtbClient[F[_]](
         .send(backend)
         .void
       retrievedOrder <- state.get.map(_.retrievedOrder)
-    yield retrievedOrder.map { td =>
+    yield retrievedOrder.filter(_.profit.isDefined).map { td =>
       OpenedTradeOrder(
         cp,
         if (td.cmd == 0) TradeOrder.Position.Buy else TradeOrder.Position.Sell,
@@ -57,7 +57,7 @@ final private class LiveXtbClient[F[_]](
         td.open_price,
         Instant.ofEpochMilli(td.open_time),
         td.volume,
-        td.profit
+        td.profit.get
       )
     }
 

@@ -28,7 +28,7 @@ object XtbResponse {
       cmd: Int,
       open_price: BigDecimal,
       open_time: Long,
-      profit: BigDecimal
+      profit: Option[BigDecimal]
   ) derives Codec.AsObject
   final case class Trades(returnData: List[TradeData]) extends XtbResponse derives Codec.AsObject
 

@@ -24,6 +24,8 @@ class XtbClientSpec extends ClientSpec {
   val config = XtbConfig("wss://ws.xtb.com")
   val pair   = CurrencyPair(EUR, CAD)
 
+  val brokerConfig: BrokerParameters.Xtb = BrokerParameters.Xtb("foo", "bar", true)
+
   "A XtbClient" should {
     "return error on failed authentication" ignore {
       val testingBackend: SttpBackend[IO, Fs2Streams[IO] with WebSockets] = backendStub.whenAnyRequest
@@ -37,18 +39,53 @@ class XtbClientSpec extends ClientSpec {
 
       val result = for
         client <- XtbClient.make[IO](config, testingBackend)
-        res    <- client.submit(BrokerParameters.Xtb("foo", "bar", true), pair, TradeOrder.Exit)
+        res    <- client.submit(brokerConfig, pair, TradeOrder.Exit)
       yield res
 
       result.assertError(AppError.AccessDenied("foo"))
     }
 
-    "send enter market request" in {
-      pending
+    "send enter market request" ignore {
+      val result = AsyncHttpClientFs2Backend
+        .resource[IO](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
+        .use { backend =>
+          for
+            client <- XtbClient.make[IO](config, backend)
+            order = TradeOrder.Enter(TradeOrder.Position.Buy, BigDecimal(0.1))
+            res <- client.submit(brokerConfig, pair, order)
+          yield res
+        }
+
+      result.asserting(_ mustBe ())
     }
 
-    "send exit market request" in {
-      pending
+    "get existing order" ignore {
+      val result = AsyncHttpClientFs2Backend
+        .resource[IO](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
+        .use { backend =>
+          for
+            client <- XtbClient.make[IO](config, backend)
+            res    <- client.getCurrentOrder(brokerConfig, pair)
+          yield res
+        }
+
+      result.asserting { order =>
+        order.map(_.currencyPair) mustBe Some(pair)
+      }
+    }
+
+    "send exit market request" ignore {
+      val result = AsyncHttpClientFs2Backend
+        .resource[IO](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
+        .use { backend =>
+          for
+            client <- XtbClient.make[IO](config, backend)
+            _      <- IO.sleep(10.seconds)
+            res    <- client.submit(brokerConfig, pair, TradeOrder.Exit)
+          yield res
+        }
+
+      result.asserting(_ mustBe ())
     }
   }
 }
