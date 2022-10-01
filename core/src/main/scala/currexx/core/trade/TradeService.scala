@@ -126,12 +126,6 @@ final private class LiveTradeService[F[_]](
       dispatcher.dispatch(Action.ProcessTradeOrderPlacement(top))
 
   extension (ms: MarketState) def hasOpenPosition: Boolean = ms.currentPosition.isDefined
-
-  extension (to: TradeOrder)
-    def isEnter: Boolean =
-      to match
-        case TradeOrder.Exit     => false
-        case _: TradeOrder.Enter => true
 }
 
 object TradeService:

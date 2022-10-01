@@ -34,10 +34,10 @@ object TradeStrategyExecutor {
     def analyze(state: MarketState, triggers: List[Indicator]): Option[TradeStrategyExecutor.Decision] =
       triggers.collectFirst { case t: Indicator.TrendChangeDetection =>
         state.signals.getOrElse(t.kind, Nil).headOption.map(_.condition).collect {
-          case Condition.TrendDirectionChange(Trend.Downward, Trend.Consolidation, _) => Decision.Buy
-          case Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, _)   => Decision.Sell
-          case Condition.TrendDirectionChange(_, Trend.Upward, _) if !state.buying    => Decision.Buy
-          case Condition.TrendDirectionChange(_, Trend.Downward, _) if !state.selling => Decision.Sell
+          case Condition.TrendDirectionChange(Trend.Downward, Trend.Consolidation, _) if !state.buying => Decision.Buy
+          case Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, _) if !state.selling  => Decision.Sell
+          case Condition.TrendDirectionChange(_, Trend.Upward, _) if !state.buying                     => Decision.Buy
+          case Condition.TrendDirectionChange(_, Trend.Downward, _) if !state.selling                  => Decision.Sell
         }
       }.flatten
 

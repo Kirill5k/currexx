@@ -21,7 +21,7 @@ object Optimizer extends IOApp.Simple {
     crossoverProbability = 0.7,
     mutationProbability = 0.25,
     elitismRatio = 0.2,
-    shuffle = true
+    shuffle = false
   )
 
   val thresholdCrossing = Indicator.ThresholdCrossing(
@@ -32,7 +32,7 @@ object Optimizer extends IOApp.Simple {
   )
   val trendChangeDetection = Indicator.TrendChangeDetection(
     ValueSource.Close,
-    ValueTransformation.SingleOutput.JMA(20, 100, 2)
+    ValueTransformation.SingleOutput.JMA(44, -72, 1)
 //    ValueTransformation.SingleOutput.HMA(25)
 //    ValueTransformation.SingleOutput.NMA(45, 5, 11.0d, MovingAverage.Weighted)
   )

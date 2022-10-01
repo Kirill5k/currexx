@@ -29,6 +29,12 @@ object TradeOrder {
     strict = true,
     typeFieldName = "kind"
   )
+
+  extension (to: TradeOrder)
+    def isEnter: Boolean =
+      to match
+        case TradeOrder.Exit     => false
+        case _: TradeOrder.Enter => true
 }
 
 final case class OpenedTradeOrder(
