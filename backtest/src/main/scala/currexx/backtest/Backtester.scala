@@ -23,7 +23,7 @@ object Backtester extends IOApp.Simple {
         source = ValueSource.Close,
         transformation = ValueTransformation.SingleOutput.sequenced(
           ValueTransformation.SingleOutput.HMA(5),
-          ValueTransformation.SingleOutput.JMA(44, -72, 1),
+//          ValueTransformation.SingleOutput.JMA(44, -72, 1),
         )
       ),
       Indicator.ThresholdCrossing(
