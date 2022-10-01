@@ -22,16 +22,16 @@ object Backtester extends IOApp.Simple {
       Indicator.TrendChangeDetection(
         source = ValueSource.Close,
         transformation = ValueTransformation.SingleOutput.sequenced(
-          ValueTransformation.SingleOutput.NMA(45, 15, 76.5, MovingAverage.Weighted),
+          ValueTransformation.SingleOutput.JMA(44, -72, 1),
 //          ValueTransformation.SingleOutput.HMA(5),
         )
       ),
-//      Indicator.ThresholdCrossing(
-//        source = ValueSource.Close,
-//        transformation = ValueTransformation.DoubleOutput.STOCH(20, 3, 3),
-//        upperBoundary = 75,
-//        lowerBoundary = 25
-//      )
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.DoubleOutput.STOCH(20, 3, 3),
+        upperBoundary = 75,
+        lowerBoundary = 25
+      )
     )
   )
 

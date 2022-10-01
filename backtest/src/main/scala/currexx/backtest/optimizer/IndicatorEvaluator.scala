@@ -4,6 +4,7 @@ import cats.Show
 import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import cats.syntax.traverse.*
 import currexx.algorithms.Fitness
 import currexx.algorithms.operators.{Evaluator, Initialiser}
 import currexx.backtest.{MarketDataProvider, OrderStatsCollector, TestSettings}
@@ -25,19 +26,29 @@ object IndicatorEvaluator {
         case Indicator.ThresholdCrossing(source, transformation, upperBoundary, lowerBoundary) =>
           s"${ind.kind}-${source.print}-${transformation}-lb$lowerBoundary-up$upperBoundary"
 
-  def make[F[_]: Async](testFilePath: String, ts: TradeStrategy, otherIndicators: List[Indicator] = Nil): F[Evaluator[F, Indicator]] =
+  def make[F[_]: Async](
+      testFilePaths: List[String],
+      ts: TradeStrategy,
+      otherIndicators: List[Indicator] = Nil
+  ): F[Evaluator[F, Indicator]] =
     for
-      testData <- MarketDataProvider.read[F](testFilePath, cp).compile.toList
+      testDataSets <- testFilePaths.traverse(MarketDataProvider.read[F](_, cp).compile.toList)
       eval <- Evaluator.cached[F, Indicator] { ind =>
-        for
-          services <- TestServices.make[F](TestSettings.make(cp, ts, ind :: otherIndicators))
-          _ <- Stream
-            .emits(testData)
-            .through(services.processMarketData)
-            .compile
-            .drain
-          orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
-        yield (ind, Fitness(orderStats.totalProfit))
+        testDataSets
+          .traverse { testData =>
+            for
+              services <- TestServices.make[F](TestSettings.make(cp, ts, ind :: otherIndicators))
+              _ <- Stream
+                .emits(testData)
+                .through(services.processMarketData)
+                .compile
+                .drain
+              orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
+            yield orderStats.totalProfit
+          }
+          .map(res => ind -> Fitness(res.mean))
       }
     yield eval
+
+  extension (l: List[BigDecimal]) def mean: BigDecimal = l.sum / l.size
 }
