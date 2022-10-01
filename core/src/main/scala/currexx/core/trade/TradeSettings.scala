@@ -12,8 +12,8 @@ final case class TradingParameters(
     trailingStopLoss: Option[BigDecimal] = None,
     takeProfit: Option[BigDecimal] = None
 ) derives Codec.AsObject:
-  def toOrder(pair: CurrencyPair, position: TradeOrder.Position): TradeOrder =
-    TradeOrder.Enter(position, volume, stopLossPerCurrency.get(pair.quote.code).orElse(stopLoss), trailingStopLoss, takeProfit)
+  def toOrder(position: TradeOrder.Position, cp: CurrencyPair, price: BigDecimal): TradeOrder =
+    TradeOrder.Enter(position, cp, price, volume)
 
 final case class TradeSettings(
     userId: UserId,

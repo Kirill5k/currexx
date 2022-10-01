@@ -21,20 +21,16 @@ class TradeControllerSpec extends ControllerSpec {
     "POST /trade/orders" should {
       "submit order placement request" in {
         val svc = mock[TradeService[IO]]
-        when(svc.placeOrder(any[UserId], any[CurrencyPair], any[TradeOrder], any[Boolean])).thenReturn(IO.unit)
+        when(svc.placeOrder(any[UserId], any[TradeOrder], any[Boolean])).thenReturn(IO.unit)
 
         val requestBody =
           s"""
              |{
+             |  "kind" : "enter",
              |  "currencyPair" : "GBP/EUR",
-             |  "order" : {
-             |    "kind" : "enter",
-             |    "position" : "buy",
-             |    "volume" : 0.1,
-             |    "stopLoss" : 25,
-             |    "trailingStopLoss" : null,
-             |    "takeProfit" : null
-             |  }
+             |  "position" : "buy",
+             |  "volume" : 0.1,
+             |  "price" : 3.0
              |}
              |""".stripMargin
 
@@ -43,7 +39,7 @@ class TradeControllerSpec extends ControllerSpec {
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.Created, None)
-        verify(svc).placeOrder(Users.uid, Markets.gbpeur, Trades.order.order, false)
+        verify(svc).placeOrder(Users.uid, Trades.order.order, false)
       }
     }
 
@@ -58,20 +54,17 @@ class TradeControllerSpec extends ControllerSpec {
         val responseBody =
           s"""[
              |{
-             |  "currencyPair" : "GBPEUR",
              |  "order" : {
              |    "kind" : "enter",
              |    "position" : "buy",
              |    "volume" : 0.1,
-             |    "stopLoss" : 25,
-             |    "trailingStopLoss" : null,
-             |    "takeProfit" : null
+             |    "price" : 3.0,
+             |    "currencyPair" : "GBPEUR"
              |  },
              |  "broker" : {
              |    "broker" : "vindaloo",
              |    "externalId" : "1"
              |  },
-             |  "price" : 3.0,
              |  "time" : "${Trades.ts}"
              |}
              |]""".stripMargin

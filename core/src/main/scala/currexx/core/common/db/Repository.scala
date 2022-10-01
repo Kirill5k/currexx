@@ -16,19 +16,20 @@ import java.time.Instant
 trait Repository[F[_]] {
 
   protected object Field {
-    val Id             = "_id"
-    val Name           = "name"
-    val Time           = "time"
-    val UId            = "userId"
-    val Email          = "email"
-    val LastQueriedAt  = "lastQueriedAt"
-    val LastUpdatedAt  = "lastUpdatedAt"
-    val Status         = "status"
-    val LastAccessedAt = "lastAccessedAt"
-    val Active         = "active"
-    val CurrencyPair   = "currencyPair"
-    val Indicators     = "indicators"
-    val TriggeredBy    = "triggeredBy"
+    val Id                = "_id"
+    val Name              = "name"
+    val Time              = "time"
+    val UId               = "userId"
+    val Email             = "email"
+    val LastQueriedAt     = "lastQueriedAt"
+    val LastUpdatedAt     = "lastUpdatedAt"
+    val Status            = "status"
+    val LastAccessedAt    = "lastAccessedAt"
+    val Active            = "active"
+    val CurrencyPair      = "currencyPair"
+    val OrderCurrencyPair = "order.currencyPair"
+    val Indicators        = "indicators"
+    val TriggeredBy       = "triggeredBy"
   }
 
   private def idEqFilter(name: String, id: Option[String]): Filter = Filter.eq(name, id.map(ObjectId.apply).orNull)

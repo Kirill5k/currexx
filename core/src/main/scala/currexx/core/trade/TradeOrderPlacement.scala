@@ -8,9 +8,7 @@ import java.time.Instant
 
 final case class TradeOrderPlacement(
     userId: UserId,
-    currencyPair: CurrencyPair,
     order: TradeOrder,
     broker: BrokerParameters,
-    price: BigDecimal,
     time: Instant
 )

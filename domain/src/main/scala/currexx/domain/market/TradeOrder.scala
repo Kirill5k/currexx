@@ -1,40 +1,45 @@
 package currexx.domain.market
 
 import currexx.domain.types.EnumType
-import org.latestbit.circe.adt.codec.*
+import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder, Json}
+import io.circe.syntax.*
 
 import java.time.Instant
-import scala.util.Try
 
-enum TradeOrder derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
-  case Exit
-  case Enter(
-      position: TradeOrder.Position,
-      volume: BigDecimal,
-      stopLoss: Option[BigDecimal] = None,
-      trailingStopLoss: Option[BigDecimal] = None,
-      takeProfit: Option[BigDecimal] = None
-  )
+sealed trait TradeOrder(val kind: String):
+  def isEnter: Boolean
+  def currencyPair: CurrencyPair
+  def price: BigDecimal
 
 object TradeOrder {
   object Position extends EnumType[Position](() => Position.values, _.toString.toLowerCase)
   enum Position:
     case Buy, Sell
 
-  given JsonTaggedAdt.Config[TradeOrder] = JsonTaggedAdt.Config.Values[TradeOrder](
-    mappings = Map(
-      "exit"  -> JsonTaggedAdt.tagged[TradeOrder.Exit.type],
-      "enter" -> JsonTaggedAdt.tagged[TradeOrder.Enter]
-    ),
-    strict = true,
-    typeFieldName = "kind"
-  )
+  final case class Enter(
+      position: TradeOrder.Position,
+      currencyPair: CurrencyPair,
+      price: BigDecimal,
+      volume: BigDecimal
+  ) extends TradeOrder("enter")
+      derives Codec.AsObject:
+    def isEnter: Boolean = true
 
-  extension (to: TradeOrder)
-    def isEnter: Boolean =
-      to match
-        case TradeOrder.Exit     => false
-        case _: TradeOrder.Enter => true
+  final case class Exit(currencyPair: CurrencyPair, price: BigDecimal) extends TradeOrder("exit") derives Codec.AsObject:
+    def isEnter: Boolean = false
+
+  inline given Decoder[TradeOrder] = Decoder.instance { c =>
+    c.downField("kind").as[String].flatMap {
+      case "exit"  => c.as[Exit]
+      case "enter" => c.as[Enter]
+      case kind    => Left(DecodingFailure(s"Unexpected trade-order kind $kind", List(CursorOp.Field("kind"))))
+    }
+  }
+
+  inline given Encoder[TradeOrder] = Encoder.instance {
+    case enter: Enter => enter.asJsonObject.add("kind", Json.fromString("enter")).asJson
+    case exit: Exit   => exit.asJsonObject.add("kind", Json.fromString("exit")).asJson
+  }
 }
 
 final case class OpenedTradeOrder(

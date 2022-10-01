@@ -14,7 +14,7 @@ import sttp.model.Uri
 import scala.concurrent.duration.*
 
 private[clients] trait VindalooClient[F[_]] extends HttpClient[F]:
-  def submit(params: BrokerParameters.Vindaloo, cp: CurrencyPair, order: TradeOrder): F[Unit]
+  def submit(params: BrokerParameters.Vindaloo, order: TradeOrder): F[Unit]
   def getCurrentOrder(params: BrokerParameters.Vindaloo, cp: CurrencyPair): F[Option[OpenedTradeOrder]]
 
 final private class LiveVindalooClient[F[_]](
@@ -28,23 +28,23 @@ final private class LiveVindalooClient[F[_]](
   override protected val name: String                                   = "vindaloo"
   override protected val delayBetweenConnectionFailures: FiniteDuration = 5.seconds
 
-  override def submit(params: BrokerParameters.Vindaloo, cp: CurrencyPair, order: TradeOrder): F[Unit] =
-    logger.info(s"Submitting $cp order $order to Vindaloo(${params.externalId})") >> {
+  override def submit(params: BrokerParameters.Vindaloo, order: TradeOrder): F[Unit] =
+    logger.info(s"Submitting order $order to Vindaloo(${params.externalId})") >> {
       order match
-        case enter: TradeOrder.Enter => enterMarketOrder(params.externalId, cp, enter)
-        case TradeOrder.Exit         => exitMarketOrder(params.externalId, cp)
+        case enter: TradeOrder.Enter => enterMarketOrder(params.externalId, enter)
+        case exit: TradeOrder.Exit   => exitMarketOrder(params.externalId, exit)
     }
 
-  private def enterMarketOrder(externalId: String, currencyPair: CurrencyPair, order: TradeOrder.Enter): F[Unit] = {
-    val stopLoss   = order.stopLoss.getOrElse(0)
-    val trailingSL = order.trailingStopLoss.getOrElse(0)
-    val takeProfit = order.takeProfit.getOrElse(0)
+  private def enterMarketOrder(externalId: String, order: TradeOrder.Enter): F[Unit] = {
+    val stopLoss   = 0
+    val trailingSL = 0
+    val takeProfit = 0
     val pos        = order.position.toString.toLowerCase
-    sendRequest(uri"${config.baseUri}/$externalId/$stopLoss/$trailingSL/$takeProfit/$pos/$currencyPair/${order.volume}")
+    sendRequest(uri"${config.baseUri}/$externalId/$stopLoss/$trailingSL/$takeProfit/$pos/${order.currencyPair}/${order.volume}")
   }
 
-  private def exitMarketOrder(externalId: String, currencyPair: CurrencyPair): F[Unit] =
-    sendRequest(uri"${config.baseUri}/close/$externalId/$currencyPair")
+  private def exitMarketOrder(externalId: String, order: TradeOrder.Exit): F[Unit] =
+    sendRequest(uri"${config.baseUri}/close/$externalId/${order.currencyPair}")
 
   private def sendRequest(uri: Uri): F[Unit] =
     dispatch(basicRequest.post(uri))

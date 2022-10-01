@@ -53,9 +53,7 @@ object XtbRequest {
 
   def openTransaction(
       sessionId: String,
-      cp: CurrencyPair,
-      order: TradeOrder.Enter,
-      price: SymbolData
+      order: TradeOrder.Enter
   ): XtbRequest[RequestArguments.Transaction] =
     XtbRequest(
       "tradeTransaction",
@@ -64,13 +62,14 @@ object XtbRequest {
         RequestArguments.TradeTransInfo(
           `type` = 0,
           cmd = Some(if (order.position == TradeOrder.Position.Buy) 0 else 1),
-          symbol = cp.toString,
-          customComment = s"Currexx - ${TradeOrder.Position.Buy.toString} $cp",
-          offset = order.trailingStopLoss,
+          symbol = order.currencyPair.toString,
+          customComment = s"Currexx - ${TradeOrder.Position.Buy.toString} ${order.currencyPair}",
+          offset = None,
           volume = order.volume,
-          price = if (order.position == TradeOrder.Position.Buy) price.ask else price.bid,
-          sl = order.stopLoss,
-          tp = order.takeProfit,
+//          price = if (order.position == TradeOrder.Position.Buy) price.ask else price.bid,
+          price = order.price,
+          sl = None,
+          tp = None,
         )
       )
     )

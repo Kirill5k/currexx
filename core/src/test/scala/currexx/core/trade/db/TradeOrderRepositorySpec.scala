@@ -5,6 +5,7 @@ import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Trades, Users}
+import currexx.domain.market.TradeOrder
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
 
@@ -79,7 +80,7 @@ class TradeOrderRepositorySpec extends MongoSpec {
         val result = for
           repo <- TradeOrderRepository.make(db)
           _    <- repo.save(Trades.order)
-          _    <- repo.save(Trades.order.copy(currencyPair = Markets.gbpusd))
+          _    <- repo.save(Trades.order.copy(order = TradeOrder.Enter(TradeOrder.Position.Sell, Markets.gbpusd, BigDecimal(5), BigDecimal(0.1))))
           res  <- repo.getAllTradedCurrencies(Users.uid)
         yield res
 

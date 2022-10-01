@@ -20,14 +20,14 @@ class VindalooClientSpec extends ClientSpec {
     "send enter market requests" in {
       val testingBackend: SttpBackend[IO, Any] = backendStub
         .whenRequestMatchesPartial {
-          case r if r.isPost && r.isGoingTo("vindaloo.com/15/25/0/0/buy/GBPUSD/0.1") => Response.ok("ok")
+          case r if r.isPost && r.isGoingTo("vindaloo.com/15/0/0/0/buy/GBPUSD/0.1") => Response.ok("ok")
           case _                                                                     => throw new RuntimeException()
         }
 
       val result = for
         client <- VindalooClient.make[IO](config, testingBackend)
-        order = TradeOrder.Enter(TradeOrder.Position.Buy, BigDecimal(0.1), Some(BigDecimal(25)), None, None)
-        res <- client.submit(BrokerParameters.Vindaloo("15"), pair, order)
+        order = TradeOrder.Enter(TradeOrder.Position.Buy, pair, BigDecimal(1.3), BigDecimal(0.1))
+        res <- client.submit(BrokerParameters.Vindaloo("15"), order)
       yield res
 
       result.assertIsVoid
@@ -42,7 +42,7 @@ class VindalooClientSpec extends ClientSpec {
 
       val result = for
         client <- VindalooClient.make[IO](config, testingBackend)
-        res    <- client.submit(BrokerParameters.Vindaloo("15"), pair, TradeOrder.Exit)
+        res    <- client.submit(BrokerParameters.Vindaloo("15"), TradeOrder.Exit(pair, BigDecimal(1.3)))
       yield res
 
       result.assertIsVoid

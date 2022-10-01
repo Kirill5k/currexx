@@ -23,6 +23,7 @@ import scala.concurrent.duration.*
 class XtbClientSpec extends ClientSpec {
   val config = XtbConfig("wss://ws.xtb.com")
   val pair   = CurrencyPair(EUR, CAD)
+  val price  = BigDecimal(1.341)
 
   val brokerConfig: BrokerParameters.Xtb = BrokerParameters.Xtb("foo", "bar", true)
 
@@ -39,7 +40,7 @@ class XtbClientSpec extends ClientSpec {
 
       val result = for
         client <- XtbClient.make[IO](config, testingBackend)
-        res    <- client.submit(brokerConfig, pair, TradeOrder.Exit)
+        res    <- client.submit(brokerConfig, TradeOrder.Exit(pair, price))
       yield res
 
       result.assertError(AppError.AccessDenied("foo"))
@@ -51,8 +52,8 @@ class XtbClientSpec extends ClientSpec {
         .use { backend =>
           for
             client <- XtbClient.make[IO](config, backend)
-            order = TradeOrder.Enter(TradeOrder.Position.Buy, BigDecimal(0.1))
-            res <- client.submit(brokerConfig, pair, order)
+            order = TradeOrder.Enter(TradeOrder.Position.Buy, pair, price, BigDecimal(0.1))
+            res <- client.submit(brokerConfig, order)
           yield res
         }
 
@@ -81,7 +82,7 @@ class XtbClientSpec extends ClientSpec {
           for
             client <- XtbClient.make[IO](config, backend)
             _      <- IO.sleep(10.seconds)
-            res    <- client.submit(brokerConfig, pair, TradeOrder.Exit)
+            res    <- client.submit(brokerConfig, TradeOrder.Exit(pair, price))
           yield res
         }
 

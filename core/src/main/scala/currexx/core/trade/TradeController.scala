@@ -52,9 +52,9 @@ final private class TradeController[F[_]](
 
   private def submitTradeOrderPlacement(using auth: Authenticator[F]) =
     submitTradeOrderPlacementEndpoint.withAuthenticatedSession
-      .serverLogic { session => (req, closePendingOrders) =>
+      .serverLogic { session => (order, closePendingOrders) =>
         service
-          .placeOrder(session.userId, req.currencyPair, req.order, closePendingOrders)
+          .placeOrder(session.userId, order, closePendingOrders)
           .voidResponse
       }
 
@@ -80,21 +80,14 @@ object TradeController extends TapirSchema with TapirJson {
     def toDomain(userId: UserId): TradeSettings = TradeSettings(userId, strategy, broker, trading, comment)
 
   final case class TradeOrderView(
-      currencyPair: CurrencyPair,
       order: TradeOrder,
       broker: BrokerParameters,
-      price: BigDecimal,
       time: Instant
   ) derives Codec.AsObject
 
   object TradeOrderView:
     def from(top: TradeOrderPlacement): TradeOrderView =
-      TradeOrderView(top.currencyPair, top.order, top.broker, top.price, top.time)
-
-  final case class TradeOrderPlacementRequest(
-      currencyPair: CurrencyPair,
-      order: TradeOrder
-  ) derives Codec.AsObject
+      TradeOrderView(top.order, top.broker, top.time)
 
   private val basePath     = "trade"
   private val settingsPath = basePath / "settings"
@@ -108,7 +101,7 @@ object TradeController extends TapirSchema with TapirJson {
 
   val submitTradeOrderPlacementEndpoint = Controller.securedEndpoint.post
     .in(ordersPath)
-    .in(jsonBody[TradeOrderPlacementRequest])
+    .in(jsonBody[TradeOrder])
     .in(query[Boolean]("closePendingOrders").description("Close pending orders").default(true))
     .out(statusCode(StatusCode.Created))
     .description("Submit trade order placement")

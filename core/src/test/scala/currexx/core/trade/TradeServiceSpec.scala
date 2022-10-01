@@ -91,22 +91,21 @@ class TradeServiceSpec extends CatsSpec {
     "placeOrder" should {
       "submit order placements" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(dataClient.latestPrice(any[CurrencyPair])).thenReturn(IO.pure(Markets.priceRange))
         when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
-        when(brokerClient.submit(any[CurrencyPair], any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
-        val order = TradeOrder.Enter(TradeOrder.Position.Buy, BigDecimal(0.1))
+        val order = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, BigDecimal(1.3), BigDecimal(0.1))
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.placeOrder(Users.uid, Markets.gbpeur, order, false)
+          _   <- svc.placeOrder(Users.uid, order, false)
         yield ()
 
         result.asserting { res =>
-          verify(dataClient).latestPrice(Markets.gbpeur)
+          verifyNoInteractions(dataClient)
           verify(settRepo).get(Users.uid)
-          verify(brokerClient).submit(Markets.gbpeur, Trades.broker, order)
+          verify(brokerClient).submit(Trades.broker, order)
           verify(orderRepo, Mockito.never()).findLatestBy(any[UserId], any[CurrencyPair])
           verify(orderRepo).save(any[TradeOrderPlacement])
           verify(disp).dispatch(any[Action])
@@ -116,23 +115,22 @@ class TradeServiceSpec extends CatsSpec {
 
       "close existing orders before submitting the actual placement" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(dataClient.latestPrice(any[CurrencyPair])).thenReturn(IO.pure(Markets.priceRange))
         when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
-        when(brokerClient.submit(any[CurrencyPair], any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
         when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturn(IO.none)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
-        val order = TradeOrder.Enter(TradeOrder.Position.Buy, BigDecimal(0.1))
+        val order = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, BigDecimal(1.3), BigDecimal(0.1))
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.placeOrder(Users.uid, Markets.gbpeur, order, true)
+          _   <- svc.placeOrder(Users.uid, order, true)
         yield ()
 
         result.asserting { res =>
-          verify(dataClient).latestPrice(Markets.gbpeur)
+          verifyNoInteractions(dataClient)
           verify(settRepo).get(Users.uid)
-          verify(brokerClient).submit(Markets.gbpeur, Trades.broker, order)
+          verify(brokerClient).submit(Trades.broker, order)
           verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
           verify(orderRepo).save(any[TradeOrderPlacement])
           verify(disp).dispatch(any[Action])
@@ -160,7 +158,8 @@ class TradeServiceSpec extends CatsSpec {
 
       "not do anything when latest order is exit" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturn(IO.some(Trades.order.copy(order = TradeOrder.Exit)))
+        when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair]))
+          .thenReturn(IO.some(Trades.order.copy(order = TradeOrder.Exit(Markets.gbpeur, BigDecimal(1.5)))))
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
@@ -178,7 +177,7 @@ class TradeServiceSpec extends CatsSpec {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(dataClient.latestPrice(any[CurrencyPair])).thenReturn(IO.pure(Markets.priceRange))
         when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturn(IO.some(Trades.order))
-        when(brokerClient.submit(any[CurrencyPair], any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
@@ -191,7 +190,7 @@ class TradeServiceSpec extends CatsSpec {
           verifyNoInteractions(settRepo)
           verify(dataClient).latestPrice(Markets.gbpeur)
           verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
-          verify(brokerClient).submit(Markets.gbpeur, Trades.broker, TradeOrder.Exit)
+          verify(brokerClient).submit(Trades.broker, TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close))
           verify(orderRepo).save(any[TradeOrderPlacement])
           verify(disp).dispatch(any[Action])
           res mustBe ()
@@ -222,8 +221,8 @@ class TradeServiceSpec extends CatsSpec {
       "submit close order if profit is above max" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
-        when(brokerClient.find(any[CurrencyPair], any[BrokerParameters])).thenReturn(IO.pure(Some(Trades.openedOrder)))
-        when(brokerClient.submit(any[CurrencyPair], any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
+        when(brokerClient.find(any[BrokerParameters], any[CurrencyPair])).thenReturn(IO.pure(Some(Trades.openedOrder)))
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
@@ -235,8 +234,8 @@ class TradeServiceSpec extends CatsSpec {
         result.asserting { res =>
           verifyNoInteractions(dataClient)
           verify(settRepo).get(Users.uid)
-          verify(brokerClient).find(Markets.gbpeur, Trades.broker)
-          verify(brokerClient).submit(Markets.gbpeur, Trades.broker, TradeOrder.Exit)
+          verify(brokerClient).find(Trades.broker, Markets.gbpeur)
+          verify(brokerClient).submit(Trades.broker, TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close))
           verify(orderRepo).save(any[TradeOrderPlacement])
           verify(disp).dispatch(any[Action])
           res mustBe ()
@@ -246,9 +245,9 @@ class TradeServiceSpec extends CatsSpec {
       "submit close order if profit is below min" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
-        when(brokerClient.find(any[CurrencyPair], any[BrokerParameters]))
+        when(brokerClient.find(any[BrokerParameters], any[CurrencyPair]))
           .thenReturn(IO.pure(Some(Trades.openedOrder.copy(profit = BigDecimal(-100)))))
-        when(brokerClient.submit(any[CurrencyPair], any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
@@ -260,8 +259,8 @@ class TradeServiceSpec extends CatsSpec {
         result.asserting { res =>
           verifyNoInteractions(dataClient)
           verify(settRepo).get(Users.uid)
-          verify(brokerClient).find(Markets.gbpeur, Trades.broker)
-          verify(brokerClient).submit(Markets.gbpeur, Trades.broker, TradeOrder.Exit)
+          verify(brokerClient).find(Trades.broker, Markets.gbpeur)
+          verify(brokerClient).submit(Trades.broker, TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close))
           verify(orderRepo).save(any[TradeOrderPlacement])
           verify(disp).dispatch(any[Action])
           res mustBe ()
@@ -271,7 +270,7 @@ class TradeServiceSpec extends CatsSpec {
       "not do anything if profit is within range" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
-        when(brokerClient.find(any[CurrencyPair], any[BrokerParameters]))
+        when(brokerClient.find(any[BrokerParameters], any[CurrencyPair]))
           .thenReturn(IO.pure(Some(Trades.openedOrder.copy(profit = BigDecimal(0)))))
 
         val result = for
@@ -282,7 +281,7 @@ class TradeServiceSpec extends CatsSpec {
         result.asserting { res =>
           verifyNoInteractions(dataClient, orderRepo, disp)
           verify(settRepo).get(Users.uid)
-          verify(brokerClient).find(Markets.gbpeur, Trades.broker)
+          verify(brokerClient).find(Trades.broker, Markets.gbpeur)
           verifyNoMoreInteractions(brokerClient)
           res mustBe ()
         }
@@ -291,7 +290,7 @@ class TradeServiceSpec extends CatsSpec {
       "not do anything if there are no opened positions" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
-        when(brokerClient.find(any[CurrencyPair], any[BrokerParameters])).thenReturn(IO.pure(None))
+        when(brokerClient.find(any[BrokerParameters], any[CurrencyPair])).thenReturn(IO.pure(None))
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
@@ -301,7 +300,7 @@ class TradeServiceSpec extends CatsSpec {
         result.asserting { res =>
           verifyNoInteractions(dataClient, orderRepo, disp)
           verify(settRepo).get(Users.uid)
-          verify(brokerClient).find(Markets.gbpeur, Trades.broker)
+          verify(brokerClient).find(Trades.broker, Markets.gbpeur)
           verifyNoMoreInteractions(brokerClient)
           res mustBe ()
         }
@@ -330,7 +329,7 @@ class TradeServiceSpec extends CatsSpec {
       "close existing order if new order has reverse position" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings.copy(strategy = TradeStrategy.TrendChange)))
-        when(brokerClient.submit(any[CurrencyPair], any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
         when(dataClient.latestPrice(any[CurrencyPair])).thenReturn(IO.pure(Markets.priceRange))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
@@ -345,11 +344,10 @@ class TradeServiceSpec extends CatsSpec {
 
         result.asserting { res =>
           verify(settRepo).get(Users.uid)
-          verify(brokerClient).submit(Markets.gbpeur, Trades.broker, TradeOrder.Exit)
+          verify(brokerClient).submit(Trades.broker, TradeOrder.Exit(Markets.gbpeur, BigDecimal(3.0)))
           verify(brokerClient).submit(
-            Markets.gbpeur,
             Trades.broker,
-            Trades.settings.trading.toOrder(Markets.gbpeur, TradeOrder.Position.Buy)
+            Trades.settings.trading.toOrder(TradeOrder.Position.Buy, Markets.gbpeur, BigDecimal(3.0))
           )
           verify(dataClient).latestPrice(Markets.gbpeur)
           verify(orderRepo).save(any[TradeOrderPlacement])

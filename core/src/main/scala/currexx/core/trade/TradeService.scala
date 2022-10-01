@@ -25,7 +25,7 @@ trait TradeService[F[_]]:
   def updateSettings(settings: TradeSettings): F[Unit]
   def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]]
   def processMarketStateUpdate(state: MarketState, triggers: List[Indicator]): F[Unit]
-  def placeOrder(uid: UserId, cp: CurrencyPair, order: TradeOrder, closePendingOrders: Boolean): F[Unit]
+  def placeOrder(uid: UserId, order: TradeOrder, closePendingOrders: Boolean): F[Unit]
   def closeOpenOrders(uid: UserId): F[Unit]
   def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
   def closeOrderIfProfitIsOutsideRange(uid: UserId, cp: CurrencyPair, min: Option[BigDecimal], max: Option[BigDecimal]): F[Unit]
@@ -47,23 +47,11 @@ final private class LiveTradeService[F[_]](
   override def fetchMarketData(uid: UserId, cp: CurrencyPair, interval: Interval): F[Unit] =
     marketDataClient.timeSeriesData(cp, interval).flatMap(data => dispatcher.dispatch(Action.ProcessMarketData(uid, data)))
 
-  override def placeOrder(uid: UserId, cp: CurrencyPair, order: TradeOrder, closePendingOrders: Boolean): F[Unit] =
-    (F.realTimeInstant, marketDataClient.latestPrice(cp), settingsRepository.get(uid))
-      .mapN { (time, price, sett) =>
-        val pendingClose = if (closePendingOrders && order.isEnter) {
-          orderRepository
-            .findLatestBy(uid, cp)
-            .map {
-              case Some(top) if top.order.isEnter =>
-                Some(top.copy(time = time, price = price.close, order = TradeOrder.Exit))
-              case _ => None
-            }
-        } else F.pure(None)
-
-        pendingClose.map(_.toVector :+ TradeOrderPlacement(uid, cp, order, sett.broker, price.close, time))
-      }
-      .flatten
-      .flatMap(_.traverse(submitOrderPlacement).void)
+  override def placeOrder(uid: UserId, order: TradeOrder, closePendingOrders: Boolean): F[Unit] =
+    F.whenA(closePendingOrders)(closeOpenOrders(uid, order.currencyPair)) >>
+      (F.realTimeInstant, settingsRepository.get(uid))
+        .mapN((time, sett) => TradeOrderPlacement(uid, order, sett.broker, time))
+        .flatMap(submitOrderPlacement)
 
   override def closeOpenOrders(uid: UserId): F[Unit] =
     Stream
@@ -78,7 +66,7 @@ final private class LiveTradeService[F[_]](
       .flatMap {
         case Some(top) if top.order.isEnter =>
           (F.realTimeInstant, marketDataClient.latestPrice(cp))
-            .mapN((time, price) => top.copy(time = time, price = price.close, order = TradeOrder.Exit))
+            .mapN((time, price) => top.copy(time = time, order = TradeOrder.Exit(cp, price.close)))
             .flatMap(submitOrderPlacement)
         case _ => F.unit
       }
@@ -91,11 +79,11 @@ final private class LiveTradeService[F[_]](
   ): F[Unit] =
     for
       settings   <- settingsRepository.get(uid)
-      foundOrder <- brokerClient.find(cp, settings.broker)
+      foundOrder <- brokerClient.find(settings.broker, cp)
       time       <- F.realTimeInstant
       _ <- foundOrder match
         case Some(o) if min.exists(_ > o.profit) || max.exists(_ < o.profit) =>
-          submitOrderPlacement(TradeOrderPlacement(uid, cp, TradeOrder.Exit, settings.broker, o.currentPrice, time))
+          submitOrderPlacement(TradeOrderPlacement(uid, TradeOrder.Exit(cp, o.currentPrice), settings.broker, time))
         case _ => F.unit
     yield ()
 
@@ -106,22 +94,22 @@ final private class LiveTradeService[F[_]](
           .get(settings.strategy)
           .analyze(state, triggers)
           .map {
-            case Decision.Buy   => settings.trading.toOrder(state.currencyPair, TradeOrder.Position.Buy)
-            case Decision.Sell  => settings.trading.toOrder(state.currencyPair, TradeOrder.Position.Sell)
-            case Decision.Close => TradeOrder.Exit
+            case Decision.Buy   => settings.trading.toOrder(TradeOrder.Position.Buy, state.currencyPair, price.close)
+            case Decision.Sell  => settings.trading.toOrder(TradeOrder.Position.Sell, state.currencyPair, price.close)
+            case Decision.Close => TradeOrder.Exit(state.currencyPair, price.close)
           }
-          .map(order => TradeOrderPlacement(state.userId, state.currencyPair, order, settings.broker, price.close, time))
+          .map(order => TradeOrderPlacement(state.userId, order, settings.broker, time))
       }
       .flatMap {
         case Some(top) =>
-          F.whenA(state.hasOpenPosition && top.order.isEnter)(brokerClient.submit(top.currencyPair, top.broker, TradeOrder.Exit)) *>
+          F.whenA(state.hasOpenPosition && top.order.isEnter)(brokerClient.submit(top.broker, TradeOrder.Exit(top.order.currencyPair, top.order.price))) *>
             submitOrderPlacement(top)
         case None =>
           F.unit
       }
 
   private def submitOrderPlacement(top: TradeOrderPlacement): F[Unit] =
-    brokerClient.submit(top.currencyPair, top.broker, top.order) *>
+    brokerClient.submit(top.broker, top.order) *>
       orderRepository.save(top) *>
       dispatcher.dispatch(Action.ProcessTradeOrderPlacement(top))
 

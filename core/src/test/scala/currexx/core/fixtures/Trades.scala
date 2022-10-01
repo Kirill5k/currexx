@@ -22,10 +22,8 @@ object Trades {
 
   lazy val order = TradeOrderPlacement(
     Users.uid,
-    Markets.gbpeur,
-    TradeOrder.Enter(TradeOrder.Position.Buy, BigDecimal(0.1), Some(BigDecimal(25)), None, None),
+    TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, Markets.priceRange.close, BigDecimal(0.1)),
     broker,
-    Markets.priceRange.close,
     ts
   )
   

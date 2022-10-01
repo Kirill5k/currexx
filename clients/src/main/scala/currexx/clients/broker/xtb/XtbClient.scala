@@ -26,7 +26,7 @@ import java.nio.charset.StandardCharsets
 import java.time.Instant
 
 private[clients] trait XtbClient[F[_]] extends HttpClient[F]:
-  def submit(params: BrokerParameters.Xtb, pair: CurrencyPair, order: TradeOrder): F[Unit]
+  def submit(params: BrokerParameters.Xtb, order: TradeOrder): F[Unit]
   def getCurrentOrder(params: BrokerParameters.Xtb, cp: CurrencyPair): F[Option[OpenedTradeOrder]]
 
 final private class LiveXtbClient[F[_]](
@@ -61,14 +61,14 @@ final private class LiveXtbClient[F[_]](
       )
     }
 
-  override def submit(params: BrokerParameters.Xtb, cp: CurrencyPair, order: TradeOrder): F[Unit] =
+  override def submit(params: BrokerParameters.Xtb, order: TradeOrder): F[Unit] =
     initEmptyState.flatMap { state =>
       basicRequest
         .response(
           asWebSocketStream(Fs2Streams[F])(
             order match
-              case TradeOrder.Exit         => orderClosureProcess(state, params, cp)
-              case enter: TradeOrder.Enter => orderPlacementProcess(state, params, cp, enter)
+              case exit: TradeOrder.Exit   => orderClosureProcess(state, params, exit)
+              case enter: TradeOrder.Enter => orderPlacementProcess(state, params, enter)
           )
         )
         .get(uri"${config.baseUri}/${if (params.demo) "demo" else "real"}")
@@ -79,7 +79,6 @@ final private class LiveXtbClient[F[_]](
   private def orderPlacementProcess(
       state: Ref[F, XtbClient.WsState],
       params: BrokerParameters.Xtb,
-      cp: CurrencyPair,
       order: TradeOrder.Enter
   ): Pipe[F, WebSocketFrame.Data[_], WebSocketFrame] = { input =>
     login(params) ++
@@ -88,9 +87,7 @@ final private class LiveXtbClient[F[_]](
         .flatMap {
           case XtbResponse.Login(sessionId) =>
             Stream.eval(state.update(_.withSessionId(sessionId))).drain ++
-              Stream.emit(XtbRequest.symbolInfo(sessionId, cp).asText)
-          case XtbResponse.SymbolInfo(price) =>
-            obtainSessionId(state).map(sid => XtbRequest.openTransaction(sid, cp, order, price).asText)
+              Stream.emit(XtbRequest.openTransaction(sessionId, order).asText)
           case XtbResponse.OrderPlacement(_) => Stream.emit(WebSocketFrame.close)
           case error: XtbResponse.Error      => handError(params.userId, error)
           case _                             => Stream.empty
@@ -100,7 +97,7 @@ final private class LiveXtbClient[F[_]](
   private def orderClosureProcess(
       state: Ref[F, XtbClient.WsState],
       params: BrokerParameters.Xtb,
-      cp: CurrencyPair
+      order: TradeOrder.Exit
   ): Pipe[F, WebSocketFrame.Data[_], WebSocketFrame] = { input =>
     login(params) ++
       input
@@ -114,12 +111,12 @@ final private class LiveXtbClient[F[_]](
               .flatMap { sid =>
                 Stream
                   .emits(trades)
-                  .filter(_.symbol == cp.toString)
-                  .map(td => XtbRequest.closeTransaction(sid, cp, td).asText)
+                  .filter(_.symbol == order.currencyPair.toString)
+                  .map(td => XtbRequest.closeTransaction(sid, order.currencyPair, td).asText)
               }
           case XtbResponse.OrderPlacement(_) => Stream.emit(WebSocketFrame.close)
           case XtbResponse.Error("SE199", _) =>
-            Stream.logError(s"$name-client/server-${params.userId}: failed to close transaction for $cp") ++
+            Stream.logError(s"$name-client/server-${params.userId}: failed to close transaction for $order") ++
               obtainSessionId(state).delayBy(delayBetweenConnectionFailures).map(sid => XtbRequest.currentTrades(sid).asText)
           case error: XtbResponse.Error => handError(params.userId, error)
           case _                        => Stream.empty

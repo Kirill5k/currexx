@@ -97,7 +97,7 @@ class MarketServiceSpec extends CatsSpec {
         yield state
 
         result.asserting { res =>
-          verify(stateRepo).update(Users.uid, Markets.gbpeur, Some(PositionState(TradeOrder.Position.Buy, Trades.ts, Trades.order.price)))
+          verify(stateRepo).update(Users.uid, Markets.gbpeur, Some(PositionState(TradeOrder.Position.Buy, Trades.ts, Markets.priceRange.close)))
           verifyNoInteractions(disp)
           res mustBe ()
         }
