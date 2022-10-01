@@ -48,8 +48,8 @@ final private class LiveXtbClient[F[_]](
         .get(uri"${config.baseUri}/${if (params.demo) "demo" else "real"}")
         .send(backend)
         .void
-      retrievedOrder <- state.get.map(_.retrievedOrder)
-    yield retrievedOrder.filter(_.profit.isDefined).map { td =>
+      retrievedOrder <- state.get.map(_.retrievedOrder.filter(_.profit.isDefined))
+    yield retrievedOrder.map { td =>
       OpenedTradeOrder(
         cp,
         if (td.cmd == 0) TradeOrder.Position.Buy else TradeOrder.Position.Sell,
@@ -163,6 +163,10 @@ final private class LiveXtbClient[F[_]](
 
   private def handError(userId: String, error: XtbResponse.Error): Stream[F, WebSocketFrame] =
     error match
+      case XtbResponse.Error("EX027", desc) =>
+        Stream.emit(WebSocketFrame.close) ++
+          Stream.logError(s"$name-client/account-not-available-$userId: $desc") ++
+          Stream.raiseError(AppError.AccessDenied(s"Failed to authenticate with $name: $desc"))
       case XtbResponse.Error("BE005", desc) =>
         Stream.emit(WebSocketFrame.close) ++
           Stream.logError(s"$name-client/forbidden-$userId: $desc") ++

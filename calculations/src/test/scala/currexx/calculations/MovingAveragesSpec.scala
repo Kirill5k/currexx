@@ -37,11 +37,13 @@ class MovingAveragesSpec extends AnyWordSpec with Matchers {
       hma.take(6).map(rounded(4)) mustBe List(1.1224, 1.1154, 1.114, 1.1193, 1.1274, 1.1361)
     }
 
-    "calculate Jurik Moving Average" in {
+    "calculate Jurik Moving Average (simplified)" in {
       val jma = MovingAverages.jurikSimplified(values, 9, 50, 2)
 
       jma.take(6).map(rounded(4)) mustBe List(1.1264, 1.1202, 1.1172, 1.1201, 1.1262, 1.1359)
     }
+
+    // 1.2999, 1.1214, 1.1155, 1.1169, 1,1223, 1.1341
   }
 
   def rounded(scale: Int)(num: Double): Double =
