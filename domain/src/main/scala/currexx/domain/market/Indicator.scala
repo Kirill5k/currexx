@@ -33,7 +33,7 @@ object ValueTransformation {
     case JMA(length: Int, phase: Int, power: Int)                                   extends SingleOutput("jma")
 
   object SingleOutput:
-    def sequenced(sequence: SingleOutput*): SingleOutput = SingleOutput.Sequenced(sequence.toList)
+    def sequenced(so: SingleOutput, soSequence: SingleOutput*): SingleOutput = SingleOutput.Sequenced(so :: soSequence.toList)
 
     given JsonTaggedAdt.Config[SingleOutput] = JsonTaggedAdt.Config.Values[SingleOutput](
       mappings = Map(
