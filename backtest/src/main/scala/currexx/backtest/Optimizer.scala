@@ -21,7 +21,7 @@ object Optimizer extends IOApp.Simple {
     crossoverProbability = 0.7,
     mutationProbability = 0.25,
     elitismRatio = 0.2,
-    shuffle = false
+    shuffle = true
   )
 
   val thresholdCrossing = Indicator.ThresholdCrossing(
@@ -37,12 +37,13 @@ object Optimizer extends IOApp.Simple {
 //    ValueTransformation.SingleOutput.NMA(45, 5, 11.0d, MovingAverage.Weighted)
   )
 
-  val testDataSets    = List("nzd-cad-1d.csv", "eur-chf-1d.csv", "nzd-chf-1d.csv")
-  val strategy        = TradeStrategy.TrendChangeAggressive
+  val testDataSets    = List("nzd-cad-1d.csv", "eur-chf-1d.csv", "nzd-chf-1d.csv", "usd-dkk-1d.csv")
+  val strategy        = TradeStrategy.TrendChange
   val target          = trendChangeDetection
   val otherIndicators = Nil
 
   override def run: IO[Unit] = for
+    _       <- IO.println(s"Starting optimization of $target")
     startTs <- IO.realTime
     init    <- IndicatorInitialiser.make[IO]
     cross   <- IndicatorCrossover.make[IO]
