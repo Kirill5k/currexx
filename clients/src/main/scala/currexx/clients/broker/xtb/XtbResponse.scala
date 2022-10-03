@@ -13,7 +13,11 @@ object XtbResponse {
   final case class Login(streamSessionId: String)               extends XtbResponse derives Codec.AsObject
   final case class Error(errorCode: String, errorDescr: String) extends XtbResponse derives Codec.AsObject
 
-  final case class SymbolData(ask: BigDecimal, bid: BigDecimal) derives Codec.AsObject
+  final case class SymbolData(
+      ask: BigDecimal,
+      bid: BigDecimal,
+      contractSize: Int
+  ) derives Codec.AsObject
   final case class SymbolInfo(returnData: SymbolData) extends XtbResponse derives Codec.AsObject
 
   final case class OrderData(order: Long) derives Codec.AsObject

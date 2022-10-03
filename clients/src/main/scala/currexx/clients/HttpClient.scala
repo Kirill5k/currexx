@@ -34,5 +34,6 @@ trait HttpClient[F[_]] {
   extension (S: Stream.type)
     def logError[F[_]](message: String)(using logger: Logger[F]): Stream[F, Nothing] =
       S.eval(logger.error(message)).drain
-
+    def logWarn[F[_]](message: String)(using logger: Logger[F]): Stream[F, Nothing] =
+      S.eval(logger.warn(message)).drain
 }

@@ -6,7 +6,7 @@ import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.clients.HttpClient
 import currexx.clients.broker.BrokerParameters
-import currexx.clients.broker.xtb.XtbResponse.TradeData
+import currexx.clients.broker.xtb.XtbResponse.{SymbolData, TradeData}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, OpenedTradeOrder, TradeOrder}
 import io.circe.syntax.*
@@ -48,18 +48,8 @@ final private class LiveXtbClient[F[_]](
         .get(uri"${config.baseUri}/${if (params.demo) "demo" else "real"}")
         .send(backend)
         .void
-      retrievedOrder <- state.get.map(_.retrievedOrder.filter(_.profit.isDefined))
-    yield retrievedOrder.map { td =>
-      OpenedTradeOrder(
-        cp,
-        if (td.cmd == 0) TradeOrder.Position.Buy else TradeOrder.Position.Sell,
-        td.close_price,
-        td.open_price,
-        Instant.ofEpochMilli(td.open_time),
-        td.volume,
-        td.profit.get
-      )
-    }
+      retrievedOrder <- state.get.map(_.openedTradeOrder(cp))
+    yield retrievedOrder
 
   override def submit(params: BrokerParameters.Xtb, order: TradeOrder): F[Unit] =
     initEmptyState.flatMap { state =>
@@ -136,7 +126,18 @@ final private class LiveXtbClient[F[_]](
             Stream.eval(state.update(_.withSessionId(sessionId))).drain ++
               Stream.emit(XtbRequest.currentTrades(sessionId).asText)
           case XtbResponse.Trades(trades) =>
-            Stream.eval(state.update(_.withRetrievedOrder(trades.find(_.symbol == cp.toString)))).drain ++
+            trades.find(_.symbol == cp.toString) match
+              case None =>
+                Stream.emit(WebSocketFrame.close)
+              case Some(order) if order.profit.isDefined =>
+                Stream.eval(state.update(_.withRetrievedOrder(order))).drain ++
+                  Stream.emit(WebSocketFrame.close)
+              case Some(order) =>
+                Stream.logWarn(s"$name-client/noprofit-${params.userId}-$cp") ++
+                  Stream.eval(state.update(_.withRetrievedOrder(order))).drain ++
+                  obtainSessionId(state).map(sid => XtbRequest.symbolInfo(sid, cp).asText)
+          case XtbResponse.SymbolInfo(price) =>
+            Stream.eval(state.update(_.withCurrentPrice(price))).drain ++
               Stream.emit(WebSocketFrame.close)
           case error: XtbResponse.Error => handError(params.userId, error)
           case _                        => Stream.empty
@@ -178,9 +179,34 @@ final private class LiveXtbClient[F[_]](
 }
 
 object XtbClient:
-  final case class WsState(sessionId: Option[String], retrievedOrder: Option[TradeData] = None):
-    def withRetrievedOrder(retrievedOrder: Option[TradeData]): WsState = copy(retrievedOrder = retrievedOrder)
-    def withSessionId(sessionId: String): WsState                      = copy(sessionId = Some(sessionId))
+  final case class WsState(
+      sessionId: Option[String],
+      retrievedOrder: Option[TradeData] = None,
+      price: Option[SymbolData] = None
+  ) {
+    def withRetrievedOrder(retrievedOrder: TradeData): WsState = copy(retrievedOrder = Some(retrievedOrder))
+    def withSessionId(sessionId: String): WsState              = copy(sessionId = Some(sessionId))
+    def withCurrentPrice(price: SymbolData): WsState           = copy(price = Some(price))
+
+    def openedTradeOrder(cp: CurrencyPair): Option[OpenedTradeOrder] =
+      retrievedOrder.map { td =>
+        val closePrice =
+          if (td.close_price > 0) td.close_price
+          else if (td.cmd == 0) price.get.bid
+          else price.get.ask
+        def spread = if (td.cmd == 0) td.open_price - closePrice else closePrice - td.open_price
+        val profit = td.profit.getOrElse(spread * td.volume * price.get.contractSize)
+        OpenedTradeOrder(
+          cp,
+          if (td.cmd == 0) TradeOrder.Position.Buy else TradeOrder.Position.Sell,
+          closePrice,
+          td.open_price,
+          Instant.ofEpochMilli(td.open_time),
+          td.volume,
+          profit
+        )
+      }
+  }
 
   def make[F[_]: Async: Logger](
       config: XtbConfig,
