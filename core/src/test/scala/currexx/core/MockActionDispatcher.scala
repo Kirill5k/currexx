@@ -22,6 +22,5 @@ final private class MockActionDispatcher[F[_]](
   override def actions: fs2.Stream[F, Action] =
     Stream.emits(submittedActions)
 
-object MockActionDispatcher {
+object MockActionDispatcher:
   def make[F[_]: Monad] = new MockActionDispatcher[F](ListBuffer.empty)
-}

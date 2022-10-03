@@ -83,7 +83,6 @@ class MonitorServiceSpec extends CatsSpec {
           verify(repo).update(Monitors.monitor)
           disp.submittedActions must have size 1
           disp.submittedActions.head mustBe an[Action.ScheduleProfitMonitor]
-          // verify(disp).dispatch(any[Action.ScheduleProfitMonitor])
           res mustBe ()
         }
       }
