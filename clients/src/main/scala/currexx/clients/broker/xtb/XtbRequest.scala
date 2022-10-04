@@ -66,8 +66,6 @@ object XtbRequest {
           customComment = s"Currexx - ${TradeOrder.Position.Buy.toString} ${order.currencyPair}",
           offset = None,
           volume = order.volume,
-          // TODO: test if this works
-//          price = if (order.position == TradeOrder.Position.Buy) price.ask else price.bid,
           price = order.price,
           sl = None,
           tp = None,

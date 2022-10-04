@@ -52,6 +52,7 @@ final private class LiveSignalService[F[_]](
           .flatMap {
             case tcd: Indicator.TrendChangeDetection => SignalService.detectTrendChange(uid, data, tcd)
             case tc: Indicator.ThresholdCrossing     => SignalService.detectThresholdCrossing(uid, data, tc)
+            case ls: Indicator.LinesCrossing         => SignalService.detectLinesCrossing(uid, data, ls)
           }
           .traverse { signal =>
             settings.triggerFrequency match
@@ -104,39 +105,26 @@ object SignalService:
         val highs = data.prices.map(_.high.toDouble).toList
         val lows  = data.prices.map(_.low.toDouble).toList
         MomentumOscillators.stochastic(source, highs, lows, length, slowK, slowD)._1
-    val currentValue = transformed.head
-    val condition =
-      if (indicator.upperBoundary < currentValue) Some(Condition.AboveThreshold(indicator.upperBoundary, currentValue))
-      else if (indicator.lowerBoundary > currentValue) Some(Condition.BelowThreshold(indicator.lowerBoundary, currentValue))
-      else None
-    condition.map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))
+    Condition
+      .thresholdCrossing(transformed, indicator.lowerBoundary, indicator.upperBoundary)
+      .map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))
   }
 
   def detectTrendChange(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.TrendChangeDetection): Option[Signal] = {
     val source      = indicator.source.extract(data)
     val transformed = indicator.transformation.transform(source)
-    val res         = identifyTrends(transformed)
-    val prevTrend   = res.drop(1).head
-    Option
-      .when(res.head != prevTrend)(Condition.TrendDirectionChange(prevTrend, res.head, Some(res.drop(1).takeWhile(_ == prevTrend).size)))
+    Condition
+      .trendDirectionChange(transformed)
       .map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))
   }
 
-  private def identifyTrends(values: List[Double]): List[Trend] = {
-    val vals  = values.toArray
-    val vals2 = vals.tail
-    val vals3 = vals.zip(vals.map(-_)).map(_ - _)
-    val vals4 = vals.zip(vals).map(_ + _)
-
-    val diff  = vals2.zip(vals3).map(_ - _)
-    val diff3 = vals4.zip(vals2).map(_ - _)
-
-    val isNotUp: Int => Boolean   = i => diff(i) > diff(i + 1) && diff(i + 1) > diff(i + 2)
-    val isNotDown: Int => Boolean = i => diff3(i) > diff3(i + 1) && diff3(i + 1) > diff3(i + 2)
-
-    val trend         = vals.zip(vals2).map((v1, v2) => if (v1 > v2) Trend.Upward else Trend.Downward)
-    val consolidation = (0 until values.size - 5).map(i => Option.when(isNotUp(i) == isNotDown(i))(Trend.Consolidation))
-    consolidation.zip(trend).map(_.getOrElse(_)).toList
+  def detectLinesCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.LinesCrossing): Option[Signal] = {
+    val source = indicator.source.extract(data)
+    val line1  = indicator.transformation1.transform(source)
+    val line2  = indicator.transformation2.transform(source)
+    Condition
+      .linesCrossing(line1, line2)
+      .map(c => Signal(uid, data.currencyPair, c, indicator, data.prices.head.time))
   }
 
   def make[F[_]: Concurrent](
