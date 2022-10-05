@@ -35,13 +35,19 @@ object Condition {
     val isGrowing: Int => Boolean   = i => diff(i) > diff(i + 1) && diff(i + 1) > diff(i + 2)
     val isDeclining: Int => Boolean = i => diff(i) < diff(i + 1) && diff(i + 1) < diff(i + 2)
 
-    val trend         = current.zip(previous).map((c, p) => if (c > p) Trend.Upward else Trend.Downward)
-    val completeTrend = (0 until line.size - 3).toList.map(i => if (!isGrowing(i) && !isDeclining(i)) Trend.Consolidation else trend(i))
-    val currTrend     = completeTrend.head
-    val prevTrend     = completeTrend.tail.head
+    val trend = LazyList
+      .range(0, line.size - 3)
+      .map { i =>
+        if (!isGrowing(i) && !isDeclining(i)) Trend.Consolidation
+        else if (current(i) > previous(i)) Trend.Upward
+        else Trend.Downward
+      }
+
+    val currTrend = trend.head
+    val prevTrend = trend.drop(1).head
     Option
       .when(currTrend != prevTrend)(
-        Condition.TrendDirectionChange(prevTrend, currTrend, Some(completeTrend.tail.takeWhile(_ == prevTrend).size))
+        Condition.TrendDirectionChange(prevTrend, currTrend, Some(trend.drop(1).takeWhile(_ == prevTrend).size))
       )
   }
 
