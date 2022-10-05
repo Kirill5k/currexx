@@ -2,7 +2,7 @@ package currexx.core.common.action
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-import currexx.core.CatsSpec
+import currexx.core.IOWordSpec
 import currexx.core.fixtures.{Markets, Signals, Users}
 import currexx.core.market.MarketService
 import currexx.core.monitor.MonitorService
@@ -13,7 +13,7 @@ import currexx.domain.user.UserId
 
 import scala.concurrent.duration.*
 
-class ActionProcessorSpec extends CatsSpec {
+class ActionProcessorSpec extends IOWordSpec {
 
   "An ActionProcessor" should {
     "process submitted signals" in {

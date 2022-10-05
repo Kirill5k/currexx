@@ -2,7 +2,7 @@ package currexx.core.signal
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import currexx.core.{CatsSpec, FileReader}
+import currexx.core.{IOWordSpec, FileReader}
 import currexx.domain.user.UserId
 import currexx.domain.market.{Condition, CurrencyPair, Indicator, MovingAverage, PriceRange, Trend, ValueSource, ValueTransformation as VT}
 import currexx.core.common.action.{Action, ActionDispatcher}
@@ -14,7 +14,7 @@ import io.circe.JsonObject
 import java.time.{Instant, LocalDate}
 import scala.collection.immutable.ListMap
 
-class SignalServiceSpec extends CatsSpec {
+class SignalServiceSpec extends IOWordSpec {
 
   "A SignalService" when {
     "getSettings" should {

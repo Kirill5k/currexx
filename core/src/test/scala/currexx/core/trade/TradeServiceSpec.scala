@@ -3,7 +3,7 @@ package currexx.core.trade
 import cats.effect.IO
 import currexx.clients.broker.{BrokerClient, BrokerParameters}
 import currexx.clients.data.MarketDataClient
-import currexx.core.CatsSpec
+import currexx.core.IOWordSpec
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Trades, Users}
@@ -15,7 +15,7 @@ import org.mockito.Mockito
 
 import java.time.Instant
 
-class TradeServiceSpec extends CatsSpec {
+class TradeServiceSpec extends IOWordSpec {
 
   "A TradeService" should {
     "getAllOrders" should {

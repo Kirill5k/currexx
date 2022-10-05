@@ -5,7 +5,7 @@ import cats.effect.IO
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.fixtures.{Markets, Signals, Users}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
-import currexx.core.{CatsSpec, FileReader}
+import currexx.core.{IOWordSpec, FileReader}
 import currexx.domain.market.*
 import currexx.domain.user.UserId
 import io.circe.JsonObject
@@ -13,7 +13,7 @@ import io.circe.JsonObject
 import java.time.LocalDate
 import scala.collection.immutable.ListMap
 
-class SignalServiceISpec extends CatsSpec {
+class SignalServiceISpec extends IOWordSpec {
 
   "A SignalService" when {
     "detectTrendChange" should {

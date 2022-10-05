@@ -4,7 +4,7 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import jwt.*
 import currexx.core.common.config.JwtConfig
-import currexx.core.CatsSpec
+import currexx.core.IOWordSpec
 import currexx.core.auth.jwt.JwtEncoder
 import currexx.domain.session.SessionId
 import currexx.domain.user.UserId
@@ -13,7 +13,7 @@ import currexx.domain.errors.AppError
 import org.scalatest.wordspec.AsyncWordSpec
 import pdi.jwt.algorithms.JwtUnknownAlgorithm
 
-class JwtEncoderSpec extends CatsSpec with JsonCodecs {
+class JwtEncoderSpec extends IOWordSpec with JsonCodecs {
 
   val config  = JwtConfig("HS256", "secret-key")
   val session = JwtToken(SessionId("s1"), UserId("u1"))

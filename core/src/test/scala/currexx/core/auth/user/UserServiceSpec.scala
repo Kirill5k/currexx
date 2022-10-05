@@ -2,13 +2,13 @@ package currexx.core.auth.user
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-import currexx.core.CatsSpec
+import currexx.core.IOWordSpec
 import currexx.core.fixtures.Users
 import currexx.core.auth.user.db.UserRepository
 import currexx.domain.user.*
 import currexx.domain.errors.AppError.{InvalidEmailOrPassword, InvalidPassword}
 
-class UserServiceSpec extends CatsSpec {
+class UserServiceSpec extends IOWordSpec {
 
   "A UserService" when {
     "create" should {

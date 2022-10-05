@@ -70,14 +70,14 @@ final private class LiveSignalService[F[_]](
 object SignalService:
 
   extension (vs: ValueSource)
-    def extract(data: MarketTimeSeriesData): List[Double] =
+    private def extract(data: MarketTimeSeriesData): List[Double] =
       vs match
         case ValueSource.Close => data.prices.map(_.close.toDouble).toList
         case ValueSource.Open  => data.prices.map(_.open.toDouble).toList
         case ValueSource.HL2   => data.prices.map(_.high.toDouble).zip(data.prices.map(_.low.toDouble)).map((h, l) => (h + l) / 2).toList
 
   extension (vt: VT.SingleOutput)
-    def transform(data: List[Double]): List[Double] =
+    private def transform(data: List[Double]): List[Double] =
       vt match
         case VT.SingleOutput.Sequenced(transformations) => transformations.foldLeft(data)((d, t) => t.transform(d))
         case VT.SingleOutput.Kalman(gain)               => Filters.kalman(data, gain)
@@ -90,7 +90,7 @@ object SignalService:
           MovingAverages.nyquist(data, length, signalLength, lambda, ma.calculation)
 
   extension (ma: MovingAverage)
-    def calculation: (List[Double], Int) => List[Double] =
+    private def calculation: (List[Double], Int) => List[Double] =
       ma match
         case MovingAverage.Exponential => (values, length) => MovingAverages.exponential(values, length)
         case MovingAverage.Simple      => MovingAverages.simple
@@ -124,7 +124,7 @@ object SignalService:
     val line2  = indicator.transformation2.transform(source)
     Condition
       .linesCrossing(line1, line2)
-      .map(c => Signal(uid, data.currencyPair, c, indicator, data.prices.head.time))
+      .map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))
   }
 
   def make[F[_]: Concurrent](

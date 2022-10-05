@@ -2,7 +2,7 @@ package currexx.core.monitor
 
 import cats.Applicative
 import cats.effect.IO
-import currexx.core.{CatsSpec, MockActionDispatcher}
+import currexx.core.{IOWordSpec, MockActionDispatcher}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.fixtures.{Markets, Monitors, Users}
 import currexx.core.monitor.db.MonitorRepository
@@ -16,7 +16,7 @@ import org.mockito.Mockito
 import java.time.Instant
 import scala.concurrent.duration.*
 
-class MonitorServiceSpec extends CatsSpec {
+class MonitorServiceSpec extends IOWordSpec {
 
   "A MonitorService" when {
     "update" should {

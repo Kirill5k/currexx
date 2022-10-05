@@ -2,11 +2,11 @@ package currexx.core.auth.user
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-import currexx.core.CatsSpec
+import currexx.core.IOWordSpec
 import currexx.core.common.config.{AuthConfig, JwtConfig}
 import currexx.domain.user.*
 
-class PasswordEncryptorSpec extends CatsSpec {
+class PasswordEncryptorSpec extends IOWordSpec {
 
   val authConfig = AuthConfig("$2a$10$8K1p/a0dL1LXMIgoEDFrwO", JwtConfig("ALG", "SECRET"))
 

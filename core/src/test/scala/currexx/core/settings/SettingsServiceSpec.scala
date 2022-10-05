@@ -1,7 +1,7 @@
 package currexx.core.settings
 
 import cats.effect.IO
-import currexx.core.CatsSpec
+import currexx.core.IOWordSpec
 import currexx.core.fixtures.Users
 import currexx.core.settings.db.SettingsRepository
 import currexx.domain.errors.AppError
@@ -9,7 +9,7 @@ import currexx.domain.user.UserId
 import mongo4cats.bson.ObjectId
 import org.mockito.Mockito.times
 
-class SettingsServiceSpec extends CatsSpec {
+class SettingsServiceSpec extends IOWordSpec {
 
   "SettingsService" when {
     val settings = GlobalSettings(Users.uid, None, None)

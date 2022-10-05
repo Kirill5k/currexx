@@ -2,7 +2,7 @@ package currexx.core.auth.session
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-import currexx.core.CatsSpec
+import currexx.core.IOWordSpec
 import currexx.core.auth.jwt.{BearerToken, JwtEncoder, JwtToken}
 import currexx.core.auth.session.db.SessionRepository
 import currexx.domain.user.UserId
@@ -14,7 +14,7 @@ import org.mockito.Mockito.{verify, verifyNoInteractions, when}
 
 import java.time.Instant
 
-class SessionServiceSpec extends CatsSpec {
+class SessionServiceSpec extends IOWordSpec {
 
   "A SessionService" when {
 

@@ -2,9 +2,9 @@ package currexx.core.common
 
 import cats.effect.IO
 import config.AppConfig
-import currexx.core.CatsSpec
+import currexx.core.IOWordSpec
 
-class AppConfigSpec extends CatsSpec {
+class AppConfigSpec extends IOWordSpec {
 
   System.setProperty("MONGO_HOST", "mongo")
   System.setProperty("MONGO_USER", "user")

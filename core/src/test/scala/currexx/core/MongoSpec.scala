@@ -7,7 +7,7 @@ import mongo4cats.embedded.EmbeddedMongo
 
 import java.time.Instant
 
-trait MongoSpec extends EmbeddedMongo with CatsSpec {
+trait MongoSpec extends EmbeddedMongo with IOWordSpec {
 
   def accDoc(
       id: UserId,

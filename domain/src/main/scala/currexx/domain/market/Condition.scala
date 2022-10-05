@@ -27,24 +27,18 @@ object Condition {
     typeFieldName = "kind"
   )
 
-  // TODO: TESTS
   def trendDirectionChange(line: List[Double]): Option[Condition] = {
-    val vals  = line.toArray
-    val vals2 = vals.tail
-    val vals3 = vals.zip(vals.map(-_)).map(_ - _)
-    val vals4 = vals.zip(vals).map(_ + _)
+    val current  = line.toArray
+    val previous = current.tail
 
-    val diff  = vals2.zip(vals3).map(_ - _)
-    val diff3 = vals4.zip(vals2).map(_ - _)
+    val diff                        = previous.zip(current.map(_ * 2)).map(_ - _)
+    val isGrowing: Int => Boolean   = i => diff(i) > diff(i + 1) && diff(i + 1) > diff(i + 2)
+    val isDeclining: Int => Boolean = i => diff(i) < diff(i + 1) && diff(i + 1) < diff(i + 2)
 
-    val isNotUp: Int => Boolean   = i => diff(i) > diff(i + 1) && diff(i + 1) > diff(i + 2)
-    val isNotDown: Int => Boolean = i => diff3(i) > diff3(i + 1) && diff3(i + 1) > diff3(i + 2)
-
-    val trend         = vals.zip(vals2).map((v1, v2) => if (v1 > v2) Trend.Upward else Trend.Downward)
-    val consolidation = (0 until line.size - 5).map(i => Option.when(isNotUp(i) == isNotDown(i))(Trend.Consolidation))
-    val completeTrend = consolidation.zip(trend).map(_.getOrElse(_)).toList
+    val trend         = current.zip(previous).map((c, p) => if (c > p) Trend.Upward else Trend.Downward)
+    val completeTrend = (0 until line.size - 3).toList.map(i => if (!isGrowing(i) && !isDeclining(i)) Trend.Consolidation else trend(i))
     val currTrend     = completeTrend.head
-    val prevTrend     = completeTrend.drop(1).head
+    val prevTrend     = completeTrend.tail.head
     Option
       .when(currTrend != prevTrend)(
         Condition.TrendDirectionChange(prevTrend, currTrend, Some(completeTrend.tail.takeWhile(_ == prevTrend).size))

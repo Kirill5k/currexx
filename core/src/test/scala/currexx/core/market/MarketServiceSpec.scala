@@ -1,7 +1,7 @@
 package currexx.core.market
 
 import cats.effect.IO
-import currexx.core.CatsSpec
+import currexx.core.IOWordSpec
 import currexx.domain.user.UserId
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.market.db.MarketStateRepository
@@ -12,7 +12,7 @@ import currexx.domain.market.{Condition, CurrencyPair, Indicator, PriceRange, Tr
 import java.time.Instant
 import scala.concurrent.duration.*
 
-class MarketServiceSpec extends CatsSpec {
+class MarketServiceSpec extends IOWordSpec {
 
   "A MarketService" when {
     "clearState" should {

@@ -3,7 +3,7 @@ package currexx.core.trade
 import cats.effect.IO
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.SearchParams
-import currexx.core.{CatsSpec, ControllerSpec}
+import currexx.core.{IOWordSpec, ControllerSpec}
 import currexx.core.fixtures.{Markets, Sessions, Trades, Users}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, TradeOrder}
