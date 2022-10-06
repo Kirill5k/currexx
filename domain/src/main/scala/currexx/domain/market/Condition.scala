@@ -31,7 +31,7 @@ object Condition {
     val current  = line.toArray
     val previous = current.tail
 
-    val diff                        = previous.zip(current.map(_ * 2)).map(_ - _)
+    val diff                        = previous.lazyZip(current).map((p, c) => p - 2 * c)
     val isGrowing: Int => Boolean   = i => diff(i) > diff(i + 1) && diff(i + 1) > diff(i + 2)
     val isDeclining: Int => Boolean = i => diff(i) < diff(i + 1) && diff(i + 1) < diff(i + 2)
 
