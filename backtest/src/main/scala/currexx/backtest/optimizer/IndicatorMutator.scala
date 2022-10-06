@@ -28,14 +28,14 @@ object IndicatorMutator {
         }
 
         def mutateVtSo(vt: VT.SingleOutput): VT.SingleOutput = vt match
-          case SingleOutput.Sequenced(sequence)       => SingleOutput.Sequenced(sequence.map(mutateVtSo))
-          case SingleOutput.Kalman(gain)              => SingleOutput.Kalman(mutateDouble(gain, stepSize = 0.025))
-          case SingleOutput.WMA(length)               => SingleOutput.WMA(mutateInt(length, 45))
-          case SingleOutput.SMA(length)               => SingleOutput.SMA(mutateInt(length, 45))
-          case SingleOutput.EMA(length)               => SingleOutput.EMA(mutateInt(length, 45))
-          case SingleOutput.HMA(length)               => SingleOutput.HMA(mutateInt(length, 45, 5))
+          case SingleOutput.Sequenced(sequence) => SingleOutput.Sequenced(sequence.map(mutateVtSo))
+          case SingleOutput.Kalman(gain)        => SingleOutput.Kalman(mutateDouble(gain, stepSize = 0.025))
+          case SingleOutput.WMA(length)         => SingleOutput.WMA(mutateInt(length, 45))
+          case SingleOutput.SMA(length)         => SingleOutput.SMA(mutateInt(length, 45))
+          case SingleOutput.EMA(length)         => SingleOutput.EMA(mutateInt(length, 45))
+          case SingleOutput.HMA(length)         => SingleOutput.HMA(mutateInt(length, 45, 5))
           case SingleOutput.JMA(length, phase, power) =>
-            SingleOutput.JMA(mutateInt(length, 45, 5), mutateInt(phase+100, 200) - 100, mutateInt(power, 7))
+            SingleOutput.JMA(mutateInt(length, 45, 5), mutateInt(phase + 100, 200) - 100, mutateInt(power, 7))
           case SingleOutput.NMA(length, signalLength, lambda, maCalc) =>
             SingleOutput.NMA(mutateInt(length, 50), mutateInt(signalLength, 31), mutateDouble(lambda, 15d, 0.5d), maCalc)
 
@@ -58,6 +58,8 @@ object IndicatorMutator {
                 mutateInt(ub.toInt - 50, 49) + 50,
                 mutateInt(lb.toInt, 49)
               )
+            case Indicator.LinesCrossing(vs, st, ft) =>
+              Indicator.LinesCrossing(vs, mutateVtSo(st), mutateVtSo(ft))
         }
       }
     }

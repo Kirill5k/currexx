@@ -119,11 +119,11 @@ object SignalService:
   }
 
   def detectLinesCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.LinesCrossing): Option[Signal] = {
-    val source = indicator.source.extract(data)
-    val line1  = indicator.transformation1.transform(source)
-    val line2  = indicator.transformation2.transform(source)
+    val source   = indicator.source.extract(data)
+    val slowLine = indicator.slowTransformation.transform(source)
+    val fastLine = indicator.fastTransformation.transform(source)
     Condition
-      .linesCrossing(line1, line2)
+      .linesCrossing(slowLine, fastLine)
       .map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))
   }
 

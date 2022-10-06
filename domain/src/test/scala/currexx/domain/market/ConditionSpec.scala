@@ -55,14 +55,14 @@ class ConditionSpec extends AnyWordSpec with Matchers {
     }
 
     "linesCrossing" should {
-      "return CrossingDown when line 1 crosses line 2 from above" in {
+      "return CrossingDown when line 1 (slow) crosses line 2 (fast) from above" in {
         val line1 = List(1.0, 3.0, 3.0, 3.0, 3.0)
         val line2 = List(3.0, 1.0, 1.0, 1.0, 1.0)
 
         Condition.linesCrossing(line1, line2) mustBe Some(Condition.CrossingDown)
       }
 
-      "return CrossingUp when line 1 crosses line 2 from below" in {
+      "return CrossingUp when line 1 (slow) crosses line 2 (fast) from below" in {
         val line1 = List(3.0, 1.0, 1.0, 1.0, 1.0)
         val line2 = List(2.0, 2.0, 2.0, 2.0, 2.0)
 

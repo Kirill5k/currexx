@@ -25,6 +25,8 @@ object IndicatorEvaluator {
           s"${ind.kind}-${source.print}-${transformation}"
         case Indicator.ThresholdCrossing(source, transformation, upperBoundary, lowerBoundary) =>
           s"${ind.kind}-${source.print}-${transformation}-lb$lowerBoundary-up$upperBoundary"
+        case Indicator.LinesCrossing(source, slowTransformation, fastTransformation) =>
+          s"${ind.kind}-${source.print}-${slowTransformation}-${fastTransformation}"
 
   def make[F[_]: Async](
       testFilePaths: List[String],

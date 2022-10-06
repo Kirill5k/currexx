@@ -40,6 +40,7 @@ object IndicatorInitialiser {
               rand.nextInt(49) + 50,
               rand.nextInt(49) + 1
             )
+          case Indicator.LinesCrossing(source, slow, fast) => Indicator.LinesCrossing(source, randomiseSo(slow), randomiseSo(fast))
       }
     }
 }

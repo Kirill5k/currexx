@@ -3,6 +3,7 @@ package currexx.backtest.optimizer
 import cats.effect.Sync
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
+import cats.syntax.apply.*
 import cats.syntax.applicativeError.*
 import currexx.algorithms.operators.Crossover
 import currexx.domain.market.{Indicator, ValueTransformation as VT}
@@ -57,6 +58,8 @@ object IndicatorCrossover {
 
         F.defer {
           (par1, par2) match
+            case (Indicator.LinesCrossing(s, st1, ft1), Indicator.LinesCrossing(_, st2, ft2)) =>
+              F.fromEither((crossSo(st1, st2), crossSo(ft1, ft2)).mapN((st, ft) => Indicator.LinesCrossing(s, st, ft)))
             case (Indicator.TrendChangeDetection(s, t1), Indicator.TrendChangeDetection(_, t2)) =>
               F.fromEither(crossSo(t1, t2)).map(t => Indicator.TrendChangeDetection(s, t))
             case (Indicator.ThresholdCrossing(s, t1, ub1, lb1), Indicator.ThresholdCrossing(_, t2, ub2, lb2)) =>
