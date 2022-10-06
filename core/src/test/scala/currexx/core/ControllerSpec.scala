@@ -31,11 +31,7 @@ trait ControllerSpec extends AnyWordSpec with MockitoMatchers with Matchers {
       expectedBody: Option[String] = None
   ): Assertion =
     response
-      .flatTap { res =>
-        IO {
-          res.status mustBe expectedStatus
-        }
-      }
+      .flatTap(res => IO(res.status mustBe expectedStatus))
       .flatMap { res =>
         expectedBody match {
           case Some(expectedJson) => res.as[String].map(parse(_) mustBe parse(expectedJson))

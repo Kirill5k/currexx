@@ -7,7 +7,7 @@ import currexx.domain.types.EnumType
 
 object TradeStrategy extends EnumType[TradeStrategy](() => TradeStrategy.values, _.print)
 enum TradeStrategy:
-  case Disabled, TrendChange, TrendChangeAggressive, TrendChangeWithConfirmation
+  case Disabled, TrendChange, TrendChangeAggressive, TrendChangeWithConfirmation, LinesCrossing
 
 trait TradeStrategyExecutor:
   def analyze(state: MarketState, triggers: List[Indicator]): Option[TradeStrategyExecutor.Decision]
@@ -57,12 +57,22 @@ object TradeStrategyExecutor {
         case _ => None
     }
 
+  private case object LinesCrossing extends TradeStrategyExecutor:
+    def analyze(state: MarketState, triggers: List[Indicator]): Option[TradeStrategyExecutor.Decision] =
+      triggers.collectFirst { case i: Indicator.LinesCrossing =>
+        state.signals.getOrElse(i.kind, Nil).headOption.map(_.condition).collect {
+          case Condition.CrossingUp   => Decision.Sell
+          case Condition.CrossingDown => Decision.Buy
+        }
+      }.flatten
+
   def get(strategy: TradeStrategy): TradeStrategyExecutor =
     strategy match
       case TradeStrategy.Disabled                    => Disabled
       case TradeStrategy.TrendChange                 => TrendChange
       case TradeStrategy.TrendChangeAggressive       => TrendChangeAggressive
       case TradeStrategy.TrendChangeWithConfirmation => TrendChangeWithConfirmation
+      case TradeStrategy.LinesCrossing               => LinesCrossing
 
   extension (state: MarketState)
     def buying: Boolean  = state.currentPosition.map(_.position).contains(TradeOrder.Position.Buy)
