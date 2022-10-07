@@ -1,6 +1,7 @@
 package currexx.core.fixtures
 
-import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId, PriceMonitorSchedule, ProfitMonitorSchedule}
+import cats.data.NonEmptyList
+import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId}
 import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.monitor.Schedule
 import currexx.domain.user.UserId
@@ -11,27 +12,28 @@ import java.time.temporal.ChronoUnit
 import scala.concurrent.duration.*
 
 object Monitors {
-  lazy val mid: MonitorId                             = MonitorId(ObjectId.gen)
-  lazy val queriedAt: Instant                         = Instant.now.truncatedTo(ChronoUnit.MILLIS)
-  lazy val priceMonitorSchedule: PriceMonitorSchedule = PriceMonitorSchedule(Interval.H1, Schedule.Periodic(3.hours), Some(queriedAt))
-  lazy val profitMonitorSchedule: ProfitMonitorSchedule =
-    ProfitMonitorSchedule(Some(BigDecimal(-10)), Some(BigDecimal(150)), Schedule.Periodic(3.hours), Some(queriedAt))
-  lazy val monitor: Monitor = Monitor(mid, Users.uid, true, Markets.gbpeur, priceMonitorSchedule, Some(profitMonitorSchedule))
+  lazy val mid: MonitorId     = MonitorId(ObjectId.gen)
+  lazy val queriedAt: Instant = Instant.now.truncatedTo(ChronoUnit.MILLIS)
 
-  def create(
+  private val cps     = NonEmptyList.of(Markets.gbpeur)
+  lazy val marketData = Monitor.MarketData(mid, Users.uid, true, cps, Schedule.Periodic(3.hours), Some(queriedAt), Interval.H1)
+  lazy val profit     = Monitor.Profit(mid, Users.uid, true, cps, Schedule.Periodic(3.hours), Some(queriedAt), Some(-10), Some(150))
+
+  def createMarketData(
       uid: UserId = Users.uid,
-      pair: CurrencyPair = Markets.gbpeur,
-      price: PriceMonitorSchedule = priceMonitorSchedule.copy(lastQueriedAt = None),
-      profit: Option[ProfitMonitorSchedule] = Some(profitMonitorSchedule.copy(lastQueriedAt = None))
-  ): CreateMonitor = CreateMonitor(uid, pair, price, profit)
+      pairs: NonEmptyList[CurrencyPair] = cps,
+      schedule: Schedule = Schedule.Periodic(3.hours),
+      interval: Interval = Interval.H1
+  ): CreateMonitor = CreateMonitor.MarketData(uid, pairs, schedule, interval)
 
-  def gen(
+  def genMarketData(
       mid: MonitorId = MonitorId(ObjectId.gen),
       uid: UserId = Users.uid,
-      pair: CurrencyPair = Markets.gbpeur,
-      price: PriceMonitorSchedule = priceMonitorSchedule,
-      profit: Option[ProfitMonitorSchedule] = Some(profitMonitorSchedule)
+      pairs: NonEmptyList[CurrencyPair] = cps,
+      schedule: Schedule = Schedule.Periodic(3.hours),
+      interval: Interval = Interval.H1,
+      lastQueriedAt: Option[Instant] = Some(queriedAt)
   ): Monitor =
-    Monitor(mid, uid, true, pair, price, profit)
+    Monitor.MarketData(mid, uid, true, pairs, schedule, lastQueriedAt, interval)
 
 }

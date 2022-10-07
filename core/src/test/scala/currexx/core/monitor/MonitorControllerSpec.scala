@@ -22,35 +22,37 @@ class MonitorControllerSpec extends ControllerSpec {
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
         val requestBody = s"""{
-             |"currencyPair": "GBP/EUR",
-             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}},
-             |"profit": {"min": "-10","max": "150","schedule": {"kind":"periodic","period":"3 hours"}}
+             |"kind": "market-data",
+             |"currencyPairs": ["GBP/EUR"],
+             |"interval": "H1",
+             |"schedule": {"kind":"periodic","period":"3 hours"}
              |}""".stripMargin
 
         val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.Created, Some(s"""{"id":"${Monitors.mid}"}"""))
-        verify(svc).create(Monitors.create())
+        verify(svc).create(Monitors.createMarketData())
       }
 
       "return 409 if monitor for the requested currency pair already exists" in {
         val svc = mock[MonitorService[IO]]
-        when(svc.create(any[CreateMonitor])).thenReturn(IO.raiseError(AppError.AlreadyBeingMonitored(Markets.gbpeur)))
+        when(svc.create(any[CreateMonitor])).thenReturn(IO.raiseError(AppError.AlreadyBeingMonitored(Set(Markets.gbpeur))))
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
         val requestBody = s"""{
-             |"currencyPair": "GBP/EUR",
-             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}},
-             |"profit": {"min": "-10","max": "150","schedule": {"kind":"periodic","period":"3 hours"}}
+             |"kind": "market-data",
+             |"currencyPairs": ["GBP/EUR"],
+             |"interval": "H1",
+             |"schedule": {"kind":"periodic","period":"3 hours"}
              |}""".stripMargin
 
         val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.Conflict, Some("""{"message":"Monitor for currency pair GBPEUR already exists"}"""))
-        verify(svc).create(Monitors.create())
+        verify(svc).create(Monitors.createMarketData())
       }
 
       "validation error when profit monitor schedule has missing boundaries" in {
@@ -59,11 +61,10 @@ class MonitorControllerSpec extends ControllerSpec {
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val requestBody =
-          s"""{
-             |"currencyPair": "GBP/EUR",
-             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}},
-             |"profit": {"schedule": {"kind":"periodic","period":"3 hours"}}
+        val requestBody = s"""{
+             |"currencyPairs": "GBP/EUR",
+             |"kind": "profit",
+             |"schedule": {"kind":"periodic","period":"3 hours"}
              |}""".stripMargin
 
         val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
@@ -151,7 +152,7 @@ class MonitorControllerSpec extends ControllerSpec {
     "POST /monitors/:id/query" should {
       "manually query the monitor" in {
         val svc = mock[MonitorService[IO]]
-        when(svc.triggerPriceMonitor(any[UserId], any[MonitorId], any[Boolean])).thenReturn(IO.unit)
+        when(svc.triggerMonitor(any[UserId], any[MonitorId], any[Boolean])).thenReturn(IO.unit)
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
@@ -159,14 +160,14 @@ class MonitorControllerSpec extends ControllerSpec {
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.NoContent, None)
-        verify(svc).triggerPriceMonitor(Users.uid, Monitors.mid, true)
+        verify(svc).triggerMonitor(Users.uid, Monitors.mid, true)
       }
     }
 
     "GET /monitors" should {
       "return all monitors" in {
         val svc = mock[MonitorService[IO]]
-        when(svc.getAll(any[UserId])).thenReturn(IO.pure(List(Monitors.monitor)))
+        when(svc.getAll(any[UserId])).thenReturn(IO.pure(List(Monitors.marketData, Monitors.profit)))
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
@@ -174,13 +175,28 @@ class MonitorControllerSpec extends ControllerSpec {
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody =
-          s"""[{
+          s"""[
+             |{
              |"id": "${Monitors.mid}",
+             |"kind": "market-data"
              |"active": true,
-             |"currencyPair": "${Markets.gbpeur}",
-             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"},
-             |"profit": {"min": -10,"max": 150,"schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
-             |}]""".stripMargin
+             |"currencyPairs": "[${Markets.gbpeur}]",
+             |"schedule": {"kind":"periodic","period":"3 hours"},
+             |"lastQueriedAt": "${Monitors.queriedAt}",
+             |"interval": "H1"
+             |},
+             |{
+             |"id": "${Monitors.mid}",
+             |"kind": "profit",
+             |"active": true,
+             |"currencyPairs": "[${Markets.gbpeur}]",
+             |"schedule": {"kind":"periodic","period":"3 hours"},
+             |"lastQueriedAt": "${Monitors.queriedAt}"},
+             |"min": -10,
+             |"max": 150
+             |}
+             |]""".stripMargin
+
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
         verify(svc).getAll(Users.uid)
       }
@@ -189,21 +205,23 @@ class MonitorControllerSpec extends ControllerSpec {
     "GET /monitors/:id" should {
       "find monitor by id" in {
         val svc = mock[MonitorService[IO]]
-        when(svc.get(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.monitor))
+        when(svc.get(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.marketData))
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
         val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.GET)
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val responseBody =
-          s"""{
+        val responseBody = s"""{
              |"id": "${Monitors.mid}",
+             |"kind": "market-data"
              |"active": true,
-             |"currencyPair": "${Markets.gbpeur}",
-             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"},
-             |"profit": {"min": -10,"max": 150,"schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
+             |"currencyPairs": "[${Markets.gbpeur}]",
+             |"schedule": {"kind":"periodic","period":"3 hours"},
+             |"lastQueriedAt": "${Monitors.queriedAt}",
+             |"interval": "H1"
              |}""".stripMargin
+
         verifyJsonResponse(res, Status.Ok, Some(responseBody))
         verify(svc).get(Users.uid, Monitors.mid)
       }
@@ -216,20 +234,21 @@ class MonitorControllerSpec extends ControllerSpec {
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val requestBody =
-          s"""{
+        val requestBody = s"""{
              |"id": "${Monitors.mid}",
+             |"kind": "market-data"
              |"active": true,
-             |"currencyPair": "${Markets.gbpeur}",
-             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"},
-             |"profit": {"min": "-10","max": "150","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
+             |"currencyPairs": "[${Markets.gbpeur}]",
+             |"schedule": {"kind":"periodic","period":"3 hours"},
+             |"lastQueriedAt": "${Monitors.queriedAt}",
+             |"interval": "H1"
              |}""".stripMargin
 
         val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT).withJsonBody(parseJson(requestBody))
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.NoContent, None)
-        verify(svc).update(Monitors.monitor)
+        verify(svc).update(Monitors.marketData)
       }
 
       "return error when id in path is different from id in requesst" in {
@@ -237,13 +256,14 @@ class MonitorControllerSpec extends ControllerSpec {
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val requestBody =
-          s"""{
+        val requestBody = s"""{
              |"id": "foo",
+             |"kind": "market-data"
              |"active": true,
-             |"currencyPair": "${Markets.gbpeur}",
-             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"},
-             |"profit": {"min": "-10","max": "150","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
+             |"currencyPairs": "[${Markets.gbpeur}]",
+             |"schedule": {"kind":"periodic","period":"3 hours"},
+             |"lastQueriedAt": "${Monitors.queriedAt}",
+             |"interval": "H1"
              |}""".stripMargin
 
         val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT).withJsonBody(parseJson(requestBody))
@@ -255,55 +275,6 @@ class MonitorControllerSpec extends ControllerSpec {
           Some("""{"message":"The id supplied in the path does not match with the id in the request body"}""")
         )
         verifyNoInteractions(svc)
-      }
-    }
-
-    "PUT /monitors/compound" should {
-      "return an error when trying to update nonexisting monitor" in {
-        val svc = mock[MonitorService[IO]]
-        when(svc.getAll(any[UserId])).thenReturn(IO.pure(List(Monitors.monitor)))
-
-        given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
-
-        val requestBody =
-          s"""{
-             |"currencyPairs": ["GBPUSD", "EURDKK"],
-             |"active": true,
-             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"},
-             |"profit": {"min": "-10","max": "150","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"}
-             |}""".stripMargin
-
-        val req = requestWithAuthHeader(uri"/monitors/compound", method = Method.PUT).withJsonBody(parseJson(requestBody))
-        val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
-
-        verifyJsonResponse(res, Status.NotFound, Some("""{"message":"Currency pairs GBPUSD, EURDKK are not being tracked"}"""))
-        verify(svc).getAll(Users.uid)
-        verifyNoMoreInteractions(svc)
-      }
-
-      "update multiple monitors at once" in {
-        val svc = mock[MonitorService[IO]]
-
-        val monitors = List(Monitors.gen(profit = None), Monitors.gen(pair = Markets.gbpusd, profit = None))
-        when(svc.getAll(any[UserId])).thenReturn(IO.pure(monitors))
-        when(svc.update(any[Monitor])).thenReturn(IO.unit)
-
-        given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
-
-        val requestBody =
-          s"""{
-             |"currencyPairs": ["GBPUSD", "GBPEUR"],
-             |"active": true,
-             |"price": {"interval": "H1","schedule": {"kind":"periodic","period":"3 hours"}, "lastQueriedAt": "${Monitors.queriedAt}"},
-             |"profit": null
-             |}""".stripMargin
-
-        val req = requestWithAuthHeader(uri"/monitors/compound", method = Method.PUT).withJsonBody(parseJson(requestBody))
-        val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
-
-        verifyJsonResponse(res, Status.NoContent, None)
-        verify(svc).getAll(Users.uid)
-        monitors.foreach(m => verify(svc).update(m.copy(profit = None)))
       }
     }
   }

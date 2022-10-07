@@ -1,6 +1,7 @@
 package currexx.core.trade
 
 import cats.effect.IO
+import cats.data.NonEmptyList
 import currexx.clients.broker.{BrokerClient, BrokerParameters}
 import currexx.clients.data.MarketDataClient
 import currexx.core.IOWordSpec
@@ -228,7 +229,7 @@ class TradeServiceSpec extends IOWordSpec {
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, Markets.gbpeur, None, Some(BigDecimal(10)))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, NonEmptyList.of(Markets.gbpeur), None, Some(10))
         yield ()
 
         result.asserting { res =>
@@ -253,7 +254,7 @@ class TradeServiceSpec extends IOWordSpec {
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, Markets.gbpeur, Some(BigDecimal(-10)), Some(BigDecimal(10)))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, NonEmptyList.of(Markets.gbpeur), Some(-10), Some(10))
         yield ()
 
         result.asserting { res =>
@@ -275,7 +276,7 @@ class TradeServiceSpec extends IOWordSpec {
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, Markets.gbpeur, Some(BigDecimal(-10)), Some(BigDecimal(10)))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, NonEmptyList.of(Markets.gbpeur), Some(-10), Some(10))
         yield ()
 
         result.asserting { res =>
@@ -294,7 +295,7 @@ class TradeServiceSpec extends IOWordSpec {
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, Markets.gbpeur, Some(BigDecimal(-10)), Some(BigDecimal(10)))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, NonEmptyList.of(Markets.gbpeur), Some(-10), Some(10))
         yield ()
 
         result.asserting { res =>

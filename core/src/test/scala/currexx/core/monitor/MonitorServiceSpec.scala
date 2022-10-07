@@ -1,6 +1,7 @@
 package currexx.core.monitor
 
 import cats.Applicative
+import cats.data.NonEmptyList
 import cats.effect.IO
 import currexx.core.{IOWordSpec, MockActionDispatcher}
 import currexx.core.common.action.{Action, ActionDispatcher}
@@ -22,67 +23,16 @@ class MonitorServiceSpec extends IOWordSpec {
     "update" should {
       "update monitor properties in the db" in {
         val (repo, disp) = mocks
-        when(repo.update(any[Monitor])).thenReturn(IO.pure(Monitors.monitor))
+        when(repo.update(any[Monitor])).thenReturn(IO.pure(Monitors.marketData))
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
-          res <- svc.update(Monitors.monitor)
+          res <- svc.update(Monitors.marketData)
         yield res
 
         result.asserting { res =>
-          verify(repo).update(Monitors.monitor)
+          verify(repo).update(Monitors.marketData)
           disp.submittedActions mustBe empty
-          res mustBe ()
-        }
-      }
-
-      "close open orders when currency pair has changed" in {
-        val (repo, disp) = mocks
-        when(repo.update(any[Monitor])).thenReturn(IO.pure(Monitors.monitor))
-
-        val updated = Monitors.monitor.copy(currencyPair = Markets.gbpusd)
-        val result = for
-          svc <- MonitorService.make[IO](repo, disp)
-          res <- svc.update(updated)
-        yield res
-
-        result.asserting { res =>
-          disp.submittedActions mustBe List(Action.CloseOpenOrders(Users.uid, Markets.gbpeur))
-          verify(repo).update(updated)
-          res mustBe ()
-        }
-      }
-
-      "close open orders when monitor has been deactivated" in {
-        val (repo, disp) = mocks
-        when(repo.update(any[Monitor])).thenReturn(IO.pure(Monitors.monitor))
-
-        val updated = Monitors.monitor.copy(active = false)
-        val result = for
-          svc <- MonitorService.make[IO](repo, disp)
-          res <- svc.update(updated)
-        yield res
-
-        result.asserting { res =>
-          disp.submittedActions mustBe List(Action.CloseOpenOrders(Users.uid, Markets.gbpeur))
-          verify(repo).update(updated)
-          res mustBe ()
-        }
-      }
-
-      "reschedule profit monitor it it was previously undefined" in {
-        val (repo, disp) = mocks
-        when(repo.update(any[Monitor])).thenReturn(IO.pure(Monitors.monitor.copy(profit = None)))
-
-        val result = for
-          svc <- MonitorService.make[IO](repo, disp)
-          res <- svc.update(Monitors.monitor)
-        yield res
-
-        result.asserting { res =>
-          verify(repo).update(Monitors.monitor)
-          disp.submittedActions must have size 1
-          disp.submittedActions.head mustBe an[Action.ScheduleProfitMonitor]
           res mustBe ()
         }
       }
@@ -109,7 +59,7 @@ class MonitorServiceSpec extends IOWordSpec {
     "pause" should {
       "set active to false" in {
         val (repo, disp) = mocks
-        when(repo.activate(any[UserId], any[MonitorId], any[Boolean])).thenReturn(IO.pure(Monitors.monitor))
+        when(repo.activate(any[UserId], any[MonitorId], any[Boolean])).thenReturn(IO.pure(Monitors.marketData))
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -118,7 +68,6 @@ class MonitorServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(repo).activate(Users.uid, Monitors.mid, false)
-          disp.submittedActions mustBe List(Action.CloseOpenOrders(Users.uid, Markets.gbpeur))
           res mustBe ()
         }
       }
@@ -131,31 +80,12 @@ class MonitorServiceSpec extends IOWordSpec {
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
-          mid <- svc.create(Monitors.create())
+          mid <- svc.create(Monitors.createMarketData())
         yield mid
 
         result.asserting { mid =>
-          verify(repo).create(Monitors.create())
-          disp.submittedActions mustBe List(
-            Action.SchedulePriceMonitor(Users.uid, Monitors.mid, 0.seconds),
-            Action.ScheduleProfitMonitor(Users.uid, Monitors.mid, 0.seconds)
-          )
-          mid mustBe Monitors.mid
-        }
-      }
-
-      "not schedule profit monitor if it is not defined" in {
-        val (repo, disp) = mocks
-        when(repo.create(any[CreateMonitor])).thenReturn(IO.pure(Monitors.mid))
-
-        val result = for
-          svc <- MonitorService.make[IO](repo, disp)
-          mid <- svc.create(Monitors.create(profit = None))
-        yield mid
-
-        result.asserting { mid =>
-          verify(repo).create(Monitors.create(profit = None))
-          disp.submittedActions mustBe List(Action.SchedulePriceMonitor(Users.uid, Monitors.mid, 0.seconds))
+          verify(repo).create(Monitors.createMarketData())
+          disp.submittedActions mustBe List(Action.ScheduleMonitor(Users.uid, Monitors.mid, 0.seconds))
           mid mustBe Monitors.mid
         }
       }
@@ -164,16 +94,16 @@ class MonitorServiceSpec extends IOWordSpec {
         val (repo, disp) = mocks
         when(repo.create(any[CreateMonitor])).thenReturn(IO.pure(Monitors.mid))
 
-        val priceMonitorSchedule = Monitors.priceMonitorSchedule.copy(schedule = Schedule.Cron("0 7,20 * * 1-5").value)
+        val schedule = Schedule.Cron("0 7,20 * * 1-5").value
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
-          mid <- svc.create(Monitors.create(price = priceMonitorSchedule, profit = None))
+          mid <- svc.create(Monitors.createMarketData(schedule = schedule))
         yield mid
 
         result.asserting { mid =>
-          verify(repo).create(Monitors.create(price = priceMonitorSchedule, profit = None))
+          verify(repo).create(Monitors.createMarketData(schedule = schedule))
           disp.submittedActions must have size 1
-          disp.submittedActions.head mustBe an[Action.SchedulePriceMonitor]
+          disp.submittedActions.head mustBe an[Action.ScheduleMonitor]
           mid mustBe Monitors.mid
         }
       }
@@ -182,9 +112,7 @@ class MonitorServiceSpec extends IOWordSpec {
     "rescheduleAll" should {
       "schedule monitors without lastQueriedAt to start immediately" in {
         val (repo, disp)   = mocks
-        val priceSchedule  = Monitors.priceMonitorSchedule.copy(lastQueriedAt = None)
-        val profitSchedule = Monitors.profitMonitorSchedule.copy(lastQueriedAt = None)
-        when(repo.stream).thenReturn(Stream(Monitors.monitor.copy(price = priceSchedule, profit = Some(profitSchedule))))
+        when(repo.stream).thenReturn(Stream(Monitors.marketData.copy(lastQueriedAt = None)))
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -193,18 +121,14 @@ class MonitorServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(repo).stream
-          disp.submittedActions mustBe List(
-            Action.SchedulePriceMonitor(Users.uid, Monitors.mid, 0.seconds),
-            Action.ScheduleProfitMonitor(Users.uid, Monitors.mid, 0.seconds)
-          )
+          disp.submittedActions mustBe List(Action.ScheduleMonitor(Users.uid, Monitors.mid, 0.seconds))
           res mustBe ()
         }
       }
 
       "schedule monitors with old lastQueriedAt to start immediately" in {
         val (repo, disp) = mocks
-        val schedule     = Monitors.priceMonitorSchedule.copy(lastQueriedAt = Some(Instant.parse("2020-01-01T00:00:00Z")))
-        when(repo.stream).thenReturn(Stream(Monitors.monitor.copy(price = schedule, profit = None)))
+        when(repo.stream).thenReturn(Stream(Monitors.marketData.copy(lastQueriedAt = Some(Instant.parse("2020-01-01T00:00:00Z")))))
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -213,15 +137,14 @@ class MonitorServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(repo).stream
-          disp.submittedActions mustBe List(Action.SchedulePriceMonitor(Users.uid, Monitors.mid, 0.seconds))
+          disp.submittedActions mustBe List(Action.ScheduleMonitor(Users.uid, Monitors.mid, 0.seconds))
           res mustBe ()
         }
       }
 
       "schedule monitors with recent lastQueriedAt to wait" in {
         val (repo, disp) = mocks
-        val schedule     = Monitors.priceMonitorSchedule.copy(lastQueriedAt = Some(Instant.now.minusSeconds(50)))
-        when(repo.stream).thenReturn(Stream(Monitors.monitor.copy(price = schedule, profit = None)))
+        when(repo.stream).thenReturn(Stream(Monitors.marketData.copy(lastQueriedAt = Some(Instant.now.minusSeconds(50)))))
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -231,107 +154,68 @@ class MonitorServiceSpec extends IOWordSpec {
         result.asserting { res =>
           verify(repo).stream
           disp.submittedActions must have size 1
-          disp.submittedActions.head mustBe an[Action.SchedulePriceMonitor]
+          disp.submittedActions.head mustBe an[Action.ScheduleMonitor]
           res mustBe ()
         }
       }
     }
 
-    "triggerProfitMonitor" should {
+    "triggerMonitor" should {
       "submit assert profit action for active monitor" in {
         val (repo, disp) = mocks
-        when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.monitor))
-        when(repo.updateProfitQueriedTimestamp(any[UserId], any[MonitorId])).thenReturn(IO.unit)
+        when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.profit))
+        when(repo.updateQueriedTimestamp(any[UserId], any[MonitorId])).thenReturn(IO.unit)
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
-          res <- svc.triggerProfitMonitor(Users.uid, Monitors.mid)
+          res <- svc.triggerMonitor(Users.uid, Monitors.mid)
         yield res
 
         result.asserting { res =>
           verify(repo).find(Users.uid, Monitors.mid)
-          verify(repo).updateProfitQueriedTimestamp(Users.uid, Monitors.mid)
+          verify(repo).updateQueriedTimestamp(Users.uid, Monitors.mid)
           verifyNoMoreInteractions(repo)
           disp.submittedActions must have size 2
-          disp.submittedActions.head mustBe Action.AssertProfit(Users.uid, Markets.gbpeur, Some(BigDecimal(-10)), Some(BigDecimal(150)))
-          disp.submittedActions.last mustBe an[Action.ScheduleProfitMonitor]
-          res mustBe ()
-        }
-      }
-
-      "return error when profit monitor is not defined" in {
-        val (repo, disp) = mocks
-        when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.monitor.copy(profit = None)))
-
-        val result = for
-          svc <- MonitorService.make[IO](repo, disp)
-          res <- svc.triggerProfitMonitor(Users.uid, Monitors.mid)
-        yield res
-
-        result.attempt.asserting { res =>
-          verify(repo).find(Users.uid, Monitors.mid)
-          disp.submittedActions mustBe empty
-          res mustBe Left(AppError.NotScheduled("profit"))
-        }
-      }
-    }
-
-    "triggerPriceMonitor" should {
-      "submit fetch market data action for active monitor" in {
-        val (repo, disp) = mocks
-        when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.monitor))
-        when(repo.updatePriceQueriedTimestamp(any[UserId], any[MonitorId])).thenReturn(IO.unit)
-
-        val result = for
-          svc <- MonitorService.make[IO](repo, disp)
-          res <- svc.triggerPriceMonitor(Users.uid, Monitors.mid)
-        yield res
-
-        result.asserting { res =>
-          verify(repo).find(Users.uid, Monitors.mid)
-          verify(repo).updatePriceQueriedTimestamp(Users.uid, Monitors.mid)
-          verifyNoMoreInteractions(repo)
-          disp.submittedActions must have size 2
-          disp.submittedActions.head mustBe Action.FetchMarketData(Users.uid, Markets.gbpeur, Interval.H1)
-          disp.submittedActions.last mustBe an[Action.SchedulePriceMonitor]
+          disp.submittedActions.head mustBe Action.AssertProfit(Users.uid, NonEmptyList.of(Markets.gbpeur), Some(-10), Some(150))
+          disp.submittedActions.last mustBe an[Action.ScheduleMonitor]
           res mustBe ()
         }
       }
 
       "not reschedule monitor in case of manual query" in {
         val (repo, disp) = mocks
-        when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.monitor))
-        when(repo.updatePriceQueriedTimestamp(any[UserId], any[MonitorId])).thenReturn(IO.unit)
+        when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.marketData))
+        when(repo.updateQueriedTimestamp(any[UserId], any[MonitorId])).thenReturn(IO.unit)
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
-          res <- svc.triggerPriceMonitor(Users.uid, Monitors.mid, true)
+          res <- svc.triggerMonitor(Users.uid, Monitors.mid, true)
         yield res
 
         result.asserting { res =>
           verify(repo).find(Users.uid, Monitors.mid)
-          verify(repo).updatePriceQueriedTimestamp(Users.uid, Monitors.mid)
+          verify(repo).updateQueriedTimestamp(Users.uid, Monitors.mid)
           verifyNoMoreInteractions(repo)
-          disp.submittedActions mustBe List(Action.FetchMarketData(Users.uid, Markets.gbpeur, Interval.H1))
-          res mustBe ()
+          disp.submittedActions mustBe List(Action.FetchMarketData(Users.uid, NonEmptyList.of(Markets.gbpeur), Interval.H1))
+          res mustBe()
         }
       }
 
       "not submit fetch market data and assert profit actions for inactive monitor" in {
         val (repo, disp) = mocks
-        when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.monitor.copy(active = false)))
+        when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.marketData.copy(active = false)))
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
-          res <- svc.triggerPriceMonitor(Users.uid, Monitors.mid)
+          res <- svc.triggerMonitor(Users.uid, Monitors.mid)
         yield res
 
         result.asserting { res =>
           verify(repo).find(Users.uid, Monitors.mid)
           verifyNoMoreInteractions(repo)
           disp.submittedActions must have size 1
-          disp.submittedActions.head mustBe an[Action.SchedulePriceMonitor]
-          res mustBe ()
+          disp.submittedActions.head mustBe an[Action.ScheduleMonitor]
+          res mustBe()
         }
       }
     }

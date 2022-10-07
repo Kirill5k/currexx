@@ -1,10 +1,11 @@
 package currexx.core.monitor.db
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
 import currexx.core.fixtures.{Markets, Monitors, Users}
-import currexx.core.monitor.{Monitor, PriceMonitorSchedule}
+import currexx.core.monitor.Monitor
 import currexx.domain.errors.AppError
 import currexx.domain.market.Interval
 import mongo4cats.client.MongoClient
@@ -22,31 +23,25 @@ class MonitorRepositorySpec extends MongoSpec {
       "create new monitor" in withEmbeddedMongoDb { client =>
         val result = for
           repo <- MonitorRepository.make(client)
-          mid  <- repo.create(Monitors.create())
-          mon  <- repo.find(Users.uid, mid)
-        yield (mid, mon)
+          mon  <- repo.create(Monitors.createMarketData())
+          res  <- repo.find(Users.uid, mon.id)
+        yield (mon, res)
 
-        result.map { (mid, mon) =>
-          mon mustBe Monitor(
-            mid,
-            Users.uid,
-            true,
-            Markets.gbpeur,
-            Monitors.priceMonitorSchedule.copy(lastQueriedAt = None),
-            Some(Monitors.profitMonitorSchedule.copy(lastQueriedAt = None))
-          )
+        result.map { (created, found) =>
+          found mustBe Monitors.genMarketData(mid = found.id, lastQueriedAt = None)
+          created mustBe Monitors.genMarketData(mid = created.id, lastQueriedAt = None)
         }
       }
 
       "return error when creating monitor for an existing currency pair" in withEmbeddedMongoDb { client =>
         val result = for
           repo <- MonitorRepository.make(client)
-          _    <- repo.create(Monitors.create())
-          _    <- repo.create(Monitors.create())
+          _    <- repo.create(Monitors.createMarketData())
+          _    <- repo.create(Monitors.createMarketData(pairs = NonEmptyList.of(Markets.gbpeur, Markets.gbpusd)))
         yield ()
 
         result.attempt.map { res =>
-          res mustBe Left(AppError.AlreadyBeingMonitored(Markets.gbpeur))
+          res mustBe Left(AppError.AlreadyBeingMonitored(Set(Markets.gbpeur)))
         }
       }
     }
@@ -66,9 +61,9 @@ class MonitorRepositorySpec extends MongoSpec {
       "return error when monitor belongs to someone else" in withEmbeddedMongoDb { client =>
         val result = for
           repo <- MonitorRepository.make(client)
-          mid  <- repo.create(Monitors.create())
-          mon  <- repo.find(Users.uid2, mid)
-        yield mon
+          mon  <- repo.create(Monitors.createMarketData())
+          res  <- repo.find(Users.uid2, mon.id)
+        yield res
 
         result.attempt.map { res =>
           res mustBe a[Left[AppError.EntityDoesNotExist, Monitor]]
@@ -80,20 +75,20 @@ class MonitorRepositorySpec extends MongoSpec {
       "return all monitors" in withEmbeddedMongoDb { client =>
         val result = for
           repo <- MonitorRepository.make(client)
-          mid1 <- repo.create(Monitors.create())
-          mid2 <- repo.create(Monitors.create(pair = Markets.gbpusd))
+          mon1 <- repo.create(Monitors.createMarketData())
+          mon2 <- repo.create(Monitors.createMarketData(pairs = NonEmptyList.of(Markets.gbpusd)))
           mons <- repo.getAll(Users.uid)
-        yield (List(mid1, mid2), mons)
+        yield (List(mon1, mon2), mons)
 
-        result.map { (ids, mons) =>
-          ids mustBe mons.map(_.id)
+        result.map { (created, found) =>
+          created mustBe found
         }
       }
 
       "return empty list when there are no monitors" in withEmbeddedMongoDb { client =>
         val result = for
           repo <- MonitorRepository.make(client)
-          _    <- repo.create(Monitors.create())
+          _    <- repo.create(Monitors.createMarketData())
           mons <- repo.getAll(Users.uid2)
         yield mons
 
@@ -105,10 +100,10 @@ class MonitorRepositorySpec extends MongoSpec {
       "update monitor status" in withEmbeddedMongoDb { client =>
         val result = for
           repo <- MonitorRepository.make(client)
-          mid  <- repo.create(Monitors.create())
-          _    <- repo.activate(Users.uid, mid, false)
-          mon  <- repo.find(Users.uid, mid)
-        yield mon
+          mon  <- repo.create(Monitors.createMarketData())
+          _    <- repo.activate(Users.uid, mon.id, false)
+          upd  <- repo.find(Users.uid, mon.id)
+        yield upd
 
         result.map { res =>
           res.active mustBe false
@@ -118,7 +113,7 @@ class MonitorRepositorySpec extends MongoSpec {
       "allow updating status multiple times" in withEmbeddedMongoDb { client =>
         val result = for
           repo <- MonitorRepository.make(client)
-          mid  <- repo.create(Monitors.create())
+          mid  <- repo.create(Monitors.createMarketData()).map(_.id)
           _    <- repo.activate(Users.uid, mid, false)
           _    <- repo.activate(Users.uid, mid, false)
           _    <- repo.activate(Users.uid, mid, false)
@@ -143,15 +138,15 @@ class MonitorRepositorySpec extends MongoSpec {
       "delete monitor from db and return deleted mon back" in withEmbeddedMongoDb { client =>
         val result = for
           repo    <- MonitorRepository.make(client)
-          mid     <- repo.create(Monitors.create())
-          deleted <- repo.delete(Users.uid, mid)
+          mon     <- repo.create(Monitors.createMarketData())
+          deleted <- repo.delete(Users.uid, mon.id)
           mons    <- repo.getAll(Users.uid)
         yield (deleted, mons)
 
         result.map { case (deleted, mons) =>
           mons mustBe Nil
           deleted.userId mustBe Users.uid
-          deleted.currencyPair mustBe Markets.gbpeur
+          deleted.currencyPairs mustBe NonEmptyList.of(Markets.gbpeur)
         }
       }
 
@@ -171,63 +166,44 @@ class MonitorRepositorySpec extends MongoSpec {
       "update monitor in db and return previous monitor" in withEmbeddedMongoDb { client =>
         val result = for
           repo <- MonitorRepository.make(client)
-          mid  <- repo.create(Monitors.create())
-          newPriceMonitorSchedule = Monitors.monitor.price.copy(interval = Interval.M1)
-          oldMon <- repo.update(Monitors.monitor.copy(id = mid, price = newPriceMonitorSchedule, currencyPair = Markets.gbpusd))
-          updMon <- repo.find(Users.uid, mid)
-        yield (oldMon, updMon)
+          mon  <- repo.create(Monitors.createMarketData())
+          old <- repo.update(Monitors.marketData.copy(id = mon.id, interval = Interval.M1, currencyPairs = NonEmptyList.of(Markets.gbpusd)))
+          upd <- repo.find(Users.uid, mon.id)
+        yield (old, upd)
 
         result.map { case (oldMon, updMon) =>
-          updMon.price.interval mustBe Interval.M1
-          updMon.currencyPair mustBe Markets.gbpusd
-
-          oldMon.currencyPair mustBe Markets.gbpeur
+          updMon.asInstanceOf[Monitor.MarketData].interval mustBe Interval.M1
+          oldMon.asInstanceOf[Monitor.MarketData].interval mustBe Interval.H1
+          updMon.currencyPairs mustBe NonEmptyList.of(Markets.gbpusd)
+          oldMon.currencyPairs mustBe NonEmptyList.of(Markets.gbpeur)
         }
       }
 
       "not allow to update currency pair to the one that's already being monitored" in withEmbeddedMongoDb { client =>
         val result = for
           repo <- MonitorRepository.make(client)
-          mid  <- repo.create(Monitors.create())
-          _    <- repo.create(Monitors.create(pair = Markets.gbpusd))
-          _    <- repo.update(Monitors.monitor.copy(id = mid, currencyPair = Markets.gbpusd))
-          mon  <- repo.find(Users.uid, mid)
-        yield mon
+          mon  <- repo.create(Monitors.createMarketData())
+          _    <- repo.create(Monitors.createMarketData(pairs = NonEmptyList.of(Markets.gbpusd)))
+          _    <- repo.update(Monitors.marketData.copy(id = mon.id, currencyPairs = NonEmptyList.of(Markets.gbpusd)))
+        yield ()
 
         result.attempt.map { res =>
-          res mustBe Left(AppError.AlreadyBeingMonitored(Markets.gbpusd))
+          res mustBe Left(AppError.AlreadyBeingMonitored(Set(Markets.gbpusd)))
         }
       }
     }
 
-    "updatePriceQueriedTimestamp" should {
+    "updateQueriedTimestamp" should {
       "update last queried at timestamp in price monitor schedule" in withEmbeddedMongoDb { client =>
         val result = for
-          repo <- MonitorRepository.make(client)
-          priceMonitorSchedule = Monitors.priceMonitorSchedule.copy(lastQueriedAt = None)
-          mid    <- repo.create(Monitors.create(price = priceMonitorSchedule))
-          _      <- repo.updatePriceQueriedTimestamp(Users.uid, mid)
-          updMon <- repo.find(Users.uid, mid)
+          repo   <- MonitorRepository.make(client)
+          mon    <- repo.create(Monitors.createMarketData())
+          _      <- repo.updateQueriedTimestamp(Users.uid, mon.id)
+          updMon <- repo.find(Users.uid, mon.id)
         yield updMon
 
         result.map { updMon =>
-          updMon.price.lastQueriedAt mustBe defined
-        }
-      }
-    }
-
-    "updateProfitQueriedTimestamp" should {
-      "update last queried at timestamp in profit monitor schedule" in withEmbeddedMongoDb { client =>
-        val result = for
-          repo <- MonitorRepository.make(client)
-          profitMonitorSchedule = Monitors.profitMonitorSchedule.copy(lastQueriedAt = None)
-          mid <- repo.create(Monitors.create(profit = Some(profitMonitorSchedule)))
-          _ <- repo.updateProfitQueriedTimestamp(Users.uid, mid)
-          updMon <- repo.find(Users.uid, mid)
-        yield updMon
-
-        result.map { updMon =>
-          updMon.profit.flatMap(_.lastQueriedAt) mustBe defined
+          updMon.lastQueriedAt mustBe defined
         }
       }
     }

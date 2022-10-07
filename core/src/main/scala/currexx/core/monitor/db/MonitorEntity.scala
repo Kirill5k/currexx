@@ -8,7 +8,7 @@ import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId}
 import currexx.domain.user.UserId
 import currexx.domain.json.given
 import currexx.domain.monitor.Schedule
-import mongo4cats.bson.ObjectId
+import mongo4cats.bson.{BsonValue, ObjectId}
 import mongo4cats.circe.given
 
 import java.time.Instant
