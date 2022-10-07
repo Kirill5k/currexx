@@ -1,13 +1,10 @@
 package currexx.core.monitor.db
 
 import cats.effect.Async
-import cats.syntax.applicative.*
-import cats.syntax.applicativeError.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.common.db.Repository
 import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId}
-import currexx.domain.JsonCodecs
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.monitor.Schedule
@@ -96,18 +93,17 @@ final private class LiveMonitorRepository[F[_]](
 
   private def alreadyBeingMonitoredError(uid: UserId, kind: String, cps: List[CurrencyPair]): F[Monitor] =
     collection
-      .find(userIdEq(uid) && Filter.eq(Field.Kind, kind))
+      .distinct[CurrencyPair](Field.CurrencyPairs, uidAndKindAndCurrencyPairs(uid, kind, cps))
       .all
-      .map(_.flatMap(_.currencyPairs.toList).toSet)
       .flatMap { alreadyTracked =>
-        AppError.AlreadyBeingMonitored(alreadyTracked.intersect(cps.toSet)).raiseError[F, Monitor]
+        F.raiseError(AppError.AlreadyBeingMonitored(alreadyTracked.toSet.intersect(cps.toSet)))
       }
 
   private def uidAndKindAndCurrencyPairs(uid: UserId, kind: String, cps: List[CurrencyPair]): Filter =
     userIdEq(uid) && Filter.eq(Field.Kind, kind) && Filter.in(Field.CurrencyPairs, cps)
 }
 
-object MonitorRepository extends MongoJsonCodecs with JsonCodecs:
+object MonitorRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[MonitorRepository[F]] =
     db.getCollectionWithCodec[MonitorEntity]("monitors")
       .map(_.withAddedCodec[CurrencyPair].withAddedCodec[Interval].withAddedCodec[Schedule])
