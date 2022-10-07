@@ -13,6 +13,7 @@ import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.monitor.Schedule
 import currexx.domain.user.UserId
 import fs2.Stream
+import mongo4cats.bson.BsonValue
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
 import mongo4cats.operations.{Filter, Update}
@@ -95,9 +96,9 @@ final private class LiveMonitorRepository[F[_]](
 
   private def alreadyBeingMonitoredError(uid: UserId, kind: String, cps: List[CurrencyPair]): F[Monitor] =
     collection
-      .distinct[List[CurrencyPair]](Field.CurrencyPairs, uidAndKindAndCurrencyPairs(uid, kind, cps))
+      .find(userIdEq(uid) && Filter.eq(Field.Kind, kind))
       .all
-      .map(_.flatten.toSet)
+      .map(_.flatMap(_.currencyPairs.toList).toSet)
       .flatMap { alreadyTracked =>
         AppError.AlreadyBeingMonitored(alreadyTracked.intersect(cps.toSet)).raiseError[F, Monitor]
       }
