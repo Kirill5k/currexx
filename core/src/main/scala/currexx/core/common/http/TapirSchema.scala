@@ -2,6 +2,7 @@ package currexx.core.common.http
 
 import cats.syntax.option.*
 import currexx.clients.broker.BrokerParameters
+import currexx.core.monitor.MonitorController.{CreateMonitorRequest, MonitorView}
 import currexx.domain.market.{Condition, Currency, CurrencyPair, Indicator, Interval, TradeOrder, Trend}
 import eu.timepit.refined.types.string.NonEmptyString
 import currexx.domain.validations.{EmailString, IdString}
@@ -19,20 +20,22 @@ import scala.concurrent.duration.FiniteDuration
 
 transparent trait TapirSchema extends SchemaDerivation {
   // TODO: fix schemas
-  inline given Schema[UserId]              = Schema.string
-  inline given Schema[MonitorId]           = Schema.string
-  inline given Schema[IdString]            = Schema.string
-  inline given Schema[NonEmptyString]      = Schema.string
-  inline given Schema[EmailString]         = Schema.string
-  inline given Schema[Currency]            = Schema.string
-  inline given Schema[FiniteDuration]      = Schema.string
-  inline given Schema[Trend]               = Schema.string
-  inline given Schema[Schedule]            = Schema.string
-  inline given Schema[TradeOrder]          = Schema.string
-  inline given Schema[TradeOrder.Position] = Schema.string
-  inline given Schema[Indicator]           = Schema.string
-  inline given Schema[Condition]           = Schema.string
-  inline given Schema[TriggerFrequency]    = Schema.string
-  inline given Schema[TradeStrategy]       = Schema.string
-  inline given Schema[BrokerParameters]    = Schema.string
+  given Schema[UserId]               = Schema.string
+  given Schema[MonitorId]            = Schema.string
+  given Schema[IdString]             = Schema.string
+  given Schema[NonEmptyString]       = Schema.string
+  given Schema[EmailString]          = Schema.string
+  given Schema[Currency]             = Schema.string
+  given Schema[MonitorView]          = Schema.string
+  given Schema[CreateMonitorRequest] = Schema.string
+  given Schema[FiniteDuration]       = Schema.string
+  given Schema[Trend]                = Schema.string
+  given Schema[Schedule]             = Schema.string
+  given Schema[TradeOrder]           = Schema.string
+  given Schema[TradeOrder.Position]  = Schema.string
+  given Schema[Indicator]            = Schema.string
+  given Schema[Condition]            = Schema.string
+  given Schema[TriggerFrequency]     = Schema.string
+  given Schema[TradeStrategy]        = Schema.string
+  given Schema[BrokerParameters]     = Schema.string
 }
