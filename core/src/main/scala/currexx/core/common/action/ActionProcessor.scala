@@ -38,14 +38,12 @@ final private class LiveActionProcessor[F[_]](
         logger.info(s"closing all opened orders") *> tradeService.closeOpenOrders(uid)
       case Action.CloseOpenOrders(uid, pair) =>
         logger.info(s"closing opened order for $pair currency pair") *> tradeService.closeOpenOrders(uid, pair)
-      case Action.ScheduleProfitMonitor(uid, mid, period) =>
-        F.sleep(period) *> logger.info(s"triggering profit monitor $mid") *> monitorService.triggerProfitMonitor(uid, mid)
-      case Action.AssertProfit(uid, cp, min, max) =>
-        logger.info(s"verifying current position for $cp") *> tradeService.closeOrderIfProfitIsOutsideRange(uid, cp, min, max)
-      case Action.SchedulePriceMonitor(uid, mid, period) =>
-        F.sleep(period) *> logger.info(s"triggering price monitor $mid") *> monitorService.triggerPriceMonitor(uid, mid)
-      case Action.FetchMarketData(uid, cp, interval) =>
-        logger.info(s"fetching market data for $cp") *> tradeService.fetchMarketData(uid, cp, interval)
+      case Action.ScheduleMonitor(uid, mid, period) =>
+        F.sleep(period) *> logger.info(s"triggering monitor $mid") *> monitorService.triggerMonitor(uid, mid)
+      case Action.AssertProfit(uid, cps, min, max) =>
+        logger.info(s"verifying current position for ${cps}") *> tradeService.closeOrderIfProfitIsOutsideRange(uid, cps, min, max)
+      case Action.FetchMarketData(uid, cps, interval) =>
+        logger.info(s"fetching market data for ${cps}") *> tradeService.fetchMarketData(uid, cps, interval)
       case Action.ProcessMarketData(uid, data) =>
         logger.info(s"processing market data for ${data.currencyPair}") *> signalService.processMarketData(uid, data)
       case Action.ProcessSignals(uid, cp, signals) =>

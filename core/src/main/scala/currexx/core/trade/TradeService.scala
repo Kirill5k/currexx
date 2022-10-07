@@ -1,6 +1,7 @@
 package currexx.core.trade
 
 import cats.Monad
+import cats.data.NonEmptyList
 import cats.effect.kernel.Temporal
 import cats.syntax.apply.*
 import cats.syntax.functor.*
@@ -28,8 +29,8 @@ trait TradeService[F[_]]:
   def placeOrder(uid: UserId, order: TradeOrder, closePendingOrders: Boolean): F[Unit]
   def closeOpenOrders(uid: UserId): F[Unit]
   def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
-  def closeOrderIfProfitIsOutsideRange(uid: UserId, cp: CurrencyPair, min: Option[BigDecimal], max: Option[BigDecimal]): F[Unit]
-  def fetchMarketData(uid: UserId, cp: CurrencyPair, interval: Interval): F[Unit]
+  def closeOrderIfProfitIsOutsideRange(uid: UserId, cps: NonEmptyList[CurrencyPair], min: Option[BigDecimal], max: Option[BigDecimal]): F[Unit]
+  def fetchMarketData(uid: UserId, cps: NonEmptyList[CurrencyPair], interval: Interval): F[Unit]
 
 final private class LiveTradeService[F[_]](
     private val settingsRepository: TradeSettingsRepository[F],
@@ -44,8 +45,12 @@ final private class LiveTradeService[F[_]](
   override def updateSettings(settings: TradeSettings): F[Unit]                          = settingsRepository.update(settings)
   override def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]] = orderRepository.getAll(uid, sp)
 
-  override def fetchMarketData(uid: UserId, cp: CurrencyPair, interval: Interval): F[Unit] =
-    marketDataClient.timeSeriesData(cp, interval).flatMap(data => dispatcher.dispatch(Action.ProcessMarketData(uid, data)))
+  override def fetchMarketData(uid: UserId, cps: NonEmptyList[CurrencyPair], interval: Interval): F[Unit] =
+    cps.traverse { cp =>
+      marketDataClient
+        .timeSeriesData(cp, interval)
+        .flatMap(data => dispatcher.dispatch(Action.ProcessMarketData(uid, data)))
+    }.void
 
   override def placeOrder(uid: UserId, order: TradeOrder, closePendingOrders: Boolean): F[Unit] =
     F.whenA(closePendingOrders)(closeOpenOrders(uid, order.currencyPair)) >>
@@ -73,19 +78,22 @@ final private class LiveTradeService[F[_]](
 
   override def closeOrderIfProfitIsOutsideRange(
       uid: UserId,
-      cp: CurrencyPair,
+      cps: NonEmptyList[CurrencyPair],
       min: Option[BigDecimal],
       max: Option[BigDecimal]
   ): F[Unit] =
-    for
-      settings   <- settingsRepository.get(uid)
-      foundOrder <- brokerClient.find(settings.broker, cp)
-      time       <- F.realTimeInstant
-      _ <- foundOrder match
-        case Some(o) if min.exists(_ > o.profit) || max.exists(_ < o.profit) =>
-          submitOrderPlacement(TradeOrderPlacement(uid, TradeOrder.Exit(cp, o.currentPrice), settings.broker, time))
-        case _ => F.unit
-    yield ()
+    // TODO: Refactor
+    cps.traverse { cp =>
+      for
+        settings <- settingsRepository.get(uid)
+        foundOrder <- brokerClient.find(settings.broker, cp)
+        time <- F.realTimeInstant
+        _ <- foundOrder match
+          case Some(o) if min.exists(_ > o.profit) || max.exists(_ < o.profit) =>
+            submitOrderPlacement(TradeOrderPlacement(uid, TradeOrder.Exit(cp, o.currentPrice), settings.broker, time))
+          case _ => F.unit
+      yield ()
+    }.void
 
   override def processMarketStateUpdate(state: MarketState, triggers: List[Indicator]): F[Unit] =
     (settingsRepository.get(state.userId), marketDataClient.latestPrice(state.currencyPair), F.realTimeInstant)
@@ -102,7 +110,9 @@ final private class LiveTradeService[F[_]](
       }
       .flatMap {
         case Some(top) =>
-          F.whenA(state.hasOpenPosition && top.order.isEnter)(brokerClient.submit(top.broker, TradeOrder.Exit(top.order.currencyPair, top.order.price))) *>
+          F.whenA(state.hasOpenPosition && top.order.isEnter)(
+            brokerClient.submit(top.broker, TradeOrder.Exit(top.order.currencyPair, top.order.price))
+          ) *>
             submitOrderPlacement(top)
         case None =>
           F.unit

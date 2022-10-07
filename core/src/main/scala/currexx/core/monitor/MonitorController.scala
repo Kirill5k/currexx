@@ -13,7 +13,8 @@ import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.monitor.Schedule
 import currexx.domain.user.UserId
-import io.circe.Codec
+import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder, Json}
+import io.circe.syntax.*
 import org.http4s.HttpRoutes
 import sttp.model.StatusCode
 import sttp.tapir.*
@@ -65,7 +66,7 @@ final private class MonitorController[F[_]](
     queryMonitorEndpoint.withAuthenticatedSession
       .serverLogic { session => mid =>
         service
-          .triggerPriceMonitor(session.userId, mid, true)
+          .triggerMonitor(session.userId, mid, true)
           .voidResponse
       }
 
@@ -86,23 +87,6 @@ final private class MonitorController[F[_]](
             .voidResponse
       }
 
-  private def compoundUpdateMonitor(using authenticator: Authenticator[F]) =
-    compoundUpdateMonitorEndpoint.withAuthenticatedSession
-      .serverLogic { session => req =>
-        for
-          _        <- F.fromEither(req.validated)
-          monitors <- service.getAll(session.userId)
-          updatedPairs = req.currencyPairs
-          trackedPairs = monitors.map(_.currencyPair).toSet
-          _ <- F.raiseUnless(updatedPairs.subsetOf(trackedPairs))(AppError.NotTracked(updatedPairs.diff(trackedPairs)))
-          res <- monitors
-            .filter(m => updatedPairs(m.currencyPair))
-            .map(_.copy(profit = req.profit, price = req.price, active = req.active))
-            .traverse(service.update)
-            .voidResponse
-        yield res
-      }
-
   private def getAllMonitors(using authenticator: Authenticator[F]) =
     getAllMonitorsEndpoint.withAuthenticatedSession
       .serverLogic { session => _ =>
@@ -114,7 +98,6 @@ final private class MonitorController[F[_]](
   override def routes(using authenticator: Authenticator[F]): HttpRoutes[F] =
     Http4sServerInterpreter[F](Controller.serverOptions).toRoutes(
       List(
-        compoundUpdateMonitor,
         setupNewMonitor,
         pauseMonitor,
         resumeMonitor,
@@ -129,56 +112,115 @@ final private class MonitorController[F[_]](
 
 object MonitorController extends TapirSchema with TapirJson {
 
-  private def validate(pms: ProfitMonitorSchedule): Either[AppError, Unit] =
-    Either.cond(
-      pms.min.isDefined || pms.max.isDefined,
-      (),
-      AppError.FailedValidation("Profit monitor schedule needs to have min or max boundary specified")
-    )
+  sealed trait CreateMonitorRequest(val kind: String):
+    def currencyPairs: NonEmptySet[CurrencyPair]
+    def schedule: Schedule
+    def toDomain(uid: UserId): Either[AppError, CreateMonitor]
 
-  final case class CompoundUpdateMonitorRequest(
-      currencyPairs: Set[CurrencyPair],
-      active: Boolean,
-      price: PriceMonitorSchedule,
-      profit: Option[ProfitMonitorSchedule]
-  ) derives Codec.AsObject:
-    def validated: Either[AppError, Unit] =
-      for
-        _ <- profit.map(validate).getOrElse(Right(()))
-        _ <- Either.cond(currencyPairs.nonEmpty, (), AppError.FailedValidation("Currency pairs must not be empty"))
-      yield ()
+  object CreateMonitorRequest {
+    final case class MarketData(
+        currencyPairs: NonEmptySet[CurrencyPair],
+        schedule: Schedule,
+        interval: Interval
+    ) extends CreateMonitorRequest("market-data")
+        derives Codec.AsObject:
+      def toDomain(uid: UserId): Either[AppError, CreateMonitor] =
+        Right(CreateMonitor.MarketData(uid, currencyPairs.toNonEmptyList, schedule, interval))
 
-  final case class CreateMonitorRequest(
-      currencyPair: CurrencyPair,
-      price: PriceMonitorSchedule,
-      profit: Option[ProfitMonitorSchedule]
-  ) derives Codec.AsObject:
-    def toDomain(uid: UserId): Either[AppError, CreateMonitor] =
-      for _ <- profit.map(validate).getOrElse(Right(()))
-      yield CreateMonitor(uid, currencyPair, price, profit)
+    final case class Profit(
+        currencyPairs: NonEmptySet[CurrencyPair],
+        schedule: Schedule,
+        min: Option[BigDecimal],
+        max: Option[BigDecimal]
+    ) extends CreateMonitorRequest("profit")
+        derives Codec.AsObject:
+      def toDomain(uid: UserId): Either[AppError, CreateMonitor] =
+        Either.cond(
+          min.isDefined || max.isDefined,
+          CreateMonitor.Profit(uid, currencyPairs.toNonEmptyList, schedule, min, max),
+          AppError.FailedValidation("Profit monitor needs to have min or max boundary specified")
+        )
+
+    inline given Decoder[CreateMonitorRequest] = Decoder.instance { c =>
+      c.downField("kind").as[String].flatMap {
+        case "market-data" => c.as[MarketData]
+        case "profit"      => c.as[Profit]
+        case kind          => Left(DecodingFailure(s"Unexpected monitor kind $kind", List(CursorOp.Field("kind"))))
+      }
+    }
+
+    inline given Encoder[CreateMonitorRequest] = Encoder.instance {
+      case marketData: MarketData => marketData.asJsonObject.add("kind", Json.fromString(marketData.kind)).asJson
+      case profit: Profit         => profit.asJsonObject.add("kind", Json.fromString(profit.kind)).asJson
+    }
+  }
 
   final case class CreateMonitorResponse(id: MonitorId) derives Codec.AsObject
 
-  final case class MonitorView(
-      id: String,
-      active: Boolean,
-      currencyPair: CurrencyPair,
-      price: PriceMonitorSchedule,
-      profit: Option[ProfitMonitorSchedule]
-  ) derives Codec.AsObject:
-    def toDomain(uid: UserId): Either[AppError, Monitor] =
-      for _ <- profit.map(validate).getOrElse(Right(()))
-      yield Monitor(MonitorId(id), uid, active, currencyPair, price, profit)
+  sealed trait MonitorView(val kind: String):
+    def id: String
+    def active: Boolean
+    def currencyPairs: NonEmptySet[CurrencyPair]
+    def schedule: Schedule
+    def lastQueriedAt: Option[Instant]
+    def toDomain(uid: UserId): Either[AppError, Monitor]
 
-  object MonitorView:
-    def from(m: Monitor): MonitorView = MonitorView(m.id.value, m.active, m.currencyPair, m.price, m.profit)
+  object MonitorView {
+    final case class MarketData(
+        id: String,
+        active: Boolean,
+        currencyPairs: NonEmptySet[CurrencyPair],
+        schedule: Schedule,
+        lastQueriedAt: Option[Instant],
+        interval: Interval
+    ) extends MonitorView("market-data")
+        derives Codec.AsObject:
+      def toDomain(uid: UserId): Either[AppError, Monitor] =
+        Right(Monitor.MarketData(MonitorId(id), uid, active, currencyPairs.toNonEmptyList, schedule, lastQueriedAt, interval))
+
+    final case class Profit(
+        id: String,
+        active: Boolean,
+        currencyPairs: NonEmptySet[CurrencyPair],
+        schedule: Schedule,
+        lastQueriedAt: Option[Instant],
+        min: Option[BigDecimal],
+        max: Option[BigDecimal]
+    ) extends MonitorView("profit")
+        derives Codec.AsObject:
+      def toDomain(uid: UserId): Either[AppError, Monitor] =
+        Either.cond(
+          min.isDefined || max.isDefined,
+          Monitor.Profit(MonitorId(id), uid, active, currencyPairs.toNonEmptyList, schedule, lastQueriedAt, min, max),
+          AppError.FailedValidation("Profit monitor needs to have min or max boundary specified")
+        )
+
+    def from(m: Monitor): MonitorView =
+      m match
+        case Monitor.MarketData(id, _, active, currencyPairs, schedule, lastQueriedAt, interval) =>
+          MonitorView.MarketData(id.value, active, currencyPairs.toNes, schedule, lastQueriedAt, interval)
+        case Monitor.Profit(id, _, active, currencyPairs, schedule, lastQueriedAt, min, max) =>
+          MonitorView.Profit(id.value, active, currencyPairs.toNes, schedule, lastQueriedAt, min, max)
+
+    inline given Decoder[MonitorView] = Decoder.instance { c =>
+      c.downField("kind").as[String].flatMap {
+        case "market-data" => c.as[MarketData]
+        case "profit"      => c.as[Profit]
+        case kind          => Left(DecodingFailure(s"Unexpected monitor kind $kind", List(CursorOp.Field("kind"))))
+      }
+    }
+
+    inline given Encoder[MonitorView] = Encoder.instance {
+      case marketData: MarketData => marketData.asJsonObject.add("kind", Json.fromString(marketData.kind)).asJson
+      case profit: Profit         => profit.asJsonObject.add("kind", Json.fromString(profit.kind)).asJson
+    }
+  }
 
   private val basePath = "monitors"
   private val monitorIdPath = basePath / path[String]
     .validate(Controller.validId)
     .map((s: String) => MonitorId(s))(_.value)
     .name("monitor-id")
-  private val compoundPath = basePath / "compound"
 
   val setupNewMonitorEndpoint = Controller.securedEndpoint.post
     .in(basePath)
@@ -221,12 +263,6 @@ object MonitorController extends TapirSchema with TapirJson {
     .in(jsonBody[MonitorView])
     .out(statusCode(StatusCode.NoContent))
     .description("Update monitor")
-
-  val compoundUpdateMonitorEndpoint = Controller.securedEndpoint.put
-    .in(compoundPath)
-    .in(jsonBody[CompoundUpdateMonitorRequest])
-    .out(statusCode(StatusCode.NoContent))
-    .description("Update multiple monitors")
 
   def make[F[_]: Async](monitorService: MonitorService[F]): F[Controller[F]] =
     Monad[F].pure(MonitorController[F](monitorService))

@@ -6,7 +6,7 @@ import cats.syntax.applicativeError.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.common.db.Repository
-import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId, PriceMonitorSchedule}
+import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId}
 import currexx.domain.JsonCodecs
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval}
@@ -25,11 +25,10 @@ trait MonitorRepository[F[_]] extends Repository[F]:
   def find(uid: UserId, id: MonitorId): F[Monitor]
   def delete(uid: UserId, id: MonitorId): F[Monitor]
   def getAll(uid: UserId): F[List[Monitor]]
-  def create(monitor: CreateMonitor): F[MonitorId]
+  def create(monitor: CreateMonitor): F[Monitor]
   def activate(uid: UserId, id: MonitorId, active: Boolean): F[Monitor]
   def update(mon: Monitor): F[Monitor]
-  def updatePriceQueriedTimestamp(uid: UserId, id: MonitorId): F[Monitor]
-  def updateProfitQueriedTimestamp(uid: UserId, id: MonitorId): F[Monitor]
+  def updateQueriedTimestamp(uid: UserId, id: MonitorId): F[Monitor]
 
 final private class LiveMonitorRepository[F[_]](
     private val collection: MongoCollection[F, MonitorEntity]
@@ -49,25 +48,22 @@ final private class LiveMonitorRepository[F[_]](
   override def getAll(uid: UserId): F[List[Monitor]] =
     collection.find(userIdEq(uid)).all.mapIterable(_.toDomain)
 
-  override def create(mon: CreateMonitor): F[MonitorId] = {
+  override def create(mon: CreateMonitor): F[Monitor] =
     val entity = MonitorEntity.from(mon)
+    val cps    = mon.currencyPairs.toList
     collection
-      .count(userIdAndCurrencyPairEq(mon.userId, mon.currencyPair))
+      .count(userIdEq(mon.userId) && Filter.in("currencyPairs", cps))
       .flatMap {
-        case 0 => collection.insertOne(entity).as(MonitorId(entity._id))
-        case _ => AppError.AlreadyBeingMonitored(mon.currencyPair).raiseError[F, MonitorId]
+        case 0 => collection.insertOne(entity).as(entity.toDomain)
+        case _ => alreadyBeingMonitoredError(mon.userId, cps)
       }
-  }
 
   override def activate(uid: UserId, id: MonitorId, active: Boolean): F[Monitor] =
     runUpdate(uid, id)(Update.set(Field.Active, active))
 
-  override def updatePriceQueriedTimestamp(uid: UserId, id: MonitorId): F[Monitor] =
-    runUpdate(uid, id)(Update.currentDate(s"price.${Field.LastQueriedAt}"))
+  override def updateQueriedTimestamp(uid: UserId, id: MonitorId): F[Monitor] =
+    runUpdate(uid, id)(Update.currentDate(Field.LastQueriedAt))
 
-  override def updateProfitQueriedTimestamp(uid: UserId, id: MonitorId): F[Monitor] =
-    runUpdate(uid, id)(Update.currentDate(s"profit.${Field.LastQueriedAt}"))
-  
   private def runUpdate(uid: UserId, id: MonitorId)(update: Update): F[Monitor] =
     collection
       .findOneAndUpdate(idEq(id.value) && userIdEq(uid), update.currentDate(Field.LastUpdatedAt))
@@ -79,24 +75,36 @@ final private class LiveMonitorRepository[F[_]](
       .flatMap(maybeMon => F.fromOption(maybeMon.map(_.toDomain), AppError.EntityDoesNotExist("Monitor", id.value)))
 
   override def update(mon: Monitor): F[Monitor] =
+    val baseUpdate = Update
+      .set(Field.Active, mon.active)
+      .set("currencyPairs", mon.currencyPairs)
+      .set("schedule", mon.schedule)
+      .set(Field.LastQueriedAt, mon.lastQueriedAt)
+    val cps = mon.currencyPairs.toList
     collection
-      .count(idEq(mon.id.value).not && userIdEq(mon.userId) && Filter.eq(Field.CurrencyPair, mon.currencyPair))
+      .count(idEq(mon.id.value).not && userIdEq(mon.userId) && Filter.eq("currencyPairs", cps))
       .flatMap {
         case 0 =>
           runUpdate(mon.userId, mon.id) {
-            Update
-              .set(Field.Active, mon.active)
-              .set(Field.CurrencyPair, mon.currencyPair)
-              .set("price", PriceMonitor.from(mon.price))
-              .set("profit", mon.profit.map(ProfitMonitor.from))
+            mon match
+              case md: Monitor.MarketData => baseUpdate.set("interval", md.interval)
+              case p: Monitor.Profit      => baseUpdate.set("min", p.min).set("max", p.max)
           }
-        case _ =>
-          AppError.AlreadyBeingMonitored(mon.currencyPair).raiseError[F, Monitor]
+        case _ => alreadyBeingMonitoredError(mon.userId, cps)
+      }
+
+  private def alreadyBeingMonitoredError(uid: UserId, cps: List[CurrencyPair]): F[Monitor] =
+    collection
+      .distinct[List[CurrencyPair]]("currencyPairs", userIdEq(uid) && Filter.in("currencyPairs", cps))
+      .all
+      .map(_.flatten.toSet)
+      .flatMap { alreadyTracked =>
+        AppError.AlreadyBeingMonitored(alreadyTracked.intersect(cps.toSet)).raiseError[F, Monitor]
       }
 }
 
 object MonitorRepository extends MongoJsonCodecs with JsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[MonitorRepository[F]] =
     db.getCollectionWithCodec[MonitorEntity]("monitors")
-      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[PriceMonitor].withAddedCodec[ProfitMonitor])
+      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[Interval])
       .map(coll => LiveMonitorRepository[F](coll))

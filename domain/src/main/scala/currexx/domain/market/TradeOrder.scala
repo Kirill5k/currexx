@@ -37,8 +37,8 @@ object TradeOrder {
   }
 
   inline given Encoder[TradeOrder] = Encoder.instance {
-    case enter: Enter => enter.asJsonObject.add("kind", Json.fromString("enter")).asJson
-    case exit: Exit   => exit.asJsonObject.add("kind", Json.fromString("exit")).asJson
+    case enter: Enter => enter.asJsonObject.add("kind", Json.fromString(enter.kind)).asJson
+    case exit: Exit   => exit.asJsonObject.add("kind", Json.fromString(exit.kind)).asJson
   }
 }
 

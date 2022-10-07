@@ -1,5 +1,6 @@
 package currexx.domain.market
 
+import cats.Order
 import cats.syntax.either.*
 import io.circe.{Decoder, Encoder}
 
@@ -20,3 +21,4 @@ object CurrencyPair:
 
   inline given Encoder[CurrencyPair] = Encoder.encodeString.contramap(_.toString)
   inline given Decoder[CurrencyPair] = Decoder.decodeString.emap(CurrencyPair.from(_))
+  inline given Order[CurrencyPair]   = Order.from((cp1, cp2) => cp1.toString.compareTo(cp2.toString))

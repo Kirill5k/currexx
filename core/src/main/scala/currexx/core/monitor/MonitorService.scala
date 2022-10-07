@@ -26,8 +26,7 @@ trait MonitorService[F[_]]:
   def delete(uid: UserId, id: MonitorId): F[Unit]
   def pause(uid: UserId, id: MonitorId): F[Unit]
   def resume(uid: UserId, id: MonitorId): F[Unit]
-  def triggerPriceMonitor(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit]
-  def triggerProfitMonitor(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit]
+  def triggerMonitor(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit]
 
 final private class LiveMonitorService[F[_]](
     private val repository: MonitorRepository[F],
@@ -35,72 +34,41 @@ final private class LiveMonitorService[F[_]](
 )(using
     F: Temporal[F]
 ) extends MonitorService[F] {
-  private def closeOpenOrders(m: Monitor): F[Unit]         = actionDispatcher.dispatch(Action.CloseOpenOrders(m.userId, m.currencyPair))
   override def getAll(uid: UserId): F[List[Monitor]]       = repository.getAll(uid)
   override def get(uid: UserId, id: MonitorId): F[Monitor] = repository.find(uid, id)
-  override def delete(uid: UserId, id: MonitorId): F[Unit] = repository.delete(uid, id).flatMap(closeOpenOrders)
-  override def pause(uid: UserId, id: MonitorId): F[Unit]  = repository.activate(uid, id, false).flatMap(closeOpenOrders)
+  override def delete(uid: UserId, id: MonitorId): F[Unit] = repository.delete(uid, id).void
+  override def pause(uid: UserId, id: MonitorId): F[Unit]  = repository.activate(uid, id, false).void
   override def resume(uid: UserId, id: MonitorId): F[Unit] = repository.activate(uid, id, true).void
 
-  override def update(mon: Monitor): F[Unit] =
-    for
-      old <- repository.update(mon)
-      _   <- F.whenA(old.currencyPair != mon.currencyPair || (old.active && !mon.active))(closeOpenOrders(old))
-      _ <- F.whenA(old.profit.isEmpty && mon.profit.isDefined)(scheduleProfitMonitor(mon.id, mon.userId, mon.profit.get, F.realTimeInstant))
-    yield ()
+  override def update(mon: Monitor): F[Unit]           = repository.update(mon).void
+  override def create(cm: CreateMonitor): F[MonitorId] = repository.create(cm).flatTap(scheduleMonitor(F.realTimeInstant)).map(_.id)
 
-  override def create(cm: CreateMonitor): F[MonitorId] =
-    for
-      mid <- repository.create(cm)
-      _   <- schedulePriceMonitor(mid, cm.userId, cm.price, F.realTimeInstant)
-      _   <- F.whenA(cm.profit.isDefined)(scheduleProfitMonitor(mid, cm.userId, cm.profit.get, F.realTimeInstant))
-    yield mid
-
-  override def triggerPriceMonitor(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit] =
+  override def triggerMonitor(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit] =
     for
       mon <- get(uid, id)
       _ <- F.whenA(mon.active) {
-        repository.updatePriceQueriedTimestamp(uid, id) >>
-          actionDispatcher.dispatch(Action.FetchMarketData(uid, mon.currencyPair, mon.price.interval))
+        repository.updateQueriedTimestamp(uid, id) >> (mon match
+          case md: Monitor.MarketData => actionDispatcher.dispatch(Action.FetchMarketData(uid, mon.currencyPairs, md.interval))
+          case p: Monitor.Profit      => actionDispatcher.dispatch(Action.AssertProfit(uid, mon.currencyPairs, p.min, p.max))
+        )
       }
-      now <- F.realTimeInstant
-      _   <- F.unlessA(manual)(schedulePriceMonitor(id, uid, mon.price.copy(lastQueriedAt = Some(now)), F.pure(now)))
-    yield ()
-
-  override def triggerProfitMonitor(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit] =
-    for
-      mon    <- get(uid, id)
-      profit <- F.fromOption(mon.profit, AppError.NotScheduled("profit"))
-      _ <- F.whenA(mon.active) {
-        repository.updateProfitQueriedTimestamp(uid, id) >>
-          actionDispatcher.dispatch(Action.AssertProfit(uid, mon.currencyPair, profit.min, profit.max))
-      }
-      now <- F.realTimeInstant
-      _   <- F.unlessA(manual)(scheduleProfitMonitor(id, uid, profit.copy(lastQueriedAt = Some(now)), F.pure(now)))
+      _ <- F.unlessA(manual)(scheduleMonitor(F.realTimeInstant)(mon))
     yield ()
 
   override def rescheduleAll: F[Unit] =
     F.realTimeInstant.flatMap { now =>
       repository.stream
-        .map { mon =>
-          schedulePriceMonitor(mon.id, mon.userId, mon.price, F.pure(now)) >>
-            F.whenA(mon.profit.isDefined)(scheduleProfitMonitor(mon.id, mon.userId, mon.profit.get, F.pure(now)))
-        }
+        .map(scheduleMonitor(F.pure(now)))
         .map(Stream.eval)
         .parJoinUnbounded
         .compile
         .drain
     }
 
-  private def schedulePriceMonitor(mid: MonitorId, uid: UserId, ms: PriceMonitorSchedule, now: => F[Instant]): F[Unit] =
+  private def scheduleMonitor(now: => F[Instant])(mon: Monitor): F[Unit] =
     now
-      .map(ms.durationBetweenNextQuery)
-      .flatMap(db => actionDispatcher.dispatch(Action.SchedulePriceMonitor(uid, mid, db)))
-
-  private def scheduleProfitMonitor(mid: MonitorId, uid: UserId, ms: ProfitMonitorSchedule, now: => F[Instant]): F[Unit] =
-    now
-      .map(ms.durationBetweenNextQuery)
-      .flatMap(db => actionDispatcher.dispatch(Action.ScheduleProfitMonitor(uid, mid, db)))
+      .map(mon.durationBetweenNextQuery)
+      .flatMap(db => actionDispatcher.dispatch(Action.ScheduleMonitor(mon.userId, mon.id, db)))
 }
 
 object MonitorService:
