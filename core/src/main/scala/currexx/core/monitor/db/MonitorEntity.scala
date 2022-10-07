@@ -18,7 +18,7 @@ sealed trait MonitorEntity(val kind: String):
   def _id: ObjectId
   def userId: ObjectId
   def active: Boolean
-  def currencyPairs: NonEmptyList[CurrencyPair]
+  def currencyPairs: List[String]
   def schedule: Schedule
   def lastQueriedAt: Option[Instant]
   def toDomain: Monitor
@@ -28,7 +28,7 @@ object MonitorEntity {
       _id: ObjectId,
       userId: ObjectId,
       active: Boolean,
-      currencyPairs: NonEmptyList[CurrencyPair],
+      currencyPairs: List[String],
       schedule: Schedule,
       lastQueriedAt: Option[Instant],
       min: Option[BigDecimal],
@@ -40,7 +40,7 @@ object MonitorEntity {
         MonitorId(_id),
         UserId(userId),
         active,
-        currencyPairs,
+        NonEmptyList.fromListUnsafe(currencyPairs.flatMap(cp => CurrencyPair.from(cp).toOption)),
         schedule,
         lastQueriedAt,
         min,
@@ -51,7 +51,7 @@ object MonitorEntity {
       _id: ObjectId,
       userId: ObjectId,
       active: Boolean,
-      currencyPairs: NonEmptyList[CurrencyPair],
+      currencyPairs: List[String],
       schedule: Schedule,
       lastQueriedAt: Option[Instant],
       interval: Interval
@@ -62,7 +62,7 @@ object MonitorEntity {
         MonitorId(_id),
         UserId(userId),
         active,
-        currencyPairs,
+        NonEmptyList.fromListUnsafe(currencyPairs.flatMap(cp => CurrencyPair.from(cp).toOption)),
         schedule,
         lastQueriedAt,
         interval
@@ -71,9 +71,9 @@ object MonitorEntity {
   def from(create: CreateMonitor): MonitorEntity =
     create match
       case CreateMonitor.MarketData(userId, currencyPairs, schedule, interval) =>
-        MonitorEntity.MarketData(ObjectId.gen, userId.toObjectId, true, currencyPairs, schedule, None, interval)
+        MonitorEntity.MarketData(ObjectId.gen, userId.toObjectId, true, currencyPairs.toList.map(_.toString), schedule, None, interval)
       case CreateMonitor.Profit(userId, currencyPairs, schedule, min, max) =>
-        MonitorEntity.Profit(ObjectId.gen, userId.toObjectId, true, currencyPairs, schedule, None, min, max)
+        MonitorEntity.Profit(ObjectId.gen, userId.toObjectId, true, currencyPairs.toList.map(_.toString), schedule, None, min, max)
 
   inline given Decoder[MonitorEntity] = Decoder.instance { c =>
     c.downField("kind").as[String].flatMap {

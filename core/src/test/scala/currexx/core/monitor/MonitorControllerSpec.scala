@@ -62,7 +62,7 @@ class MonitorControllerSpec extends ControllerSpec {
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
         val requestBody = s"""{
-             |"currencyPairs": "GBP/EUR",
+             |"currencyPairs": ["GBP/EUR"],
              |"kind": "profit",
              |"schedule": {"kind":"periodic","period":"3 hours"}
              |}""".stripMargin
@@ -70,11 +70,8 @@ class MonitorControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(
-          res,
-          Status.UnprocessableEntity,
-          Some(s"""{"message":"Profit monitor schedule needs to have min or max boundary specified"}""")
-        )
+        val responseBody = s"""{"message":"Profit monitor needs to have min or max boundary specified"}"""
+        verifyJsonResponse(res, Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
       }
     }
@@ -178,22 +175,22 @@ class MonitorControllerSpec extends ControllerSpec {
           s"""[
              |{
              |"id": "${Monitors.mid}",
-             |"kind": "market-data"
              |"active": true,
-             |"currencyPairs": "[${Markets.gbpeur}]",
+             |"currencyPairs": ["${Markets.gbpeur}"],
              |"schedule": {"kind":"periodic","period":"3 hours"},
              |"lastQueriedAt": "${Monitors.queriedAt}",
-             |"interval": "H1"
+             |"interval": "H1",
+             |"kind": "market-data"
              |},
              |{
              |"id": "${Monitors.mid}",
-             |"kind": "profit",
              |"active": true,
-             |"currencyPairs": "[${Markets.gbpeur}]",
+             |"currencyPairs": ["${Markets.gbpeur}"],
              |"schedule": {"kind":"periodic","period":"3 hours"},
-             |"lastQueriedAt": "${Monitors.queriedAt}"},
+             |"lastQueriedAt": "${Monitors.queriedAt}",
              |"min": -10,
-             |"max": 150
+             |"max": 150,
+             |"kind": "profit"
              |}
              |]""".stripMargin
 
@@ -214,9 +211,9 @@ class MonitorControllerSpec extends ControllerSpec {
 
         val responseBody = s"""{
              |"id": "${Monitors.mid}",
-             |"kind": "market-data"
+             |"kind": "market-data",
              |"active": true,
-             |"currencyPairs": "[${Markets.gbpeur}]",
+             |"currencyPairs": ["${Markets.gbpeur}"],
              |"schedule": {"kind":"periodic","period":"3 hours"},
              |"lastQueriedAt": "${Monitors.queriedAt}",
              |"interval": "H1"
@@ -236,9 +233,9 @@ class MonitorControllerSpec extends ControllerSpec {
 
         val requestBody = s"""{
              |"id": "${Monitors.mid}",
-             |"kind": "market-data"
+             |"kind": "market-data",
              |"active": true,
-             |"currencyPairs": "[${Markets.gbpeur}]",
+             |"currencyPairs": ["${Markets.gbpeur}"],
              |"schedule": {"kind":"periodic","period":"3 hours"},
              |"lastQueriedAt": "${Monitors.queriedAt}",
              |"interval": "H1"
@@ -258,9 +255,9 @@ class MonitorControllerSpec extends ControllerSpec {
 
         val requestBody = s"""{
              |"id": "foo",
-             |"kind": "market-data"
+             |"kind": "market-data",
              |"active": true,
-             |"currencyPairs": "[${Markets.gbpeur}]",
+             |"currencyPairs": ["${Markets.gbpeur}"],
              |"schedule": {"kind":"periodic","period":"3 hours"},
              |"lastQueriedAt": "${Monitors.queriedAt}",
              |"interval": "H1"

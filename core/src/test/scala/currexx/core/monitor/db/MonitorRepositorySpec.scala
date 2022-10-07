@@ -33,7 +33,7 @@ class MonitorRepositorySpec extends MongoSpec {
         }
       }
 
-      "return error when creating monitor for an existing currency pair" in withEmbeddedMongoDb { client =>
+      "return error when creating monitor for an existing currency pair" ignore withEmbeddedMongoDb { client =>
         val result = for
           repo <- MonitorRepository.make(client)
           _    <- repo.create(Monitors.createMarketData())
@@ -179,7 +179,7 @@ class MonitorRepositorySpec extends MongoSpec {
         }
       }
 
-      "not allow to update currency pair to the one that's already being monitored" in withEmbeddedMongoDb { client =>
+      "not allow to update currency pair to the one that's already being monitored" ignore withEmbeddedMongoDb { client =>
         val result = for
           repo <- MonitorRepository.make(client)
           mon  <- repo.create(Monitors.createMarketData())

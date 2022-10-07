@@ -76,7 +76,7 @@ class MonitorServiceSpec extends IOWordSpec {
     "create" should {
       "store monitor in db and submit query monitor action when schedule is periodic" in {
         val (repo, disp) = mocks
-        when(repo.create(any[CreateMonitor])).thenReturn(IO.pure(Monitors.mid))
+        when(repo.create(any[CreateMonitor])).thenReturn(IO.pure(Monitors.marketData.copy(lastQueriedAt = None)))
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -91,10 +91,10 @@ class MonitorServiceSpec extends IOWordSpec {
       }
 
       "store monitor in db and reschedule when schedule is cron" in {
-        val (repo, disp) = mocks
-        when(repo.create(any[CreateMonitor])).thenReturn(IO.pure(Monitors.mid))
-
         val schedule = Schedule.Cron("0 7,20 * * 1-5").value
+        val (repo, disp) = mocks
+        when(repo.create(any[CreateMonitor])).thenReturn(IO.pure(Monitors.marketData.copy(schedule = schedule)))
+
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
           mid <- svc.create(Monitors.createMarketData(schedule = schedule))
