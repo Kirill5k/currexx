@@ -14,18 +14,20 @@ object XtbResponse {
   final case class Error(errorCode: String, errorDescr: String) extends XtbResponse derives Codec.AsObject
 
   final case class SymbolData(
+      symbol: String,
       ask: BigDecimal,
       bid: BigDecimal,
       contractSize: Int
   ) derives Codec.AsObject
-  final case class SymbolInfo(returnData: SymbolData) extends XtbResponse derives Codec.AsObject
+  final case class SymbolInfo(returnData: SymbolData)        extends XtbResponse derives Codec.AsObject
+  final case class SymbolsInfo(returnData: List[SymbolData]) extends XtbResponse derives Codec.AsObject
 
   final case class OrderData(order: Long) derives Codec.AsObject
   final case class OrderPlacement(returnData: OrderData) extends XtbResponse derives Codec.AsObject
 
   final case class TradeData(
       position: Long,
-      symbol: String,
+      symbol: CurrencyPair,
       close_price: BigDecimal,
       closed: Boolean,
       volume: BigDecimal,

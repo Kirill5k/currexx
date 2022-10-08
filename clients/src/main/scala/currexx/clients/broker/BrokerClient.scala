@@ -1,6 +1,7 @@
 package currexx.clients.broker
 
 import cats.Monad
+import cats.data.NonEmptyList
 import cats.effect.Async
 import currexx.clients.HttpClient
 import currexx.clients.broker.vindaloo.VindalooClient
@@ -9,16 +10,16 @@ import currexx.domain.market.{CurrencyPair, OpenedTradeOrder, TradeOrder}
 
 trait BrokerClient[F[_]]:
   def submit(parameters: BrokerParameters, order: TradeOrder): F[Unit]
-  def find(parameters: BrokerParameters, cp: CurrencyPair): F[Option[OpenedTradeOrder]]
+  def find(parameters: BrokerParameters, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]]
 
 final private class LiveBrokerClient[F[_]](
     private val vindalooClient: VindalooClient[F],
     private val xtbClient: XtbClient[F]
 ) extends BrokerClient[F]:
-  override def find(parameters: BrokerParameters, cp: CurrencyPair): F[Option[OpenedTradeOrder]] =
+  override def find(parameters: BrokerParameters, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]] =
     parameters match
-      case params: BrokerParameters.Vindaloo => vindalooClient.getCurrentOrder(params, cp)
-      case params: BrokerParameters.Xtb      => xtbClient.getCurrentOrder(params, cp)
+      case params: BrokerParameters.Vindaloo => vindalooClient.getCurrentOrders(params, cps)
+      case params: BrokerParameters.Xtb      => xtbClient.getCurrentOrders(params, cps)
 
   override def submit(parameters: BrokerParameters, order: TradeOrder): F[Unit] =
     parameters match

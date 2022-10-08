@@ -1,6 +1,7 @@
 package currexx.clients.broker.xtb
 
 import cats.Monad
+import cats.data.NonEmptyList
 import cats.effect.{Async, Ref}
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
@@ -27,7 +28,7 @@ import java.time.Instant
 
 private[clients] trait XtbClient[F[_]] extends HttpClient[F]:
   def submit(params: BrokerParameters.Xtb, order: TradeOrder): F[Unit]
-  def getCurrentOrder(params: BrokerParameters.Xtb, cp: CurrencyPair): F[Option[OpenedTradeOrder]]
+  def getCurrentOrders(params: BrokerParameters.Xtb, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]]
 
 final private class LiveXtbClient[F[_]](
     private val config: XtbConfig,
@@ -40,16 +41,16 @@ final private class LiveXtbClient[F[_]](
   override protected val name: String                                   = "xtb"
   override protected val delayBetweenConnectionFailures: FiniteDuration = 5.seconds
 
-  override def getCurrentOrder(params: BrokerParameters.Xtb, cp: CurrencyPair): F[Option[OpenedTradeOrder]] =
+  override def getCurrentOrders(params: BrokerParameters.Xtb, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]] =
     for
       state <- initEmptyState
       _ <- basicRequest
-        .response(asWebSocketStream(Fs2Streams[F])(orderRetrievalProcess(state, params, cp)))
+        .response(asWebSocketStream(Fs2Streams[F])(orderRetrievalProcess(state, params, cps)))
         .get(uri"${config.baseUri}/${if (params.demo) "demo" else "real"}")
         .send(backend)
         .void
-      retrievedOrder <- state.get.map(_.openedTradeOrder(cp))
-    yield retrievedOrder
+      retrievedOrders <- state.get.map(_.openedTradeOrders)
+    yield retrievedOrders
 
   override def submit(params: BrokerParameters.Xtb, order: TradeOrder): F[Unit] =
     initEmptyState.flatMap { state =>
@@ -101,7 +102,7 @@ final private class LiveXtbClient[F[_]](
               .flatMap { sid =>
                 Stream
                   .emits(trades)
-                  .filter(_.symbol == order.currencyPair.toString)
+                  .filter(_.symbol == order.currencyPair)
                   .map(td => XtbRequest.closeTransaction(sid, order.currencyPair, td).asText)
               }
           case XtbResponse.OrderPlacement(_) => Stream.emit(WebSocketFrame.close)
@@ -116,7 +117,7 @@ final private class LiveXtbClient[F[_]](
   private def orderRetrievalProcess(
       state: Ref[F, XtbClient.WsState],
       params: BrokerParameters.Xtb,
-      cp: CurrencyPair
+      cps: NonEmptyList[CurrencyPair]
   ): Pipe[F, WebSocketFrame.Data[_], WebSocketFrame] = { input =>
     login(params) ++
       input
@@ -126,18 +127,17 @@ final private class LiveXtbClient[F[_]](
             Stream.eval(state.update(_.withSessionId(sessionId))).drain ++
               Stream.emit(XtbRequest.currentTrades(sessionId).asText)
           case XtbResponse.Trades(trades) =>
-            trades.find(_.symbol == cp.toString) match
-              case None =>
+            val symbols = cps.toList.toSet
+            val orders  = trades.filter(t => symbols.contains(t.symbol))
+            if (orders.forall(_.profit.isDefined))
+              Stream.eval(state.update(_.withRetrievedOrders(orders))).drain ++
                 Stream.emit(WebSocketFrame.close)
-              case Some(order) if order.profit.isDefined =>
-                Stream.eval(state.update(_.withRetrievedOrder(order))).drain ++
-                  Stream.emit(WebSocketFrame.close)
-              case Some(order) =>
-                Stream.logWarn(s"$name-client/noprofit-${params.userId}-$cp") ++
-                  Stream.eval(state.update(_.withRetrievedOrder(order))).drain ++
-                  obtainSessionId(state).map(sid => XtbRequest.symbolInfo(sid, cp).asText)
-          case XtbResponse.SymbolInfo(price) =>
-            Stream.eval(state.update(_.withCurrentPrice(price))).drain ++
+            else
+              Stream.logWarn(s"$name-client/noprofit-${params.userId}-${symbols.mkString("-")}") ++
+                Stream.eval(state.update(_.withRetrievedOrders(orders))).drain ++
+                obtainSessionId(state).map(sid => XtbRequest.allSymbolsInfo(sid).asText)
+          case XtbResponse.SymbolsInfo(prices) =>
+            Stream.eval(state.update(_.withCurrentPrices(prices))).drain ++
               Stream.emit(WebSocketFrame.close)
           case error: XtbResponse.Error => handError(params.userId, error)
           case _                        => Stream.empty
@@ -181,23 +181,25 @@ final private class LiveXtbClient[F[_]](
 object XtbClient:
   final case class WsState(
       sessionId: Option[String],
-      retrievedOrder: Option[TradeData] = None,
-      price: Option[SymbolData] = None
+      retrievedOrders: List[TradeData] = Nil,
+      prices: List[SymbolData] = Nil
   ) {
-    def withRetrievedOrder(retrievedOrder: TradeData): WsState = copy(retrievedOrder = Some(retrievedOrder))
-    def withSessionId(sessionId: String): WsState              = copy(sessionId = Some(sessionId))
-    def withCurrentPrice(price: SymbolData): WsState           = copy(price = Some(price))
+    def withRetrievedOrders(retrievedOrder: List[TradeData]): WsState = copy(retrievedOrders = retrievedOrder)
+    def withSessionId(sessionId: String): WsState                     = copy(sessionId = Some(sessionId))
+    def withCurrentPrices(prices: List[SymbolData]): WsState          = copy(prices = prices)
 
-    def openedTradeOrder(cp: CurrencyPair): Option[OpenedTradeOrder] =
-      retrievedOrder.map { td =>
+    def openedTradeOrders: List[OpenedTradeOrder] = {
+      val pricesBySymbols = prices.map(sd => sd.symbol -> sd).toMap
+      retrievedOrders.map { td =>
+        def price = pricesBySymbols(td.symbol.toString)
         val closePrice =
           if (td.close_price > 0) td.close_price
-          else if (td.cmd == 0) price.get.bid
-          else price.get.ask
+          else if (td.cmd == 0) price.bid
+          else price.ask
         def spread = if (td.cmd == 0) td.open_price - closePrice else closePrice - td.open_price
-        val profit = td.profit.getOrElse(spread * td.volume * price.get.contractSize)
+        val profit = td.profit.getOrElse(spread * td.volume * price.contractSize)
         OpenedTradeOrder(
-          cp,
+          td.symbol,
           if (td.cmd == 0) TradeOrder.Position.Buy else TradeOrder.Position.Sell,
           closePrice,
           td.open_price,
@@ -206,6 +208,7 @@ object XtbClient:
           profit
         )
       }
+    }
   }
 
   def make[F[_]: Async: Logger](

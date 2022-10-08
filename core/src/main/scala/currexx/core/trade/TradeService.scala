@@ -29,7 +29,12 @@ trait TradeService[F[_]]:
   def placeOrder(uid: UserId, order: TradeOrder, closePendingOrders: Boolean): F[Unit]
   def closeOpenOrders(uid: UserId): F[Unit]
   def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
-  def closeOrderIfProfitIsOutsideRange(uid: UserId, cps: NonEmptyList[CurrencyPair], min: Option[BigDecimal], max: Option[BigDecimal]): F[Unit]
+  def closeOrderIfProfitIsOutsideRange(
+      uid: UserId,
+      cps: NonEmptyList[CurrencyPair],
+      min: Option[BigDecimal],
+      max: Option[BigDecimal]
+  ): F[Unit]
   def fetchMarketData(uid: UserId, cps: NonEmptyList[CurrencyPair], interval: Interval): F[Unit]
 
 final private class LiveTradeService[F[_]](
@@ -82,18 +87,15 @@ final private class LiveTradeService[F[_]](
       min: Option[BigDecimal],
       max: Option[BigDecimal]
   ): F[Unit] =
-    // TODO: Refactor
-    cps.traverse { cp =>
-      for
-        settings <- settingsRepository.get(uid)
-        foundOrder <- brokerClient.find(settings.broker, cp)
-        time <- F.realTimeInstant
-        _ <- foundOrder match
-          case Some(o) if min.exists(_ > o.profit) || max.exists(_ < o.profit) =>
-            submitOrderPlacement(TradeOrderPlacement(uid, TradeOrder.Exit(cp, o.currentPrice), settings.broker, time))
-          case _ => F.unit
-      yield ()
-    }.void
+    for
+      settings    <- settingsRepository.get(uid)
+      foundOrders <- brokerClient.find(settings.broker, cps)
+      time        <- F.realTimeInstant
+      _ <- foundOrders
+        .filter(o => min.exists(_ > o.profit) || max.exists(_ < o.profit))
+        .map(o => TradeOrderPlacement(uid, TradeOrder.Exit(o.currencyPair, o.currentPrice), settings.broker, time))
+        .traverse(submitOrderPlacement)
+    yield ()
 
   override def processMarketStateUpdate(state: MarketState, triggers: List[Indicator]): F[Unit] =
     (settingsRepository.get(state.userId), marketDataClient.latestPrice(state.currencyPair), F.realTimeInstant)

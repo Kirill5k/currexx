@@ -1,6 +1,7 @@
 package currexx.clients.broker.vindaloo
 
 import cats.Monad
+import cats.data.NonEmptyList
 import cats.effect.Temporal
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
@@ -15,7 +16,7 @@ import scala.concurrent.duration.*
 
 private[clients] trait VindalooClient[F[_]] extends HttpClient[F]:
   def submit(params: BrokerParameters.Vindaloo, order: TradeOrder): F[Unit]
-  def getCurrentOrder(params: BrokerParameters.Vindaloo, cp: CurrencyPair): F[Option[OpenedTradeOrder]]
+  def getCurrentOrders(params: BrokerParameters.Vindaloo, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]]
 
 final private class LiveVindalooClient[F[_]](
     private val config: VindalooConfig,
@@ -57,7 +58,8 @@ final private class LiveVindalooClient[F[_]](
         }
       }
 
-  override def getCurrentOrder(params: BrokerParameters.Vindaloo, cp: CurrencyPair): F[Option[OpenedTradeOrder]] = F.pure(None)
+  override def getCurrentOrders(params: BrokerParameters.Vindaloo, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]] =
+    F.pure(Nil)
 }
 
 object VindalooClient:

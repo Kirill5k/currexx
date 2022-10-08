@@ -1,5 +1,6 @@
 package currexx.clients.broker.xtb
 
+import cats.syntax.option.*
 import currexx.clients.broker.xtb.XtbResponse.SymbolData
 import currexx.domain.market.{CurrencyPair, TradeOrder}
 import io.circe.Codec
@@ -37,18 +38,18 @@ object RequestArguments:
 final case class XtbRequest[A <: RequestArguments](
     command: String,
     streamSessionId: Option[String],
-    arguments: A
+    arguments: Option[A]
 ) derives Codec.AsObject
 
 object XtbRequest {
   def login(userId: String, password: String): XtbRequest[RequestArguments.Login] =
-    XtbRequest("login", None, RequestArguments.Login(userId, password))
+    XtbRequest("login", None, RequestArguments.Login(userId, password).some)
 
   def currentTrades(sessionId: String): XtbRequest[RequestArguments.Trades] =
     XtbRequest(
       "getTrades",
       Some(sessionId),
-      RequestArguments.Trades(true)
+      RequestArguments.Trades(true).some
     )
 
   def openTransaction(
@@ -58,19 +59,21 @@ object XtbRequest {
     XtbRequest(
       "tradeTransaction",
       Some(sessionId),
-      RequestArguments.Transaction(
-        RequestArguments.TradeTransInfo(
-          `type` = 0,
-          cmd = Some(if (order.position == TradeOrder.Position.Buy) 0 else 1),
-          symbol = order.currencyPair.toString,
-          customComment = s"Currexx - ${TradeOrder.Position.Buy.toString} ${order.currencyPair}",
-          offset = None,
-          volume = order.volume,
-          price = order.price,
-          sl = None,
-          tp = None,
+      RequestArguments
+        .Transaction(
+          RequestArguments.TradeTransInfo(
+            `type` = 0,
+            cmd = Some(if (order.position == TradeOrder.Position.Buy) 0 else 1),
+            symbol = order.currencyPair.toString,
+            customComment = s"Currexx - ${TradeOrder.Position.Buy.toString} ${order.currencyPair}",
+            offset = None,
+            volume = order.volume,
+            price = order.price,
+            sl = None,
+            tp = None
+          )
         )
-      )
+        .some
     )
 
   def closeTransaction(
@@ -81,23 +84,27 @@ object XtbRequest {
     XtbRequest(
       "tradeTransaction",
       Some(sessionId),
-      RequestArguments.Transaction(
-        RequestArguments.TradeTransInfo(
-          `type` = 2,
-          cmd = None,
-          symbol = cp.toString,
-          customComment = s"Currexx - Close $cp",
-          price = data.close_price,
-          volume = data.volume,
-          order = Some(data.position)
+      RequestArguments
+        .Transaction(
+          RequestArguments.TradeTransInfo(
+            `type` = 2,
+            cmd = None,
+            symbol = cp.toString,
+            customComment = s"Currexx - Close $cp",
+            price = data.close_price,
+            volume = data.volume,
+            order = Some(data.position)
+          )
         )
-      )
+        .some
     )
 
   def symbolInfo(sessionId: String, cp: CurrencyPair): XtbRequest[RequestArguments.SymbolInfo] =
     XtbRequest(
       "getSymbol",
       Some(sessionId),
-      RequestArguments.SymbolInfo(cp.toString)
+      Some(RequestArguments.SymbolInfo(cp.toString))
     )
+
+  def allSymbolsInfo(sessionId: String): XtbRequest[RequestArguments.SymbolInfo] = XtbRequest("getAllSymbols", Some(sessionId), None)
 }

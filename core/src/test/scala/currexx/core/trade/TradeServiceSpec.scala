@@ -222,20 +222,21 @@ class TradeServiceSpec extends IOWordSpec {
       "submit close order if profit is above max" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
-        when(brokerClient.find(any[BrokerParameters], any[CurrencyPair])).thenReturn(IO.pure(Some(Trades.openedOrder)))
+        when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]])).thenReturn(IO.pure(List(Trades.openedOrder)))
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
+        val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, NonEmptyList.of(Markets.gbpeur), None, Some(10))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, None, Some(10))
         yield ()
 
         result.asserting { res =>
           verifyNoInteractions(dataClient)
           verify(settRepo).get(Users.uid)
-          verify(brokerClient).find(Trades.broker, Markets.gbpeur)
+          verify(brokerClient).find(Trades.broker, cps)
           verify(brokerClient).submit(Trades.broker, TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close))
           verify(orderRepo).save(any[TradeOrderPlacement])
           verify(disp).dispatch(any[Action])
@@ -246,21 +247,22 @@ class TradeServiceSpec extends IOWordSpec {
       "submit close order if profit is below min" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
-        when(brokerClient.find(any[BrokerParameters], any[CurrencyPair]))
-          .thenReturn(IO.pure(Some(Trades.openedOrder.copy(profit = BigDecimal(-100)))))
+        when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]]))
+          .thenReturn(IO.pure(List(Trades.openedOrder.copy(profit = BigDecimal(-100)))))
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
+        val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, NonEmptyList.of(Markets.gbpeur), Some(-10), Some(10))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Some(-10), Some(10))
         yield ()
 
         result.asserting { res =>
           verifyNoInteractions(dataClient)
           verify(settRepo).get(Users.uid)
-          verify(brokerClient).find(Trades.broker, Markets.gbpeur)
+          verify(brokerClient).find(Trades.broker, cps)
           verify(brokerClient).submit(Trades.broker, TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close))
           verify(orderRepo).save(any[TradeOrderPlacement])
           verify(disp).dispatch(any[Action])
@@ -271,18 +273,19 @@ class TradeServiceSpec extends IOWordSpec {
       "not do anything if profit is within range" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
-        when(brokerClient.find(any[BrokerParameters], any[CurrencyPair]))
-          .thenReturn(IO.pure(Some(Trades.openedOrder.copy(profit = BigDecimal(0)))))
+        when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]]))
+          .thenReturn(IO.pure(List(Trades.openedOrder.copy(profit = BigDecimal(0)))))
 
+        val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, NonEmptyList.of(Markets.gbpeur), Some(-10), Some(10))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Some(-10), Some(10))
         yield ()
 
         result.asserting { res =>
           verifyNoInteractions(dataClient, orderRepo, disp)
           verify(settRepo).get(Users.uid)
-          verify(brokerClient).find(Trades.broker, Markets.gbpeur)
+          verify(brokerClient).find(Trades.broker, cps)
           verifyNoMoreInteractions(brokerClient)
           res mustBe ()
         }
@@ -291,17 +294,18 @@ class TradeServiceSpec extends IOWordSpec {
       "not do anything if there are no opened positions" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
-        when(brokerClient.find(any[BrokerParameters], any[CurrencyPair])).thenReturn(IO.pure(None))
+        when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]])).thenReturn(IO.pure(Nil))
 
+        val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, NonEmptyList.of(Markets.gbpeur), Some(-10), Some(10))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Some(-10), Some(10))
         yield ()
 
         result.asserting { res =>
           verifyNoInteractions(dataClient, orderRepo, disp)
           verify(settRepo).get(Users.uid)
-          verify(brokerClient).find(Trades.broker, Markets.gbpeur)
+          verify(brokerClient).find(Trades.broker, cps)
           verifyNoMoreInteractions(brokerClient)
           res mustBe ()
         }

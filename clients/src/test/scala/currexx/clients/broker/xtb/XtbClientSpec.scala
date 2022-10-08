@@ -1,6 +1,7 @@
 package currexx.clients.broker.xtb
 
 import cats.effect.IO
+import cats.data.NonEmptyList
 import currexx.clients.ClientSpec
 import currexx.clients.broker.BrokerParameters
 import currexx.clients.broker.vindaloo.{VindalooClient, VindalooConfig}
@@ -66,7 +67,7 @@ class XtbClientSpec extends ClientSpec {
         .use { backend =>
           for
             client <- XtbClient.make[IO](config, backend)
-            res    <- client.getCurrentOrder(brokerConfig, pair)
+            res    <- client.getCurrentOrders(brokerConfig, NonEmptyList.of(pair))
           yield res
         }
 
