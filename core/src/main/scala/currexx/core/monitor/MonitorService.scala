@@ -49,7 +49,7 @@ final private class LiveMonitorService[F[_]](
       _ <- F.whenA(mon.active) {
         repository.updateQueriedTimestamp(uid, id) >> (mon match
           case md: Monitor.MarketData => actionDispatcher.dispatch(Action.FetchMarketData(uid, mon.currencyPairs, md.interval))
-          case p: Monitor.Profit      => actionDispatcher.dispatch(Action.AssertProfit(uid, mon.currencyPairs, p.min, p.max))
+          case p: Monitor.Profit      => actionDispatcher.dispatch(Action.AssertProfit(uid, mon.currencyPairs, p.limits))
         )
       }
       _ <- F.unlessA(manual)(scheduleMonitor(F.realTimeInstant)(mon))

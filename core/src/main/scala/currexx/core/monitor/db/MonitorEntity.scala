@@ -7,7 +7,7 @@ import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId}
 import currexx.domain.user.UserId
 import currexx.domain.json.given
-import currexx.domain.monitor.Schedule
+import currexx.domain.monitor.{Limits, Schedule}
 import mongo4cats.bson.{BsonValue, ObjectId}
 import mongo4cats.circe.given
 
@@ -31,8 +31,7 @@ object MonitorEntity {
       currencyPairs: NonEmptyList[CurrencyPair],
       schedule: Schedule,
       lastQueriedAt: Option[Instant],
-      min: Option[BigDecimal],
-      max: Option[BigDecimal]
+      limits: Limits
   ) extends MonitorEntity("profit")
       derives Codec.AsObject:
     override def toDomain: Monitor =
@@ -43,8 +42,7 @@ object MonitorEntity {
         currencyPairs,
         schedule,
         lastQueriedAt,
-        min,
-        max
+        limits
       )
 
   final case class MarketData(
@@ -72,8 +70,8 @@ object MonitorEntity {
     create match
       case CreateMonitor.MarketData(userId, currencyPairs, schedule, interval) =>
         MonitorEntity.MarketData(ObjectId.gen, userId.toObjectId, true, currencyPairs, schedule, None, interval)
-      case CreateMonitor.Profit(userId, currencyPairs, schedule, min, max) =>
-        MonitorEntity.Profit(ObjectId.gen, userId.toObjectId, true, currencyPairs, schedule, None, min, max)
+      case CreateMonitor.Profit(userId, currencyPairs, schedule, limits) =>
+        MonitorEntity.Profit(ObjectId.gen, userId.toObjectId, true, currencyPairs, schedule, None, limits)
 
   inline given Decoder[MonitorEntity] = Decoder.instance { c =>
     c.downField("kind").as[String].flatMap {

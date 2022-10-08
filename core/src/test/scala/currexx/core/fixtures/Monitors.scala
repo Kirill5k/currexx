@@ -3,7 +3,7 @@ package currexx.core.fixtures
 import cats.data.NonEmptyList
 import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId}
 import currexx.domain.market.{CurrencyPair, Interval}
-import currexx.domain.monitor.Schedule
+import currexx.domain.monitor.{Limits, Schedule}
 import currexx.domain.user.UserId
 import mongo4cats.bson.ObjectId
 
@@ -15,9 +15,11 @@ object Monitors {
   lazy val mid: MonitorId     = MonitorId(ObjectId.gen)
   lazy val queriedAt: Instant = Instant.now.truncatedTo(ChronoUnit.MILLIS)
 
+  lazy val limits = Limits(Some(-10), Some(150), None, None)
+  
   private val cps     = NonEmptyList.of(Markets.gbpeur)
   lazy val marketData = Monitor.MarketData(mid, Users.uid, true, cps, Schedule.Periodic(3.hours), Some(queriedAt), Interval.H1)
-  lazy val profit     = Monitor.Profit(mid, Users.uid, true, cps, Schedule.Periodic(3.hours), Some(queriedAt), Some(-10), Some(150))
+  lazy val profit     = Monitor.Profit(mid, Users.uid, true, cps, Schedule.Periodic(3.hours), Some(queriedAt), limits)
 
   def createMarketData(
       uid: UserId = Users.uid,

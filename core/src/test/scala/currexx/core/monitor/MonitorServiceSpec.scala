@@ -176,7 +176,7 @@ class MonitorServiceSpec extends IOWordSpec {
           verify(repo).updateQueriedTimestamp(Users.uid, Monitors.mid)
           verifyNoMoreInteractions(repo)
           disp.submittedActions must have size 2
-          disp.submittedActions.head mustBe Action.AssertProfit(Users.uid, NonEmptyList.of(Markets.gbpeur), Some(-10), Some(150))
+          disp.submittedActions.head mustBe Action.AssertProfit(Users.uid, NonEmptyList.of(Markets.gbpeur), Monitors.profit.limits)
           disp.submittedActions.last mustBe an[Action.ScheduleMonitor]
           res mustBe ()
         }

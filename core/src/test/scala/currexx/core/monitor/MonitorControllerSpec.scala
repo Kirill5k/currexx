@@ -64,13 +64,14 @@ class MonitorControllerSpec extends ControllerSpec {
         val requestBody = s"""{
              |"currencyPairs": ["GBP/EUR"],
              |"kind": "profit",
-             |"schedule": {"kind":"periodic","period":"3 hours"}
+             |"schedule": {"kind":"periodic","period":"3 hours"},
+             |"limits": {}
              |}""".stripMargin
 
         val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val responseBody = s"""{"message":"Profit monitor needs to have min or max boundary specified"}"""
+        val responseBody = s"""{"message":"Limits must have at least one of the field defined"}"""
         verifyJsonResponse(res, Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
       }
@@ -188,8 +189,7 @@ class MonitorControllerSpec extends ControllerSpec {
              |"currencyPairs": ["${Markets.gbpeur}"],
              |"schedule": {"kind":"periodic","period":"3 hours"},
              |"lastQueriedAt": "${Monitors.queriedAt}",
-             |"min": -10,
-             |"max": 150,
+             |"limits": {"min": -10, "max": 150, "cumulativeMin" : null, "cumulativeMax" : null},
              |"kind": "profit"
              |}
              |]""".stripMargin
@@ -266,11 +266,8 @@ class MonitorControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT).withJsonBody(parseJson(requestBody))
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(
-          res,
-          Status.BadRequest,
-          Some("""{"message":"The id supplied in the path does not match with the id in the request body"}""")
-        )
+        val responseBody = """{"message":"The id supplied in the path does not match with the id in the request body"}"""
+        verifyJsonResponse(res, Status.BadRequest, Some(responseBody))
         verifyNoInteractions(svc)
       }
     }

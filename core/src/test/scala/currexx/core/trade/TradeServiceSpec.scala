@@ -12,13 +12,14 @@ import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
 import currexx.domain.market.{CurrencyPair, Indicator, TradeOrder}
+import currexx.domain.monitor.Limits
 import org.mockito.Mockito
 
 import java.time.Instant
 
 class TradeServiceSpec extends IOWordSpec {
 
-  "A TradeService" should {
+  "A TradeService" when {
     "getAllOrders" should {
       "return all orders from the repository" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
@@ -230,7 +231,7 @@ class TradeServiceSpec extends IOWordSpec {
         val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, None, Some(10))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(None, Some(10), None, None))
         yield ()
 
         result.asserting { res =>
@@ -256,7 +257,7 @@ class TradeServiceSpec extends IOWordSpec {
         val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Some(-10), Some(10))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None))
         yield ()
 
         result.asserting { res =>
@@ -279,7 +280,7 @@ class TradeServiceSpec extends IOWordSpec {
         val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Some(-10), Some(10))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None))
         yield ()
 
         result.asserting { res =>
@@ -299,7 +300,7 @@ class TradeServiceSpec extends IOWordSpec {
         val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Some(-10), Some(10))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None))
         yield ()
 
         result.asserting { res =>

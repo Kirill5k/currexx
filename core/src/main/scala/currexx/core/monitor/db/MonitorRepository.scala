@@ -86,7 +86,7 @@ final private class LiveMonitorRepository[F[_]](
           runUpdate(mon.userId, mon.id) {
             mon match
               case md: Monitor.MarketData => baseUpdate.set("interval", md.interval)
-              case p: Monitor.Profit      => baseUpdate.set("min", p.min.map(_.toDouble)).set("max", p.max.map(_.toDouble))
+              case p: Monitor.Profit      => baseUpdate.set("limits", p.limits)
           }
         case _ => alreadyBeingMonitoredError(mon.userId, mon.kind, cps)
       }

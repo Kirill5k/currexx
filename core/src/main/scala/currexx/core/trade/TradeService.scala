@@ -16,6 +16,7 @@ import currexx.core.trade.TradeStrategyExecutor.Decision
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Indicator, Interval, TradeOrder}
+import currexx.domain.monitor.Limits
 import currexx.domain.user.UserId
 import fs2.Stream
 
@@ -29,12 +30,7 @@ trait TradeService[F[_]]:
   def placeOrder(uid: UserId, order: TradeOrder, closePendingOrders: Boolean): F[Unit]
   def closeOpenOrders(uid: UserId): F[Unit]
   def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
-  def closeOrderIfProfitIsOutsideRange(
-      uid: UserId,
-      cps: NonEmptyList[CurrencyPair],
-      min: Option[BigDecimal],
-      max: Option[BigDecimal]
-  ): F[Unit]
+  def closeOrderIfProfitIsOutsideRange(uid: UserId, cps: NonEmptyList[CurrencyPair], limits: Limits): F[Unit]
   def fetchMarketData(uid: UserId, cps: NonEmptyList[CurrencyPair], interval: Interval): F[Unit]
 
 final private class LiveTradeService[F[_]](
@@ -81,18 +77,13 @@ final private class LiveTradeService[F[_]](
         case _ => F.unit
       }
 
-  override def closeOrderIfProfitIsOutsideRange(
-      uid: UserId,
-      cps: NonEmptyList[CurrencyPair],
-      min: Option[BigDecimal],
-      max: Option[BigDecimal]
-  ): F[Unit] =
+  override def closeOrderIfProfitIsOutsideRange(uid: UserId, cps: NonEmptyList[CurrencyPair], limits: Limits): F[Unit] =
     for
       settings    <- settingsRepository.get(uid)
       foundOrders <- brokerClient.find(settings.broker, cps)
       time        <- F.realTimeInstant
       _ <- foundOrders
-        .filter(o => min.exists(_ > o.profit) || max.exists(_ < o.profit))
+        .filter(o => limits.min.exists(_ > o.profit) || limits.max.exists(_ < o.profit))
         .map(o => TradeOrderPlacement(uid, TradeOrder.Exit(o.currencyPair, o.currentPrice), settings.broker, time))
         .traverse(submitOrderPlacement)
     yield ()

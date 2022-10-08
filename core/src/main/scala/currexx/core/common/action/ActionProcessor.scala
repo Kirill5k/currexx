@@ -40,8 +40,8 @@ final private class LiveActionProcessor[F[_]](
         logger.info(s"closing opened order for $pair currency pair") *> tradeService.closeOpenOrders(uid, pair)
       case Action.ScheduleMonitor(uid, mid, period) =>
         F.sleep(period) *> logger.info(s"triggering monitor $mid") *> monitorService.triggerMonitor(uid, mid)
-      case Action.AssertProfit(uid, cps, min, max) =>
-        logger.info(s"verifying current position for ${cps}") *> tradeService.closeOrderIfProfitIsOutsideRange(uid, cps, min, max)
+      case Action.AssertProfit(uid, cps, limits) =>
+        logger.info(s"verifying current position for ${cps}") *> tradeService.closeOrderIfProfitIsOutsideRange(uid, cps, limits)
       case Action.FetchMarketData(uid, cps, interval) =>
         logger.info(s"fetching market data for ${cps}") *> tradeService.fetchMarketData(uid, cps, interval)
       case Action.ProcessMarketData(uid, data) =>

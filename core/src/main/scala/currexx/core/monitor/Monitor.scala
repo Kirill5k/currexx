@@ -3,7 +3,7 @@ package currexx.core.monitor
 import cats.data.NonEmptyList
 import currexx.domain.user.UserId
 import currexx.domain.market.{CurrencyPair, Interval}
-import currexx.domain.monitor.Schedule
+import currexx.domain.monitor.{Limits, Schedule}
 import currexx.domain.types.IdType
 import currexx.core.common.time.*
 
@@ -49,8 +49,7 @@ object Monitor:
       currencyPairs: NonEmptyList[CurrencyPair],
       schedule: Schedule,
       lastQueriedAt: Option[Instant],
-      min: Option[BigDecimal],
-      max: Option[BigDecimal]
+      limits: Limits
   ) extends Monitor("profit")
 
 sealed trait CreateMonitor(val kind: String):
@@ -70,6 +69,5 @@ object CreateMonitor:
       userId: UserId,
       currencyPairs: NonEmptyList[CurrencyPair],
       schedule: Schedule,
-      min: Option[BigDecimal],
-      max: Option[BigDecimal]
+      limits: Limits
   ) extends CreateMonitor("profit")
