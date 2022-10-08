@@ -7,7 +7,7 @@ import currexx.core.common.db.Repository
 import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval}
-import currexx.domain.monitor.Schedule
+import currexx.domain.monitor.{Limits, Schedule}
 import currexx.domain.user.UserId
 import fs2.Stream
 import mongo4cats.bson.BsonValue
@@ -106,5 +106,5 @@ final private class LiveMonitorRepository[F[_]](
 object MonitorRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[MonitorRepository[F]] =
     db.getCollectionWithCodec[MonitorEntity]("monitors")
-      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[Interval].withAddedCodec[Schedule])
+      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[Interval].withAddedCodec[Schedule].withAddedCodec[Limits])
       .map(coll => LiveMonitorRepository[F](coll))
