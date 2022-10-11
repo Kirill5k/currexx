@@ -133,7 +133,7 @@ final private class LiveXtbClient[F[_]](
               Stream.eval(state.update(_.withRetrievedOrders(orders))).drain ++
                 Stream.emit(WebSocketFrame.close)
             else
-              Stream.logWarn(s"$name-client/noprofit-${params.userId}-${symbols.mkString("-")}") ++
+              Stream.logInfo(s"$name-client/noprofit-${params.userId}-${symbols.mkString("-")}") ++
                 incGetTradesAttempt(state) ++
                 obtainSessionId(state).map(sid => XtbRequest.currentTrades(sid).asText)
           case error: XtbResponse.Error => handError(params.userId, error)
