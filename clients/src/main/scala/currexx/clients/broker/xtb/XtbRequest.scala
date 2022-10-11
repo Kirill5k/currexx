@@ -106,5 +106,6 @@ object XtbRequest {
       Some(RequestArguments.SymbolInfo(cp.toString))
     )
 
-  def allSymbolsInfo(sessionId: String): XtbRequest[RequestArguments.SymbolInfo] = XtbRequest("getAllSymbols", Some(sessionId), None)
+  def allSymbolsInfo(sessionId: String): XtbRequest[RequestArguments.SymbolInfo] = 
+    XtbRequest("getAllSymbols", Some(sessionId), None)
 }

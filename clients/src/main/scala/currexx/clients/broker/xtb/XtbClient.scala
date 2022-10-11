@@ -134,11 +134,8 @@ final private class LiveXtbClient[F[_]](
                 Stream.emit(WebSocketFrame.close)
             else
               Stream.logWarn(s"$name-client/noprofit-${params.userId}-${symbols.mkString("-")}") ++
-                Stream.eval(state.update(_.withRetrievedOrders(orders))).drain ++
-                obtainSessionId(state).map(sid => XtbRequest.allSymbolsInfo(sid).asText)
-          case XtbResponse.SymbolsInfo(prices) =>
-            Stream.eval(state.update(_.withCurrentPrices(prices))).drain ++
-              Stream.emit(WebSocketFrame.close)
+                incGetTradesAttempt(state) ++
+                obtainSessionId(state).map(sid => XtbRequest.currentTrades(sid).asText)
           case error: XtbResponse.Error => handError(params.userId, error)
           case _                        => Stream.empty
         }
@@ -159,6 +156,17 @@ final private class LiveXtbClient[F[_]](
   private def obtainSessionId(state: Ref[F, XtbClient.WsState]): Stream[F, String] =
     Stream.eval(state.get.map(_.sessionId.toRight(AppError.ClientFailure(name, "no session id")))).rethrow
 
+  private def incGetTradesAttempt(state: Ref[F, XtbClient.WsState]): Stream[F, Nothing] =
+    Stream
+      .eval {
+        F.ifM(state.get.map(_.retryCount < 50))(
+          state.update(_.incRetry),
+          F.raiseError(AppError.ClientFailure(name, "Unable to obtain orders with calculated profit"))
+        )
+      }
+      .delayBy(100.millis)
+      .drain
+
   private def handError(userId: String, error: XtbResponse.Error): Stream[F, WebSocketFrame] =
     error match
       case XtbResponse.Error("EX027", desc) =>
@@ -175,40 +183,32 @@ final private class LiveXtbClient[F[_]](
           Stream.raiseError(AppError.ClientFailure(name, s"$code - $desc"))
 
   extension [A <: RequestArguments](req: XtbRequest[A])
-    def asText(using enc: Encoder[XtbRequest[A]]): Text = WebSocketFrame.text(req.asJson.noSpaces)
+    def asText(using enc: Encoder[XtbRequest[A]]): Text = WebSocketFrame.text(req.asJson.dropNullValues.noSpaces)
 }
 
 object XtbClient:
   final case class WsState(
       sessionId: Option[String],
       retrievedOrders: List[TradeData] = Nil,
-      prices: List[SymbolData] = Nil
+      prices: List[SymbolData] = Nil,
+      retryCount: Int = 0
   ) {
+    def incRetry: WsState                                             = copy(retryCount = retryCount + 1)
     def withRetrievedOrders(retrievedOrder: List[TradeData]): WsState = copy(retrievedOrders = retrievedOrder)
     def withSessionId(sessionId: String): WsState                     = copy(sessionId = Some(sessionId))
-    def withCurrentPrices(prices: List[SymbolData]): WsState          = copy(prices = prices)
 
-    def openedTradeOrders: List[OpenedTradeOrder] = {
-      val pricesBySymbols = prices.map(sd => sd.symbol -> sd).toMap
+    def openedTradeOrders: List[OpenedTradeOrder] =
       retrievedOrders.map { td =>
-        def price = pricesBySymbols(td.symbol.toString)
-        val closePrice =
-          if (td.close_price > 0) td.close_price
-          else if (td.cmd == 0) price.bid
-          else price.ask
-        def spread = if (td.cmd == 0) td.open_price - closePrice else closePrice - td.open_price
-        val profit = td.profit.getOrElse(spread * td.volume * price.contractSize)
         OpenedTradeOrder(
           td.symbol,
           if (td.cmd == 0) TradeOrder.Position.Buy else TradeOrder.Position.Sell,
-          closePrice,
+          td.close_price,
           td.open_price,
           Instant.ofEpochMilli(td.open_time),
           td.volume,
-          profit
+          td.profit.get
         )
       }
-    }
   }
 
   def make[F[_]: Async: Logger](
