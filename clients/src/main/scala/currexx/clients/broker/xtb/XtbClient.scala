@@ -156,16 +156,17 @@ final private class LiveXtbClient[F[_]](
   private def obtainSessionId(state: Ref[F, XtbClient.WsState]): Stream[F, String] =
     Stream.eval(state.get.map(_.sessionId.toRight(AppError.ClientFailure(name, "no session id")))).rethrow
 
-  private def incGetTradesAttempt(state: Ref[F, XtbClient.WsState]): Stream[F, Nothing] =
+  private def incGetTradesAttempt(state: Ref[F, XtbClient.WsState]): Stream[F, WebSocketFrame] =
     Stream
-      .eval {
-        F.ifM(state.get.map(_.retryCount < 50))(
-          state.update(_.incRetry),
-          F.raiseError(AppError.ClientFailure(name, "Unable to obtain orders with calculated profit"))
-        )
+      .eval(state.get.map(_.retryCount < 50))
+      .flatMap {
+        case true =>
+          Stream.eval(state.update(_.incRetry)).drain
+        case false =>
+          Stream.emit(WebSocketFrame.close) ++
+            Stream.raiseError(AppError.ClientFailure(name, "Unable to obtain orders with calculated profit"))
       }
       .delayBy(100.millis)
-      .drain
 
   private def handError(userId: String, error: XtbResponse.Error): Stream[F, WebSocketFrame] =
     error match
