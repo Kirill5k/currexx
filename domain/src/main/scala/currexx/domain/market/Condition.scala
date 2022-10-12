@@ -56,8 +56,8 @@ object Condition {
     else if (min > line.head) Some(Condition.BelowThreshold(min, line.head))
     else None
 
-  def linesCrossing(slowLine: List[Double], fastLine: List[Double]): Option[Condition] =
-    (slowLine.head, fastLine.head, slowLine.drop(1).head, fastLine.drop(1).head) match
+  def linesCrossing(line1: List[Double], line2: List[Double]): Option[Condition] =
+    (line1.head, line2.head, line1.drop(1).head, line2.drop(1).head) match
       case (l1c, l2c, l1p, l2p) if l1c > l2c && l1p < l2p => Some(Condition.CrossingUp)
       case (l1c, l2c, l1p, l2p) if l1c < l2c && l1p > l2p => Some(Condition.CrossingDown)
       case _                                              => None

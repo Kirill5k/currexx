@@ -19,8 +19,8 @@ object Optimizer extends IOApp.Simple {
     populationSize = 250,
     maxGen = 250,
     crossoverProbability = 0.7,
-    mutationProbability = 0.25,
-    elitismRatio = 0.2,
+    mutationProbability = 0.2,
+    elitismRatio = 0.1,
     shuffle = true
   )
 
@@ -39,8 +39,8 @@ object Optimizer extends IOApp.Simple {
 
   val linesCrossing = Indicator.LinesCrossing(
     ValueSource.Close,
-    ValueTransformation.SingleOutput.HMA(25),
-    ValueTransformation.SingleOutput.HMA(25)
+    ValueTransformation.SingleOutput.JMA(20, 100, 2),
+    ValueTransformation.SingleOutput.JMA(20, 100, 2)
   )
 
   val testDataSets    = List("nzd-cad-1d.csv", "eur-chf-1d.csv", "nzd-chf-1d.csv", "eur-aud-1d.csv")
