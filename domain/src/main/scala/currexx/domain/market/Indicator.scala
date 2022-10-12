@@ -86,8 +86,8 @@ enum Indicator(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTa
   ) extends Indicator("threshold-crossing")
   case LinesCrossing(
       source: ValueSource,
-      slowTransformation: ValueTransformation.SingleOutput,
-      fastTransformation: ValueTransformation.SingleOutput
+      line1Transformation: ValueTransformation.SingleOutput,
+      line2Transformation: ValueTransformation.SingleOutput
   ) extends Indicator("lines-crossing")
 
 object Indicator:

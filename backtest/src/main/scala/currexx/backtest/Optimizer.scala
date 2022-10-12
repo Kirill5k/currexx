@@ -37,9 +37,15 @@ object Optimizer extends IOApp.Simple {
 //    ValueTransformation.SingleOutput.NMA(45, 5, 11.0d, MovingAverage.Weighted)
   )
 
-  val testDataSets    = List("nzd-cad-1d.csv", "eur-chf-1d.csv", "nzd-chf-1d.csv", "usd-dkk-1d.csv")
-  val strategy        = TradeStrategy.TrendChangeAggressive
-  val target          = trendChangeDetection
+  val linesCrossing = Indicator.LinesCrossing(
+    ValueSource.Close,
+    ValueTransformation.SingleOutput.HMA(25),
+    ValueTransformation.SingleOutput.HMA(25)
+  )
+
+  val testDataSets    = List("nzd-cad-1d.csv", "eur-chf-1d.csv", "nzd-chf-1d.csv", "eur-aud-1d.csv")
+  val strategy        = TradeStrategy.LinesCrossing
+  val target          = linesCrossing
   val otherIndicators = Nil
 
   override def run: IO[Unit] = for

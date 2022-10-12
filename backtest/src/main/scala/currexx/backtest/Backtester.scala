@@ -21,8 +21,8 @@ object Backtester extends IOApp.Simple {
     List(
       Indicator.LinesCrossing(
         source = ValueSource.Close,
-        slowTransformation = ValueTransformation.SingleOutput.JMA(7, -100, 2),
-        fastTransformation = ValueTransformation.SingleOutput.JMA(40, 0, 2)
+        line1Transformation = ValueTransformation.SingleOutput.HMA(8),
+        line2Transformation = ValueTransformation.SingleOutput.HMA(9)
       ),
 //      Indicator.ThresholdCrossing(
 //        source = ValueSource.Close,
