@@ -15,8 +15,7 @@ final private class TestMonitorService[F[_]](using
   override def delete(uid: UserId, id: MonitorId): F[Unit]                          = F.unit
   override def pause(uid: UserId, id: MonitorId): F[Unit]                           = F.unit
   override def resume(uid: UserId, id: MonitorId): F[Unit]                          = F.unit
-  override def triggerProfitMonitor(uid: UserId, id: MonitorId, manual: Boolean): F[Unit] = F.unit
-  override def triggerPriceMonitor(uid: UserId, id: MonitorId, manual: Boolean): F[Unit]  = F.unit
+  override def triggerMonitor(uid: UserId, id: MonitorId, manual: Boolean): F[Unit] = F.unit
 
 object TestMonitorService:
   def make[F[_]: Async]: F[MonitorService[F]] =

@@ -1,6 +1,7 @@
 package currexx.backtest.services
 
 import cats.Monad
+import cats.data.NonEmptyList
 import cats.effect.{Concurrent, Ref}
 import cats.syntax.functor.*
 import currexx.clients.broker.{BrokerClient, BrokerParameters}
@@ -8,8 +9,8 @@ import currexx.clients.data.MarketDataClient
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, OpenedTradeOrder, PriceRange, TradeOrder}
 
 final class TestBrokerClient[F[_]](using F: Monad[F]) extends BrokerClient[F]:
-  override def find(parameters: BrokerParameters, cp: CurrencyPair): F[Option[OpenedTradeOrder]] = F.pure(None)
-  override def submit(parameters: BrokerParameters, order: TradeOrder): F[Unit]                  = F.unit
+  override def find(parameters: BrokerParameters, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]] = F.pure(Nil)
+  override def submit(parameters: BrokerParameters, order: TradeOrder): F[Unit]                = F.unit
 
 final class TestMarketDataClient[F[_]](
     private val priceRef: Ref[F, Option[MarketTimeSeriesData]]
