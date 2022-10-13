@@ -1,17 +1,34 @@
 package currexx.backtest.optimizer
 
+import scala.annotation.tailrec
+
 object syntax {
-  extension (s: String)
-    def prePadTo(maxLength: Int, char: Char): String =
-      if (s.length >= maxLength) s
-      else {
-        val remainingLength = maxLength - s.length
-        char.toString * remainingLength + s
+  extension (array: Array[Int])
+    def toInt: Int = {
+      var res = 0
+      var i   = 0
+      while i < array.length
+      do {
+        if (array(i) == 1)
+          res = res + math.pow(2, array.length - i - 1).toInt
+        i = i + 1
       }
+      res
+    }
 
-  extension (array: Array[Int]) def toInt: Int = Integer.parseInt(array.mkString(""), 2)
-
-  extension (i: Int)
-    def toBinaryArray(maxValue: Int): Array[Int] =
-      i.toBinaryString.prePadTo(maxValue.toBinaryString.length, '0').map(_.toString.toInt).toArray
+  extension (num: Int)
+    def toBinaryArray(maxValue: Int): Array[Int] = {
+      val bitLength = Integer.SIZE - Integer.numberOfLeadingZeros(maxValue)
+      val array     = Array.fill(bitLength)(0)
+      var i         = 0
+      var j         = num
+      while i < array.length
+      do {
+        if (j % 2 == 1)
+          array(array.length - i - 1) = 1
+        j = j / 2
+        i = i + 1
+      }
+      array
+    }
 }
