@@ -20,3 +20,4 @@ trait MockitoMatchers extends MockitoSugar:
   def verify[A](mock: A): A                          = verify(mock, Mockito.times(1))
   def verifyNoInteractions(mocks: AnyRef*): Unit     = Mockito.verifyNoInteractions(mocks*)
   def verifyNoMoreInteractions(mocks: AnyRef*): Unit = Mockito.verifyNoMoreInteractions(mocks*)
+  def never: VerificationMode                        = Mockito.never()

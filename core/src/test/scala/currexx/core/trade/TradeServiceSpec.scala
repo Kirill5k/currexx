@@ -13,7 +13,6 @@ import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
 import currexx.domain.market.{CurrencyPair, Indicator, IndicatorKind, TradeOrder}
 import currexx.domain.monitor.Limits
-import org.mockito.Mockito
 
 import java.time.Instant
 
@@ -108,7 +107,7 @@ class TradeServiceSpec extends IOWordSpec {
           verifyNoInteractions(dataClient)
           verify(settRepo).get(Users.uid)
           verify(brokerClient).submit(Trades.broker, order)
-          verify(orderRepo, Mockito.never()).findLatestBy(any[UserId], any[CurrencyPair])
+          verify(orderRepo, never).findLatestBy(any[UserId], any[CurrencyPair])
           verify(orderRepo).save(any[TradeOrderPlacement])
           verify(disp).dispatch(any[Action])
           res mustBe ()
@@ -350,11 +349,8 @@ class TradeServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(settRepo).get(Users.uid)
-          verify(brokerClient).submit(Trades.broker, TradeOrder.Exit(Markets.gbpeur, BigDecimal(3.0)))
-          verify(brokerClient).submit(
-            Trades.broker,
-            Trades.settings.trading.toOrder(TradeOrder.Position.Buy, Markets.gbpeur, BigDecimal(3.0))
-          )
+          verify(brokerClient).submit(Trades.broker, TradeOrder.Exit(Markets.gbpeur, 3.0))
+          verify(brokerClient).submit(Trades.broker, Trades.settings.trading.toOrder(TradeOrder.Position.Buy, Markets.gbpeur, 3.0))
           verify(dataClient).latestPrice(Markets.gbpeur)
           verify(orderRepo).save(any[TradeOrderPlacement])
           verify(disp).dispatch(any[Action])
