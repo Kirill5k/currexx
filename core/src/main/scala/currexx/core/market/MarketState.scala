@@ -1,6 +1,6 @@
 package currexx.core.market
 
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, PriceRange, TradeOrder}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorKind, PriceRange, TradeOrder}
 import currexx.domain.user.UserId
 import io.circe.Codec
 
@@ -22,7 +22,7 @@ final case class MarketState(
     userId: UserId,
     currencyPair: CurrencyPair,
     currentPosition: Option[PositionState],
-    signals: Map[Indicator.Kind, List[IndicatorState]],
+    signals: Map[IndicatorKind, List[IndicatorState]],
     lastUpdatedAt: Option[Instant],
     createdAt: Option[Instant]
 ) derives Codec.AsObject

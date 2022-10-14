@@ -15,7 +15,7 @@ import currexx.core.market.{MarketState, PositionState}
 import currexx.core.trade.TradeStrategyExecutor.Decision
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{CurrencyPair, Indicator, Interval, TradeOrder}
+import currexx.domain.market.{CurrencyPair, Indicator, IndicatorKind, Interval, TradeOrder}
 import currexx.domain.monitor.Limits
 import currexx.domain.user.UserId
 import fs2.Stream
@@ -26,7 +26,7 @@ trait TradeService[F[_]]:
   def getSettings(uid: UserId): F[TradeSettings]
   def updateSettings(settings: TradeSettings): F[Unit]
   def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]]
-  def processMarketStateUpdate(state: MarketState, triggers: List[Indicator]): F[Unit]
+  def processMarketStateUpdate(state: MarketState, triggers: List[IndicatorKind]): F[Unit]
   def placeOrder(uid: UserId, order: TradeOrder, closePendingOrders: Boolean): F[Unit]
   def closeOpenOrders(uid: UserId): F[Unit]
   def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
@@ -88,7 +88,7 @@ final private class LiveTradeService[F[_]](
         .traverse(submitOrderPlacement)
     yield ()
 
-  override def processMarketStateUpdate(state: MarketState, triggers: List[Indicator]): F[Unit] =
+  override def processMarketStateUpdate(state: MarketState, triggers: List[IndicatorKind]): F[Unit] =
     (settingsRepository.get(state.userId), marketDataClient.latestPrice(state.currencyPair), F.realTimeInstant)
       .mapN { (settings, price, time) =>
         TradeStrategyExecutor

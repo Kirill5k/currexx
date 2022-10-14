@@ -11,7 +11,7 @@ import currexx.core.fixtures.{Markets, Trades, Users}
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
-import currexx.domain.market.{CurrencyPair, Indicator, TradeOrder}
+import currexx.domain.market.{CurrencyPair, Indicator, IndicatorKind, TradeOrder}
 import currexx.domain.monitor.Limits
 import org.mockito.Mockito
 
@@ -321,7 +321,7 @@ class TradeServiceSpec extends IOWordSpec {
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.processMarketStateUpdate(Markets.state, List(Markets.trendChangeDetection))
+          _   <- svc.processMarketStateUpdate(Markets.state, List(IndicatorKind.TrendChangeDetection))
         yield ()
 
         result.asserting { res =>
@@ -345,7 +345,7 @@ class TradeServiceSpec extends IOWordSpec {
           currentState = Markets.stateWithSignal.copy(currentPosition =
             Some(Markets.positionState.copy(position = TradeOrder.Position.Sell))
           )
-          _ <- svc.processMarketStateUpdate(currentState, List(Markets.trendChangeDetection))
+          _ <- svc.processMarketStateUpdate(currentState, List(IndicatorKind.TrendChangeDetection))
         yield ()
 
         result.asserting { res =>

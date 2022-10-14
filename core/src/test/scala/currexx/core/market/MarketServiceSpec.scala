@@ -7,7 +7,7 @@ import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.market.db.MarketStateRepository
 import currexx.core.fixtures.{Markets, Signals, Trades, Users}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, PriceRange, TradeOrder}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorKind, PriceRange, TradeOrder}
 
 import java.time.Instant
 import scala.concurrent.duration.*
@@ -109,7 +109,7 @@ class MarketServiceSpec extends IOWordSpec {
         val (stateRepo, disp) = mocks
 
         when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state.copy(signals = Map.empty))))
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[Indicator.Kind, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[IndicatorKind, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
@@ -121,7 +121,7 @@ class MarketServiceSpec extends IOWordSpec {
           val indState = IndicatorState(Signals.trendDirectionChanged.condition, Signals.ts, Markets.trendChangeDetection)
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, Map(Markets.trendChangeDetection.kind -> List(indState)))
-          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, List(Markets.trendChangeDetection)))
+          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, List(IndicatorKind.TrendChangeDetection)))
           res mustBe ()
         }
       }
@@ -132,7 +132,7 @@ class MarketServiceSpec extends IOWordSpec {
           IndicatorState(Signals.trendDirectionChanged.condition, Signals.ts.minusSeconds(3.days.toSeconds), Markets.trendChangeDetection)
         val signalState = Map(Markets.trendChangeDetection.kind -> List(currentIndState))
         when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state.copy(signals = signalState))))
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[Indicator.Kind, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[IndicatorKind, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
@@ -149,7 +149,7 @@ class MarketServiceSpec extends IOWordSpec {
           )
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
-          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, List(Markets.trendChangeDetection)))
+          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, List(IndicatorKind.TrendChangeDetection)))
           res mustBe ()
         }
       }
@@ -157,7 +157,7 @@ class MarketServiceSpec extends IOWordSpec {
       "update signal state with multiple signals" in {
         val (stateRepo, disp) = mocks
         when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state)))
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[Indicator.Kind, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[IndicatorKind, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
@@ -176,7 +176,7 @@ class MarketServiceSpec extends IOWordSpec {
           )
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
-          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, List(Markets.thresholdCrossing, Markets.trendChangeDetection)))
+          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, List(IndicatorKind.ThresholdCrossing, IndicatorKind.TrendChangeDetection)))
           res mustBe ()
         }
       }
@@ -188,7 +188,7 @@ class MarketServiceSpec extends IOWordSpec {
         val signalState = Map(Markets.trendChangeDetection.kind -> List(currentIndState))
 
         when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state.copy(signals = signalState))))
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[Indicator.Kind, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[IndicatorKind, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
@@ -200,7 +200,7 @@ class MarketServiceSpec extends IOWordSpec {
           val finalSignalState = Map(Markets.trendChangeDetection.kind -> List(currentIndState.copy(time = Signals.ts)))
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
-          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, List(Markets.trendChangeDetection)))
+          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, List(IndicatorKind.TrendChangeDetection)))
           res mustBe ()
         }
       }

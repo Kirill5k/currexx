@@ -9,7 +9,7 @@ import currexx.core.common.time.*
 import currexx.core.signal.Signal
 import currexx.core.market.db.MarketStateRepository
 import currexx.core.trade.TradeOrderPlacement
-import currexx.domain.market.{CurrencyPair, Indicator, MarketTimeSeriesData, TradeOrder}
+import currexx.domain.market.{CurrencyPair, Indicator, IndicatorKind, MarketTimeSeriesData, TradeOrder}
 import currexx.domain.user.UserId
 
 trait MarketService[F[_]]:
@@ -43,7 +43,7 @@ final private class LiveMarketService[F[_]](
     stateRepo
       .find(uid, cp)
       .flatMap { state =>
-        val existingSignals = state.fold(Map.empty[Indicator.Kind, List[IndicatorState]])(_.signals)
+        val existingSignals = state.fold(Map.empty[IndicatorKind, List[IndicatorState]])(_.signals)
 
         val updatedSignals = signals.foldLeft(existingSignals) { (current, signal) =>
           val indicatorStates   = current.getOrElse(signal.triggeredBy.kind, Nil)
@@ -59,7 +59,7 @@ final private class LiveMarketService[F[_]](
         else stateRepo.update(uid, cp, updatedSignals).map(Some(_))
       }
       .flatMap {
-        case Some(state) => dispatcher.dispatch(Action.ProcessMarketStateUpdate(state, signals.map(_.triggeredBy)))
+        case Some(state) => dispatcher.dispatch(Action.ProcessMarketStateUpdate(state, signals.map(_.triggeredBy.kind)))
         case None        => F.unit
       }
 }

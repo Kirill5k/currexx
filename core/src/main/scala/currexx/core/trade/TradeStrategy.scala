@@ -2,7 +2,7 @@ package currexx.core.trade
 
 import cats.syntax.applicative.*
 import currexx.core.market.MarketState
-import currexx.domain.market.{Condition, Indicator, TradeOrder, Trend}
+import currexx.domain.market.{Condition, IndicatorKind, TradeOrder, Trend}
 import currexx.domain.types.EnumType
 
 object TradeStrategy extends EnumType[TradeStrategy](() => TradeStrategy.values, _.print)
@@ -10,42 +10,46 @@ enum TradeStrategy:
   case Disabled, TrendChange, TrendChangeAggressive, TrendChangeWithConfirmation, LinesCrossing
 
 trait TradeStrategyExecutor:
-  def analyze(state: MarketState, triggers: List[Indicator]): Option[TradeStrategyExecutor.Decision]
+  def analyze(state: MarketState, triggers: List[IndicatorKind]): Option[TradeStrategyExecutor.Decision]
 
 object TradeStrategyExecutor {
   enum Decision:
     case Buy, Sell, Close
 
   private case object Disabled extends TradeStrategyExecutor:
-    def analyze(state: MarketState, triggers: List[Indicator]): Option[TradeStrategyExecutor.Decision] = None
+    def analyze(state: MarketState, triggers: List[IndicatorKind]): Option[TradeStrategyExecutor.Decision] = None
 
   private case object TrendChange extends TradeStrategyExecutor:
-    def analyze(state: MarketState, triggers: List[Indicator]): Option[TradeStrategyExecutor.Decision] =
-      triggers.collectFirst { case t: Indicator.TrendChangeDetection =>
-        state.signals.getOrElse(t.kind, Nil).headOption.map(_.condition).collect {
-          case Condition.TrendDirectionChange(Trend.Downward, Trend.Consolidation, _) => Decision.Close
-          case Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, _)   => Decision.Close
-          case Condition.TrendDirectionChange(_, Trend.Upward, _) if !state.buying    => Decision.Buy
-          case Condition.TrendDirectionChange(_, Trend.Downward, _) if !state.selling => Decision.Sell
+    def analyze(state: MarketState, triggers: List[IndicatorKind]): Option[TradeStrategyExecutor.Decision] =
+      triggers
+        .find(_ == IndicatorKind.TrendChangeDetection)
+        .flatMap { tcd =>
+          state.signals.getOrElse(tcd, Nil).headOption.map(_.condition).collect {
+            case Condition.TrendDirectionChange(Trend.Downward, Trend.Consolidation, _) => Decision.Close
+            case Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, _)   => Decision.Close
+            case Condition.TrendDirectionChange(_, Trend.Upward, _) if !state.buying    => Decision.Buy
+            case Condition.TrendDirectionChange(_, Trend.Downward, _) if !state.selling => Decision.Sell
+          }
         }
-      }.flatten
 
   private case object TrendChangeAggressive extends TradeStrategyExecutor:
-    def analyze(state: MarketState, triggers: List[Indicator]): Option[TradeStrategyExecutor.Decision] =
-      triggers.collectFirst { case t: Indicator.TrendChangeDetection =>
-        state.signals.getOrElse(t.kind, Nil).headOption.map(_.condition).collect {
-          case Condition.TrendDirectionChange(Trend.Downward, Trend.Consolidation, _) if !state.buying => Decision.Buy
-          case Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, _) if !state.selling  => Decision.Sell
-          case Condition.TrendDirectionChange(_, Trend.Upward, _) if !state.buying                     => Decision.Buy
-          case Condition.TrendDirectionChange(_, Trend.Downward, _) if !state.selling                  => Decision.Sell
+    def analyze(state: MarketState, triggers: List[IndicatorKind]): Option[TradeStrategyExecutor.Decision] =
+      triggers
+        .find(_ == IndicatorKind.TrendChangeDetection)
+        .flatMap { tcd =>
+          state.signals.getOrElse(tcd, Nil).headOption.map(_.condition).collect {
+            case Condition.TrendDirectionChange(Trend.Downward, Trend.Consolidation, _) if !state.buying => Decision.Buy
+            case Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, _) if !state.selling  => Decision.Sell
+            case Condition.TrendDirectionChange(_, Trend.Upward, _) if !state.buying                     => Decision.Buy
+            case Condition.TrendDirectionChange(_, Trend.Downward, _) if !state.selling                  => Decision.Sell
+          }
         }
-      }.flatten
 
   private case object TrendChangeWithConfirmation extends TradeStrategyExecutor:
-    def analyze(state: MarketState, triggers: List[Indicator]): Option[TradeStrategyExecutor.Decision] = {
-      val conditions = triggers.flatMap(t => state.signals.getOrElse(t.kind, Nil).headOption.map(t.kind -> _.condition)).toMap
+    def analyze(state: MarketState, triggers: List[IndicatorKind]): Option[TradeStrategyExecutor.Decision] = {
+      val conditions = triggers.flatMap(t => state.signals.getOrElse(t, Nil).headOption.map(t -> _.condition)).toMap
 
-      (conditions.get(Indicator.Kind.TrendChangeDetection), conditions.get(Indicator.Kind.ThresholdCrossing)) match
+      (conditions.get(IndicatorKind.TrendChangeDetection), conditions.get(IndicatorKind.ThresholdCrossing)) match
         case (Some(Condition.TrendDirectionChange(Trend.Downward, _, _)), Some(Condition.BelowThreshold(_, _))) =>
           Some(Decision.Buy)
         case (Some(Condition.TrendDirectionChange(Trend.Upward, _, _)), Some(Condition.AboveThreshold(_, _))) =>
@@ -58,13 +62,15 @@ object TradeStrategyExecutor {
     }
 
   private case object LinesCrossing extends TradeStrategyExecutor:
-    def analyze(state: MarketState, triggers: List[Indicator]): Option[TradeStrategyExecutor.Decision] =
-      triggers.collectFirst { case i: Indicator.LinesCrossing =>
-        state.signals.getOrElse(i.kind, Nil).headOption.map(_.condition).collect {
-          case Condition.CrossingUp   => Decision.Sell
-          case Condition.CrossingDown => Decision.Buy
+    def analyze(state: MarketState, triggers: List[IndicatorKind]): Option[TradeStrategyExecutor.Decision] =
+      triggers
+        .find(_ == IndicatorKind.LinesCrossing)
+        .flatMap { ls =>
+          state.signals.getOrElse(ls, Nil).headOption.map(_.condition).collect {
+            case Condition.CrossingUp   => Decision.Sell
+            case Condition.CrossingDown => Decision.Buy
+          }
         }
-      }.flatten
 
   def get(strategy: TradeStrategy): TradeStrategyExecutor =
     strategy match

@@ -73,33 +73,33 @@ object ValueTransformation {
   ).reduceLeft(_ or _)
 }
 
-enum Indicator(val kind: Indicator.Kind) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+object IndicatorKind extends EnumType[IndicatorKind](() => IndicatorKind.values, _.print)
+enum IndicatorKind:
+  case TrendChangeDetection, ThresholdCrossing, LinesCrossing
+
+enum Indicator(val kind: IndicatorKind) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case TrendChangeDetection(
       source: ValueSource,
       transformation: ValueTransformation.SingleOutput
-  ) extends Indicator(Indicator.Kind.TrendChangeDetection)
+  ) extends Indicator(IndicatorKind.TrendChangeDetection)
   case ThresholdCrossing(
       source: ValueSource,
       transformation: ValueTransformation,
       upperBoundary: Double,
       lowerBoundary: Double
-  ) extends Indicator(Indicator.Kind.ThresholdCrossing)
+  ) extends Indicator(IndicatorKind.ThresholdCrossing)
   case LinesCrossing(
       source: ValueSource,
       line1Transformation: ValueTransformation.SingleOutput,
       line2Transformation: ValueTransformation.SingleOutput
-  ) extends Indicator(Indicator.Kind.LinesCrossing)
+  ) extends Indicator(IndicatorKind.LinesCrossing)
 
 object Indicator:
-  object Kind extends EnumType[Kind](() => Kind.values, _.print)
-  enum Kind:
-    case TrendChangeDetection, ThresholdCrossing, LinesCrossing
-
   given JsonTaggedAdt.Config[Indicator] = JsonTaggedAdt.Config.Values[Indicator](
     mappings = Map(
-      Kind.TrendChangeDetection.print -> JsonTaggedAdt.tagged[Indicator.TrendChangeDetection],
-      Kind.ThresholdCrossing.print    -> JsonTaggedAdt.tagged[Indicator.ThresholdCrossing],
-      Kind.LinesCrossing.print        -> JsonTaggedAdt.tagged[Indicator.LinesCrossing]
+      IndicatorKind.TrendChangeDetection.print -> JsonTaggedAdt.tagged[Indicator.TrendChangeDetection],
+      IndicatorKind.ThresholdCrossing.print    -> JsonTaggedAdt.tagged[Indicator.ThresholdCrossing],
+      IndicatorKind.LinesCrossing.print        -> JsonTaggedAdt.tagged[Indicator.LinesCrossing]
     ),
     strict = true,
     typeFieldName = "kind"
