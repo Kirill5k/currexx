@@ -4,7 +4,7 @@ import cats.effect.IO
 import cats.data.NonEmptyList
 import currexx.clients.broker.{BrokerClient, BrokerParameters}
 import currexx.clients.data.MarketDataClient
-import currexx.core.IOWordSpec
+import currexx.core.{IOWordSpec, MockActionDispatcher}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Trades, Users}
@@ -31,7 +31,8 @@ class TradeServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(orderRepo).getAll(Users.uid, SearchParams(None, Some(Trades.ts)))
-          verifyNoInteractions(settRepo, brokerClient, dataClient, disp)
+          verifyNoInteractions(settRepo, brokerClient, dataClient)
+          disp.submittedActions mustBe empty
           res mustBe List(Trades.order)
         }
       }
@@ -49,8 +50,9 @@ class TradeServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(settRepo).get(Users.uid)
-          verifyNoInteractions(orderRepo, brokerClient, dataClient, disp)
+          verifyNoInteractions(orderRepo, brokerClient, dataClient)
           res mustBe ()
+          disp.submittedActions mustBe empty
         }
       }
 
@@ -65,8 +67,9 @@ class TradeServiceSpec extends IOWordSpec {
 
         result.attempt.asserting { res =>
           verify(settRepo).get(Users.uid)
-          verifyNoInteractions(orderRepo, brokerClient, dataClient, disp)
+          verifyNoInteractions(orderRepo, brokerClient, dataClient)
           res mustBe Left(AppError.NotSetup("Trade"))
+          disp.submittedActions mustBe empty
         }
       }
     }
@@ -83,8 +86,9 @@ class TradeServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(settRepo).update(Trades.settings)
-          verifyNoInteractions(orderRepo, brokerClient, dataClient, disp)
+          verifyNoInteractions(orderRepo, brokerClient, dataClient)
           res mustBe ()
+          disp.submittedActions mustBe empty
         }
       }
     }
@@ -95,7 +99,6 @@ class TradeServiceSpec extends IOWordSpec {
         when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val order = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, BigDecimal(1.3), BigDecimal(0.1))
         val result = for
@@ -109,7 +112,8 @@ class TradeServiceSpec extends IOWordSpec {
           verify(brokerClient).submit(Trades.broker, order)
           verify(orderRepo, never).findLatestBy(any[UserId], any[CurrencyPair])
           verify(orderRepo).save(any[TradeOrderPlacement])
-          verify(disp).dispatch(any[Action])
+          disp.submittedActions must have size 1
+          disp.submittedActions.head mustBe an[Action.ProcessTradeOrderPlacement]
           res mustBe ()
         }
       }
@@ -120,7 +124,6 @@ class TradeServiceSpec extends IOWordSpec {
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
         when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturn(IO.none)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val order = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, BigDecimal(1.3), BigDecimal(0.1))
         val result = for
@@ -134,7 +137,8 @@ class TradeServiceSpec extends IOWordSpec {
           verify(brokerClient).submit(Trades.broker, order)
           verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
           verify(orderRepo).save(any[TradeOrderPlacement])
-          verify(disp).dispatch(any[Action])
+          disp.submittedActions must have size 1
+          disp.submittedActions.head mustBe an[Action.ProcessTradeOrderPlacement]
           res mustBe ()
         }
       }
@@ -152,7 +156,8 @@ class TradeServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
-          verifyNoInteractions(settRepo, brokerClient, dataClient, disp)
+          verifyNoInteractions(settRepo, brokerClient, dataClient)
+          disp.submittedActions mustBe empty
           res mustBe ()
         }
       }
@@ -169,7 +174,8 @@ class TradeServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
-          verifyNoInteractions(settRepo, brokerClient, dataClient, disp)
+          verifyNoInteractions(settRepo, brokerClient, dataClient)
+          disp.submittedActions mustBe empty
           res mustBe ()
         }
       }
@@ -180,7 +186,6 @@ class TradeServiceSpec extends IOWordSpec {
         when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturn(IO.some(Trades.order))
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
@@ -193,7 +198,8 @@ class TradeServiceSpec extends IOWordSpec {
           verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
           verify(brokerClient).submit(Trades.broker, TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close))
           verify(orderRepo).save(any[TradeOrderPlacement])
-          verify(disp).dispatch(any[Action])
+          disp.submittedActions must have size 1
+          disp.submittedActions.head mustBe an[Action.ProcessTradeOrderPlacement]
           res mustBe ()
         }
       }
@@ -212,7 +218,8 @@ class TradeServiceSpec extends IOWordSpec {
           verify(orderRepo).getAllTradedCurrencies(Users.uid)
           verify(orderRepo).findLatestBy(Users.uid, Markets.gbpusd)
           verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
-          verifyNoInteractions(settRepo, brokerClient, dataClient, disp)
+          verifyNoInteractions(settRepo, brokerClient, dataClient)
+          disp.submittedActions mustBe empty
           res mustBe ()
         }
       }
@@ -225,7 +232,6 @@ class TradeServiceSpec extends IOWordSpec {
         when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]])).thenReturn(IO.pure(List(Trades.openedOrder)))
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
@@ -239,7 +245,8 @@ class TradeServiceSpec extends IOWordSpec {
           verify(brokerClient).find(Trades.broker, cps)
           verify(brokerClient).submit(Trades.broker, TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close))
           verify(orderRepo).save(any[TradeOrderPlacement])
-          verify(disp).dispatch(any[Action])
+          disp.submittedActions must have size 1
+          disp.submittedActions.head mustBe an[Action.ProcessTradeOrderPlacement]
           res mustBe ()
         }
       }
@@ -251,7 +258,6 @@ class TradeServiceSpec extends IOWordSpec {
           .thenReturn(IO.pure(List(Trades.openedOrder.copy(profit = BigDecimal(-100)))))
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
@@ -265,7 +271,8 @@ class TradeServiceSpec extends IOWordSpec {
           verify(brokerClient).find(Trades.broker, cps)
           verify(brokerClient).submit(Trades.broker, TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close))
           verify(orderRepo).save(any[TradeOrderPlacement])
-          verify(disp).dispatch(any[Action])
+          disp.submittedActions must have size 1
+          disp.submittedActions.head mustBe an[Action.ProcessTradeOrderPlacement]
           res mustBe ()
         }
       }
@@ -283,10 +290,11 @@ class TradeServiceSpec extends IOWordSpec {
         yield ()
 
         result.asserting { res =>
-          verifyNoInteractions(dataClient, orderRepo, disp)
+          verifyNoInteractions(dataClient, orderRepo)
           verify(settRepo).get(Users.uid)
           verify(brokerClient).find(Trades.broker, cps)
           verifyNoMoreInteractions(brokerClient)
+          disp.submittedActions mustBe empty
           res mustBe ()
         }
       }
@@ -303,10 +311,11 @@ class TradeServiceSpec extends IOWordSpec {
         yield ()
 
         result.asserting { res =>
-          verifyNoInteractions(dataClient, orderRepo, disp)
+          verifyNoInteractions(dataClient, orderRepo)
           verify(settRepo).get(Users.uid)
           verify(brokerClient).find(Trades.broker, cps)
           verifyNoMoreInteractions(brokerClient)
+          disp.submittedActions mustBe empty
           res mustBe ()
         }
       }
@@ -326,7 +335,8 @@ class TradeServiceSpec extends IOWordSpec {
         result.asserting { res =>
           verify(settRepo).get(Users.uid)
           verify(dataClient).latestPrice(Markets.gbpeur)
-          verifyNoInteractions(orderRepo, brokerClient, disp)
+          verifyNoInteractions(orderRepo, brokerClient)
+          disp.submittedActions mustBe empty
           res mustBe ()
         }
       }
@@ -337,7 +347,6 @@ class TradeServiceSpec extends IOWordSpec {
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
         when(dataClient.latestPrice(any[CurrencyPair])).thenReturn(IO.pure(Markets.priceRange))
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
@@ -353,19 +362,20 @@ class TradeServiceSpec extends IOWordSpec {
           verify(brokerClient).submit(Trades.broker, Trades.settings.trading.toOrder(TradeOrder.Position.Buy, Markets.gbpeur, 3.0))
           verify(dataClient).latestPrice(Markets.gbpeur)
           verify(orderRepo).save(any[TradeOrderPlacement])
-          verify(disp).dispatch(any[Action])
+          disp.submittedActions must have size 1
+          disp.submittedActions.head mustBe an[Action.ProcessTradeOrderPlacement]
           res mustBe ()
         }
       }
     }
   }
 
-  def mocks: (TradeSettingsRepository[IO], TradeOrderRepository[IO], BrokerClient[IO], MarketDataClient[IO], ActionDispatcher[IO]) =
+  def mocks: (TradeSettingsRepository[IO], TradeOrderRepository[IO], BrokerClient[IO], MarketDataClient[IO], MockActionDispatcher[IO]) =
     (
       mock[TradeSettingsRepository[IO]],
       mock[TradeOrderRepository[IO]],
       mock[BrokerClient[IO]],
       mock[MarketDataClient[IO]],
-      mock[ActionDispatcher[IO]]
+      MockActionDispatcher[IO]
     )
 }

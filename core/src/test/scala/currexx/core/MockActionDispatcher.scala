@@ -23,4 +23,5 @@ final private class MockActionDispatcher[F[_]](
     Stream.emits(submittedActions)
 
 object MockActionDispatcher:
-  def make[F[_]: Monad] = new MockActionDispatcher[F](ListBuffer.empty)
+  def apply[F[_]: Monad] = make[F]
+  def make[F[_]: Monad]  = new MockActionDispatcher[F](ListBuffer.empty)
