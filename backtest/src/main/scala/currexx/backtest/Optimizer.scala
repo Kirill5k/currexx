@@ -43,7 +43,7 @@ object Optimizer extends IOApp.Simple {
     ValueTransformation.SingleOutput.JMA(20, 100, 2)
   )
 
-  val testDataSets    = List("nzd-cad-1d.csv", "eur-chf-1d.csv", "nzd-chf-1d.csv", "eur-aud-1d.csv")
+  val testDataSets    = List("nzd-cad-1d.csv", "eur-chf-1d.csv", "nzd-chf-1d.csv", "eur-aud-1d.csv", "eur-gbp-1d.csv", "aud-cad-1d.csv")
   val strategy        = TradeStrategy.LinesCrossing
   val target          = linesCrossing
   val otherIndicators = Nil

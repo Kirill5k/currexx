@@ -15,14 +15,14 @@ final case class IndicatorState(
 final case class PositionState(
     position: TradeOrder.Position,
     openedAt: Instant,
-    openPrice: BigDecimal,
+    openPrice: BigDecimal
 ) derives Codec.AsObject
 
 final case class MarketState(
     userId: UserId,
     currencyPair: CurrencyPair,
     currentPosition: Option[PositionState],
-    signals: Map[String, List[IndicatorState]],
+    signals: Map[Indicator.Kind, List[IndicatorState]],
     lastUpdatedAt: Option[Instant],
     createdAt: Option[Instant]
 ) derives Codec.AsObject

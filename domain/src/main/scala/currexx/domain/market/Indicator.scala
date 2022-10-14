@@ -73,29 +73,33 @@ object ValueTransformation {
   ).reduceLeft(_ or _)
 }
 
-enum Indicator(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+enum Indicator(val kind: Indicator.Kind) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case TrendChangeDetection(
       source: ValueSource,
       transformation: ValueTransformation.SingleOutput
-  ) extends Indicator("trend-change-detection")
+  ) extends Indicator(Indicator.Kind.TrendChangeDetection)
   case ThresholdCrossing(
       source: ValueSource,
       transformation: ValueTransformation,
       upperBoundary: Double,
       lowerBoundary: Double
-  ) extends Indicator("threshold-crossing")
+  ) extends Indicator(Indicator.Kind.ThresholdCrossing)
   case LinesCrossing(
       source: ValueSource,
       line1Transformation: ValueTransformation.SingleOutput,
       line2Transformation: ValueTransformation.SingleOutput
-  ) extends Indicator("lines-crossing")
+  ) extends Indicator(Indicator.Kind.LinesCrossing)
 
 object Indicator:
+  object Kind extends EnumType[Kind](() => Kind.values, _.print)
+  enum Kind:
+    case TrendChangeDetection, ThresholdCrossing, LinesCrossing
+
   given JsonTaggedAdt.Config[Indicator] = JsonTaggedAdt.Config.Values[Indicator](
     mappings = Map(
-      "trend-change-detection" -> JsonTaggedAdt.tagged[Indicator.TrendChangeDetection],
-      "threshold-crossing"     -> JsonTaggedAdt.tagged[Indicator.ThresholdCrossing],
-      "lines-crossing"         -> JsonTaggedAdt.tagged[Indicator.LinesCrossing]
+      Kind.TrendChangeDetection.print -> JsonTaggedAdt.tagged[Indicator.TrendChangeDetection],
+      Kind.ThresholdCrossing.print    -> JsonTaggedAdt.tagged[Indicator.ThresholdCrossing],
+      Kind.LinesCrossing.print        -> JsonTaggedAdt.tagged[Indicator.LinesCrossing]
     ),
     strict = true,
     typeFieldName = "kind"

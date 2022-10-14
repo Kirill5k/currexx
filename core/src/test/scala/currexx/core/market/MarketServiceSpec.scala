@@ -109,7 +109,7 @@ class MarketServiceSpec extends IOWordSpec {
         val (stateRepo, disp) = mocks
 
         when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state.copy(signals = Map.empty))))
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[String, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[Indicator.Kind, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
@@ -132,7 +132,7 @@ class MarketServiceSpec extends IOWordSpec {
           IndicatorState(Signals.trendDirectionChanged.condition, Signals.ts.minusSeconds(3.days.toSeconds), Markets.trendChangeDetection)
         val signalState = Map(Markets.trendChangeDetection.kind -> List(currentIndState))
         when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state.copy(signals = signalState))))
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[String, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[Indicator.Kind, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
@@ -157,7 +157,7 @@ class MarketServiceSpec extends IOWordSpec {
       "update signal state with multiple signals" in {
         val (stateRepo, disp) = mocks
         when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state)))
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[String, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[Indicator.Kind, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for
@@ -188,7 +188,7 @@ class MarketServiceSpec extends IOWordSpec {
         val signalState = Map(Markets.trendChangeDetection.kind -> List(currentIndState))
 
         when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state.copy(signals = signalState))))
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[String, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[Indicator.Kind, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
         when(disp.dispatch(any[Action])).thenReturn(IO.unit)
 
         val result = for

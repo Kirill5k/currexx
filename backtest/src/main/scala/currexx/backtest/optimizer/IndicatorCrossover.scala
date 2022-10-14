@@ -43,7 +43,7 @@ object IndicatorCrossover {
           case (VT.SingleOutput.NMA(l1, sl1, d1, ma1), VT.SingleOutput.NMA(l2, sl2, d2, _)) =>
             Right(VT.SingleOutput.NMA(crossInt(l1, l2), crossInt(sl1, sl2), crossDouble(d1, d2, 0.5), ma1))
           case (VT.SingleOutput.Sequenced(s1), VT.SingleOutput.Sequenced(s2)) =>
-            s1.zip(s2).traverse(crossSo(_, _)).map(VT.SingleOutput.Sequenced(_))
+            s1.zip(s2).traverse(crossSo _).map(VT.SingleOutput.Sequenced(_))
           case _ => Left(new IllegalArgumentException("both parents must be of the same type"))
 
         def crossDo(do1: VT.DoubleOutput, do2: VT.DoubleOutput): Either[Throwable, VT.DoubleOutput] = (do1, do2) match

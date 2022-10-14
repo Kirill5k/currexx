@@ -2,6 +2,7 @@ package currexx.core.common.http
 
 import cats.syntax.option.*
 import currexx.clients.broker.BrokerParameters
+import currexx.core.market.MarketController.MarketStateView
 import currexx.core.monitor.MonitorController.{CreateMonitorRequest, MonitorView}
 import currexx.domain.market.{Condition, Currency, CurrencyPair, Indicator, Interval, TradeOrder, Trend}
 import eu.timepit.refined.types.string.NonEmptyString
@@ -38,4 +39,5 @@ transparent trait TapirSchema extends SchemaDerivation {
   given Schema[TriggerFrequency]     = Schema.string
   given Schema[TradeStrategy]        = Schema.string
   given Schema[BrokerParameters]     = Schema.string
+  given Schema[MarketStateView]      = Schema.string
 }

@@ -48,9 +48,7 @@ object IndicatorEvaluator {
               orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
             yield orderStats.totalProfit
           }
-          .map(res => ind -> Fitness(res.mean))
+          .map(res => ind -> Fitness(res.min))
       }
     yield eval
-
-  extension (l: List[BigDecimal]) def mean: BigDecimal = l.sum / l.size
 }

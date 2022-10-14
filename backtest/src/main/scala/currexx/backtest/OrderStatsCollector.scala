@@ -18,8 +18,8 @@ final case class OrderStats(
   def close(profit: BigDecimal) =
     copy(
       totalProfit = totalProfit + profit,
-      biggestWin = if (profit > biggestWin) profit else biggestWin,
-      biggestLoss = if (profit < biggestLoss) profit else biggestLoss
+      biggestWin = profit.max(biggestWin),
+      biggestLoss = profit.min(biggestLoss)
     )
   override def toString: String =
     s"""OrderStats(

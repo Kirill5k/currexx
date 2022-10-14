@@ -45,7 +45,7 @@ object TradeStrategyExecutor {
     def analyze(state: MarketState, triggers: List[Indicator]): Option[TradeStrategyExecutor.Decision] = {
       val conditions = triggers.flatMap(t => state.signals.getOrElse(t.kind, Nil).headOption.map(t.kind -> _.condition)).toMap
 
-      (conditions.get("trend-change-detection"), conditions.get("threshold-crossing")) match
+      (conditions.get(Indicator.Kind.TrendChangeDetection), conditions.get(Indicator.Kind.ThresholdCrossing)) match
         case (Some(Condition.TrendDirectionChange(Trend.Downward, _, _)), Some(Condition.BelowThreshold(_, _))) =>
           Some(Decision.Buy)
         case (Some(Condition.TrendDirectionChange(Trend.Upward, _, _)), Some(Condition.AboveThreshold(_, _))) =>

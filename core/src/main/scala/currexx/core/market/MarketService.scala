@@ -43,7 +43,7 @@ final private class LiveMarketService[F[_]](
     stateRepo
       .find(uid, cp)
       .flatMap { state =>
-        val existingSignals = state.fold(Map.empty[String, List[IndicatorState]])(_.signals)
+        val existingSignals = state.fold(Map.empty[Indicator.Kind, List[IndicatorState]])(_.signals)
 
         val updatedSignals = signals.foldLeft(existingSignals) { (current, signal) =>
           val indicatorStates   = current.getOrElse(signal.triggeredBy.kind, Nil)

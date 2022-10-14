@@ -6,7 +6,7 @@ import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import io.circe.syntax.*
 import com.mongodb.client.model.ReturnDocument
-import currexx.domain.market.{CurrencyPair, PriceRange}
+import currexx.domain.market.{CurrencyPair, Indicator, PriceRange}
 import currexx.domain.user.UserId
 import currexx.domain.errors.AppError
 import currexx.core.common.db.Repository
@@ -18,7 +18,7 @@ import mongo4cats.operations.{Filter, Update}
 import mongo4cats.database.MongoDatabase
 
 trait MarketStateRepository[F[_]] extends Repository[F]:
-  def update(uid: UserId, pair: CurrencyPair, signals: Map[String, List[IndicatorState]]): F[MarketState]
+  def update(uid: UserId, pair: CurrencyPair, signals: Map[Indicator.Kind, List[IndicatorState]]): F[MarketState]
   def update(uid: UserId, pair: CurrencyPair, position: Option[PositionState]): F[MarketState]
   def getAll(uid: UserId): F[List[MarketState]]
   def deleteAll(uid: UserId): F[Unit]
@@ -41,10 +41,10 @@ final private class LiveMarketStateRepository[F[_]](
       .deleteOne(userIdAndCurrencyPairEq(uid, cp))
       .flatMap(errorIfNotDeleted(AppError.NotTracked(List(cp))))
 
-  override def update(uid: UserId, cp: CurrencyPair, signals: Map[String, List[IndicatorState]]): F[MarketState] =
+  override def update(uid: UserId, cp: CurrencyPair, signals: Map[Indicator.Kind, List[IndicatorState]]): F[MarketState] =
     runUpdate(
       userIdAndCurrencyPairEq(uid, cp),
-      Update.set("signals", signals),
+      Update.set("signals", signals.map((k, v) => k.print -> v)),
       MarketStateEntity.make(uid, cp, signals = signals)
     )
 

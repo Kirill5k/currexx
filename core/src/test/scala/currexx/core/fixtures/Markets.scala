@@ -36,7 +36,7 @@ object Markets {
 
   lazy val indicatorState: IndicatorState =
     IndicatorState(Signals.trendDirectionChanged.condition, Signals.trendDirectionChanged.time, trendChangeDetection)
-  lazy val indicatorStates: Map[String, List[IndicatorState]] = Map(trendChangeDetection.kind -> List(indicatorState))
+  lazy val indicatorStates: Map[Indicator.Kind, List[IndicatorState]] = Map(trendChangeDetection.kind -> List(indicatorState))
 
   lazy val state: MarketState = MarketState(
     Users.uid,

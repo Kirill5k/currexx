@@ -1,15 +1,17 @@
 package currexx.domain
 
 import mongo4cats.bson.ObjectId
-import io.circe.{Decoder, Encoder}
+import io.circe.{Decoder, Encoder, KeyDecoder, KeyEncoder}
 
 import scala.reflect.ClassTag
 
 object types {
 
   transparent trait EnumType[E: ClassTag](private val enums: () => Array[E], private val unwrap: E => String):
-    given Encoder[E] = Encoder[String].contramap(unwrap(_))
-    given Decoder[E] = Decoder[String].emap(from)
+    given Encoder[E]    = Encoder[String].contramap(unwrap(_))
+    given Decoder[E]    = Decoder[String].emap(from)
+    given KeyEncoder[E] = (e: E) => unwrap(e)
+    given KeyDecoder[E] = (key: String) => from(key).toOption
 
     def from(kind: String): Either[String, E] =
       enums()
