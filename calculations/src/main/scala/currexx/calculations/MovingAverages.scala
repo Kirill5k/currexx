@@ -1,7 +1,6 @@
 package currexx.calculations
 
 import scala.annotation.tailrec
-import scala.collection.mutable.Queue
 
 object MovingAverages {
 
@@ -27,16 +26,20 @@ object MovingAverages {
     exponentialAsArray(values, n, smoothing).toList
 
   def simple(values: List[Double], n: Int): List[Double] = {
+    val window = collection.mutable.Queue.empty[Double]
     @tailrec
-    def calc(queue: Queue[Double], remaining: List[Double], result: List[Double]): List[Double] =
+    def calc(remaining: List[Double], result: List[Double]): List[Double] =
       if (remaining.isEmpty) result
-      else if (queue.size < n) calc(queue.addOne(remaining.head), remaining.tail, result)
-      else {
-        val updatedQueue = queue.drop(1).addOne(remaining.head)
-        val sma          = updatedQueue.sum / n
-        calc(updatedQueue, remaining.tail, sma :: result)
+      else if (window.size < n) {
+        window.enqueue(remaining.head)
+        calc(remaining.tail, result)
+      } else {
+        window.dequeue()
+        window.enqueue(remaining.head)
+        val sma = window.sum / n
+        calc(remaining.tail, sma :: result)
       }
-    calc(Queue.empty, values.reverse, Nil)
+    calc(values.reverse, Nil)
   }
 
   def macd(values: List[Double], fastLength: Int = 12, slowLength: Int = 26): List[Double] = {
@@ -62,36 +65,40 @@ object MovingAverages {
     (macdLine, signalLine)
   }
 
-  def weightedAsArray(values: List[Double], n: Int): Array[Double] = {
-    val wmas    = Array.ofDim[Double](values.size)
-    val divider = (n * (n + 1)) / 2
-    @tailrec
-    def calc(queue: Queue[Double], remaining: List[Double], i: Int): Array[Double] =
-      if (remaining.isEmpty) wmas.drop(i)
-      else if (queue.size < n) calc(queue.addOne(remaining.head), remaining.tail, i)
-      else {
-        val updatedQueue = queue.drop(1).addOne(remaining.head)
-        wmas(i - 1) = updatedQueue.zipWithIndex.foldLeft(0d) { case (sum, (v, i)) => sum + (n + i + 1 - n) * v } / divider
-        calc(updatedQueue, remaining.tail, i - 1)
+  private def weightedAsArray(values: Iterator[Double], n: Int, size: Int): Array[Double] = {
+    val wmas     = Array.ofDim[Double](size)
+    val divider  = (n * (n + 1)) / 2
+    val window   = collection.mutable.Queue.empty[Double]
+    var i        = size
+    while (values.hasNext) {
+      if (window.size < n) {
+        window.enqueue(values.next())
+      } else {
+        window.dequeue()
+        window.enqueue(values.next())
+        wmas(i - 1) = window.zipWithIndex.foldLeft(0d) { case (sum, (v, i)) => sum + (n + i + 1 - n) * v } / divider
       }
-    calc(Queue.empty, values.reverse, values.size)
+      i = i - 1
+    }
+    wmas.drop(i)
   }
 
   def weighted(values: List[Double], n: Int): List[Double] =
-    weightedAsArray(values, n).toList
+    weightedAsArray(values.reverseIterator, n, values.size).toList
 
   def hull(values: List[Double], n: Int): List[Double] = {
-    val n2    = math.round(n.toDouble / 2).toInt
-    val sqrtn   = math.round(math.sqrt(n.toDouble)).toInt
-    val nwma  = weightedAsArray(values, n)
-    val n2wma = weightedAsArray(values, n2)
-    var i     = 0
-    val diff  = Array.ofDim[Double](nwma.length)
+    val n2       = math.round(n.toDouble / 2).toInt
+    val sqrtn    = math.round(math.sqrt(n.toDouble)).toInt
+    val reversed = values.reverse
+    val nwma     = weightedAsArray(reversed.iterator, n, values.size)
+    val n2wma    = weightedAsArray(reversed.iterator, n2, values.size)
+    var i        = 0
+    val diff     = Array.ofDim[Double](nwma.length)
     while (i < nwma.length) {
-      diff(i) = n2wma(i) * 2 - nwma(i)
+      diff(nwma.length - i - 1) = n2wma(i) * 2 - nwma(i)
       i = i + 1
     }
-    weighted(diff.toList, sqrtn)
+    weightedAsArray(diff.iterator, sqrtn, diff.length).toList
   }
 
   def triple(
