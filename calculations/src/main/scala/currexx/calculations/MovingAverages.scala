@@ -27,17 +27,16 @@ object MovingAverages {
     exponentialAsArray(values, n, smoothing).toList
 
   def simple(values: List[Double], n: Int): List[Double] = {
-    val smas = Array.ofDim[Double](values.size)
     @tailrec
-    def calc(queue: Queue[Double], remaining: List[Double], i: Int): List[Double] =
-      if (remaining.isEmpty) smas.drop(i).toList
-      else if (queue.size < n) calc(queue.addOne(remaining.head), remaining.tail, i)
+    def calc(queue: Queue[Double], remaining: List[Double], result: List[Double]): List[Double] =
+      if (remaining.isEmpty) result
+      else if (queue.size < n) calc(queue.addOne(remaining.head), remaining.tail, result)
       else {
         val updatedQueue = queue.drop(1).addOne(remaining.head)
-        smas(i - 1) = updatedQueue.sum / n
-        calc(updatedQueue, remaining.tail, i - 1)
+        val sma          = updatedQueue.sum / n
+        calc(updatedQueue, remaining.tail, sma :: result)
       }
-    calc(Queue.empty, values.reverse, values.size)
+    calc(Queue.empty, values.reverse, Nil)
   }
 
   def macd(values: List[Double], fastLength: Int = 12, slowLength: Int = 26): List[Double] = {
@@ -83,11 +82,16 @@ object MovingAverages {
 
   def hull(values: List[Double], n: Int): List[Double] = {
     val n2    = math.round(n.toDouble / 2).toInt
+    val sqrtn   = math.round(math.sqrt(n.toDouble)).toInt
     val nwma  = weightedAsArray(values, n)
-    val n2wma = weightedAsArray(values, n2).take(nwma.length).map(_ * 2)
-    val diff  = n2wma.zip(nwma).map(_ - _)
-    val sqn   = math.round(math.sqrt(n.toDouble)).toInt
-    weighted(diff.toList, sqn)
+    val n2wma = weightedAsArray(values, n2)
+    var i     = 0
+    val diff  = Array.ofDim[Double](nwma.length)
+    while (i < nwma.length) {
+      diff(i) = n2wma(i) * 2 - nwma(i)
+      i = i + 1
+    }
+    weighted(diff.toList, sqrtn)
   }
 
   def triple(
