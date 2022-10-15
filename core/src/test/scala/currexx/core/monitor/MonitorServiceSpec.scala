@@ -23,7 +23,7 @@ class MonitorServiceSpec extends IOWordSpec {
     "update" should {
       "update monitor properties in the db" in {
         val (repo, disp) = mocks
-        when(repo.update(any[Monitor])).thenReturn(IO.pure(Monitors.marketData))
+        when(repo.update(any[Monitor])).thenReturnIO(Monitors.marketData)
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -59,7 +59,7 @@ class MonitorServiceSpec extends IOWordSpec {
     "pause" should {
       "set active to false" in {
         val (repo, disp) = mocks
-        when(repo.activate(any[UserId], any[MonitorId], any[Boolean])).thenReturn(IO.pure(Monitors.marketData))
+        when(repo.activate(any[UserId], any[MonitorId], any[Boolean])).thenReturnIO(Monitors.marketData)
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -76,7 +76,7 @@ class MonitorServiceSpec extends IOWordSpec {
     "create" should {
       "store monitor in db and submit query monitor action when schedule is periodic" in {
         val (repo, disp) = mocks
-        when(repo.create(any[CreateMonitor])).thenReturn(IO.pure(Monitors.marketData.copy(lastQueriedAt = None)))
+        when(repo.create(any[CreateMonitor])).thenReturnIO(Monitors.marketData.copy(lastQueriedAt = None))
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -93,7 +93,7 @@ class MonitorServiceSpec extends IOWordSpec {
       "store monitor in db and reschedule when schedule is cron" in {
         val schedule = Schedule.Cron("0 7,20 * * 1-5").value
         val (repo, disp) = mocks
-        when(repo.create(any[CreateMonitor])).thenReturn(IO.pure(Monitors.marketData.copy(schedule = schedule)))
+        when(repo.create(any[CreateMonitor])).thenReturnIO(Monitors.marketData.copy(schedule = schedule))
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -163,7 +163,7 @@ class MonitorServiceSpec extends IOWordSpec {
     "triggerMonitor" should {
       "submit assert profit action for active monitor" in {
         val (repo, disp) = mocks
-        when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.profit))
+        when(repo.find(any[UserId], any[MonitorId])).thenReturnIO(Monitors.profit)
         when(repo.updateQueriedTimestamp(any[UserId], any[MonitorId])).thenReturn(IO.unit)
 
         val result = for
@@ -184,7 +184,7 @@ class MonitorServiceSpec extends IOWordSpec {
 
       "not reschedule monitor in case of manual query" in {
         val (repo, disp) = mocks
-        when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.marketData))
+        when(repo.find(any[UserId], any[MonitorId])).thenReturnIO(Monitors.marketData)
         when(repo.updateQueriedTimestamp(any[UserId], any[MonitorId])).thenReturn(IO.unit)
 
         val result = for
@@ -203,7 +203,7 @@ class MonitorServiceSpec extends IOWordSpec {
 
       "not submit fetch market data and assert profit actions for inactive monitor" in {
         val (repo, disp) = mocks
-        when(repo.find(any[UserId], any[MonitorId])).thenReturn(IO.pure(Monitors.marketData.copy(active = false)))
+        when(repo.find(any[UserId], any[MonitorId])).thenReturnIO(Monitors.marketData.copy(active = false))
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)

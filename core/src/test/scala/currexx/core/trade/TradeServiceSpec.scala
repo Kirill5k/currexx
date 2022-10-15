@@ -22,7 +22,7 @@ class TradeServiceSpec extends IOWordSpec {
     "getAllOrders" should {
       "return all orders from the repository" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(orderRepo.getAll(any[UserId], any[SearchParams])).thenReturn(IO.pure(List(Trades.order)))
+        when(orderRepo.getAll(any[UserId], any[SearchParams])).thenReturnIO(List(Trades.order))
 
         val result = for
           svc    <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
@@ -41,7 +41,7 @@ class TradeServiceSpec extends IOWordSpec {
     "getSettings" should {
       "store trade-settings in the repository" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
+        when(settRepo.get(any[UserId])).thenReturnIO(Trades.settings)
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
@@ -58,7 +58,7 @@ class TradeServiceSpec extends IOWordSpec {
 
       "return error when settings do not exist" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.raiseError(AppError.NotSetup("Trade")))
+        when(settRepo.get(any[UserId])).thenReturnError(AppError.NotSetup("Trade"))
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
@@ -77,7 +77,7 @@ class TradeServiceSpec extends IOWordSpec {
     "updateSettings" should {
       "store trade-settings in the repository" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(settRepo.update(any[TradeSettings])).thenReturn(IO.unit)
+        when(settRepo.update(any[TradeSettings])).thenReturnUnit
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
@@ -96,11 +96,11 @@ class TradeServiceSpec extends IOWordSpec {
     "placeOrder" should {
       "submit order placements" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
-        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
-        when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
+        when(settRepo.get(any[UserId])).thenReturnIO(Trades.settings)
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
+        when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
-        val order = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, BigDecimal(1.3), BigDecimal(0.1))
+        val order = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, 1.3, 0.1)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
           _   <- svc.placeOrder(Users.uid, order, false)
@@ -120,10 +120,10 @@ class TradeServiceSpec extends IOWordSpec {
 
       "close existing orders before submitting the actual placement" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
-        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
-        when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturn(IO.none)
-        when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
+        when(settRepo.get(any[UserId])).thenReturnIO(Trades.settings)
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
+        when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturnNone
+        when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
         val order = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, BigDecimal(1.3), BigDecimal(0.1))
         val result = for
@@ -147,7 +147,7 @@ class TradeServiceSpec extends IOWordSpec {
     "closeOpenOrders" should {
       "not do anything when there are no orders" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturn(IO.none)
+        when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturnNone
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
@@ -165,7 +165,7 @@ class TradeServiceSpec extends IOWordSpec {
       "not do anything when latest order is exit" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair]))
-          .thenReturn(IO.some(Trades.order.copy(order = TradeOrder.Exit(Markets.gbpeur, BigDecimal(1.5)))))
+          .thenReturnSome(Trades.order.copy(order = TradeOrder.Exit(Markets.gbpeur, 1.5)))
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
@@ -182,10 +182,10 @@ class TradeServiceSpec extends IOWordSpec {
 
       "close existing order" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(dataClient.latestPrice(any[CurrencyPair])).thenReturn(IO.pure(Markets.priceRange))
-        when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturn(IO.some(Trades.order))
-        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
-        when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
+        when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
+        when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturnSome(Trades.order)
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
+        when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
@@ -206,8 +206,8 @@ class TradeServiceSpec extends IOWordSpec {
 
       "obtain traded currencies and close all open orders" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(orderRepo.getAllTradedCurrencies(any[UserId])).thenReturn(IO.pure(List(Markets.gbpeur, Markets.gbpusd)))
-        when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturn(IO.none)
+        when(orderRepo.getAllTradedCurrencies(any[UserId])).thenReturnIO(List(Markets.gbpeur, Markets.gbpusd))
+        when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturnNone
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
@@ -228,10 +228,10 @@ class TradeServiceSpec extends IOWordSpec {
     "closeOrderIfProfitIsOutsideRange" should {
       "submit close order if profit is above max" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
-        when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]])).thenReturn(IO.pure(List(Trades.openedOrder)))
-        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
-        when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
+        when(settRepo.get(any[UserId])).thenReturnIO(Trades.settings)
+        when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]])).thenReturnIO(List(Trades.openedOrder))
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
+        when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
         val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
@@ -253,11 +253,11 @@ class TradeServiceSpec extends IOWordSpec {
 
       "submit close order if profit is below min" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
+        when(settRepo.get(any[UserId])).thenReturnIO(Trades.settings)
         when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]]))
-          .thenReturn(IO.pure(List(Trades.openedOrder.copy(profit = BigDecimal(-100)))))
-        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
-        when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
+          .thenReturnIO(List(Trades.openedOrder.copy(profit = -100)))
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
+        when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
         val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
@@ -279,9 +279,9 @@ class TradeServiceSpec extends IOWordSpec {
 
       "not do anything if profit is within range" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
+        when(settRepo.get(any[UserId])).thenReturnIO(Trades.settings)
         when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]]))
-          .thenReturn(IO.pure(List(Trades.openedOrder.copy(profit = BigDecimal(0)))))
+          .thenReturnIO(List(Trades.openedOrder.copy(profit = 0)))
 
         val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
@@ -301,8 +301,8 @@ class TradeServiceSpec extends IOWordSpec {
 
       "not do anything if there are no opened positions" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings))
-        when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]])).thenReturn(IO.pure(Nil))
+        when(settRepo.get(any[UserId])).thenReturnIO(Trades.settings)
+        when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]])).thenReturnIO(Nil)
 
         val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
@@ -324,8 +324,8 @@ class TradeServiceSpec extends IOWordSpec {
     "processMarketStateUpdate" should {
       "not do anything when trading strategy is disabled" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings.copy(strategy = TradeStrategy.Disabled)))
-        when(dataClient.latestPrice(any[CurrencyPair])).thenReturn(IO.pure(Markets.priceRange))
+        when(settRepo.get(any[UserId])).thenReturnIO(Trades.settings.copy(strategy = TradeStrategy.Disabled))
+        when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
@@ -343,10 +343,10 @@ class TradeServiceSpec extends IOWordSpec {
 
       "close existing order if new order has reverse position" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Trades.settings.copy(strategy = TradeStrategy.TrendChange)))
-        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.unit)
-        when(orderRepo.save(any[TradeOrderPlacement])).thenReturn(IO.unit)
-        when(dataClient.latestPrice(any[CurrencyPair])).thenReturn(IO.pure(Markets.priceRange))
+        when(settRepo.get(any[UserId])).thenReturnIO(Trades.settings.copy(strategy = TradeStrategy.TrendChange))
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
+        when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
+        when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)

@@ -1,7 +1,7 @@
 package currexx.core.market
 
 import cats.effect.IO
-import currexx.core.IOWordSpec
+import currexx.core.{IOWordSpec, MockActionDispatcher}
 import currexx.domain.user.UserId
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.market.db.MarketStateRepository
@@ -18,8 +18,7 @@ class MarketServiceSpec extends IOWordSpec {
     "clearState" should {
       "delete all existing market states and close orders" in {
         val (stateRepo, disp) = mocks
-        when(stateRepo.deleteAll(any[UserId])).thenReturn(IO.unit)
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+        when(stateRepo.deleteAll(any[UserId])).thenReturnUnit
 
         val result = for
           svc   <- MarketService.make[IO](stateRepo, disp)
@@ -28,15 +27,14 @@ class MarketServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(stateRepo).deleteAll(Users.uid)
-          verify(disp).dispatch(Action.CloseAllOpenOrders(Users.uid))
+          disp.submittedActions mustBe List(Action.CloseAllOpenOrders(Users.uid))
           res mustBe ()
         }
       }
 
       "delete all existing market states without closing orders" in {
         val (stateRepo, disp) = mocks
-        when(stateRepo.deleteAll(any[UserId])).thenReturn(IO.unit)
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+        when(stateRepo.deleteAll(any[UserId])).thenReturnUnit
 
         val result = for
           svc   <- MarketService.make[IO](stateRepo, disp)
@@ -45,15 +43,14 @@ class MarketServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(stateRepo).deleteAll(Users.uid)
-          verifyNoInteractions(disp)
+          disp.submittedActions mustBe empty
           res mustBe ()
         }
       }
 
       "delete existing market for a single currency" in {
         val (stateRepo, disp) = mocks
-        when(stateRepo.delete(any[UserId], any[CurrencyPair])).thenReturn(IO.unit)
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+        when(stateRepo.delete(any[UserId], any[CurrencyPair])).thenReturnUnit
 
         val result = for
           svc   <- MarketService.make[IO](stateRepo, disp)
@@ -62,7 +59,7 @@ class MarketServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(stateRepo).delete(Users.uid, Markets.gbpeur)
-          verify(disp).dispatch(Action.CloseOpenOrders(Users.uid, Markets.gbpeur))
+          disp.submittedActions mustBe List(Action.CloseOpenOrders(Users.uid, Markets.gbpeur))
           res mustBe ()
         }
       }
@@ -71,7 +68,7 @@ class MarketServiceSpec extends IOWordSpec {
     "getState" should {
       "return state of all traded currencies" in {
         val (stateRepo, disp) = mocks
-        when(stateRepo.getAll(any[UserId])).thenReturn(IO.pure(List(Markets.state)))
+        when(stateRepo.getAll(any[UserId])).thenReturnIO(List(Markets.state))
 
         val result = for
           svc   <- MarketService.make[IO](stateRepo, disp)
@@ -80,7 +77,7 @@ class MarketServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(stateRepo).getAll(Users.uid)
-          verifyNoInteractions(disp)
+          disp.submittedActions mustBe empty
           res mustBe List(Markets.state)
         }
       }
@@ -97,8 +94,12 @@ class MarketServiceSpec extends IOWordSpec {
         yield state
 
         result.asserting { res =>
-          verify(stateRepo).update(Users.uid, Markets.gbpeur, Some(PositionState(TradeOrder.Position.Buy, Trades.ts, Markets.priceRange.close)))
-          verifyNoInteractions(disp)
+          verify(stateRepo).update(
+            Users.uid,
+            Markets.gbpeur,
+            Some(PositionState(TradeOrder.Position.Buy, Trades.ts, Markets.priceRange.close))
+          )
+          disp.submittedActions mustBe empty
           res mustBe ()
         }
       }
@@ -107,10 +108,8 @@ class MarketServiceSpec extends IOWordSpec {
     "processSignal" should {
       "update signal state with the latest received signal when current signal state is empty" in {
         val (stateRepo, disp) = mocks
-
-        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state.copy(signals = Map.empty))))
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[IndicatorKind, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(Markets.state.copy(signals = Map.empty))
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[IndicatorKind, List[IndicatorState]]])).thenReturnIO(Markets.state)
 
         val result = for
           svc   <- MarketService.make[IO](stateRepo, disp)
@@ -121,19 +120,21 @@ class MarketServiceSpec extends IOWordSpec {
           val indState = IndicatorState(Signals.trendDirectionChanged.condition, Signals.ts, Markets.trendChangeDetection)
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, Map(Markets.trendChangeDetection.kind -> List(indState)))
-          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, List(IndicatorKind.TrendChangeDetection)))
+          disp.submittedActions mustBe List(Action.ProcessMarketStateUpdate(Markets.state, List(IndicatorKind.TrendChangeDetection)))
           res mustBe ()
         }
       }
 
       "update signal state with the latest received signal" in {
         val (stateRepo, disp) = mocks
-        val currentIndState =
-          IndicatorState(Signals.trendDirectionChanged.condition, Signals.ts.minusSeconds(3.days.toSeconds), Markets.trendChangeDetection)
+        val currentIndState = IndicatorState(
+          Signals.trendDirectionChanged.condition,
+          Signals.ts.minusSeconds(3.days.toSeconds),
+          Markets.trendChangeDetection
+        )
         val signalState = Map(Markets.trendChangeDetection.kind -> List(currentIndState))
-        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state.copy(signals = signalState))))
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[IndicatorKind, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(Markets.state.copy(signals = signalState))
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[IndicatorKind, List[IndicatorState]]])).thenReturnIO(Markets.state)
 
         val result = for
           svc   <- MarketService.make[IO](stateRepo, disp)
@@ -149,16 +150,15 @@ class MarketServiceSpec extends IOWordSpec {
           )
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
-          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, List(IndicatorKind.TrendChangeDetection)))
+          disp.submittedActions mustBe List(Action.ProcessMarketStateUpdate(Markets.state, List(IndicatorKind.TrendChangeDetection)))
           res mustBe ()
         }
       }
 
       "update signal state with multiple signals" in {
         val (stateRepo, disp) = mocks
-        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state)))
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[IndicatorKind, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(Markets.state)
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[IndicatorKind, List[IndicatorState]]])).thenReturnIO(Markets.state)
 
         val result = for
           svc   <- MarketService.make[IO](stateRepo, disp)
@@ -167,29 +167,29 @@ class MarketServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           val finalSignalState = Map(
-            Markets.trendChangeDetection.kind -> List(
-              IndicatorState(Signals.trendDirectionChanged.condition, Signals.ts, Markets.trendChangeDetection)
-            ),
-            Markets.thresholdCrossing.kind -> List(
-              IndicatorState(Signals.thresholdCrossing.condition, Signals.ts, Markets.thresholdCrossing)
-            )
+            Markets.trendChangeDetection.kind ->
+              List(IndicatorState(Signals.trendDirectionChanged.condition, Signals.ts, Markets.trendChangeDetection)),
+            Markets.thresholdCrossing.kind ->
+              List(IndicatorState(Signals.thresholdCrossing.condition, Signals.ts, Markets.thresholdCrossing))
           )
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
-          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, List(IndicatorKind.ThresholdCrossing, IndicatorKind.TrendChangeDetection)))
+          disp.submittedActions mustBe List(Action.ProcessMarketStateUpdate(Markets.state, List(IndicatorKind.ThresholdCrossing, IndicatorKind.TrendChangeDetection)))
           res mustBe ()
         }
       }
 
       "replace latest indicator state if new signal has same date" in {
         val (stateRepo, disp) = mocks
-        val currentIndState =
-          IndicatorState(Signals.trendDirectionChanged.condition, Signals.ts.minusSeconds(10), Markets.trendChangeDetection)
+        val currentIndState = IndicatorState(
+          Signals.trendDirectionChanged.condition,
+          Signals.ts.minusSeconds(10),
+          Markets.trendChangeDetection
+        )
         val signalState = Map(Markets.trendChangeDetection.kind -> List(currentIndState))
 
-        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state.copy(signals = signalState))))
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[IndicatorKind, List[IndicatorState]]])).thenReturn(IO.pure(Markets.state))
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(Markets.state.copy(signals = signalState))
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[Map[IndicatorKind, List[IndicatorState]]])).thenReturnIO(Markets.state)
 
         val result = for
           svc   <- MarketService.make[IO](stateRepo, disp)
@@ -200,15 +200,14 @@ class MarketServiceSpec extends IOWordSpec {
           val finalSignalState = Map(Markets.trendChangeDetection.kind -> List(currentIndState.copy(time = Signals.ts)))
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
-          verify(disp).dispatch(Action.ProcessMarketStateUpdate(Markets.state, List(IndicatorKind.TrendChangeDetection)))
+          disp.submittedActions mustBe List(Action.ProcessMarketStateUpdate(Markets.state, List(IndicatorKind.TrendChangeDetection)))
           res mustBe ()
         }
       }
 
       "not emit update when indicator state hasn't changed" in {
         val (stateRepo, disp) = mocks
-
-        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.stateWithSignal)))
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(Markets.stateWithSignal)
 
         val result = for
           svc   <- MarketService.make[IO](stateRepo, disp)
@@ -218,13 +217,13 @@ class MarketServiceSpec extends IOWordSpec {
         result.asserting { res =>
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verifyNoMoreInteractions(stateRepo)
-          verifyNoInteractions(disp)
+          disp.submittedActions mustBe empty
           res mustBe ()
         }
       }
     }
   }
 
-  def mocks: (MarketStateRepository[IO], ActionDispatcher[IO]) =
-    (mock[MarketStateRepository[IO]], mock[ActionDispatcher[IO]])
+  def mocks: (MarketStateRepository[IO], MockActionDispatcher[IO]) =
+    (mock[MarketStateRepository[IO]], MockActionDispatcher[IO])
 }

@@ -16,7 +16,7 @@ class SettingsServiceSpec extends IOWordSpec {
     "get" should {
       "return settings from repository" in {
         val repo = mock[SettingsRepository[IO]]
-        when(repo.get(any[UserId])).thenReturn(IO.pure(settings))
+        when(repo.get(any[UserId])).thenReturnIO(settings)
 
         val result = for
           svc <- SettingsService.make(repo)
@@ -31,7 +31,7 @@ class SettingsServiceSpec extends IOWordSpec {
 
       "create new settings in these do not exist" in {
         val repo = mock[SettingsRepository[IO]]
-        when(repo.get(any[UserId])).thenReturn(IO.raiseError(AppError.NotSetup("Global"))).thenReturn(IO.pure(settings))
+        when(repo.get(any[UserId])).thenReturnError(AppError.NotSetup("Global")).thenReturnIO(settings)
         when(repo.createFor(any[UserId])).thenReturn(IO.unit)
 
         val result = for

@@ -20,7 +20,7 @@ class SignalServiceSpec extends IOWordSpec {
     "getSettings" should {
       "store signal-settings in the repository" in {
         val (signRepo, settRepo, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Signals.settings))
+        when(settRepo.get(any[UserId])).thenReturnIO(Signals.settings)
 
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
@@ -38,7 +38,7 @@ class SignalServiceSpec extends IOWordSpec {
     "updateSettings" should {
       "store signal-settings in the repository" in {
         val (signRepo, settRepo, disp) = mocks
-        when(settRepo.update(any[SignalSettings])).thenReturn(IO.unit)
+        when(settRepo.update(any[SignalSettings])).thenReturnUnit
 
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
@@ -56,8 +56,8 @@ class SignalServiceSpec extends IOWordSpec {
     "submit" should {
       "store new signal in the repository and dispatch an action" in {
         val (signRepo, settRepo, disp) = mocks
-        when(signRepo.saveAll(anyList[Signal])).thenReturn(IO.unit)
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+        when(signRepo.saveAll(anyList[Signal])).thenReturnUnit
+        when(disp.dispatch(any[Action])).thenReturnUnit
 
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
@@ -75,7 +75,7 @@ class SignalServiceSpec extends IOWordSpec {
     "getAll" should {
       "return all signals from the signalRepository" in {
         val (signRepo, settRepo, disp) = mocks
-        when(signRepo.getAll(any[UserId], any[SearchParams])).thenReturn(IO.pure(List(Signals.trendDirectionChanged)))
+        when(signRepo.getAll(any[UserId], any[SearchParams])).thenReturnIO(List(Signals.trendDirectionChanged))
 
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
@@ -93,7 +93,7 @@ class SignalServiceSpec extends IOWordSpec {
     "processMarketData" should {
       "not do anything when there are no changes in market data since last point" in {
         val (signRepo, settRepo, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Signals.settings))
+        when(settRepo.get(any[UserId])).thenReturnIO(Signals.settings)
 
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
@@ -109,8 +109,8 @@ class SignalServiceSpec extends IOWordSpec {
 
       "not submit a signal if such signal has already been submitted on that date" in {
         val (signRepo, settRepo, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Signals.settings))
-        when(signRepo.isFirstOfItsKindForThatDate(any[Signal])).thenReturn(IO.pure(false))
+        when(settRepo.get(any[UserId])).thenReturnIO(Signals.settings)
+        when(signRepo.isFirstOfItsKindForThatDate(any[Signal])).thenReturnIO(false)
 
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val result = for
@@ -136,9 +136,9 @@ class SignalServiceSpec extends IOWordSpec {
 
       "create signal when trend direction changes" in {
         val (signRepo, settRepo, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Signals.settings.copy(triggerFrequency = TriggerFrequency.Continuously)))
-        when(signRepo.saveAll(anyList[Signal])).thenReturn(IO.unit)
-        when(disp.dispatch(any[Action])).thenReturn(IO.unit)
+        when(settRepo.get(any[UserId])).thenReturnIO(Signals.settings.copy(triggerFrequency = TriggerFrequency.Continuously))
+        when(signRepo.saveAll(anyList[Signal])).thenReturnUnit
+        when(disp.dispatch(any[Action])).thenReturnUnit
 
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val result = for
@@ -164,8 +164,8 @@ class SignalServiceSpec extends IOWordSpec {
 
       "not do anything when there are no changes in trend" in {
         val (signRepo, settRepo, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturn(IO.pure(Signals.settings))
-        when(signRepo.isFirstOfItsKindForThatDate(any[Signal])).thenReturn(IO.pure(false))
+        when(settRepo.get(any[UserId])).thenReturnIO(Signals.settings)
+        when(signRepo.isFirstOfItsKindForThatDate(any[Signal])).thenReturnIO(false)
 
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
         val result = for

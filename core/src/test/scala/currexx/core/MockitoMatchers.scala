@@ -1,5 +1,6 @@
 package currexx.core
 
+import cats.effect.IO
 import org.mockito.ArgumentMatchers
 import org.mockito.Mockito
 import org.mockito.stubbing.Answer
@@ -21,3 +22,13 @@ trait MockitoMatchers extends MockitoSugar:
   def verifyNoInteractions(mocks: AnyRef*): Unit     = Mockito.verifyNoInteractions(mocks*)
   def verifyNoMoreInteractions(mocks: AnyRef*): Unit = Mockito.verifyNoMoreInteractions(mocks*)
   def never: VerificationMode                        = Mockito.never()
+
+  extension [A](stub: OngoingStubbing[IO[A]])
+    def thenReturnIO(value: A): OngoingStubbing[IO[A]]            = stub.thenReturn(IO.pure(value))
+    def thenReturnError(error: Throwable): OngoingStubbing[IO[A]] = stub.thenReturn(IO.raiseError(error))
+
+  extension (stub: OngoingStubbing[IO[Unit]]) def thenReturnUnit: OngoingStubbing[IO[Unit]] = stub.thenReturn(IO.unit)
+
+  extension [A](stub: OngoingStubbing[IO[Option[A]]])
+    def thenReturnNone: OngoingStubbing[IO[Option[A]]]           = stub.thenReturn(IO.none[A])
+    def thenReturnSome(value: A): OngoingStubbing[IO[Option[A]]] = stub.thenReturn(IO.some(value))
