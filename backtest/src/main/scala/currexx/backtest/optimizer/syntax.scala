@@ -3,6 +3,18 @@ package currexx.backtest.optimizer
 import scala.annotation.tailrec
 
 object syntax {
+  extension (list: List[BigDecimal])
+    def median: BigDecimal = {
+      val sorted = list.sorted
+      val size = list.size
+      if (size % 2 == 1) sorted(size / 2)
+      else {
+        val partial = sorted.drop((size - 1) / 2)
+        val (left, right) = (partial.head, partial.tail.head)
+        (left + right) / 2
+      }
+    }
+  
   extension (array: Array[Int])
     def toInt: Int = {
       var res = 0

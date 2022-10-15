@@ -9,6 +9,7 @@ import currexx.algorithms.Fitness
 import currexx.algorithms.operators.{Evaluator, Initialiser}
 import currexx.backtest.{MarketDataProvider, OrderStatsCollector, TestSettings}
 import currexx.backtest.services.TestServices
+import currexx.backtest.optimizer.syntax.*
 import currexx.core.trade.TradeStrategy
 import currexx.domain.market.Currency.{EUR, GBP}
 import currexx.domain.market.{CurrencyPair, Indicator, MovingAverage}
@@ -48,7 +49,7 @@ object IndicatorEvaluator {
               orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
             yield orderStats.totalProfit
           }
-          .map(res => ind -> Fitness(res.min))
+          .map(res => ind -> Fitness(res.median))
       }
     yield eval
 }

@@ -2,7 +2,7 @@ package currexx.core.signal
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import currexx.core.{IOWordSpec, FileReader}
+import currexx.core.{IOWordSpec, FileReader, MockActionDispatcher}
 import currexx.domain.user.UserId
 import currexx.domain.market.{Condition, CurrencyPair, Indicator, MovingAverage, PriceRange, Trend, ValueSource, ValueTransformation as VT}
 import currexx.core.common.action.{Action, ActionDispatcher}
@@ -29,7 +29,7 @@ class SignalServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(settRepo).get(Users.uid)
-          verifyNoInteractions(signRepo, disp)
+          disp.submittedActions mustBe empty
           res mustBe ()
         }
       }
@@ -47,7 +47,8 @@ class SignalServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(settRepo).update(Signals.settings)
-          verifyNoInteractions(signRepo, disp)
+          verifyNoInteractions(signRepo)
+          disp.submittedActions mustBe empty
           res mustBe ()
         }
       }
@@ -57,7 +58,6 @@ class SignalServiceSpec extends IOWordSpec {
       "store new signal in the repository and dispatch an action" in {
         val (signRepo, settRepo, disp) = mocks
         when(signRepo.saveAll(anyList[Signal])).thenReturnUnit
-        when(disp.dispatch(any[Action])).thenReturnUnit
 
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
@@ -66,7 +66,7 @@ class SignalServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(signRepo).saveAll(List(Signals.trendDirectionChanged))
-          verify(disp).dispatch(Action.ProcessSignals(Users.uid, Markets.gbpeur, List(Signals.trendDirectionChanged)))
+          disp.submittedActions mustBe List(Action.ProcessSignals(Users.uid, Markets.gbpeur, List(Signals.trendDirectionChanged)))
           res mustBe ()
         }
       }
@@ -83,8 +83,9 @@ class SignalServiceSpec extends IOWordSpec {
         yield res
 
         result.asserting { res =>
-          verifyNoInteractions(settRepo, disp)
+          verifyNoInteractions(settRepo)
           verify(signRepo).getAll(Users.uid, SearchParams(Some(Signals.ts), None, Some(Markets.gbpeur)))
+          disp.submittedActions mustBe empty
           res mustBe List(Signals.trendDirectionChanged)
         }
       }
@@ -102,7 +103,8 @@ class SignalServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(settRepo).get(Users.uid)
-          verifyNoInteractions(disp, signRepo)
+          verifyNoInteractions(signRepo)
+          disp.submittedActions mustBe empty
           res mustBe ()
         }
       }
@@ -129,7 +131,7 @@ class SignalServiceSpec extends IOWordSpec {
           verify(settRepo).get(Users.uid)
           verify(signRepo).isFirstOfItsKindForThatDate(expectedSignal)
           verifyNoMoreInteractions(signRepo)
-          verifyNoInteractions(disp)
+          disp.submittedActions mustBe empty
           res mustBe ()
         }
       }
@@ -138,7 +140,6 @@ class SignalServiceSpec extends IOWordSpec {
         val (signRepo, settRepo, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturnIO(Signals.settings.copy(triggerFrequency = TriggerFrequency.Continuously))
         when(signRepo.saveAll(anyList[Signal])).thenReturnUnit
-        when(disp.dispatch(any[Action])).thenReturnUnit
 
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val result = for
@@ -156,8 +157,8 @@ class SignalServiceSpec extends IOWordSpec {
           )
           verify(settRepo).get(Users.uid)
           verify(signRepo).saveAll(List(expectedSignal))
-          verify(disp).dispatch(Action.ProcessSignals(Users.uid, Markets.gbpeur, List(expectedSignal)))
           verifyNoMoreInteractions(signRepo)
+          disp.submittedActions mustBe List(Action.ProcessSignals(Users.uid, Markets.gbpeur, List(expectedSignal)))
           res mustBe ()
         }
       }
@@ -176,7 +177,8 @@ class SignalServiceSpec extends IOWordSpec {
         result.asserting { res =>
           verify(settRepo).get(Users.uid)
           verifyNoMoreInteractions(signRepo)
-          verifyNoInteractions(disp, signRepo)
+          verifyNoInteractions(signRepo)
+          disp.submittedActions mustBe empty
           res mustBe ()
         }
       }
@@ -220,8 +222,8 @@ class SignalServiceSpec extends IOWordSpec {
     }
   }
 
-  def mocks: (SignalRepository[IO], SignalSettingsRepository[IO], ActionDispatcher[IO]) =
-    (mock[SignalRepository[IO]], mock[SignalSettingsRepository[IO]], mock[ActionDispatcher[IO]])
+  def mocks: (SignalRepository[IO], SignalSettingsRepository[IO], MockActionDispatcher[IO]) =
+    (mock[SignalRepository[IO]], mock[SignalSettingsRepository[IO]], MockActionDispatcher[IO])
 
   extension [A](nel: NonEmptyList[A])
     def drop(n: Int): NonEmptyList[A] =
