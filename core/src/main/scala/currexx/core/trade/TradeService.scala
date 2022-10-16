@@ -17,6 +17,7 @@ import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Indicator, IndicatorKind, Interval, TradeOrder}
 import currexx.domain.monitor.Limits
+import currexx.domain.time.Clock
 import currexx.domain.user.UserId
 import fs2.Stream
 
@@ -40,7 +41,8 @@ final private class LiveTradeService[F[_]](
     private val marketDataClient: MarketDataClient[F],
     private val dispatcher: ActionDispatcher[F]
 )(using
-    F: Temporal[F]
+    F: Temporal[F],
+    clock: Clock[F]
 ) extends TradeService[F] {
   override def getSettings(uid: UserId): F[TradeSettings]                                = settingsRepository.get(uid)
   override def updateSettings(settings: TradeSettings): F[Unit]                          = settingsRepository.update(settings)
@@ -55,7 +57,7 @@ final private class LiveTradeService[F[_]](
 
   override def placeOrder(uid: UserId, order: TradeOrder, closePendingOrders: Boolean): F[Unit] =
     F.whenA(closePendingOrders)(closeOpenOrders(uid, order.currencyPair)) >>
-      (F.realTimeInstant, settingsRepository.get(uid))
+      (clock.currentTime, settingsRepository.get(uid))
         .mapN((time, sett) => TradeOrderPlacement(uid, order, sett.broker, time))
         .flatMap(submitOrderPlacement)
 
@@ -71,7 +73,7 @@ final private class LiveTradeService[F[_]](
       .findLatestBy(uid, cp)
       .flatMap {
         case Some(top) if top.order.isEnter =>
-          (F.realTimeInstant, marketDataClient.latestPrice(cp))
+          (clock.currentTime, marketDataClient.latestPrice(cp))
             .mapN((time, price) => top.copy(time = time, order = TradeOrder.Exit(cp, price.close)))
             .flatMap(submitOrderPlacement)
         case _ => F.unit
@@ -81,7 +83,7 @@ final private class LiveTradeService[F[_]](
     for
       settings    <- settingsRepository.get(uid)
       foundOrders <- brokerClient.find(settings.broker, cps)
-      time        <- F.realTimeInstant
+      time        <- clock.currentTime
       _ <- foundOrders
         .filter(o => limits.min.exists(_ > o.profit) || limits.max.exists(_ < o.profit))
         .map(o => TradeOrderPlacement(uid, TradeOrder.Exit(o.currencyPair, o.currentPrice), settings.broker, time))
@@ -89,7 +91,7 @@ final private class LiveTradeService[F[_]](
     yield ()
 
   override def processMarketStateUpdate(state: MarketState, triggers: List[IndicatorKind]): F[Unit] =
-    (settingsRepository.get(state.userId), marketDataClient.latestPrice(state.currencyPair), F.realTimeInstant)
+    (settingsRepository.get(state.userId), marketDataClient.latestPrice(state.currencyPair), clock.currentTime)
       .mapN { (settings, price, time) =>
         TradeStrategyExecutor
           .get(settings.strategy)
@@ -120,7 +122,7 @@ final private class LiveTradeService[F[_]](
 }
 
 object TradeService:
-  def make[F[_]: Temporal](
+  def make[F[_]: Temporal: Clock](
       settingsRepo: TradeSettingsRepository[F],
       orderRepository: TradeOrderRepository[F],
       brokerClient: BrokerClient[F],

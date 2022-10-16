@@ -7,6 +7,7 @@ import currexx.clients.Clients
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.Controller
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
+import currexx.domain.time.Clock
 import mongo4cats.database.MongoDatabase
 
 final class Trades[F[_]] private (
@@ -15,7 +16,7 @@ final class Trades[F[_]] private (
 )
 
 object Trades:
-  def make[F[_]: Async](
+  def make[F[_]: Async: Clock](
       database: MongoDatabase[F],
       clients: Clients[F],
       dispatcher: ActionDispatcher[F]

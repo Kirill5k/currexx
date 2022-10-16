@@ -13,8 +13,10 @@ import currexx.core.signal.Signals
 import currexx.core.trade.Trades
 import currexx.core.monitor.Monitors
 import currexx.core.settings.Settings
+import currexx.domain.time.Clock
 
 object Application extends IOApp.Simple:
+  given Clock[IO] = Clock.default[IO]
   override val run: IO[Unit] =
     Logger.make[IO].flatMap { implicit logger =>
       for

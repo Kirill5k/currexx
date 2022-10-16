@@ -4,7 +4,7 @@ import cats.effect.IO
 import cats.data.NonEmptyList
 import currexx.clients.broker.{BrokerClient, BrokerParameters}
 import currexx.clients.data.MarketDataClient
-import currexx.core.{IOWordSpec, MockActionDispatcher}
+import currexx.core.{IOWordSpec, MockActionDispatcher, MockClock}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Trades, Users}
@@ -13,12 +13,16 @@ import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
 import currexx.domain.market.{CurrencyPair, Indicator, IndicatorKind, TradeOrder}
 import currexx.domain.monitor.Limits
+import currexx.domain.time.Clock
 
 import java.time.Instant
 
 class TradeServiceSpec extends IOWordSpec {
 
   "A TradeService" when {
+    val now         = Instant.now()
+    given Clock[IO] = MockClock[IO](now)
+
     "getAllOrders" should {
       "return all orders from the repository" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
@@ -107,13 +111,13 @@ class TradeServiceSpec extends IOWordSpec {
         yield ()
 
         result.asserting { res =>
+          val placedOrder = TradeOrderPlacement(Users.uid, order, Trades.settings.broker, now)
           verifyNoInteractions(dataClient)
           verify(settRepo).get(Users.uid)
           verify(brokerClient).submit(Trades.broker, order)
           verify(orderRepo, never).findLatestBy(any[UserId], any[CurrencyPair])
-          verify(orderRepo).save(any[TradeOrderPlacement])
-          disp.submittedActions must have size 1
-          disp.submittedActions.head mustBe an[Action.ProcessTradeOrderPlacement]
+          verify(orderRepo).save(placedOrder)
+          disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
           res mustBe ()
         }
       }
@@ -132,13 +136,13 @@ class TradeServiceSpec extends IOWordSpec {
         yield ()
 
         result.asserting { res =>
+          val placedOrder = TradeOrderPlacement(Users.uid, order, Trades.broker, now)
           verifyNoInteractions(dataClient)
           verify(settRepo).get(Users.uid)
           verify(brokerClient).submit(Trades.broker, order)
           verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
-          verify(orderRepo).save(any[TradeOrderPlacement])
-          disp.submittedActions must have size 1
-          disp.submittedActions.head mustBe an[Action.ProcessTradeOrderPlacement]
+          verify(orderRepo).save(placedOrder)
+          disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
           res mustBe ()
         }
       }
@@ -193,13 +197,14 @@ class TradeServiceSpec extends IOWordSpec {
         yield ()
 
         result.asserting { res =>
+          val exitOrder = TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close)
+          val placedOrder = TradeOrderPlacement(Users.uid, exitOrder, Trades.broker, now)
           verifyNoInteractions(settRepo)
           verify(dataClient).latestPrice(Markets.gbpeur)
           verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
-          verify(brokerClient).submit(Trades.broker, TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close))
-          verify(orderRepo).save(any[TradeOrderPlacement])
-          disp.submittedActions must have size 1
-          disp.submittedActions.head mustBe an[Action.ProcessTradeOrderPlacement]
+          verify(brokerClient).submit(Trades.broker, exitOrder)
+          verify(orderRepo).save(placedOrder)
+          disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
           res mustBe ()
         }
       }
@@ -240,13 +245,14 @@ class TradeServiceSpec extends IOWordSpec {
         yield ()
 
         result.asserting { res =>
+          val exitOrder = TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close)
+          val placedOrder = TradeOrderPlacement(Users.uid, exitOrder, Trades.broker, now)
           verifyNoInteractions(dataClient)
           verify(settRepo).get(Users.uid)
           verify(brokerClient).find(Trades.broker, cps)
-          verify(brokerClient).submit(Trades.broker, TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close))
-          verify(orderRepo).save(any[TradeOrderPlacement])
-          disp.submittedActions must have size 1
-          disp.submittedActions.head mustBe an[Action.ProcessTradeOrderPlacement]
+          verify(brokerClient).submit(Trades.broker, exitOrder)
+          verify(orderRepo).save(placedOrder)
+          disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
           res mustBe ()
         }
       }
@@ -266,13 +272,14 @@ class TradeServiceSpec extends IOWordSpec {
         yield ()
 
         result.asserting { res =>
+          val exitOrder = TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close)
+          val placedOrder = TradeOrderPlacement(Users.uid, exitOrder, Trades.broker, now)
           verifyNoInteractions(dataClient)
           verify(settRepo).get(Users.uid)
           verify(brokerClient).find(Trades.broker, cps)
-          verify(brokerClient).submit(Trades.broker, TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close))
-          verify(orderRepo).save(any[TradeOrderPlacement])
-          disp.submittedActions must have size 1
-          disp.submittedActions.head mustBe an[Action.ProcessTradeOrderPlacement]
+          verify(brokerClient).submit(Trades.broker, exitOrder)
+          verify(orderRepo).save(placedOrder)
+          disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
           res mustBe ()
         }
       }
@@ -357,13 +364,14 @@ class TradeServiceSpec extends IOWordSpec {
         yield ()
 
         result.asserting { res =>
+          val order = Trades.settings.trading.toOrder(TradeOrder.Position.Buy, Markets.gbpeur, 3.0)
+          val placedOrder = TradeOrderPlacement(Users.uid, order, Trades.broker, now)
           verify(settRepo).get(Users.uid)
           verify(brokerClient).submit(Trades.broker, TradeOrder.Exit(Markets.gbpeur, 3.0))
-          verify(brokerClient).submit(Trades.broker, Trades.settings.trading.toOrder(TradeOrder.Position.Buy, Markets.gbpeur, 3.0))
+          verify(brokerClient).submit(Trades.broker, order)
           verify(dataClient).latestPrice(Markets.gbpeur)
-          verify(orderRepo).save(any[TradeOrderPlacement])
-          disp.submittedActions must have size 1
-          disp.submittedActions.head mustBe an[Action.ProcessTradeOrderPlacement]
+          verify(orderRepo).save(placedOrder)
+          disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
           res mustBe ()
         }
       }
