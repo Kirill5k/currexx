@@ -11,6 +11,7 @@ import currexx.core.common.http.SearchParams
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import currexx.core.trade.{TradeOrderPlacement, TradeService, TradeSettings}
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange, TradeOrder}
+import currexx.domain.time.Clock
 import currexx.domain.user.UserId
 
 final private class TestTradeSettingsRepository[F[_]](
@@ -28,7 +29,7 @@ final private class TestTradeOrderRepository[F[_]: Async](
   override def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]] = orders.get.map(_.headOption)
 
 object TestTradeService:
-  def make[F[_]: Async](
+  def make[F[_]: Async: Clock](
       initialSettings: TradeSettings,
       clients: TestClients[F],
       dispatcher: ActionDispatcher[F]
