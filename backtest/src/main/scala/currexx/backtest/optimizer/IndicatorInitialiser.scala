@@ -6,8 +6,7 @@ import currexx.domain.market.{Indicator, MovingAverage, ValueTransformation as V
 
 import scala.util.Random
 
-object IndicatorInitialiser {
-
+object IndicatorInitialiser:
   def make[F[_]](using F: Sync[F], rand: Random): F[Initialiser[F, Indicator]] =
     Initialiser.simple[F, Indicator] { ind =>
 
@@ -18,7 +17,7 @@ object IndicatorInitialiser {
         case VT.SingleOutput.SMA(_)              => VT.SingleOutput.SMA(rand.nextInt(41) + 2)
         case VT.SingleOutput.EMA(_)              => VT.SingleOutput.EMA(rand.nextInt(41) + 2)
         case VT.SingleOutput.HMA(_)              => VT.SingleOutput.HMA(rand.nextInt(41) + 2)
-        case VT.SingleOutput.JMA(_, _, _)        => VT.SingleOutput.JMA(rand.nextInt(41) + 2, rand.nextInt(40) * 50 - 100, rand.nextInt(6) + 1)
+        case VT.SingleOutput.JMA(_, _, _) => VT.SingleOutput.JMA(rand.nextInt(41) + 2, rand.nextInt(40) * 50 - 100, rand.nextInt(6) + 1)
         case VT.SingleOutput.NMA(_, _, _, _) =>
           VT.SingleOutput.NMA(rand.nextInt(48) + 2, rand.nextInt(28) + 2, rand.nextInt(80) * 0.25d, MovingAverage.Weighted)
 
@@ -43,4 +42,3 @@ object IndicatorInitialiser {
           case Indicator.LinesCrossing(source, slow, fast) => Indicator.LinesCrossing(source, randomiseSo(slow), randomiseSo(fast))
       }
     }
-}

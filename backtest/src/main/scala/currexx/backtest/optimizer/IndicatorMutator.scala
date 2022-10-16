@@ -8,8 +8,7 @@ import currexx.backtest.optimizer.syntax.*
 
 import scala.util.Random
 
-object IndicatorMutator {
-
+object IndicatorMutator:
   def make[F[_]](using F: Sync[F]): F[Mutator[F, Indicator]] = F.pure {
     new Mutator[F, Indicator] {
       val bitFlitMutator = Mutator.pureBitFlip
@@ -64,4 +63,3 @@ object IndicatorMutator {
       }
     }
   }
-}

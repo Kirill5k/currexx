@@ -11,8 +11,7 @@ import currexx.backtest.optimizer.syntax.*
 
 import scala.util.Random
 
-object IndicatorCrossover {
-
+object IndicatorCrossover:
   def make[F[_]](using F: Sync[F]): F[Crossover[F, Indicator]] = F.pure {
     new Crossover[F, Indicator] {
       val threeWaySplitCrossover = Crossover.pureThreeWaySplit[Int]
@@ -78,4 +77,3 @@ object IndicatorCrossover {
         maybeCrossSync(par1, par2, crossoverProbability)
     }
   }
-}
