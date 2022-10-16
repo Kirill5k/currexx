@@ -7,6 +7,7 @@ import currexx.clients.Clients
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.Controller
 import currexx.core.monitor.db.MonitorRepository
+import currexx.domain.time.Clock
 import mongo4cats.database.MongoDatabase
 
 final class Monitors[F[_]] private (
@@ -15,7 +16,7 @@ final class Monitors[F[_]] private (
 )
 
 object Monitors:
-  def make[F[_]: Async](
+  def make[F[_]: Async: Clock](
       database: MongoDatabase[F],
       dispatcher: ActionDispatcher[F]
   ): F[Monitors[F]] =

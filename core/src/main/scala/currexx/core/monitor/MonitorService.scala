@@ -11,6 +11,7 @@ import currexx.core.monitor.db.MonitorRepository
 import currexx.domain.errors.AppError
 import currexx.domain.market.CurrencyPair
 import currexx.domain.monitor.Schedule
+import currexx.domain.time.Clock
 import currexx.domain.user.UserId
 import fs2.Stream
 
@@ -32,7 +33,8 @@ final private class LiveMonitorService[F[_]](
     private val repository: MonitorRepository[F],
     private val actionDispatcher: ActionDispatcher[F]
 )(using
-    F: Temporal[F]
+    F: Temporal[F],
+    clock: Clock[F]
 ) extends MonitorService[F] {
   override def getAll(uid: UserId): F[List[Monitor]]       = repository.getAll(uid)
   override def get(uid: UserId, id: MonitorId): F[Monitor] = repository.find(uid, id)
@@ -41,7 +43,7 @@ final private class LiveMonitorService[F[_]](
   override def resume(uid: UserId, id: MonitorId): F[Unit] = repository.activate(uid, id, true).void
 
   override def update(mon: Monitor): F[Unit]           = repository.update(mon).void
-  override def create(cm: CreateMonitor): F[MonitorId] = repository.create(cm).flatTap(scheduleMonitor(F.realTimeInstant)).map(_.id)
+  override def create(cm: CreateMonitor): F[MonitorId] = repository.create(cm).flatTap(scheduleMonitor(clock.currentTime)).map(_.id)
 
   override def triggerMonitor(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit] =
     for
@@ -52,11 +54,11 @@ final private class LiveMonitorService[F[_]](
           case p: Monitor.Profit      => actionDispatcher.dispatch(Action.AssertProfit(uid, mon.currencyPairs, p.limits))
         )
       }
-      _ <- F.unlessA(manual)(scheduleMonitor(F.realTimeInstant)(mon))
+      _ <- F.unlessA(manual)(scheduleMonitor(clock.currentTime)(mon))
     yield ()
 
   override def rescheduleAll: F[Unit] =
-    F.realTimeInstant.flatMap { now =>
+    clock.currentTime.flatMap { now =>
       repository.stream
         .map(scheduleMonitor(F.pure(now)))
         .map(Stream.eval)
@@ -72,7 +74,7 @@ final private class LiveMonitorService[F[_]](
 }
 
 object MonitorService:
-  def make[F[_]: Temporal](
+  def make[F[_]: Temporal: Clock](
       repository: MonitorRepository[F],
       actionDispatcher: ActionDispatcher[F]
   ): F[MonitorService[F]] =

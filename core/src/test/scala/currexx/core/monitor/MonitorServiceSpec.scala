@@ -3,13 +3,14 @@ package currexx.core.monitor
 import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.IO
-import currexx.core.{IOWordSpec, MockActionDispatcher}
+import currexx.core.{IOWordSpec, MockActionDispatcher, MockClock}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.fixtures.{Markets, Monitors, Users}
 import currexx.core.monitor.db.MonitorRepository
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.monitor.Schedule
+import currexx.domain.time.Clock
 import currexx.domain.user.UserId
 import fs2.Stream
 import org.mockito.Mockito
@@ -20,6 +21,9 @@ import scala.concurrent.duration.*
 class MonitorServiceSpec extends IOWordSpec {
 
   "A MonitorService" when {
+    val now         = Monitors.queriedAt.plusSeconds(1.hour.toSeconds)
+    given Clock[IO] = MockClock[IO](now)
+
     "update" should {
       "update monitor properties in the db" in {
         val (repo, disp) = mocks
@@ -91,7 +95,7 @@ class MonitorServiceSpec extends IOWordSpec {
       }
 
       "store monitor in db and reschedule when schedule is cron" in {
-        val schedule = Schedule.Cron("0 7,20 * * 1-5").value
+        val schedule     = Schedule.Cron("0 7,20 * * 1-5").value
         val (repo, disp) = mocks
         when(repo.create(any[CreateMonitor])).thenReturnIO(Monitors.marketData.copy(schedule = schedule))
 
@@ -111,7 +115,7 @@ class MonitorServiceSpec extends IOWordSpec {
 
     "rescheduleAll" should {
       "schedule monitors without lastQueriedAt to start immediately" in {
-        val (repo, disp)   = mocks
+        val (repo, disp) = mocks
         when(repo.stream).thenReturn(Stream(Monitors.marketData.copy(lastQueriedAt = None)))
 
         val result = for
@@ -144,7 +148,7 @@ class MonitorServiceSpec extends IOWordSpec {
 
       "schedule monitors with recent lastQueriedAt to wait" in {
         val (repo, disp) = mocks
-        when(repo.stream).thenReturn(Stream(Monitors.marketData.copy(lastQueriedAt = Some(Instant.now.minusSeconds(50)))))
+        when(repo.stream).thenReturn(Stream(Monitors.marketData))
 
         val result = for
           svc <- MonitorService.make[IO](repo, disp)
@@ -153,8 +157,7 @@ class MonitorServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(repo).stream
-          disp.submittedActions must have size 1
-          disp.submittedActions.head mustBe an[Action.ScheduleMonitor]
+          disp.submittedActions mustBe List(Action.ScheduleMonitor(Users.uid, Monitors.mid, 2.hours))
           res mustBe ()
         }
       }
@@ -175,9 +178,10 @@ class MonitorServiceSpec extends IOWordSpec {
           verify(repo).find(Users.uid, Monitors.mid)
           verify(repo).updateQueriedTimestamp(Users.uid, Monitors.mid)
           verifyNoMoreInteractions(repo)
-          disp.submittedActions must have size 2
-          disp.submittedActions.head mustBe Action.AssertProfit(Users.uid, NonEmptyList.of(Markets.gbpeur), Monitors.profit.limits)
-          disp.submittedActions.last mustBe an[Action.ScheduleMonitor]
+          disp.submittedActions mustBe List(
+            Action.AssertProfit(Users.uid, NonEmptyList.of(Markets.gbpeur), Monitors.profit.limits),
+            Action.ScheduleMonitor(Users.uid, Monitors.mid, 2.hours)
+          )
           res mustBe ()
         }
       }
@@ -197,7 +201,7 @@ class MonitorServiceSpec extends IOWordSpec {
           verify(repo).updateQueriedTimestamp(Users.uid, Monitors.mid)
           verifyNoMoreInteractions(repo)
           disp.submittedActions mustBe List(Action.FetchMarketData(Users.uid, NonEmptyList.of(Markets.gbpeur), Interval.H1))
-          res mustBe()
+          res mustBe ()
         }
       }
 
@@ -213,9 +217,8 @@ class MonitorServiceSpec extends IOWordSpec {
         result.asserting { res =>
           verify(repo).find(Users.uid, Monitors.mid)
           verifyNoMoreInteractions(repo)
-          disp.submittedActions must have size 1
-          disp.submittedActions.head mustBe an[Action.ScheduleMonitor]
-          res mustBe()
+          disp.submittedActions mustBe List(Action.ScheduleMonitor(Users.uid, Monitors.mid, 2.hours))
+          res mustBe ()
         }
       }
     }
