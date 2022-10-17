@@ -4,6 +4,7 @@ import scala.annotation.tailrec
 
 object syntax {
   extension (list: List[BigDecimal])
+    def mean: BigDecimal = list.sum / list.size
     def median: BigDecimal = {
       val sorted = list.sorted
       val size   = list.size
