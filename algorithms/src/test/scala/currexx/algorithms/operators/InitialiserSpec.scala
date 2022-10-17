@@ -1,11 +1,11 @@
 package currexx.algorithms.operators
 
 import cats.effect.IO
-import currexx.algorithms.CatsSpec
+import currexx.algorithms.IOWordSpec
 
 import scala.util.Random
 
-class InitialiserSpec extends CatsSpec {
+class InitialiserSpec extends IOWordSpec {
 
   "Initialiser.initialisePopulation" should {
     val rand                                   = Random(42)

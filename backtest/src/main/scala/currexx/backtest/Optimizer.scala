@@ -2,6 +2,7 @@ package currexx.backtest
 
 import cats.Show
 import cats.effect.{IO, IOApp}
+import cats.syntax.traverse.*
 import currexx.algorithms.Parameters
 import currexx.algorithms.operators.{Elitism, Selector}
 import currexx.backtest.optimizer.{IndicatorCrossover, IndicatorEvaluator, IndicatorInitialiser, IndicatorMutator, OptimisationAlgorithm}
@@ -17,10 +18,10 @@ object Optimizer extends IOApp.Simple {
 
   val gaParameters = Parameters.GA(
     populationSize = 250,
-    maxGen = 250,
+    maxGen = 500,
     crossoverProbability = 0.7,
-    mutationProbability = 0.2,
-    elitismRatio = 0.1,
+    mutationProbability = 0.3,
+    elitismRatio = 0.05,
     shuffle = true
   )
 
@@ -32,9 +33,9 @@ object Optimizer extends IOApp.Simple {
   )
   val trendChangeDetection = Indicator.TrendChangeDetection(
     ValueSource.Close,
-    ValueTransformation.SingleOutput.JMA(44, -72, 1)
-//    ValueTransformation.SingleOutput.HMA(25)
-//    ValueTransformation.SingleOutput.NMA(45, 5, 11.0d, MovingAverage.Weighted)
+//    ValueTransformation.SingleOutput.JMA(44, -72, 1)
+    ValueTransformation.SingleOutput.HMA(25)
+//    ValueTransformation.SingleOutput.NMA(45, 5, 11.0d, MovingAverage.Hull)
   )
 
   val linesCrossing = Indicator.LinesCrossing(
@@ -61,6 +62,6 @@ object Optimizer extends IOApp.Simple {
     res   <- OptimisationAlgorithm.ga[IO, Indicator](init, cross, mut, eval, sel, elit, updateFn).optimise(target, gaParameters)
     endTs <- IO.realTime
     _     <- IO.println(s"Total duration ${(endTs - startTs).toMinutes}m")
-    _     <- IO.println(s"${res._1} - ${res._2}")
+    _     <- res.zipWithIndex.take(20).traverse { case ((ind, f), i) => IO.println(s"${i + 1}: $f - $ind") }
   yield ()
 }

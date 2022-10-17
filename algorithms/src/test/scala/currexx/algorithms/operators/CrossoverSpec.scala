@@ -2,11 +2,11 @@ package currexx.algorithms.operators
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-import currexx.algorithms.CatsSpec
+import currexx.algorithms.IOWordSpec
 
 import scala.util.Random
 
-class CrossoverSpec extends CatsSpec {
+class CrossoverSpec extends IOWordSpec {
 
   "Crossover.threeWaySplit" should {
 

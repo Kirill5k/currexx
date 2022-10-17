@@ -33,7 +33,7 @@ enum Op[A, I]:
   case EvaluatePopulation[I](population: Population[I])                                 extends Op[EvaluatedPopulation[I], I]
   case SelectElites[I](population: EvaluatedPopulation[I], popSize: Int, ratio: Double) extends Op[Population[I], I]
   case SelectPairs[I](population: EvaluatedPopulation[I], limit: Int)                   extends Op[DistributedPopulation[I], I]
-  case SelectFittest[I](population: EvaluatedPopulation[I])                             extends Op[(I, Fitness), I]
+  case SortByFitness[I](population: EvaluatedPopulation[I])                             extends Op[EvaluatedPopulation[I], I]
   case ApplyToAll[A, B, I](population: Population[A], op: A => Op[B, I])                extends Op[Population[B], I]
 
 object Op:
@@ -54,8 +54,6 @@ object Op:
           updateFn.fold(F.unit)(f => f(iteration, maxGen))
         case Op.InitPopulation(seed, size, shuffle) =>
           initialiser.initialisePopulation(seed, size, shuffle)
-        case Op.SelectFittest(population) =>
-          selector.selectFittest(population)
         case Op.Cross(ind1, ind2, prob) =>
           crossover.cross(ind1, ind2, prob)
         case Op.Mutate(ind, prob) =>
@@ -68,6 +66,8 @@ object Op:
           elitism.select(population, popSize * ratio)
         case Op.SelectPairs(population, limit) =>
           selector.selectPairs(population, limit)
+        case Op.SortByFitness(population) =>
+          F.delay(population.sortBy(_._2)(Ordering[Fitness].reverse))
         case Op.ApplyToAll(population, op) =>
           Stream.emits(population).mapAsync(Int.MaxValue)(i => apply(op(i))).compile.toVector
         case _ | null =>

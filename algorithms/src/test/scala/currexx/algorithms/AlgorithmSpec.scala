@@ -20,6 +20,7 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
         """Initialise population of size 5 with shuffle=true
           |Iteration 1 of 2
           |Evaluate entire population
+          |Sorting evaluated population by fitness
           |Select 1.25 elites from the current population
           |Distribute population in pairs
           |Applied to the entire population: Crossover 2 individuals with probability 0.5
@@ -27,13 +28,14 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
           |Applied to the entire population: Mutate individual with probability 0.2
           |Iteration 2 of 2
           |Evaluate entire population
+          |Sorting evaluated population by fitness
           |Select 1.25 elites from the current population
           |Distribute population in pairs
           |Applied to the entire population: Crossover 2 individuals with probability 0.5
           |Applied to the entire population: Crossover 2 individuals with probability 0.5
           |Applied to the entire population: Mutate individual with probability 0.2
           |Evaluate entire population
-          |Select the fittest individual from the population
+          |Sorting evaluated population by fitness
           |""".stripMargin
     }
   }
@@ -63,9 +65,9 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
       case Op.SelectPairs(population, limit) =>
         State.modify[List[String]](_ :+ "Distribute population in pairs\n") >>
           State.pure(population.map((i, _) => (i, i)))
-      case Op.SelectFittest(population) =>
-        State.modify[List[String]](_ :+ "Select the fittest individual from the population\n") >>
-          State.pure(population.head)
+      case Op.SortByFitness(population) =>
+        State.modify[List[String]](_ :+ "Sorting evaluated population by fitness\n") >>
+          State.pure(population.sortBy(_._2)(Ordering[Fitness].reverse))
       case Op.ApplyToAll(population, op) =>
         State.modify[List[String]](_ :+ "Applied to the entire population: ") >>
           apply(op(population.head)).map(r => Vector(r))

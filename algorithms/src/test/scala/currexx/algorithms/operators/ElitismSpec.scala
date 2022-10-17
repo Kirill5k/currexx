@@ -2,20 +2,19 @@ package currexx.algorithms.operators
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-import currexx.algorithms.{CatsSpec, Fitness}
+import currexx.algorithms.{Fitness, IOWordSpec}
 
-class ElitismSpec extends CatsSpec {
+class ElitismSpec extends IOWordSpec {
 
   "Elitism.simple" should {
-
-    "select proportion of fittest individuals" in {
+    "select proportion of best individuals from the evaluated and sorted population" in {
       val population = Vector(
+        (6, Fitness(20.0)),
+        (4, Fitness(10.0)),
+        (3, Fitness(5.0)),
         (1, Fitness(4.0)),
         (2, Fitness(2.0)),
-        (3, Fitness(5.0)),
-        (4, Fitness(10.0)),
-        (5, Fitness(1.0)),
-        (6, Fitness(20.0))
+        (5, Fitness(1.0))
       )
 
       val result = Elitism.simple[IO, Int].flatMap(_.select(population, 2))

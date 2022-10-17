@@ -1,11 +1,11 @@
 package currexx.algorithms.operators
 
 import cats.effect.IO
-import currexx.algorithms.CatsSpec
+import currexx.algorithms.IOWordSpec
 
 import scala.util.Random
 
-class MutatorSpec extends CatsSpec {
+class MutatorSpec extends IOWordSpec {
 
   "Mutator.neighbourSwap" should {
     "swap 2 neighbour elements in seq" in {

@@ -9,14 +9,11 @@ import scala.annotation.tailrec
 import scala.util.Random
 
 trait Selector[F[_], I]:
-  def selectFittest(population: EvaluatedPopulation[I]): F[(I, Fitness)]
   def selectPairs(population: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): F[DistributedPopulation[I]]
 
 object Selector:
   def pureRouletteWheel[I] = new Selector[Id, I] {
-    override def selectFittest(population: EvaluatedPopulation[I]): Id[(I, Fitness)] =
-      population.maxBy(_._2)
-    override def selectPairs(population: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): Id[DistributedPopulation[I]] =
+    override def selectPairs(popByFitness: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): Id[DistributedPopulation[I]] =
       @tailrec
       def go(newPop: Population[I], remPop: EvaluatedPopulation[I], remFitness: Fitness): Population[I] =
         if (remPop.isEmpty || newPop.size >= populationLimit) newPop
@@ -24,7 +21,6 @@ object Selector:
           val ((pickedInd, indFitness), remaining) = pickOne(remPop, remFitness)
           go(pickedInd +: newPop, remaining, remFitness - indFitness)
         }
-      val popByFitness = population.sortBy(_._2)(Ordering[Fitness].reverse)
       val fTotal       = popByFitness.map(_._2).reduce(_ + _)
       go(Vector.empty, popByFitness, fTotal).reverse.pairs
 
@@ -58,8 +54,6 @@ object Selector:
     F.pure {
       new Selector[F, I] {
         val rouletteWheelSelector = pureRouletteWheel[I]
-        override def selectFittest(population: EvaluatedPopulation[I]): F[(I, Fitness)] =
-          F.delay(rouletteWheelSelector.selectFittest(population))
         override def selectPairs(population: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): F[DistributedPopulation[I]] =
           F.delay(rouletteWheelSelector.selectPairs(population, populationLimit))
       }

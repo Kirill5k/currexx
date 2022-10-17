@@ -2,9 +2,9 @@ package currexx.algorithms.operators
 
 import cats.Show
 import cats.effect.{IO, Ref}
-import currexx.algorithms.{CatsSpec, Fitness}
+import currexx.algorithms.{IOWordSpec, Fitness}
 
-class EvaluatorSpec extends CatsSpec {
+class EvaluatorSpec extends IOWordSpec {
 
   "Evaluator.cached" should {
     "store evaluation results in cache" in {

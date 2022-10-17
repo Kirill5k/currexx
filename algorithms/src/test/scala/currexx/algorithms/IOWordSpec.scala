@@ -8,7 +8,7 @@ import org.scalatest.{Assertion, EitherValues}
 
 import scala.concurrent.Future
 
-trait CatsSpec extends AsyncWordSpec with Matchers:
+trait IOWordSpec extends AsyncWordSpec with Matchers:
   extension [A](io: IO[A])
     def asserting(f: A => Assertion): Future[Assertion] =
       io.map(f).unsafeToFuture()(IORuntime.global)
