@@ -49,7 +49,7 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
         State.modify[List[String]](_ :+ s"Iteration $i of $maxGen\n")
       case Op.Cross(ind1, ind2, prob) =>
         State.modify[List[String]](_ :+ s"Crossover 2 individuals with probability $prob\n") >>
-          State.pure(Some(ind1))
+          State.pure(ind1)
       case Op.Mutate(ind, prob) =>
         State.modify[List[String]](_ :+ s"Mutate individual with probability $prob\n") >>
           State.pure(ind)
