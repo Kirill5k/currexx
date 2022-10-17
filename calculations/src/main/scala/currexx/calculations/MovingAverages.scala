@@ -66,10 +66,10 @@ object MovingAverages {
   }
 
   private def weightedAsArray(values: Iterator[Double], n: Int, size: Int): Array[Double] = {
-    val wmas     = Array.ofDim[Double](size)
-    val divider  = (n * (n + 1)) / 2
-    val window   = collection.mutable.Queue.empty[Double]
-    var i        = size
+    val wmas    = Array.ofDim[Double](size - n)
+    val divider = (n * (n + 1)) / 2
+    val window  = collection.mutable.Queue.empty[Double]
+    var i       = size - n
     while (values.hasNext) {
       if (window.size < n) {
         window.enqueue(values.next())
@@ -77,20 +77,19 @@ object MovingAverages {
         window.dequeue()
         window.enqueue(values.next())
         wmas(i - 1) = window.zipWithIndex.foldLeft(0d) { case (sum, (v, i)) => sum + (n + i + 1 - n) * v } / divider
+        i = i - 1
       }
-      i = i - 1
     }
-    wmas.drop(i)
+    wmas
   }
 
   def weighted(values: List[Double], n: Int): List[Double] =
     weightedAsArray(values.reverseIterator, n, values.size).toList
 
   def hull(values: List[Double], n: Int): List[Double] = {
-    val n2       = math.round(n.toDouble / 2).toInt
-    val sqrtn    = math.round(math.sqrt(n.toDouble)).toInt
     val reversed = values.reverse
     val nwma     = weightedAsArray(reversed.iterator, n, values.size)
+    val n2       = math.round(n.toDouble / 2).toInt
     val n2wma    = weightedAsArray(reversed.iterator, n2, values.size)
     var i        = 0
     val diff     = Array.ofDim[Double](nwma.length)
@@ -98,6 +97,7 @@ object MovingAverages {
       diff(nwma.length - i - 1) = n2wma(i) * 2 - nwma(i)
       i = i + 1
     }
+    val sqrtn = math.round(math.sqrt(n.toDouble)).toInt
     weightedAsArray(diff.iterator, sqrtn, diff.length).toList
   }
 
