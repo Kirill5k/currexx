@@ -11,6 +11,7 @@ import currexx.core.auth.session.SessionService
 import currexx.core.auth.user.PasswordEncryptor
 import currexx.core.common.config.AuthConfig
 import currexx.core.common.http.Controller
+import currexx.domain.time.Clock
 import jwt.JwtEncoder
 import mongo4cats.database.MongoDatabase
 import org.http4s.HttpRoutes
@@ -21,7 +22,7 @@ final class Auth[F[_]] private (
 )
 
 object Auth:
-  def make[F[_]: Async](config: AuthConfig, database: MongoDatabase[F]): F[Auth[F]] =
+  def make[F[_]: Async: Clock](config: AuthConfig, database: MongoDatabase[F]): F[Auth[F]] =
     for
       sessRepo <- SessionRepository.make[F](database)
       jwtEnc   <- JwtEncoder.circeJwtEncoder[F](config.jwt)

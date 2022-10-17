@@ -62,10 +62,10 @@ class UserRepositorySpec extends MongoSpec {
 
       "return empty option when account does not exist" in {
         withEmbeddedMongoDb { client =>
-          val result = for {
+          val result = for
             repo <- UserRepository.make(client)
             acc  <- repo.findBy(UserEmail("acc2@et.com"))
-          } yield acc
+          yield acc
 
           result.map(_ mustBe None)
         }

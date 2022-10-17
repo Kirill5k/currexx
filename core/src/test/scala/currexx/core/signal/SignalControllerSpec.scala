@@ -1,13 +1,14 @@
 package currexx.core.signal
 
 import cats.effect.IO
-import currexx.core.ControllerSpec
+import currexx.core.{ControllerSpec, MockClock}
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.SearchParams
 import currexx.domain.user.UserId
 import currexx.core.fixtures.{Markets, Sessions, Signals, Users}
 import currexx.domain.errors.AppError
-import currexx.domain.market.CurrencyPair
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, Trend, ValueSource, ValueTransformation}
+import currexx.domain.time.Clock
 import org.http4s.implicits.*
 import org.http4s.{Method, Request, Status, Uri}
 
@@ -16,6 +17,8 @@ import java.time.Instant
 class SignalControllerSpec extends ControllerSpec {
 
   "A SignalController" when {
+    val now                       = Instant.now
+    given Clock[IO]               = MockClock[IO](now)
     given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
     "POST /signals" should {
@@ -31,8 +34,16 @@ class SignalControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withJsonBody(parseJson(reqBody))
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
+        val submittedSignal = Signal(
+          Users.uid,
+          Markets.gbpeur,
+          Condition.TrendDirectionChange(Trend.Downward, Trend.Upward, None),
+          Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.HMA(16)),
+          now
+        )
+
         verifyJsonResponse(res, Status.NoContent, None)
-        verify(svc).submit(any[Signal])
+        verify(svc).submit(submittedSignal)
       }
 
       "return error on unrecognized indicator" in {

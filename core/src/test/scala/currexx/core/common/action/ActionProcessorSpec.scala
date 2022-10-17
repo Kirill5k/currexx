@@ -21,12 +21,12 @@ class ActionProcessorSpec extends IOWordSpec {
 
       when(marksvc.processSignals(any[UserId], any[CurrencyPair], anyList[Signal])).thenReturn(IO.unit)
 
-      val result = for {
+      val result = for
         dispatcher <- ActionDispatcher.make[IO]
         processor  <- ActionProcessor.make[IO](dispatcher, monsvc, sigsvc, marksvc, tradesvc)
         _          <- dispatcher.dispatch(Action.ProcessSignals(Users.uid, Markets.gbpeur, List(Signals.trendDirectionChanged)))
         res        <- processor.run.interruptAfter(2.second).compile.drain
-      } yield res
+      yield res
 
       result.unsafeToFuture().map { r =>
         verify(marksvc).processSignals(Users.uid, Markets.gbpeur, List(Signals.trendDirectionChanged))

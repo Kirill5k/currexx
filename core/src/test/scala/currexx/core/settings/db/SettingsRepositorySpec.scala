@@ -23,10 +23,10 @@ class SettingsRepositorySpec extends MongoSpec {
     "get" should {
       "return empty option when settings do not exist" in {
         withEmbeddedMongoDb { db =>
-          val result = for {
+          val result = for
             repo <- SettingsRepository.make[IO](db)
             res  <- repo.get(Users.uid2)
-          } yield res
+          yield res
 
           result.attempt.map(_ mustBe Left(AppError.NotSetup("Global")))
         }
@@ -34,10 +34,10 @@ class SettingsRepositorySpec extends MongoSpec {
 
       "join data from 2 tables and return single object" in {
         withEmbeddedMongoDb { db =>
-          val result = for {
+          val result = for
             repo <- SettingsRepository.make[IO](db)
             res  <- repo.get(Users.uid)
-          } yield res
+          yield res
 
           result.map { settings =>
             settings mustBe GlobalSettings(
@@ -53,11 +53,11 @@ class SettingsRepositorySpec extends MongoSpec {
     "createFor" should {
       "create an entry in settings collection for a given user-id" in {
         withEmbeddedMongoDb { db =>
-          val result = for {
+          val result = for
             repo <- SettingsRepository.make[IO](db)
             _    <- repo.createFor(Users.uid2)
             res  <- repo.get(Users.uid2)
-          } yield res
+          yield res
 
           result.map(_.userId mustBe Users.uid2)
         }
@@ -65,12 +65,12 @@ class SettingsRepositorySpec extends MongoSpec {
 
       "not create a config if it already exists" in {
         withEmbeddedMongoDb { db =>
-          val result = for {
+          val result = for
             repo <- SettingsRepository.make[IO](db)
             _    <- repo.createFor(Users.uid2)
             _    <- repo.createFor(Users.uid2)
             res  <- db.getCollection("settings").flatMap(_.count(Filter.eq("userId", Users.uid2.toObjectId)))
-          } yield res
+          yield res
 
           result.map(_ mustBe 1)
         }

@@ -17,12 +17,16 @@ object Backtester extends IOApp.Simple {
 
   val settings = TestSettings.make(
     CurrencyPair(EUR, GBP),
-    TradeStrategy.LinesCrossing,
+    TradeStrategy.TrendChangeAggressive,
     List(
-      Indicator.LinesCrossing(
+//      Indicator.LinesCrossing(
+//        source = ValueSource.Close,
+//        line1Transformation = ValueTransformation.SingleOutput.JMA(21, -90, 6),
+//        line2Transformation = ValueTransformation.SingleOutput.JMA(13, 48, 3)
+//      ),
+      Indicator.TrendChangeDetection(
         source = ValueSource.Close,
-        line1Transformation = ValueTransformation.SingleOutput.JMA(21, -90, 6),
-        line2Transformation = ValueTransformation.SingleOutput.JMA(13, 48, 3)
+        transformation = ValueTransformation.SingleOutput.HMA(5)
       ),
 //      Indicator.ThresholdCrossing(
 //        source = ValueSource.Close,

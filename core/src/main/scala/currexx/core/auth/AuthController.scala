@@ -16,6 +16,7 @@ import currexx.core.auth.jwt.BearerToken
 import currexx.core.auth.session.SessionService
 import currexx.core.auth.user.UserService
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
+import currexx.domain.time.Clock
 import io.circe.Codec
 import io.circe.refined.*
 import org.http4s.HttpRoutes
@@ -30,7 +31,8 @@ final private class AuthController[F[_]](
     private val userService: UserService[F],
     private val sessionService: SessionService[F]
 )(using
-    F: Async[F]
+    F: Async[F],
+    clock: Clock[F]
 ) extends Controller[F] {
   import AuthController.*
 
@@ -69,11 +71,11 @@ final private class AuthController[F[_]](
   private def login =
     loginEndpoint
       .serverLogic { (ip, login) =>
-        for {
+        for
           acc  <- userService.login(login.toDomain)
-          time <- F.realTimeInstant
+          time <- clock.currentTime
           res  <- sessionService.create(CreateSession(acc.id, ip, time)).mapResponse(LoginResponse.bearer)
-        } yield res
+        yield res
       }
 
   def routes(using authenticator: Authenticator[F]): HttpRoutes[F] =
@@ -95,30 +97,26 @@ object AuthController extends TapirSchema with TapirJson {
       firstName: NonEmptyString,
       lastName: NonEmptyString,
       password: NonEmptyString
-  ) derives Codec.AsObject {
-    def userDetails: UserDetails =
-      UserDetails(UserEmail.from(email), UserName(firstName.value, lastName.value))
-    def userPassword: Password = Password(password.value)
-  }
+  ) derives Codec.AsObject:
+    def userDetails: UserDetails = UserDetails(UserEmail.from(email), UserName(firstName.value, lastName.value))
+    def userPassword: Password   = Password(password.value)
 
   final case class CreateUserResponse(id: UserId) derives Codec.AsObject
 
   final case class LoginRequest(
       email: EmailString,
       password: NonEmptyString
-  ) derives Codec.AsObject {
+  ) derives Codec.AsObject:
     def toDomain: Login = Login(UserEmail.from(email), Password(password.value))
-  }
 
   final case class LoginResponse(
       access_token: String,
       token_type: String
   ) derives Codec.AsObject
 
-  object LoginResponse {
+  object LoginResponse:
     def bearer(bearerToken: BearerToken): LoginResponse =
       LoginResponse(access_token = bearerToken.value, token_type = "Bearer")
-  }
 
   final case class UserView(
       id: String,
@@ -128,7 +126,7 @@ object AuthController extends TapirSchema with TapirJson {
       registrationDate: Instant
   ) derives Codec.AsObject
 
-  object UserView {
+  object UserView:
     def from(acc: User): UserView =
       UserView(
         acc.id.value,
@@ -137,15 +135,13 @@ object AuthController extends TapirSchema with TapirJson {
         acc.email.value,
         acc.registrationDate
       )
-  }
 
   final case class ChangePasswordRequest(
       currentPassword: NonEmptyString,
       newPassword: NonEmptyString
-  ) derives Codec.AsObject {
+  ) derives Codec.AsObject:
     def toDomain(id: UserId): ChangePassword =
       ChangePassword(id, Password(currentPassword.value), Password(newPassword.value))
-  }
 
   private val basePath   = "auth"
   private val userPath   = basePath / "user"
@@ -180,7 +176,7 @@ object AuthController extends TapirSchema with TapirJson {
     .out(statusCode(StatusCode.NoContent))
     .description("Logout and invalidate current session")
 
-  def make[F[_]: Async](
+  def make[F[_]: Async: Clock](
       userService: UserService[F],
       sessionService: SessionService[F]
   ): F[Controller[F]] =

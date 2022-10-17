@@ -1,7 +1,7 @@
 package currexx.core.auth
 
 import cats.effect.IO
-import currexx.core.ControllerSpec
+import currexx.core.{ControllerSpec, MockClock}
 import currexx.core.auth.session.SessionService
 import currexx.core.auth.user.UserService
 import currexx.domain.session.*
@@ -12,10 +12,16 @@ import currexx.core.fixtures.{Sessions, Users}
 import org.http4s.implicits.*
 import org.http4s.{HttpDate, Method, Request, Status, Uri}
 import currexx.domain.market.Currency.USD
+import currexx.domain.time.Clock
+
+import java.time.Instant
 
 class AuthControllerSpec extends ControllerSpec {
 
   "An AuthController" when {
+    val now = Instant.now
+    given Clock[IO] = MockClock[IO](now)
+
     "GET /auth/user" should {
       "return current account" in {
         val (usrSvc, sessSvc) = mocks
@@ -181,7 +187,7 @@ class AuthControllerSpec extends ControllerSpec {
 
         verifyJsonResponse(res, Status.Ok, Some(s"""{"access_token":"token","token_type":"Bearer"}"""))
         verify(usrSvc).login(Login(UserEmail("foo@bar.com"), Password("bar")))
-        verify(sessSvc).create(any[CreateSession])
+        verify(sessSvc).create(CreateSession(Users.uid, None, now))
       }
     }
 

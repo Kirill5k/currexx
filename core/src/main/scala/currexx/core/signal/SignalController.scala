@@ -10,6 +10,7 @@ import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
 import currexx.domain.market.{Condition, CurrencyPair, Indicator}
+import currexx.domain.time.Clock
 import io.circe.Codec
 import org.http4s.HttpRoutes
 import sttp.model.StatusCode
@@ -21,7 +22,8 @@ import java.time.Instant
 final private class SignalController[F[_]](
     private val service: SignalService[F]
 )(using
-    F: Async[F]
+    F: Async[F],
+    clock: Clock[F]
 ) extends Controller[F] {
   import SignalController.*
 
@@ -29,7 +31,7 @@ final private class SignalController[F[_]](
     submitSignalEndpoint.withAuthenticatedSession
       .serverLogic { session => req =>
         for
-          time <- F.realTimeInstant
+          time <- clock.currentTime
           signal = Signal(session.userId, req.currencyPair, req.condition, req.triggeredBy, time)
           res <- service.submit(signal).voidResponse
         yield res
@@ -122,6 +124,6 @@ object SignalController extends TapirSchema with TapirJson {
     .out(statusCode(StatusCode.NoContent))
     .description("Update settings for active indicators")
 
-  def make[F[_]: Async](service: SignalService[F]): F[Controller[F]] =
+  def make[F[_]: Async: Clock](service: SignalService[F]): F[Controller[F]] =
     Monad[F].pure(SignalController[F](service))
 }
