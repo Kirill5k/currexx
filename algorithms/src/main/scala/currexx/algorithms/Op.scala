@@ -3,6 +3,7 @@ package currexx.algorithms
 import cats.~>
 import cats.effect.{Async, Sync}
 import cats.free.Free
+import cats.syntax.functor.*
 import currexx.algorithms.operators.*
 import fs2.Stream
 
@@ -27,7 +28,7 @@ type DistributedPopulation[I] = Vector[(I, I)]
 enum Op[A, I]:
   case UpdateOnProgress[I](iteration: Int, maxGen: Int)                                 extends Op[Unit, I]
   case InitPopulation[I](seed: I, size: Int, shuffle: Boolean)                          extends Op[Population[I], I]
-  case Cross[I](ind1: I, ind2: I, prob: Double)                                         extends Op[Option[I], I]
+  case Cross[I](ind1: I, ind2: I, prob: Double)                                         extends Op[I, I]
   case Mutate[I](ind: I, prob: Double)                                                  extends Op[I, I]
   case EvaluateOne[I](ind: I)                                                           extends Op[(I, Fitness), I]
   case EvaluatePopulation[I](population: Population[I])                                 extends Op[EvaluatedPopulation[I], I]
@@ -55,7 +56,7 @@ object Op:
         case Op.InitPopulation(seed, size, shuffle) =>
           initialiser.initialisePopulation(seed, size, shuffle)
         case Op.Cross(ind1, ind2, prob) =>
-          crossover.cross(ind1, ind2, prob)
+          crossover.cross(ind1, ind2, prob).map(_.getOrElse(ind1))
         case Op.Mutate(ind, prob) =>
           mutator.mutate(ind, prob)
         case Op.EvaluateOne(ind) =>

@@ -70,6 +70,8 @@ object IndicatorCrossover:
                 }
             case _ =>
               F.raiseError(new IllegalArgumentException("both parents must be of the same type"))
+        }.handleErrorWith { e =>
+          F.raiseError(new IllegalArgumentException(s"failed to cross $par1 and $par2 together: ${e.getMessage}"))
         }
       }
 
