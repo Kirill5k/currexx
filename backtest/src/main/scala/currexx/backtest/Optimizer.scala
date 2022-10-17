@@ -18,7 +18,7 @@ object Optimizer extends IOApp.Simple {
 
   val gaParameters = Parameters.GA(
     populationSize = 250,
-    maxGen = 500,
+    maxGen = 250,
     crossoverProbability = 0.7,
     mutationProbability = 0.3,
     elitismRatio = 0.05,
@@ -62,6 +62,6 @@ object Optimizer extends IOApp.Simple {
     res   <- OptimisationAlgorithm.ga[IO, Indicator](init, cross, mut, eval, sel, elit, updateFn).optimise(target, gaParameters)
     endTs <- IO.realTime
     _     <- IO.println(s"Total duration ${(endTs - startTs).toMinutes}m")
-    _     <- res.zipWithIndex.take(20).traverse { case ((ind, f), i) => IO.println(s"${i + 1}: $f - $ind") }
+    _     <- res.zipWithIndex.take(25).traverse { case ((ind, f), i) => IO.println(s"${i + 1}: $f - $ind") }
   yield ()
 }
