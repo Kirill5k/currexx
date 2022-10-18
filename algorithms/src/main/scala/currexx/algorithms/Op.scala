@@ -56,7 +56,7 @@ object Op:
         case Op.InitPopulation(seed, size, shuffle) =>
           initialiser.initialisePopulation(seed, size, shuffle)
         case Op.Cross(ind1, ind2, prob) =>
-          crossover.cross(ind1, ind2, prob).map(_.getOrElse(ind1))
+          crossover.cross(ind1, ind2, prob)
         case Op.Mutate(ind, prob) =>
           mutator.mutate(ind, prob)
         case Op.EvaluateOne(ind) =>

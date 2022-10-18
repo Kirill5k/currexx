@@ -21,8 +21,8 @@ object Backtester extends IOApp.Simple {
     List(
       Indicator.LinesCrossing(
         source = ValueSource.Close,
-        line1Transformation = ValueTransformation.SingleOutput.JMA(5, 100, 2),
-        line2Transformation = ValueTransformation.SingleOutput.JMA(16, 80, 7)
+        line1Transformation = ValueTransformation.SingleOutput.JMA(13,100,5),
+        line2Transformation = ValueTransformation.SingleOutput.JMA(5,20,1)
       ),
 //      Indicator.TrendChangeDetection(
 //        source = ValueSource.Close,
