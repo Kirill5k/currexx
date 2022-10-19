@@ -19,10 +19,10 @@ object Selector:
         if (remPop.isEmpty || newPop.size >= populationLimit) newPop
         else {
           val ((pickedInd, indFitness), remaining) = pickOne(remPop, remFitness)
-          go(pickedInd +: newPop, remaining, remFitness - indFitness)
+          go(newPop :+ pickedInd, remaining, remFitness - indFitness)
         }
       val fTotal       = popByFitness.map(_._2).reduce(_ + _)
-      go(Vector.empty, popByFitness, fTotal).reverse.pairs
+      go(Vector.empty, popByFitness, fTotal).pairs
 
     private def pickOne(
         popByFitness: EvaluatedPopulation[I],

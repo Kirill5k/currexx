@@ -9,7 +9,7 @@ trait Mutator[F[_], I]:
   def mutate(ind: I, mutationProbability: Double)(using r: Random): F[I]
 
 object Mutator:
-  def pureBitFlip = new Mutator[Id, Array[Int]]:
+  def pureBitFlip: Mutator[Id, Array[Int]] = new Mutator[Id, Array[Int]]:
     override def mutate(ind: Array[Int], mutationProbability: Double)(using r: Random): Id[Array[Int]] =
       val result = ind.clone()
       var i      = 0
