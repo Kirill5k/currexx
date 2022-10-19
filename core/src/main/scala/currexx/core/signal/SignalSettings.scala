@@ -4,7 +4,7 @@ import currexx.domain.market.Indicator
 import currexx.domain.types.EnumType
 import currexx.domain.user.UserId
 
-object TriggerFrequency extends EnumType[TriggerFrequency](() => TriggerFrequency.values, _.print)
+object TriggerFrequency extends EnumType[TriggerFrequency](() => TriggerFrequency.values)
 enum TriggerFrequency:
   case Continuously, OncePerDay
   

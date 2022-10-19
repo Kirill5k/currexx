@@ -7,15 +7,15 @@ import io.circe.{Decoder, Encoder}
 import io.circe.syntax.*
 import org.latestbit.circe.adt.codec.*
 
-object MovingAverage extends EnumType[MovingAverage](() => MovingAverage.values, _.toString.toLowerCase)
+object MovingAverage extends EnumType[MovingAverage](() => MovingAverage.values)
 enum MovingAverage:
   case Weighted, Exponential, Simple, Hull
 
-object CompositeMovingAverage extends EnumType[CompositeMovingAverage](() => CompositeMovingAverage.values, _.toString.toLowerCase)
+object CompositeMovingAverage extends EnumType[CompositeMovingAverage](() => CompositeMovingAverage.values)
 enum CompositeMovingAverage:
   case Triple, Nyquist, Jurik
 
-object ValueSource extends EnumType[ValueSource](() => ValueSource.values, _.toString.toLowerCase)
+object ValueSource extends EnumType[ValueSource](() => ValueSource.values, EnumType.printLowerCase(_))
 enum ValueSource:
   case Close, Open, HL2
 
@@ -73,7 +73,7 @@ object ValueTransformation {
   ).reduceLeft(_ or _)
 }
 
-object IndicatorKind extends EnumType[IndicatorKind](() => IndicatorKind.values, _.print)
+object IndicatorKind extends EnumType[IndicatorKind](() => IndicatorKind.values)
 enum IndicatorKind:
   case TrendChangeDetection, ThresholdCrossing, LinesCrossing
 

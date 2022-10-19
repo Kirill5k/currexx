@@ -5,7 +5,7 @@ import currexx.core.market.MarketState
 import currexx.domain.market.{Condition, IndicatorKind, TradeOrder, Trend}
 import currexx.domain.types.EnumType
 
-object TradeStrategy extends EnumType[TradeStrategy](() => TradeStrategy.values, _.print)
+object TradeStrategy extends EnumType[TradeStrategy](() => TradeStrategy.values)
 enum TradeStrategy:
   case Disabled, TrendChange, TrendChangeAggressive, TrendChangeWithConfirmation, LinesCrossing
 

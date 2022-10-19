@@ -12,7 +12,7 @@ sealed trait TradeOrder(val kind: String):
   def price: BigDecimal
 
 object TradeOrder {
-  object Position extends EnumType[Position](() => Position.values, _.toString.toLowerCase)
+  object Position extends EnumType[Position](() => Position.values)
   enum Position:
     case Buy, Sell
 

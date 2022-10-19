@@ -3,7 +3,7 @@ package currexx.domain.market
 import currexx.domain.types.EnumType
 import org.latestbit.circe.adt.codec.*
 
-object Trend extends EnumType[Trend](() => Trend.values, _.print)
+object Trend extends EnumType[Trend](() => Trend.values)
 enum Trend:
   case Upward, Downward, Consolidation
 

@@ -7,7 +7,11 @@ import scala.reflect.ClassTag
 
 object types {
 
-  transparent trait EnumType[E: ClassTag](private val enums: () => Array[E], private val unwrap: E => String):
+  object EnumType:
+    def printKebabCase[E](e: E): String = e.toString.replaceAll("(?<=[a-z])(?=[A-Z])", "-").toLowerCase
+    def printLowerCase[E](e: E): String = e.toString.toLowerCase
+
+  transparent trait EnumType[E: ClassTag](private val enums: () => Array[E], private val unwrap: E => String = EnumType.printKebabCase(_)):
     given Encoder[E]    = Encoder[String].contramap(unwrap(_))
     given Decoder[E]    = Decoder[String].emap(from)
     given KeyEncoder[E] = (e: E) => unwrap(e)
@@ -20,7 +24,7 @@ object types {
           s"Invalid value $kind for enum ${implicitly[ClassTag[E]].runtimeClass.getSimpleName}, Accepted values: ${enums().map(_.print).mkString(",")}"
         )
 
-    extension (e: E) def print: String = e.toString.replaceAll("(?<=[a-z])(?=[A-Z])", "-").toLowerCase
+    extension (e: E) def print: String = EnumType.printKebabCase(e)
 
   transparent trait IdType[Id]:
     def apply(id: String): Id   = id.asInstanceOf[Id]
