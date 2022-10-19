@@ -20,7 +20,7 @@ object Optimizer extends IOApp.Simple {
     populationSize = 250,
     maxGen = 250,
     crossoverProbability = 0.7,
-    mutationProbability = 0.3,
+    mutationProbability = 0.25,
     elitismRatio = 0.05,
     shuffle = true
   )
@@ -51,7 +51,7 @@ object Optimizer extends IOApp.Simple {
 
   override def run: IO[Unit] = for
     _       <- IO.println(s"Starting optimization of $target")
-    startTs <- IO.realTime
+    startTs <- IO.monotonic
     init    <- IndicatorInitialiser.make[IO]
     cross   <- IndicatorCrossover.make[IO]
     mut     <- IndicatorMutator.make[IO]
@@ -60,7 +60,7 @@ object Optimizer extends IOApp.Simple {
     elit    <- Elitism.simple[IO, Indicator]
     updateFn = (currentGen: Int, maxGen: Int) => IO.whenA(currentGen % 10 == 0)(IO.println(s"$currentGen out of $maxGen"))
     res   <- OptimisationAlgorithm.ga[IO, Indicator](init, cross, mut, eval, sel, elit, updateFn).optimise(target, gaParameters)
-    endTs <- IO.realTime
+    endTs <- IO.monotonic
     _     <- IO.println(s"Total duration ${(endTs - startTs).toMinutes}m")
     _     <- res.zipWithIndex.take(25).traverse { case ((ind, f), i) => IO.println(s"${i + 1}: $f - $ind") }
   yield ()

@@ -49,7 +49,7 @@ object IndicatorEvaluator {
               orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
             yield orderStats.totalProfit
           }
-          .map(res => ind -> Fitness(res.mean))
+          .map(res => ind -> Fitness(res.median))
       }
     yield eval
 }

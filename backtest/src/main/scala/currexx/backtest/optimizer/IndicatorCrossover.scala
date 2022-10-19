@@ -75,7 +75,7 @@ object IndicatorCrossover:
         }
       }
 
-      override def cross(par1: Indicator, par2: Indicator, crossoverProbability: Double)(using r: Random): F[Option[Indicator]] =
+      override def cross(par1: Indicator, par2: Indicator, crossoverProbability: Double)(using r: Random): F[Indicator] =
         maybeCrossSync(par1, par2, crossoverProbability)
     }
   }
