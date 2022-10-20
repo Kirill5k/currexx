@@ -81,6 +81,7 @@ object SignalService:
       vt match
         case VT.SingleOutput.Sequenced(transformations) => transformations.foldLeft(data)((d, t) => t.transform(d))
         case VT.SingleOutput.Kalman(gain)               => Filters.kalman(data, gain)
+        case VT.SingleOutput.RSX(length)                => MomentumOscillators.jurikRelativeStrengthIndex(data, length)
         case VT.SingleOutput.WMA(length)                => MovingAverages.weighted(data, length)
         case VT.SingleOutput.SMA(length)                => MovingAverages.simple(data, length)
         case VT.SingleOutput.EMA(length)                => MovingAverages.exponential(data, length)
@@ -119,9 +120,9 @@ object SignalService:
   }
 
   def detectLinesCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.LinesCrossing): Option[Signal] = {
-    val source   = indicator.source.extract(data)
-    val line1 = indicator.line1Transformation.transform(source)
-    val line2 = indicator.line2Transformation.transform(source)
+    val source = indicator.source.extract(data)
+    val line1  = indicator.line1Transformation.transform(source)
+    val line2  = indicator.line2Transformation.transform(source)
     Condition
       .linesCrossing(line1, line2)
       .map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))

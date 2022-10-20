@@ -13,6 +13,7 @@ object IndicatorInitialiser:
       def randomiseSo(transformation: VT.SingleOutput): VT.SingleOutput = transformation match
         case VT.SingleOutput.Sequenced(sequence) => VT.SingleOutput.Sequenced(sequence.map(randomiseSo))
         case VT.SingleOutput.Kalman(_)           => VT.SingleOutput.Kalman(rand.nextInt(20) * 0.05d)
+        case VT.SingleOutput.RSX(_)              => VT.SingleOutput.RSX(rand.nextInt(41) + 2)
         case VT.SingleOutput.WMA(_)              => VT.SingleOutput.WMA(rand.nextInt(41) + 2)
         case VT.SingleOutput.SMA(_)              => VT.SingleOutput.SMA(rand.nextInt(41) + 2)
         case VT.SingleOutput.EMA(_)              => VT.SingleOutput.EMA(rand.nextInt(41) + 2)

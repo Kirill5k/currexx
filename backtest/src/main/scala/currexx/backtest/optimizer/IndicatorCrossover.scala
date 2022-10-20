@@ -32,6 +32,7 @@ object IndicatorCrossover:
         }
 
         def crossSo(so1: VT.SingleOutput, so2: VT.SingleOutput): Either[Throwable, VT.SingleOutput] = (so1, so2) match
+          case (VT.SingleOutput.RSX(l1), VT.SingleOutput.RSX(l2))       => Right(VT.SingleOutput.RSX(crossInt(l1, l2, Some(5))))
           case (VT.SingleOutput.HMA(l1), VT.SingleOutput.HMA(l2))       => Right(VT.SingleOutput.HMA(crossInt(l1, l2, Some(5))))
           case (VT.SingleOutput.SMA(l1), VT.SingleOutput.SMA(l2))       => Right(VT.SingleOutput.SMA(crossInt(l1, l2, Some(5))))
           case (VT.SingleOutput.WMA(l1), VT.SingleOutput.WMA(l2))       => Right(VT.SingleOutput.WMA(crossInt(l1, l2, Some(5))))

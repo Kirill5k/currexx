@@ -25,6 +25,7 @@ object ValueTransformation {
   enum SingleOutput(val kind: String) extends ValueTransformation derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
     case Sequenced(sequence: List[SingleOutput])                                    extends SingleOutput("sequenced")
     case Kalman(gain: Double)                                                       extends SingleOutput("kalman")
+    case RSX(length: Int)                                                           extends SingleOutput("rsx")
     case WMA(length: Int)                                                           extends SingleOutput("wma")
     case SMA(length: Int)                                                           extends SingleOutput("sma")
     case EMA(length: Int)                                                           extends SingleOutput("ema")
@@ -39,6 +40,7 @@ object ValueTransformation {
       mappings = Map(
         "sequenced" -> JsonTaggedAdt.tagged[SingleOutput.Sequenced],
         "kalman"    -> JsonTaggedAdt.tagged[SingleOutput.Kalman],
+        "rsx"       -> JsonTaggedAdt.tagged[SingleOutput.RSX],
         "ema"       -> JsonTaggedAdt.tagged[SingleOutput.EMA],
         "hma"       -> JsonTaggedAdt.tagged[SingleOutput.HMA],
         "nma"       -> JsonTaggedAdt.tagged[SingleOutput.NMA],

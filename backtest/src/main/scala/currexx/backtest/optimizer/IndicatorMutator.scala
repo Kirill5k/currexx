@@ -29,6 +29,7 @@ object IndicatorMutator:
         def mutateVtSo(vt: VT.SingleOutput): VT.SingleOutput = vt match
           case SingleOutput.Sequenced(sequence) => SingleOutput.Sequenced(sequence.map(mutateVtSo))
           case SingleOutput.Kalman(gain)        => SingleOutput.Kalman(mutateDouble(gain, stepSize = 0.025))
+          case SingleOutput.RSX(length)         => SingleOutput.RSX(mutateInt(length, 45))
           case SingleOutput.WMA(length)         => SingleOutput.WMA(mutateInt(length, 45))
           case SingleOutput.SMA(length)         => SingleOutput.SMA(mutateInt(length, 45))
           case SingleOutput.EMA(length)         => SingleOutput.EMA(mutateInt(length, 45))

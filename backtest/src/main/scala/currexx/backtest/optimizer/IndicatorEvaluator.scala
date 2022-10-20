@@ -19,15 +19,13 @@ object IndicatorEvaluator {
 
   val cp = CurrencyPair(EUR, GBP)
 
-  given Show[Indicator] = new Show[Indicator]:
-    override def show(ind: Indicator): String =
-      ind match
-        case Indicator.TrendChangeDetection(source, transformation) =>
-          s"${ind.kind}-${source.print}-${transformation}"
-        case Indicator.ThresholdCrossing(source, transformation, upperBoundary, lowerBoundary) =>
-          s"${ind.kind}-${source.print}-${transformation}-lb$lowerBoundary-up$upperBoundary"
-        case Indicator.LinesCrossing(source, slowTransformation, fastTransformation) =>
-          s"${ind.kind}-${source.print}-${slowTransformation}-${fastTransformation}"
+  given Show[Indicator] = (ind: Indicator) => ind match
+    case Indicator.TrendChangeDetection(source, transformation) =>
+      s"${ind.kind}-${source.print}-${transformation}"
+    case Indicator.ThresholdCrossing(source, transformation, upperBoundary, lowerBoundary) =>
+      s"${ind.kind}-${source.print}-${transformation}-lb$lowerBoundary-up$upperBoundary"
+    case Indicator.LinesCrossing(source, slowTransformation, fastTransformation) =>
+      s"${ind.kind}-${source.print}-${slowTransformation}-${fastTransformation}"
 
   def make[F[_]: Async](
       testFilePaths: List[String],
