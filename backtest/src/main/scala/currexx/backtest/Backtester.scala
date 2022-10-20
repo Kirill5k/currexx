@@ -3,6 +3,7 @@ package currexx.backtest
 import cats.effect.{IO, IOApp}
 import cats.syntax.flatMap.*
 import currexx.backtest.services.TestServices
+import currexx.backtest.optimizer.syntax.*
 import currexx.core.trade.TradeStrategy
 import currexx.domain.market.{CurrencyPair, Indicator, MovingAverage, ValueSource, ValueTransformation}
 import org.typelevel.log4cats.Logger
@@ -21,8 +22,8 @@ object Backtester extends IOApp.Simple {
     List(
       Indicator.LinesCrossing(
         source = ValueSource.Close,
-        line1Transformation = ValueTransformation.SingleOutput.JMA(13,100,5),
-        line2Transformation = ValueTransformation.SingleOutput.JMA(5,20,1)
+        line1Transformation = ValueTransformation.SingleOutput.JMA(21,-90,6),
+        line2Transformation = ValueTransformation.SingleOutput.JMA(13,48,3)
       ),
 //      Indicator.TrendChangeDetection(
 //        source = ValueSource.Close,
@@ -55,5 +56,5 @@ object Backtester extends IOApp.Simple {
       }
       .compile
       .toList
-      .flatMap(stats => logger.info(s"total profit: ${stats.map(_.totalProfit).sum}"))
+      .flatMap(stats => logger.info(s"total profit: ${stats.map(_.totalProfit).sum}, median: ${stats.map(_.totalProfit).median}"))
 }
