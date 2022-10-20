@@ -4,7 +4,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable.{Queue => MQueue}
 
 object MomentumOscillators {
-  
+
   def relativeStrengthIndex(values: List[Double], length: Int): List[Double] = {
     val rsis = Array.ofDim[Double](values.size)
     @tailrec
@@ -88,7 +88,7 @@ object MomentumOscillators {
         val f10 = prevF8
         val v8  = f8 - f10
         val f28 = f20 * prevF28 + f18 * v8
-        val f30 = f18 + f28 + f20 * prevF30
+        val f30 = f18 * f28 + f20 * prevF30
         val vC  = f28 * 1.5 - f30 * 0.5
         val f38 = f20 * prevF38 + f18 * vC
         val f40 = f18 * f38 + f20 * prevF40
