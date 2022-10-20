@@ -18,7 +18,7 @@ import currexx.domain.market.{
   MarketTimeSeriesData,
   MovingAverage,
   Trend,
-  ValueSource,
+  ValueSource as VS,
   ValueTransformation as VT
 }
 import fs2.Stream
@@ -69,12 +69,13 @@ final private class LiveSignalService[F[_]](
 
 object SignalService:
 
-  extension (vs: ValueSource)
+  extension (vs: VS)
     private def extract(data: MarketTimeSeriesData): List[Double] =
       vs match
-        case ValueSource.Close => data.prices.map(_.close.toDouble).toList
-        case ValueSource.Open  => data.prices.map(_.open.toDouble).toList
-        case ValueSource.HL2   => data.prices.map(_.high.toDouble).zip(data.prices.map(_.low.toDouble)).map((h, l) => (h + l) / 2).toList
+        case VS.Close => data.prices.map(_.close.toDouble).toList
+        case VS.Open  => data.prices.map(_.open.toDouble).toList
+        case VS.HL2   => data.prices.map(p => (p.high.toDouble + p.low.toDouble) / 2).toList
+        case VS.HLC3  => data.prices.map(p => (p.high.toDouble + p.low.toDouble + p.close.toDouble) / 3).toList
 
   extension (vt: VT.SingleOutput)
     private def transform(data: List[Double]): List[Double] =

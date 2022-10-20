@@ -17,7 +17,7 @@ enum CompositeMovingAverage:
 
 object ValueSource extends EnumType[ValueSource](() => ValueSource.values, EnumType.printLowerCase(_))
 enum ValueSource:
-  case Close, Open, HL2
+  case Close, Open, HL2, HLC3
 
 sealed trait ValueTransformation
 
