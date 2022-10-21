@@ -31,37 +31,27 @@ object IndicatorCrossover:
           minValue.fold(result)(math.max(_, result))
         }
 
-        def crossSo(so1: VT.SingleOutput, so2: VT.SingleOutput): Either[Throwable, VT.SingleOutput] = (so1, so2) match
-          case (VT.SingleOutput.RSX(l1), VT.SingleOutput.RSX(l2))       => Right(VT.SingleOutput.RSX(crossInt(l1, l2, Some(5))))
-          case (VT.SingleOutput.HMA(l1), VT.SingleOutput.HMA(l2))       => Right(VT.SingleOutput.HMA(crossInt(l1, l2, Some(5))))
-          case (VT.SingleOutput.SMA(l1), VT.SingleOutput.SMA(l2))       => Right(VT.SingleOutput.SMA(crossInt(l1, l2, Some(5))))
-          case (VT.SingleOutput.WMA(l1), VT.SingleOutput.WMA(l2))       => Right(VT.SingleOutput.WMA(crossInt(l1, l2, Some(5))))
-          case (VT.SingleOutput.EMA(l1), VT.SingleOutput.EMA(l2))       => Right(VT.SingleOutput.EMA(crossInt(l1, l2, Some(5))))
-          case (VT.SingleOutput.Kalman(g1), VT.SingleOutput.Kalman(g2)) => Right(VT.SingleOutput.Kalman(crossDouble(g1, g2, 0.05)))
-          case (VT.SingleOutput.JMA(l1, ph1, po1), VT.SingleOutput.JMA(l2, ph2, po2)) =>
-            Right(VT.SingleOutput.JMA(crossInt(l1, l2, Some(5)), crossInt((ph1 + 100) / 5, (ph2 + 100) / 5) * 5 - 100, crossInt(po1, po2)))
-          case (VT.SingleOutput.NMA(l1, sl1, d1, ma1), VT.SingleOutput.NMA(l2, sl2, d2, _)) =>
-            Right(VT.SingleOutput.NMA(crossInt(l1, l2), crossInt(sl1, sl2), crossDouble(d1, d2, 0.5), ma1))
-          case (VT.SingleOutput.Sequenced(s1), VT.SingleOutput.Sequenced(s2)) =>
-            s1.zip(s2).traverse(crossSo _).map(VT.SingleOutput.Sequenced(_))
-          case _ => Left(new IllegalArgumentException("both parents must be of the same type"))
-
-        def crossDo(do1: VT.DoubleOutput, do2: VT.DoubleOutput): Either[Throwable, VT.DoubleOutput] = (do1, do2) match
-          case (VT.DoubleOutput.STOCH(l1, sk1, sd1), VT.DoubleOutput.STOCH(l2, sk2, sd2)) =>
-            Right(VT.DoubleOutput.STOCH(crossInt(l1, l2), crossInt(sk1, sk2), crossInt(sd1, sd2)))
-          case _ => Left(new IllegalArgumentException("both parents must be of the same type"))
-
-        def crossVt(vt1: VT, vt2: VT): Either[Throwable, VT] = (vt1, vt2) match
-          case (so1: VT.SingleOutput, so2: VT.SingleOutput) => crossSo(so1, so2)
-          case (do1: VT.DoubleOutput, do2: VT.DoubleOutput) => crossDo(do1, do2)
-          case _                                            => Left(new IllegalArgumentException("both parents must be of the same type"))
+        def crossVt(so1: VT, so2: VT): Either[Throwable, VT] = (so1, so2) match
+          case (VT.RSX(l1), VT.RSX(l2))       => Right(VT.RSX(crossInt(l1, l2, Some(5))))
+          case (VT.STOCH(l1), VT.STOCH(l2))   => Right(VT.STOCH(crossInt(l1, l2, Some(5))))
+          case (VT.HMA(l1), VT.HMA(l2))       => Right(VT.HMA(crossInt(l1, l2, Some(5))))
+          case (VT.SMA(l1), VT.SMA(l2))       => Right(VT.SMA(crossInt(l1, l2, Some(5))))
+          case (VT.WMA(l1), VT.WMA(l2))       => Right(VT.WMA(crossInt(l1, l2, Some(5))))
+          case (VT.EMA(l1), VT.EMA(l2))       => Right(VT.EMA(crossInt(l1, l2, Some(5))))
+          case (VT.Kalman(g1), VT.Kalman(g2)) => Right(VT.Kalman(crossDouble(g1, g2, 0.05)))
+          case (VT.JMA(l1, ph1, po1), VT.JMA(l2, ph2, po2)) =>
+            Right(VT.JMA(crossInt(l1, l2, Some(5)), crossInt((ph1 + 100) / 5, (ph2 + 100) / 5) * 5 - 100, crossInt(po1, po2)))
+          case (VT.NMA(l1, sl1, d1, ma1), VT.NMA(l2, sl2, d2, _)) =>
+            Right(VT.NMA(crossInt(l1, l2), crossInt(sl1, sl2), crossDouble(d1, d2, 0.5), ma1))
+          case (VT.Sequenced(s1), VT.Sequenced(s2)) => s1.zip(s2).traverse(crossVt _).map(VT.Sequenced(_))
+          case _                                    => Left(new IllegalArgumentException("both parents must be of the same type"))
 
         F.defer {
           (par1, par2) match
             case (Indicator.LinesCrossing(s, st1, ft1), Indicator.LinesCrossing(_, st2, ft2)) =>
-              F.fromEither((crossSo(st1, st2), crossSo(ft1, ft2)).mapN((st, ft) => Indicator.LinesCrossing(s, st, ft)))
+              F.fromEither((crossVt(st1, st2), crossVt(ft1, ft2)).mapN((st, ft) => Indicator.LinesCrossing(s, st, ft)))
             case (Indicator.TrendChangeDetection(s, t1), Indicator.TrendChangeDetection(_, t2)) =>
-              F.fromEither(crossSo(t1, t2)).map(t => Indicator.TrendChangeDetection(s, t))
+              F.fromEither(crossVt(t1, t2)).map(t => Indicator.TrendChangeDetection(s, t))
             case (Indicator.ThresholdCrossing(s, t1, ub1, lb1), Indicator.ThresholdCrossing(_, t2, ub2, lb2)) =>
               F.fromEither(crossVt(t1, t2))
                 .map { t =>
