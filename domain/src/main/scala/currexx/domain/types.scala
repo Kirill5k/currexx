@@ -21,10 +21,10 @@ object types {
       enums()
         .find(unwrap(_) == kind)
         .toRight(
-          s"Invalid value $kind for enum ${implicitly[ClassTag[E]].runtimeClass.getSimpleName}, Accepted values: ${enums().map(_.print).mkString(",")}"
+          s"Invalid value $kind for enum ${implicitly[ClassTag[E]].runtimeClass.getSimpleName}, Accepted values: ${enums().map(unwrap).mkString(",")}"
         )
 
-    extension (e: E) def print: String = EnumType.printKebabCase(e)
+    extension (e: E) def print: String = unwrap(e)
 
   transparent trait IdType[Id]:
     def apply(id: String): Id   = id.asInstanceOf[Id]

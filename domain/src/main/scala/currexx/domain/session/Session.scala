@@ -10,7 +10,7 @@ import scala.util.Try
 opaque type SessionId = String
 object SessionId extends IdType[SessionId]
 
-object SessionStatus extends EnumType[SessionStatus](() => SessionStatus.values, EnumType.printKebabCase(_))
+object SessionStatus extends EnumType[SessionStatus](() => SessionStatus.values)
 enum SessionStatus:
   case Authenticated, LoggedOut, Invalidated
 
