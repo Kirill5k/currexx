@@ -11,11 +11,11 @@ enum Interval derives JsonTaggedAdt.PureEncoder, JsonTaggedAdt.PureDecoder:
   case M1, M5, M15, M30, H1, D1
 
 final case class PriceRange(
-    open: BigDecimal,
-    high: BigDecimal,
-    low: BigDecimal,
-    close: BigDecimal,
-    volume: BigDecimal,
+    open: Double,
+    high: Double,
+    low: Double,
+    close: Double,
+    volume: Double,
     time: Instant
 ) derives Codec.AsObject
 
@@ -24,5 +24,5 @@ final case class MarketTimeSeriesData(
     interval: Interval,
     prices: NonEmptyList[PriceRange]
 ):
-  def highs[A](f: BigDecimal => A): List[A] = prices.toList.map(pr => f(pr.high))
-  def lows[A](f: BigDecimal => A): List[A]  = prices.toList.map(pr => f(pr.low))
+  def highs: List[Double] = prices.toList.map(_.high)
+  def lows: List[Double]  = prices.toList.map(_.low)

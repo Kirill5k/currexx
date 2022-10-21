@@ -4,7 +4,19 @@ import cats.data.NonEmptyList
 import currexx.clients.broker.BrokerParameters
 import currexx.core.market.{IndicatorState, MarketState, PositionState}
 import currexx.domain.market.Currency.{EUR, GBP, USD}
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorKind, Interval, MarketTimeSeriesData, PriceRange, TradeOrder, Trend, ValueSource, ValueTransformation}
+import currexx.domain.market.{
+  Condition,
+  CurrencyPair,
+  Indicator,
+  IndicatorKind,
+  Interval,
+  MarketTimeSeriesData,
+  PriceRange,
+  TradeOrder,
+  Trend,
+  ValueSource,
+  ValueTransformation
+}
 
 import java.time.Instant
 
@@ -17,8 +29,8 @@ object Markets {
   lazy val gbpeur: CurrencyPair = CurrencyPair(GBP, EUR)
   lazy val gbpusd: CurrencyPair = CurrencyPair(GBP, USD)
 
-  lazy val ts: Instant            = Instant.now
-  lazy val priceRange: PriceRange = PriceRange(BigDecimal(2.0), BigDecimal(4.0), BigDecimal(1.0), BigDecimal(3.0), BigDecimal(1000), ts)
+  lazy val ts: Instant                          = Instant.now
+  lazy val priceRange: PriceRange               = PriceRange(2.0, 4.0, 1.0, 3.0, 1000d, ts)
   lazy val timeSeriesData: MarketTimeSeriesData = MarketTimeSeriesData(gbpeur, Interval.H1, NonEmptyList.one(priceRange))
 
   lazy val positionState: PositionState = PositionState(TradeOrder.Position.Buy, ts, priceRange.close)
@@ -143,6 +155,6 @@ object Markets {
     )
     .zipWithIndex
     .map { case ((o, h, l, c), index) =>
-      PriceRange(BigDecimal(o), BigDecimal(h), BigDecimal(l), BigDecimal(c), BigDecimal(1000), ts.minusSeconds(index.toLong * 86400L))
+      PriceRange(o.toDouble, h.toDouble, l.toDouble, c.toDouble, 1000d, ts.minusSeconds(index.toLong * 86400L))
     }
 }

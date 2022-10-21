@@ -57,11 +57,11 @@ object MarketDataProvider:
       .map { line =>
         val vals = line.split(",")
         PriceRange(
-          BigDecimal(vals(1)),
-          BigDecimal(vals(2)),
-          BigDecimal(vals(3)),
-          BigDecimal(vals(4)),
-          BigDecimal(vals(5)),
+          vals(1).toDouble,
+          vals(2).toDouble,
+          vals(3).toDouble,
+          vals(4).toDouble,
+          vals(5).toDouble,
           LocalDate.parse(vals(0).subSequence(0, 10), timePattern).atStartOfDay().atOffset(ZoneOffset.UTC).toInstant
         )
       }

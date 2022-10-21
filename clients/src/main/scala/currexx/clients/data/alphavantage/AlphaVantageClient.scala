@@ -111,10 +111,10 @@ final private class LiveAlphaVantageClient[F[_]](
 private[clients] object AlphaVantageClient {
 
   final case class OHLC(
-      `1. open`: BigDecimal,
-      `2. high`: BigDecimal,
-      `3. low`: BigDecimal,
-      `4. close`: BigDecimal
+      `1. open`: Double,
+      `2. high`: Double,
+      `3. low`: Double,
+      `4. close`: Double
   ) derives Codec.AsObject
 
   final case class DailyResponseMetadata(

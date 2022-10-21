@@ -27,11 +27,11 @@ object FileReader {
       priceList <- prices.as[ListMap[String, JsonObject]]
       priceRange <- priceList.toList.traverse { (date, ohlc) =>
         for
-          open  <- ohlc("1. open").flatMap(_.asString).map(BigDecimal(_)).toRight(new RuntimeException("missing open"))
-          high  <- ohlc("2. high").flatMap(_.asString).map(BigDecimal(_)).toRight(new RuntimeException("missing high"))
-          low   <- ohlc("3. low").flatMap(_.asString).map(BigDecimal(_)).toRight(new RuntimeException("missing low"))
-          close <- ohlc("4. close").flatMap(_.asString).map(BigDecimal(_)).toRight(new RuntimeException("missing close"))
-        yield PriceRange(open, high, low, close, BigDecimal(0), LocalDate.parse(date).toInstantAtStartOfDay)
+          open  <- ohlc("1. open").flatMap(_.asString).map(_.toDouble).toRight(new RuntimeException("missing open"))
+          high  <- ohlc("2. high").flatMap(_.asString).map(_.toDouble).toRight(new RuntimeException("missing high"))
+          low   <- ohlc("3. low").flatMap(_.asString).map(_.toDouble).toRight(new RuntimeException("missing low"))
+          close <- ohlc("4. close").flatMap(_.asString).map(_.toDouble).toRight(new RuntimeException("missing close"))
+        yield PriceRange(open, high, low, close, 0D, LocalDate.parse(date).toInstantAtStartOfDay)
       }
       priceValues <- NonEmptyList.fromList(priceRange).toRight(new RuntimeException("empty price range list"))
     yield priceValues

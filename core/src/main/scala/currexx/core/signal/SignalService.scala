@@ -72,23 +72,23 @@ object SignalService:
   extension (vs: VS)
     private def extract(data: MarketTimeSeriesData): List[Double] =
       vs match
-        case VS.Close => data.prices.map(_.close.toDouble).toList
-        case VS.Open  => data.prices.map(_.open.toDouble).toList
-        case VS.HL2   => data.prices.map(p => (p.high.toDouble + p.low.toDouble) / 2).toList
-        case VS.HLC3  => data.prices.map(p => (p.high.toDouble + p.low.toDouble + p.close.toDouble) / 3).toList
+        case VS.Close => data.prices.map(_.close).toList
+        case VS.Open  => data.prices.map(_.open).toList
+        case VS.HL2   => data.prices.map(p => (p.high + p.low) / 2).toList
+        case VS.HLC3  => data.prices.map(p => (p.high + p.low + p.close) / 3).toList
 
   extension (vt: VT)
     private def transform(data: List[Double], ref: MarketTimeSeriesData): List[Double] =
       vt match
-        case VT.Sequenced(transformations) => transformations.foldLeft(data)((d, t) => t.transform(d, ref))
-        case VT.Kalman(gain)               => Filters.kalman(data, gain)
-        case VT.RSX(length)                => MomentumOscillators.jurikRelativeStrengthIndex(data, length)
-        case VT.STOCH(length)              => MomentumOscillators.stochastic(data, ref.highs(_.toDouble), ref.lows(_.toDouble), length)
-        case VT.WMA(length)                => MovingAverages.weighted(data, length)
-        case VT.SMA(length)                => MovingAverages.simple(data, length)
-        case VT.EMA(length)                => MovingAverages.exponential(data, length)
-        case VT.HMA(length)                => MovingAverages.hull(data, length)
-        case VT.JMA(length, phase, power)  => MovingAverages.jurikSimplified(data, length, phase, power)
+        case VT.Sequenced(transformations)            => transformations.foldLeft(data)((d, t) => t.transform(d, ref))
+        case VT.Kalman(gain)                          => Filters.kalman(data, gain)
+        case VT.RSX(length)                           => MomentumOscillators.jurikRelativeStrengthIndex(data, length)
+        case VT.STOCH(length)                         => MomentumOscillators.stochastic(data, ref.highs, ref.lows, length)
+        case VT.WMA(length)                           => MovingAverages.weighted(data, length)
+        case VT.SMA(length)                           => MovingAverages.simple(data, length)
+        case VT.EMA(length)                           => MovingAverages.exponential(data, length)
+        case VT.HMA(length)                           => MovingAverages.hull(data, length)
+        case VT.JMA(length, phase, power)             => MovingAverages.jurikSimplified(data, length, phase, power)
         case VT.NMA(length, signalLength, lambda, ma) => MovingAverages.nyquist(data, length, signalLength, lambda, ma.calculation)
 
   extension (ma: MovingAverage)

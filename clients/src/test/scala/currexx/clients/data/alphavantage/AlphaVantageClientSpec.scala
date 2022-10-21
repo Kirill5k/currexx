@@ -46,24 +46,8 @@ class AlphaVantageClientSpec extends ClientSpec {
         timeSeriesData.currencyPair mustBe pair
         timeSeriesData.interval mustBe Interval.H1
         timeSeriesData.prices must have size 100
-
-        timeSeriesData.prices.head mustBe PriceRange(
-          BigDecimal(1.30370),
-          BigDecimal(1.30505),
-          BigDecimal(1.30320),
-          BigDecimal(1.30438),
-          BigDecimal(0),
-          Instant.parse("2022-04-14T15:00:00Z")
-        )
-
-        timeSeriesData.prices.last mustBe PriceRange(
-          BigDecimal(1.30425),
-          BigDecimal(1.30522),
-          BigDecimal(1.30360),
-          BigDecimal(1.30418),
-          BigDecimal(0),
-          Instant.parse("2022-04-08T11:00:00Z")
-        )
+        timeSeriesData.prices.head mustBe PriceRange(1.30370, 1.30505, 1.30320, 1.30438, 0, Instant.parse("2022-04-14T15:00:00Z"))
+        timeSeriesData.prices.last mustBe PriceRange(1.30425, 1.30522, 1.30360, 1.30418, 0, Instant.parse("2022-04-08T11:00:00Z"))
       }
     }
 
@@ -85,24 +69,8 @@ class AlphaVantageClientSpec extends ClientSpec {
         timeSeriesData.currencyPair mustBe pair
         timeSeriesData.interval mustBe Interval.D1
         timeSeriesData.prices must have size 100
-
-        timeSeriesData.prices.head mustBe PriceRange(
-          BigDecimal(1.31211),
-          BigDecimal(1.31472),
-          BigDecimal(1.30320),
-          BigDecimal(1.30395),
-          BigDecimal(0),
-          Instant.parse("2022-04-14T14:10:00Z")
-        )
-
-        timeSeriesData.prices.last mustBe PriceRange(
-          BigDecimal(1.33175),
-          BigDecimal(1.33657),
-          BigDecimal(1.32770),
-          BigDecimal(1.33307),
-          BigDecimal(0),
-          Instant.parse("2021-11-26T00:00:00Z")
-        )
+        timeSeriesData.prices.head mustBe PriceRange(1.31211, 1.31472, 1.30320, 1.30395, 0, Instant.parse("2022-04-14T14:10:00Z"))
+        timeSeriesData.prices.last mustBe PriceRange(1.33175, 1.33657, 1.32770, 1.33307, 0, Instant.parse("2021-11-26T00:00:00Z"))
       }
     }
 
@@ -120,14 +88,7 @@ class AlphaVantageClientSpec extends ClientSpec {
       yield res
 
       result.asserting { price =>
-        price mustBe PriceRange(
-          BigDecimal(1.31211),
-          BigDecimal(1.31472),
-          BigDecimal(1.30320),
-          BigDecimal(1.30395),
-          BigDecimal(0),
-          Instant.parse("2022-04-14T14:10:00Z")
-        )
+        price mustBe PriceRange(1.31211, 1.31472, 1.30320, 1.30395, 0, Instant.parse("2022-04-14T14:10:00Z"))
       }
     }
 
