@@ -21,9 +21,9 @@ class SignalServiceISpec extends IOWordSpec {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = FileReader.pricesFromResources("aud-jpy.json"))
         val indicator = Indicator.TrendChangeDetection(
           ValueSource.Close,
-          ValueTransformation.SingleOutput.sequenced(
-            ValueTransformation.SingleOutput.HMA(6),
-            ValueTransformation.SingleOutput.Kalman(0.5)
+          ValueTransformation.sequenced(
+            ValueTransformation.HMA(6),
+            ValueTransformation.Kalman(0.5)
           )
         )
         val signal = SignalService.detectTrendChange(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.TrendChangeDetection])

@@ -38,7 +38,7 @@ class SignalControllerSpec extends ControllerSpec {
           Users.uid,
           Markets.gbpeur,
           Condition.TrendDirectionChange(Trend.Downward, Trend.Upward, None),
-          Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.HMA(16)),
+          Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(16)),
           now
         )
 

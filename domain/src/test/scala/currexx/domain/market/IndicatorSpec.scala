@@ -22,7 +22,7 @@ class IndicatorSpec extends AnyWordSpec with Matchers {
     "encode and decode indicator with single transformation from json" in {
       val indicator = Indicator.TrendChangeDetection(
         ValueSource.Close,
-        ValueTransformation.SingleOutput.NMA(9, 3, 4.2d, MovingAverage.Weighted)
+        ValueTransformation.NMA(9, 3, 4.2d, MovingAverage.Weighted)
       )
 
       val json =
@@ -39,9 +39,9 @@ class IndicatorSpec extends AnyWordSpec with Matchers {
     "encode and decode indicator with sequenced transformation from json" in {
       val indicator = Indicator.TrendChangeDetection(
         source = ValueSource.Close,
-        transformation = ValueTransformation.SingleOutput.sequenced(
-          ValueTransformation.SingleOutput.Kalman(0.25),
-          ValueTransformation.SingleOutput.HMA(6)
+        transformation = ValueTransformation.sequenced(
+          ValueTransformation.Kalman(0.25),
+          ValueTransformation.HMA(6)
         )
       )
 

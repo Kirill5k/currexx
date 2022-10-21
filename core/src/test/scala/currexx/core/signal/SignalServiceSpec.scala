@@ -185,7 +185,7 @@ class SignalServiceSpec extends IOWordSpec {
     }
 
     "detectTrendChange" should {
-      val indicator = Indicator.TrendChangeDetection(ValueSource.Close, VT.SingleOutput.NMA(16, 8, 4.2d, MovingAverage.Weighted))
+      val indicator = Indicator.TrendChangeDetection(ValueSource.Close, VT.NMA(16, 8, 4.2d, MovingAverage.Weighted))
 
       "create signal when trend direction changes" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
@@ -204,12 +204,12 @@ class SignalServiceSpec extends IOWordSpec {
     }
 
     "detectThresholdCrossing" should {
-      val indicator     = Indicator.ThresholdCrossing(ValueSource.Close, VT.DoubleOutput.STOCH(14, 3, 3), 80D, 20D)
+      val indicator     = Indicator.ThresholdCrossing(ValueSource.Close, VT.STOCH(14), 80D, 20D)
       "create signal when current value is below threshold" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val signal = SignalService.detectThresholdCrossing(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.ThresholdCrossing])
 
-        val expectedCondition = Condition.BelowThreshold(20D, BigDecimal(18.94698816942126))
+        val expectedCondition = Condition.BelowThreshold(20D, BigDecimal(15.03657545380666))
         signal mustBe Some(Signal(Users.uid, Markets.gbpeur, expectedCondition, indicator, timeSeriesData.prices.head.time))
       }
 
