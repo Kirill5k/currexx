@@ -19,60 +19,38 @@ object ValueSource extends EnumType[ValueSource](() => ValueSource.values, EnumT
 enum ValueSource:
   case Close, Open, HL2, HLC3
 
-sealed trait ValueTransformation
+enum ValueTransformation(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+  case Sequenced(sequence: List[ValueTransformation])                             extends ValueTransformation("sequenced")
+  case Kalman(gain: Double)                                                       extends ValueTransformation("kalman")
+  case RSX(length: Int)                                                           extends ValueTransformation("rsx")
+  case WMA(length: Int)                                                           extends ValueTransformation("wma")
+  case SMA(length: Int)                                                           extends ValueTransformation("sma")
+  case EMA(length: Int)                                                           extends ValueTransformation("ema")
+  case HMA(length: Int)                                                           extends ValueTransformation("hma")
+  case NMA(length: Int, signalLength: Int, lambda: Double, maCalc: MovingAverage) extends ValueTransformation("nma")
+  case JMA(length: Int, phase: Int, power: Int)                                   extends ValueTransformation("jma")
+  case STOCH(length: Int)                                                         extends ValueTransformation("stoch")
 
 object ValueTransformation {
-  enum SingleOutput(val kind: String) extends ValueTransformation derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
-    case Sequenced(sequence: List[SingleOutput])                                    extends SingleOutput("sequenced")
-    case Kalman(gain: Double)                                                       extends SingleOutput("kalman")
-    case RSX(length: Int)                                                           extends SingleOutput("rsx")
-    case WMA(length: Int)                                                           extends SingleOutput("wma")
-    case SMA(length: Int)                                                           extends SingleOutput("sma")
-    case EMA(length: Int)                                                           extends SingleOutput("ema")
-    case HMA(length: Int)                                                           extends SingleOutput("hma")
-    case NMA(length: Int, signalLength: Int, lambda: Double, maCalc: MovingAverage) extends SingleOutput("nma")
-    case JMA(length: Int, phase: Int, power: Int)                                   extends SingleOutput("jma")
+  def sequenced(vt: ValueTransformation, vtSequence: ValueTransformation*): ValueTransformation =
+    ValueTransformation.Sequenced(vt :: vtSequence.toList)
 
-  object SingleOutput:
-    def sequenced(so: SingleOutput, soSequence: SingleOutput*): SingleOutput = SingleOutput.Sequenced(so :: soSequence.toList)
-
-    given JsonTaggedAdt.Config[SingleOutput] = JsonTaggedAdt.Config.Values[SingleOutput](
-      mappings = Map(
-        "sequenced" -> JsonTaggedAdt.tagged[SingleOutput.Sequenced],
-        "kalman"    -> JsonTaggedAdt.tagged[SingleOutput.Kalman],
-        "rsx"       -> JsonTaggedAdt.tagged[SingleOutput.RSX],
-        "ema"       -> JsonTaggedAdt.tagged[SingleOutput.EMA],
-        "hma"       -> JsonTaggedAdt.tagged[SingleOutput.HMA],
-        "nma"       -> JsonTaggedAdt.tagged[SingleOutput.NMA],
-        "sma"       -> JsonTaggedAdt.tagged[SingleOutput.SMA],
-        "wma"       -> JsonTaggedAdt.tagged[SingleOutput.WMA],
-        "jma"       -> JsonTaggedAdt.tagged[SingleOutput.JMA]
-      ),
-      strict = true,
-      typeFieldName = "kind"
-    )
-
-  enum DoubleOutput(val kind: String) extends ValueTransformation derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
-    case STOCH(length: Int, slowKLength: Int, slowDLength: Int) extends DoubleOutput("stoch")
-
-  object DoubleOutput:
-    given JsonTaggedAdt.Config[DoubleOutput] = JsonTaggedAdt.Config.Values[DoubleOutput](
-      mappings = Map(
-        "stoch" -> JsonTaggedAdt.tagged[DoubleOutput.STOCH]
-      ),
-      strict = true,
-      typeFieldName = "kind"
-    )
-
-  given Encoder[ValueTransformation] = Encoder.instance {
-    case vt: SingleOutput => vt.asJson
-    case vt: DoubleOutput => vt.asJson
-  }
-
-  given Decoder[ValueTransformation] = List[Decoder[ValueTransformation]](
-    Decoder[SingleOutput].widen,
-    Decoder[DoubleOutput].widen
-  ).reduceLeft(_ or _)
+  given JsonTaggedAdt.Config[ValueTransformation] = JsonTaggedAdt.Config.Values[ValueTransformation](
+    mappings = Map(
+      "sequenced" -> JsonTaggedAdt.tagged[ValueTransformation.Sequenced],
+      "kalman"    -> JsonTaggedAdt.tagged[ValueTransformation.Kalman],
+      "rsx"       -> JsonTaggedAdt.tagged[ValueTransformation.RSX],
+      "stoch"     -> JsonTaggedAdt.tagged[ValueTransformation.STOCH],
+      "ema"       -> JsonTaggedAdt.tagged[ValueTransformation.EMA],
+      "hma"       -> JsonTaggedAdt.tagged[ValueTransformation.HMA],
+      "nma"       -> JsonTaggedAdt.tagged[ValueTransformation.NMA],
+      "sma"       -> JsonTaggedAdt.tagged[ValueTransformation.SMA],
+      "wma"       -> JsonTaggedAdt.tagged[ValueTransformation.WMA],
+      "jma"       -> JsonTaggedAdt.tagged[ValueTransformation.JMA]
+    ),
+    strict = true,
+    typeFieldName = "kind"
+  )
 }
 
 object IndicatorKind extends EnumType[IndicatorKind](() => IndicatorKind.values)
@@ -82,7 +60,7 @@ enum IndicatorKind:
 enum Indicator(val kind: IndicatorKind) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case TrendChangeDetection(
       source: ValueSource,
-      transformation: ValueTransformation.SingleOutput
+      transformation: ValueTransformation
   ) extends Indicator(IndicatorKind.TrendChangeDetection)
   case ThresholdCrossing(
       source: ValueSource,
@@ -92,8 +70,8 @@ enum Indicator(val kind: IndicatorKind) derives JsonTaggedAdt.EncoderWithConfig,
   ) extends Indicator(IndicatorKind.ThresholdCrossing)
   case LinesCrossing(
       source: ValueSource,
-      line1Transformation: ValueTransformation.SingleOutput,
-      line2Transformation: ValueTransformation.SingleOutput
+      line1Transformation: ValueTransformation,
+      line2Transformation: ValueTransformation
   ) extends Indicator(IndicatorKind.LinesCrossing)
 
 object Indicator:

@@ -23,4 +23,6 @@ final case class MarketTimeSeriesData(
     currencyPair: CurrencyPair,
     interval: Interval,
     prices: NonEmptyList[PriceRange]
-)
+):
+  def highs[A](f: BigDecimal => A): List[A] = prices.toList.map(pr => f(pr.high))
+  def lows[A](f: BigDecimal => A): List[A]  = prices.toList.map(pr => f(pr.low))

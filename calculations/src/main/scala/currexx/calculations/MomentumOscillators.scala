@@ -32,10 +32,8 @@ object MomentumOscillators {
       closings: List[Double],
       highs: List[Double],
       lows: List[Double],
-      length: Int,
-      slowKLength: Int,
-      slowDLength: Int
-  ): (List[Double], List[Double]) = {
+      length: Int
+  ): List[Double] = {
     val highsArr    = highs.toArray.reverse
     val lowsArr     = lows.toArray.reverse
     val closingsArr = closings.toArray.reverse
@@ -53,9 +51,7 @@ object MomentumOscillators {
       }
       i += 1
     }
-    val k = MovingAverages.simple(stochs.reverse.toList, slowKLength)
-    val d = MovingAverages.simple(k, slowDLength)
-    (k, d)
+    stochs.reverse.toList
   }
 
   def jurikRelativeStrengthIndex(values: List[Double], length: Int): List[Double] = {

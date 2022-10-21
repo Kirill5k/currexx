@@ -26,17 +26,14 @@ class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
 
     "stochastic" should {
       "calculate stochastic oscillator values (smooth k and smooth d)" in {
-        val (smoothK, smoothD) = MomentumOscillators.stochastic(
+        val stoch = MomentumOscillators.stochastic(
           closings = values.map(_._4),
           highs = values.map(_._2),
           lows = values.map(_._3),
-          length = 14,
-          slowKLength = 3,
-          slowDLength = 3
+          length = 14
         )
 
-        smoothK.take(5).map(rounded(4)) mustBe List(68.226, 76.8539, 81.418, 89.4693, 88.2541)
-        smoothD.take(5).map(rounded(4)) mustBe List(75.4993, 82.5804, 86.3805, 86.4844, 81.7727)
+        stoch.take(5).map(rounded(4)) mustBe List(60.4669, 71.7607, 72.4503, 86.3506, 85.453)
       }
     }
   }

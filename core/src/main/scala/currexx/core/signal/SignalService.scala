@@ -77,19 +77,19 @@ object SignalService:
         case VS.HL2   => data.prices.map(p => (p.high.toDouble + p.low.toDouble) / 2).toList
         case VS.HLC3  => data.prices.map(p => (p.high.toDouble + p.low.toDouble + p.close.toDouble) / 3).toList
 
-  extension (vt: VT.SingleOutput)
-    private def transform(data: List[Double]): List[Double] =
+  extension (vt: VT)
+    private def transform(data: List[Double], ref: MarketTimeSeriesData): List[Double] =
       vt match
-        case VT.SingleOutput.Sequenced(transformations) => transformations.foldLeft(data)((d, t) => t.transform(d))
-        case VT.SingleOutput.Kalman(gain)               => Filters.kalman(data, gain)
-        case VT.SingleOutput.RSX(length)                => MomentumOscillators.jurikRelativeStrengthIndex(data, length)
-        case VT.SingleOutput.WMA(length)                => MovingAverages.weighted(data, length)
-        case VT.SingleOutput.SMA(length)                => MovingAverages.simple(data, length)
-        case VT.SingleOutput.EMA(length)                => MovingAverages.exponential(data, length)
-        case VT.SingleOutput.HMA(length)                => MovingAverages.hull(data, length)
-        case VT.SingleOutput.JMA(length, phase, power)  => MovingAverages.jurikSimplified(data, length, phase, power)
-        case VT.SingleOutput.NMA(length, signalLength, lambda, ma) =>
-          MovingAverages.nyquist(data, length, signalLength, lambda, ma.calculation)
+        case VT.Sequenced(transformations) => transformations.foldLeft(data)((d, t) => t.transform(d, ref))
+        case VT.Kalman(gain)               => Filters.kalman(data, gain)
+        case VT.RSX(length)                => MomentumOscillators.jurikRelativeStrengthIndex(data, length)
+        case VT.STOCH(length)              => MomentumOscillators.stochastic(data, ref.highs(_.toDouble), ref.lows(_.toDouble), length)
+        case VT.WMA(length)                => MovingAverages.weighted(data, length)
+        case VT.SMA(length)                => MovingAverages.simple(data, length)
+        case VT.EMA(length)                => MovingAverages.exponential(data, length)
+        case VT.HMA(length)                => MovingAverages.hull(data, length)
+        case VT.JMA(length, phase, power)  => MovingAverages.jurikSimplified(data, length, phase, power)
+        case VT.NMA(length, signalLength, lambda, ma) => MovingAverages.nyquist(data, length, signalLength, lambda, ma.calculation)
 
   extension (ma: MovingAverage)
     private def calculation: (List[Double], Int) => List[Double] =
@@ -100,13 +100,8 @@ object SignalService:
         case MovingAverage.Hull        => MovingAverages.hull
 
   def detectThresholdCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.ThresholdCrossing): Option[Signal] = {
-    val source = indicator.source.extract(data)
-    val transformed = indicator.transformation match
-      case so: VT.SingleOutput => so.transform(source)
-      case VT.DoubleOutput.STOCH(length, slowK, slowD) =>
-        val highs = data.prices.map(_.high.toDouble).toList
-        val lows  = data.prices.map(_.low.toDouble).toList
-        MomentumOscillators.stochastic(source, highs, lows, length, slowK, slowD)._1
+    val source      = indicator.source.extract(data)
+    val transformed = indicator.transformation.transform(source, data)
     Condition
       .thresholdCrossing(transformed, indicator.lowerBoundary, indicator.upperBoundary)
       .map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))
@@ -114,7 +109,7 @@ object SignalService:
 
   def detectTrendChange(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.TrendChangeDetection): Option[Signal] = {
     val source      = indicator.source.extract(data)
-    val transformed = indicator.transformation.transform(source)
+    val transformed = indicator.transformation.transform(source, data)
     Condition
       .trendDirectionChange(transformed)
       .map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))
@@ -122,8 +117,8 @@ object SignalService:
 
   def detectLinesCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.LinesCrossing): Option[Signal] = {
     val source = indicator.source.extract(data)
-    val line1  = indicator.line1Transformation.transform(source)
-    val line2  = indicator.line2Transformation.transform(source)
+    val line1  = indicator.line1Transformation.transform(source, data)
+    val line2  = indicator.line2Transformation.transform(source, data)
     Condition
       .linesCrossing(line1, line2)
       .map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))
