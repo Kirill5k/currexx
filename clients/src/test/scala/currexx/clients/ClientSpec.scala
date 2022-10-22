@@ -10,7 +10,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import sttp.capabilities.WebSockets
 import sttp.capabilities.fs2.Fs2Streams
 import sttp.client3
-import sttp.client3.asynchttpclient.fs2.AsyncHttpClientFs2Backend
+import sttp.client3.httpclient.fs2.HttpClientFs2Backend
 import sttp.client3.testing.SttpBackendStub
 import sttp.model.{Header, Method}
 
@@ -28,7 +28,7 @@ trait ClientSpec extends AsyncWordSpec with Matchers {
       io.attempt.asserting(_ mustBe Left(error))
 
   def backendStub: SttpBackendStub[IO, Fs2Streams[IO] with WebSockets] =
-    AsyncHttpClientFs2Backend.stub[IO]
+    HttpClientFs2Backend.stub[IO]
 
   def json(path: String): String = Source.fromResource(path).getLines().toList.mkString
 

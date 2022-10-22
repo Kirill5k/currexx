@@ -12,7 +12,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import currexx.domain.market.Currency.{CAD, EUR}
 import sttp.capabilities.WebSockets
 import sttp.capabilities.fs2.Fs2Streams
-import sttp.client3.asynchttpclient.fs2.AsyncHttpClientFs2Backend
+import sttp.client3.httpclient.fs2.HttpClientFs2Backend
 import sttp.client3.testing.SttpBackendStub
 import sttp.client3.{Response, SttpBackend, SttpBackendOptions}
 import sttp.model.StatusCode
@@ -48,7 +48,7 @@ class XtbClientSpec extends ClientSpec {
     }
 
     "send enter market request" ignore {
-      val result = AsyncHttpClientFs2Backend
+      val result = HttpClientFs2Backend
         .resource[IO](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
         .use { backend =>
           for
@@ -62,7 +62,7 @@ class XtbClientSpec extends ClientSpec {
     }
 
     "get existing order" ignore {
-      val result = AsyncHttpClientFs2Backend
+      val result = HttpClientFs2Backend
         .resource[IO](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
         .use { backend =>
           for
@@ -77,7 +77,7 @@ class XtbClientSpec extends ClientSpec {
     }
 
     "send exit market request" ignore {
-      val result = AsyncHttpClientFs2Backend
+      val result = HttpClientFs2Backend
         .resource[IO](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
         .use { backend =>
           for

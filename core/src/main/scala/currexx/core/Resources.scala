@@ -8,7 +8,7 @@ import mongo4cats.database.MongoDatabase
 import mongo4cats.models.client.{ConnectionString, MongoClientSettings}
 import sttp.capabilities.WebSockets
 import sttp.capabilities.fs2.Fs2Streams
-import sttp.client3.asynchttpclient.fs2.AsyncHttpClientFs2Backend
+import sttp.client3.httpclient.fs2.HttpClientFs2Backend
 import sttp.client3.{SttpBackend, SttpBackendOptions}
 
 import java.util.concurrent.TimeUnit
@@ -35,7 +35,7 @@ object Resources:
     MongoClient.create[F](settings).evalMap(_.getDatabase("currexx"))
 
   private def sttpBackend[F[_]: Async]: Resource[F, SttpBackend[F, Fs2Streams[F] with WebSockets]] =
-    AsyncHttpClientFs2Backend.resource[F](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
+    HttpClientFs2Backend.resource[F](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
 
   def make[F[_]: Async](config: AppConfig): Resource[F, Resources[F]] =
     (

@@ -60,9 +60,9 @@ object Dependencies {
     }
 
     object sttp {
-      val core       = "com.softwaremill.sttp.client3" %% "core"                          % Versions.sttp
-      val circe      = "com.softwaremill.sttp.client3" %% "circe"                         % Versions.sttp
-      val fs2Backend = "com.softwaremill.sttp.client3" %% "async-http-client-backend-fs2" % Versions.sttp
+      val core       = "com.softwaremill.sttp.client3" %% "core"  % Versions.sttp
+      val circe      = "com.softwaremill.sttp.client3" %% "circe" % Versions.sttp
+      val fs2Backend = "com.softwaremill.sttp.client3" %% "fs2"   % Versions.sttp
       val all        = Seq(core, circe, fs2Backend)
     }
 
