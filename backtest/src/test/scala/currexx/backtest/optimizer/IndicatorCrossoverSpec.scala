@@ -13,13 +13,13 @@ class IndicatorCrossoverSpec extends CatsSpec {
 
       val result = for
         cross <- IndicatorCrossover.make[IO]
-        ind1 = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.HMA(40))
-        ind2 = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.HMA(10))
+        ind1 = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(40))
+        ind2 = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(10))
         result <- cross.cross(ind1, ind2)
       yield result
 
       result.asserting { ind =>
-        ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.HMA(8))
+        ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(8))
       }
     }
 
@@ -28,21 +28,21 @@ class IndicatorCrossoverSpec extends CatsSpec {
 
       val result = for
         cross <- IndicatorCrossover.make[IO]
-        ind1 = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.sequenced(
-          ValueTransformation.SingleOutput.HMA(40),
-          ValueTransformation.SingleOutput.Kalman(0.7),
+        ind1 = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.sequenced(
+          ValueTransformation.HMA(40),
+          ValueTransformation.Kalman(0.7),
         ))
-        ind2 = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.sequenced(
-          ValueTransformation.SingleOutput.HMA(37),
-          ValueTransformation.SingleOutput.Kalman(0.6),
+        ind2 = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.sequenced(
+          ValueTransformation.HMA(37),
+          ValueTransformation.Kalman(0.6),
         ))
         result <- cross.cross(ind1, ind2)
       yield result
 
       result.asserting { ind =>
-        ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.sequenced(
-          ValueTransformation.SingleOutput.HMA(32),
-          ValueTransformation.SingleOutput.Kalman(0.5),
+        ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.sequenced(
+          ValueTransformation.HMA(32),
+          ValueTransformation.Kalman(0.5),
         ))
       }
     }
@@ -52,16 +52,16 @@ class IndicatorCrossoverSpec extends CatsSpec {
 
       val result = for
         cross <- IndicatorCrossover.make[IO]
-        ind1 = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.sequenced(
-          ValueTransformation.SingleOutput.HMA(40),
-          ValueTransformation.SingleOutput.Kalman(0.7),
+        ind1 = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.sequenced(
+          ValueTransformation.HMA(40),
+          ValueTransformation.Kalman(0.7),
         ))
-        ind2 = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.HMA(37))
+        ind2 = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(37))
         result <- cross.cross(ind1, ind2)
       yield result
 
       result.attempt.asserting { res =>
-        res.left.map(_.getMessage) mustBe Left("both parents must be of the same type")
+        res.left.map(_.getMessage) mustBe Left("failed to cross TrendChangeDetection(Close,Sequenced(List(HMA(40), Kalman(0.7)))) and TrendChangeDetection(Close,HMA(37)) together: both parents must be of the same type")
       }
     }
   }

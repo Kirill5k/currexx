@@ -15,12 +15,12 @@ class IndicatorMutatorSpec extends CatsSpec {
 
         val result = for
           mutator <- IndicatorMutator.make[IO]
-          ind = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.Kalman(0.5))
+          ind = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.Kalman(0.5))
           res <- mutator.mutate(ind, 0.2d)
         yield res
 
         result.asserting { ind =>
-          ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.Kalman(0.1))
+          ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.Kalman(0.1))
         }
       }
     }
@@ -31,12 +31,12 @@ class IndicatorMutatorSpec extends CatsSpec {
 
         val result = for
           mutator <- IndicatorMutator.make[IO]
-          ind = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.HMA(14))
+          ind = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(14))
           res <- mutator.mutate(ind, 0.2d)
         yield res
 
         result.asserting { ind =>
-          ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.HMA(30))
+          ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(30))
         }
       }
 
@@ -45,12 +45,12 @@ class IndicatorMutatorSpec extends CatsSpec {
 
         val result = for
           mutator <- IndicatorMutator.make[IO]
-          ind = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.HMA(0))
+          ind = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(0))
           res <- mutator.mutate(ind, 0.2d)
         yield res
 
         result.asserting { ind =>
-          ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SingleOutput.HMA(1))
+          ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(5))
         }
       }
     }
@@ -63,9 +63,9 @@ class IndicatorMutatorSpec extends CatsSpec {
           mutator <- IndicatorMutator.make[IO]
           ind = Indicator.TrendChangeDetection(
             ValueSource.Close,
-            ValueTransformation.SingleOutput.sequenced(
-              ValueTransformation.SingleOutput.HMA(14),
-              ValueTransformation.SingleOutput.Kalman(0.1)
+            ValueTransformation.sequenced(
+              ValueTransformation.HMA(14),
+              ValueTransformation.Kalman(0.1)
             )
           )
           res <- mutator.mutate(ind, 0.2d)
@@ -74,9 +74,9 @@ class IndicatorMutatorSpec extends CatsSpec {
         result.asserting { ind =>
           ind mustBe Indicator.TrendChangeDetection(
             ValueSource.Close,
-            ValueTransformation.SingleOutput.sequenced(
-              ValueTransformation.SingleOutput.HMA(30),
-              ValueTransformation.SingleOutput.Kalman(0.1)
+            ValueTransformation.sequenced(
+              ValueTransformation.HMA(30),
+              ValueTransformation.Kalman(0.1)
             )
           )
         }
