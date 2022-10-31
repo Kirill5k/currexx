@@ -7,7 +7,7 @@ import currexx.domain.types.EnumType
 
 object TradeStrategy extends EnumType[TradeStrategy](() => TradeStrategy.values)
 enum TradeStrategy:
-  case Disabled, TrendChange, TrendChangeAggressive, TrendChangeWithConfirmation, LinesCrossing
+  case Disabled, TrendChange, TrendChangeAggressive, TrendChangeWithConfirmation, LinesCrossing, ThresholdCrossing
 
 trait TradeStrategyExecutor:
   def analyze(state: MarketState, triggers: List[IndicatorKind]): Option[TradeStrategyExecutor.Decision]
@@ -65,10 +65,21 @@ object TradeStrategyExecutor {
     def analyze(state: MarketState, triggers: List[IndicatorKind]): Option[TradeStrategyExecutor.Decision] =
       triggers
         .find(_ == IndicatorKind.LinesCrossing)
-        .flatMap { ls =>
-          state.signals.getOrElse(ls, Nil).headOption.map(_.condition).collect {
+        .flatMap { lc =>
+          state.signals.getOrElse(lc, Nil).headOption.map(_.condition).collect {
             case Condition.CrossingUp   => Decision.Sell
             case Condition.CrossingDown => Decision.Buy
+          }
+        }
+
+  private case object ThresholdCrossing extends TradeStrategyExecutor:
+    def analyze(state: MarketState, triggers: List[IndicatorKind]): Option[TradeStrategyExecutor.Decision] =
+      triggers
+        .find(_ == IndicatorKind.ThresholdCrossing)
+        .flatMap { tc =>
+          state.signals.getOrElse(tc, Nil).headOption.map(_.condition).collect {
+            case _: Condition.AboveThreshold => Decision.Sell
+            case _: Condition.BelowThreshold => Decision.Buy
           }
         }
 
@@ -79,6 +90,7 @@ object TradeStrategyExecutor {
       case TradeStrategy.TrendChangeAggressive       => TrendChangeAggressive
       case TradeStrategy.TrendChangeWithConfirmation => TrendChangeWithConfirmation
       case TradeStrategy.LinesCrossing               => LinesCrossing
+      case TradeStrategy.ThresholdCrossing           => ThresholdCrossing
 
   extension (state: MarketState)
     def buying: Boolean  = state.currentPosition.map(_.position).contains(TradeOrder.Position.Buy)
