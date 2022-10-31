@@ -14,6 +14,8 @@ trait IOWordSpec extends AsyncWordSpec with Matchers with MockitoMatchers with E
   inline given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
   extension [A](io: IO[A])
+    def throws(error: Throwable): Future[Assertion] =
+      io.attempt.asserting(_ mustBe Left(error))
     def asserting(f: A => Assertion): Future[Assertion] =
       io.map(f).unsafeToFuture()(IORuntime.global)
 }

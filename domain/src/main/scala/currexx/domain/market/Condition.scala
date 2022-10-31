@@ -52,9 +52,10 @@ object Condition {
   }
 
   def thresholdCrossing(line: List[Double], min: Double, max: Double): Option[Condition] =
-    if (max < line.head) Some(Condition.AboveThreshold(max, line.head))
-    else if (min > line.head) Some(Condition.BelowThreshold(min, line.head))
-    else None
+    (line.head, line.drop(1).head) match
+      case (c, p) if c > max && p <= max => Some(Condition.AboveThreshold(max, c))
+      case (c, p) if c < min && p >= min => Some(Condition.BelowThreshold(min, c))
+      case _                            => None
 
   def linesCrossing(line1: List[Double], line2: List[Double]): Option[Condition] =
     (line1.head, line2.head, line1.drop(1).head, line2.drop(1).head) match
