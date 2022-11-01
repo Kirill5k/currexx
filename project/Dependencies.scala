@@ -13,7 +13,7 @@ object Dependencies {
     val log4cats       = "2.5.0"
     val bcrypt         = "4.3.0"
     val refined        = "0.10.1"
-    val tapir          = "1.1.3"
+    val tapir          = "1.1.4"
     val jwt            = "9.1.1"
     val cronUtils      = "9.2.0"
     val taggedAdtCodec = "0.10.1"
