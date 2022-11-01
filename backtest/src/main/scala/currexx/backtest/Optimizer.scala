@@ -25,12 +25,12 @@ object Optimizer extends IOApp.Simple {
     shuffle = true
   )
 
-  val thresholdCrossing = Indicator.ThresholdCrossing(ValueSource.Close, ValueTransformation.STOCH(15), 80, 20)
   val trendChangeDetection = Indicator.TrendChangeDetection(
-    ValueSource.Close,
-//    ValueTransformation.SingleOutput.JMA(44, -72, 1)
-    ValueTransformation.HMA(25)
-//    ValueTransformation.SingleOutput.NMA(45, 5, 11.0d, MovingAverage.Hull)
+    source = ValueSource.Close,
+    transformation = ValueTransformation.sequenced(
+      ValueTransformation.RSX(21),
+      ValueTransformation.RSX(3)
+    )
   )
 
   val linesCrossing = Indicator.LinesCrossing(
@@ -39,9 +39,16 @@ object Optimizer extends IOApp.Simple {
     ValueTransformation.JMA(20, 100, 2)
   )
 
+  val thresholdCrossing = Indicator.ThresholdCrossing(
+    ValueSource.Close,
+    ValueTransformation.RSX(40),
+    70D,
+    20D
+  )
+
   val testDataSets    = List("nzd-cad-1d.csv", "eur-chf-1d.csv", "nzd-chf-1d.csv", "eur-aud-1d.csv", "eur-gbp-1d.csv", "aud-cad-1d.csv")
-  val strategy        = TradeStrategy.LinesCrossing
-  val target          = linesCrossing
+  val strategy        = TradeStrategy.ThresholdCrossing
+  val target          = thresholdCrossing
   val otherIndicators = Nil
 
   override def run: IO[Unit] = for

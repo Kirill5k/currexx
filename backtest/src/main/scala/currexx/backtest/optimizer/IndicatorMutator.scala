@@ -47,8 +47,8 @@ object IndicatorMutator:
               Indicator.ThresholdCrossing(
                 vs,
                 mutateVt(vt),
-                mutateInt(ub.toInt - 50, 49) + 50,
-                mutateInt(lb.toInt, 49)
+                mutateInt(ub.toInt, 100),
+                mutateInt(lb.toInt, 100)
               )
             case Indicator.LinesCrossing(vs, st, ft) =>
               Indicator.LinesCrossing(vs, mutateVt(st), mutateVt(ft))

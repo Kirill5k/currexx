@@ -55,9 +55,9 @@ object IndicatorCrossover:
             case (Indicator.ThresholdCrossing(s, t1, ub1, lb1), Indicator.ThresholdCrossing(_, t2, ub2, lb2)) =>
               F.fromEither(crossVt(t1, t2))
                 .map { t =>
-                  val ub = math.min(crossInt(ub1.toInt - 50, ub2.toInt - 50), 50)
-                  val lb = math.min(crossInt(lb1.toInt, lb2.toInt), 50)
-                  Indicator.ThresholdCrossing(s, t, ub + 50, lb)
+                  val ub = math.min(crossInt(ub1.toInt, ub2.toInt), 100)
+                  val lb = math.min(crossInt(lb1.toInt, lb2.toInt), 100)
+                  Indicator.ThresholdCrossing(s, t, ub, lb)
                 }
             case _ =>
               F.raiseError(new IllegalArgumentException("both parents must be of the same type"))

@@ -18,17 +18,33 @@ object Backtester extends IOApp.Simple {
 
   val settings = TestSettings.make(
     CurrencyPair(EUR, GBP),
-    TradeStrategy.LinesCrossing,
+    TradeStrategy.TrendChangeAggressive,
     List(
-      Indicator.LinesCrossing(
-        source = ValueSource.Close,
-        line1Transformation = ValueTransformation.JMA(21,100,7),
-        line2Transformation = ValueTransformation.JMA(5,-70,1)
-      ),
 //      Indicator.TrendChangeDetection(
 //        source = ValueSource.Close,
-//        transformation = ValueTransformation.SingleOutput.HMA(5)
+//        transformation = ValueTransformation.sequenced(
+//          ValueTransformation.JMA(21,100,7),
+//          ValueTransformation.RSX(3)
+//        )
+//      )
+//      Indicator.ThresholdCrossing(
+//        source = ValueSource.Close,
+//        transformation = ValueTransformation.RSX(3),
+//        upperBoundary = 52.0,
+//        lowerBoundary = 37.0
+//      )
+//      Indicator.LinesCrossing(
+//        source = ValueSource.Close,
+//        line1Transformation = ValueTransformation.JMA(21,100,7),
+//        line2Transformation = ValueTransformation.JMA(5,-70,1)
 //      ),
+      Indicator.TrendChangeDetection(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.sequenced(
+          ValueTransformation.HMA(5),
+          ValueTransformation.RSX(35)
+        )
+      ),
 //      Indicator.ThresholdCrossing(
 //        source = ValueSource.Close,
 //        transformation = ValueTransformation.DoubleOutput.STOCH(20, 3, 3),
