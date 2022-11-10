@@ -75,9 +75,11 @@ final private class LiveTwelveDataClient[F[_]](
           .flatTap(data => cache.put(pair -> interval, data))
       }
 
-  extension (ld: LocalDate)
+  extension (dateString: String)
     def toInstant(i: Int): Instant =
-      if (i == 0) ld.atTime(LocalTime.now().truncatedTo(ChronoUnit.MINUTES)).toInstant(ZoneOffset.UTC) else ld.atStartOfDay().toInstant(ZoneOffset.UTC)
+      if (dateString.length == 10 && i == 0) LocalDate.parse(dateString).atTime(LocalTime.now().truncatedTo(ChronoUnit.MINUTES)).toInstant(ZoneOffset.UTC)
+      else if (dateString.length == 10) LocalDate.parse(dateString).atStartOfDay().toInstant(ZoneOffset.UTC)
+      else Instant.parse(s"${dateString.replaceFirst(" ", "T")}Z")
 }
 
 private[clients] object TwelveDataClient {
@@ -88,7 +90,7 @@ private[clients] object TwelveDataClient {
   ) derives Codec.AsObject
 
   final case class TimeSeriesValue(
-      datetime: LocalDate,
+      datetime: String,
       open: Double,
       high: Double,
       low: Double,
