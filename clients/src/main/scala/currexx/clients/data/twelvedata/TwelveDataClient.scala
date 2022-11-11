@@ -60,7 +60,7 @@ final private class LiveTwelveDataClient[F[_]](
                   val prices = res.values.zipWithIndex.map((v, i) => PriceRange(v.open, v.high, v.low, v.close, 0d, v.datetime.toInstant(i)))
                   MarketTimeSeriesData(pair, interval, prices).pure[F]
                 case Left(DeserializationException(responseBody, error)) =>
-                  if (responseBody.contains("\"code\": 429"))
+                  if (responseBody.matches(".*\"code\":( )?429.*"))
                     F.sleep(delayBetweenClientFailures) >> fetchTimeSeriesData(pair, interval, numOfTicks)
                   else
                     logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
