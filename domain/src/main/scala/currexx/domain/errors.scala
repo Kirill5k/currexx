@@ -79,7 +79,7 @@ object errors {
       override val message: String = s"Session with id $id does not exist"
 
     case object IdMismatch extends BadReq:
-      override val message: String = "The id supplied in the path does not match with the id in the request body"
+      override val message: String = "Id provided in the path does not match with id in the request body"
 
     final case class InvalidJwtEncryptionAlgorithm(alg: String) extends AppError:
       override val message = s"unrecognized jwt encryption algorithm $alg"
