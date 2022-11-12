@@ -20,16 +20,16 @@ object Optimizer extends IOApp.Simple {
     populationSize = 250,
     maxGen = 250,
     crossoverProbability = 0.7,
-    mutationProbability = 0.25,
-    elitismRatio = 0.05,
+    mutationProbability = 0.2,
+    elitismRatio = 0.025,
     shuffle = true
   )
 
   val trendChangeDetection = Indicator.TrendChangeDetection(
     source = ValueSource.Close,
     transformation = ValueTransformation.sequenced(
-      ValueTransformation.HMA(21),
-      ValueTransformation.RSX(3)
+      ValueTransformation.JMA(21, 100, 3),
+//      ValueTransformation.RSX(3)
     )
   )
 

@@ -37,7 +37,7 @@ object IndicatorMutator:
           case VT.JMA(length, phase, power) =>
             VT.JMA(mutateInt(length, 45, 5), mutateInt((phase + 100) / 5, 40) * 5 - 100, mutateInt(power, 7))
           case VT.NMA(length, signalLength, lambda, maCalc) =>
-            VT.NMA(mutateInt(length, 50), mutateInt(signalLength, 31), mutateDouble(lambda, 15d, 0.5d), maCalc)
+            VT.NMA(mutateInt(length, 50), mutateInt(signalLength, 31), math.max(mutateDouble(lambda, 15d, 0.5d), 0.25), maCalc)
 
         F.delay {
           ind match
