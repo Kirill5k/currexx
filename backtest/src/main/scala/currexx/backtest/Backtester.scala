@@ -33,15 +33,15 @@ object Backtester extends IOApp.Simple {
 //        upperBoundary = 52.0,
 //        lowerBoundary = 37.0
 //      )
-//      Indicator.LinesCrossing(
-//        source = ValueSource.Close,
-//        line1Transformation = ValueTransformation.JMA(21,100,7),
-//        line2Transformation = ValueTransformation.JMA(5,-70,1)
-//      ),
+      Indicator.LinesCrossing(
+        source = ValueSource.Close,
+        line1Transformation = ValueTransformation.HMA(44),
+        line2Transformation = ValueTransformation.HMA(43)
+      ),
       Indicator.TrendChangeDetection(
         source = ValueSource.Close,
         transformation = ValueTransformation.sequenced(
-          ValueTransformation.HMA(5),
+          ValueTransformation.HMA(4),
 //          ValueTransformation.RSX(35)
         )
       ),

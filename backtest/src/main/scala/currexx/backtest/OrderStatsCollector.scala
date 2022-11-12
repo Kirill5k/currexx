@@ -17,8 +17,8 @@ final case class OrderStats(
     biggestLoss: BigDecimal = BigDecimal(0),
     profitByMonth: Map[String, BigDecimal] = ListMap.empty
 ):
-  def medianProfitByMonth: BigDecimal = profitByMonth.values.toList.median.setScale(4, RoundingMode.HALF_UP)
-  def meanProfitByMonth: BigDecimal   = profitByMonth.values.toList.mean.setScale(4, RoundingMode.HALF_UP)
+  def medianProfitByMonth: BigDecimal = profitByMonth.values.toList.median.roundTo(5)
+  def meanProfitByMonth: BigDecimal   = profitByMonth.values.toList.mean.roundTo(5)
   def incBuy: OrderStats              = copy(total = total + 1, buys = buys + 1)
   def incSell: OrderStats             = copy(total = total + 1, sells = sells + 1)
   def close(profit: BigDecimal, time: Instant) =
@@ -34,8 +34,8 @@ final case class OrderStats(
   override def toString: String =
     s"""OrderStats(
        |totalProfit=$totalProfit,
-       |meanProfitByMonth=$meanProfitByMonth,
        |medianProfitByMonth=$medianProfitByMonth,
+       |meanProfitByMonth=$meanProfitByMonth,
        |totalOrders=$total,
        |buys=$buys,
        |sells=$sells,

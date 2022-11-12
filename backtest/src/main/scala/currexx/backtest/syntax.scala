@@ -1,20 +1,27 @@
 package currexx.backtest
 
 import scala.annotation.tailrec
+import scala.math.BigDecimal.RoundingMode
 
 object syntax {
+  extension (bd: BigDecimal)
+    def roundTo(scale: Int): BigDecimal = bd.setScale(scale, RoundingMode.HALF_UP)
+
   extension (list: List[BigDecimal])
     def mean: BigDecimal = list.sum / list.size
-    def median: BigDecimal = {
-      val sorted = list.sorted
-      val size   = list.size
-      if (size % 2 == 1) sorted(size / 2)
+    def median: BigDecimal =
+      if (list.isEmpty) BigDecimal(0)
+      else if (list.size == 1) list.head
       else {
-        val partial       = sorted.drop((size - 1) / 2)
-        val (left, right) = (partial.head, partial.tail.head)
-        (left + right) / 2
+        val sorted = list.sorted
+        val size = list.size
+        if (size % 2 == 1) sorted(size / 2)
+        else {
+          val partial = sorted.drop((size - 1) / 2)
+          val (left, right) = (partial.head, partial.tail.head)
+          (left + right) / 2
+        }
       }
-    }
 
   extension (array: Array[Int])
     def toInt: Int = {
