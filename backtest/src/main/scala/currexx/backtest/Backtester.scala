@@ -3,7 +3,7 @@ package currexx.backtest
 import cats.effect.{IO, IOApp}
 import cats.syntax.flatMap.*
 import currexx.backtest.services.TestServices
-import currexx.backtest.optimizer.syntax.*
+import syntax.*
 import currexx.core.trade.TradeStrategy
 import currexx.domain.market.{CurrencyPair, Indicator, MovingAverage, ValueSource, ValueTransformation}
 import org.typelevel.log4cats.Logger
@@ -42,7 +42,7 @@ object Backtester extends IOApp.Simple {
         source = ValueSource.Close,
         transformation = ValueTransformation.sequenced(
           ValueTransformation.HMA(5),
-          ValueTransformation.RSX(35)
+//          ValueTransformation.RSX(35)
         )
       ),
 //      Indicator.ThresholdCrossing(

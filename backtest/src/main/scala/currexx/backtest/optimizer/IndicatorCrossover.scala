@@ -7,14 +7,14 @@ import cats.syntax.apply.*
 import cats.syntax.applicativeError.*
 import currexx.algorithms.operators.Crossover
 import currexx.domain.market.{Indicator, ValueTransformation as VT}
-import currexx.backtest.optimizer.syntax.*
+import currexx.backtest.syntax.*
 
 import scala.util.Random
 
 object IndicatorCrossover:
   def make[F[_]](using F: Sync[F]): F[Crossover[F, Indicator]] = F.pure {
     new Crossover[F, Indicator] {
-      val threeWaySplitCrossover = Crossover.pureThreeWaySplit[Int]
+      private val threeWaySplitCrossover = Crossover.pureThreeWaySplit[Int]
 
       override def cross(par1: Indicator, par2: Indicator)(using r: Random): F[Indicator] = {
 

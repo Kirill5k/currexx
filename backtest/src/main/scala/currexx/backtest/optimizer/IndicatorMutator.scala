@@ -3,14 +3,14 @@ package currexx.backtest.optimizer
 import cats.effect.Sync
 import currexx.algorithms.operators.Mutator
 import currexx.domain.market.{Indicator, ValueTransformation as VT}
-import currexx.backtest.optimizer.syntax.*
+import currexx.backtest.syntax.*
 
 import scala.util.Random
 
 object IndicatorMutator:
   def make[F[_]](using F: Sync[F]): F[Mutator[F, Indicator]] = F.pure {
     new Mutator[F, Indicator] {
-      val bitFlitMutator = Mutator.pureBitFlip
+      private val bitFlitMutator = Mutator.pureBitFlip
       override def mutate(ind: Indicator, mutationProbability: Double)(using r: Random): F[Indicator] = {
         def mutateInt(int: Int, maxValue: Int = 100, minValue: Int = 1): Int = {
           val res = math.min(bitFlitMutator.mutate(int.toBinaryArray(maxValue), mutationProbability).toInt, maxValue)

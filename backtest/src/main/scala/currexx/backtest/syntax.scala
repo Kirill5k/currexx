@@ -1,4 +1,4 @@
-package currexx.backtest.optimizer
+package currexx.backtest
 
 import scala.annotation.tailrec
 

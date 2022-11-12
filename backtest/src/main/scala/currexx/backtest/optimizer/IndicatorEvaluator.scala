@@ -9,7 +9,7 @@ import currexx.algorithms.Fitness
 import currexx.algorithms.operators.{Evaluator, Initialiser}
 import currexx.backtest.{MarketDataProvider, OrderStatsCollector, TestSettings}
 import currexx.backtest.services.TestServices
-import currexx.backtest.optimizer.syntax.*
+import currexx.backtest.syntax.*
 import currexx.core.trade.TradeStrategy
 import currexx.domain.market.Currency.{EUR, GBP}
 import currexx.domain.market.{CurrencyPair, Indicator, MovingAverage}

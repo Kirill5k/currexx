@@ -2,7 +2,7 @@ package currexx.backtest.optimizer
 
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.matchers.must.Matchers
-import currexx.backtest.optimizer.syntax.*
+import currexx.backtest.syntax.*
 
 class SyntaxSpec extends AnyWordSpec with Matchers {
 
