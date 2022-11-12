@@ -18,7 +18,7 @@ object Backtester extends IOApp.Simple {
 
   val settings = TestSettings.make(
     CurrencyPair(EUR, GBP),
-    TradeStrategy.TrendChangeAggressive,
+    TradeStrategy.LinesCrossing,
     List(
 //      Indicator.TrendChangeDetection(
 //        source = ValueSource.Close,
@@ -35,8 +35,8 @@ object Backtester extends IOApp.Simple {
 //      )
       Indicator.LinesCrossing(
         source = ValueSource.Close,
-        line1Transformation = ValueTransformation.HMA(44),
-        line2Transformation = ValueTransformation.HMA(43)
+        line1Transformation = ValueTransformation.JMA(45,100,1),
+        line2Transformation = ValueTransformation.JMA(27,100,1)
       ),
       Indicator.TrendChangeDetection(
         source = ValueSource.Close,

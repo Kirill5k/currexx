@@ -47,8 +47,8 @@ object Optimizer extends IOApp.Simple {
   )
 
   val testDataSets    = List("nzd-cad-1d.csv", "eur-chf-1d.csv", "nzd-chf-1d.csv", "eur-aud-1d.csv", "eur-gbp-1d.csv", "aud-cad-1d.csv")
-  val strategy        = TradeStrategy.LinesCrossing
-  val target          = linesCrossing
+  val strategy        = TradeStrategy.ThresholdCrossing
+  val target          = thresholdCrossing
   val otherIndicators = Nil
 
   override def run: IO[Unit] = for

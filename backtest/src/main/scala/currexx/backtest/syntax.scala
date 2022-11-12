@@ -8,7 +8,7 @@ object syntax {
     def roundTo(scale: Int): BigDecimal = bd.setScale(scale, RoundingMode.HALF_UP)
 
   extension (list: List[BigDecimal])
-    def mean: BigDecimal = list.sum / list.size
+    def mean: BigDecimal = if (list.isEmpty) BigDecimal(0) else list.sum / list.size
     def median: BigDecimal =
       if (list.isEmpty) BigDecimal(0)
       else if (list.size == 1) list.head
