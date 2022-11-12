@@ -34,9 +34,9 @@ object Optimizer extends IOApp.Simple {
   )
 
   val linesCrossing = Indicator.LinesCrossing(
-    ValueSource.HLC3,
-    ValueTransformation.JMA(20, 100, 2),
-    ValueTransformation.JMA(30, 100, 2)
+    ValueSource.Close,
+    ValueTransformation.HMA(20),
+    ValueTransformation.HMA(10)
   )
 
   val thresholdCrossing = Indicator.ThresholdCrossing(
