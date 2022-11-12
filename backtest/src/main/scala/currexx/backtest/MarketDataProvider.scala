@@ -10,6 +10,15 @@ import java.time.{Instant, LocalDate, ZoneOffset}
 import java.time.format.DateTimeFormatter
 
 object MarketDataProvider:
+  val majors = List(
+    "aud-usd-1d-2years.csv",
+    "eur-usd-1d-2years.csv",
+    "gbp-usd-1d-2years.csv",
+    "nzd-usd-1d-2years.csv",
+    "usd-cad-1d-2years.csv",
+    "usd-chf-1d-2years.csv"
+  )
+  
   val completeDataset = List(
     "aud-cad-1d.csv",
     "aud-jpy-1d.csv",

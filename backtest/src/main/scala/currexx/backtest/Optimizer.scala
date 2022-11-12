@@ -29,12 +29,12 @@ object Optimizer extends IOApp.Simple {
     source = ValueSource.Close,
     transformation = ValueTransformation.sequenced(
       ValueTransformation.HMA(21),
-//      ValueTransformation.RSX(3)
+      ValueTransformation.RSX(3)
     )
   )
 
   val linesCrossing = Indicator.LinesCrossing(
-    ValueSource.Close,
+    ValueSource.HLC3,
     ValueTransformation.JMA(20, 100, 2),
     ValueTransformation.JMA(30, 100, 2)
   )
@@ -46,9 +46,9 @@ object Optimizer extends IOApp.Simple {
     20D
   )
 
-  val testDataSets    = List("nzd-cad-1d.csv", "eur-chf-1d.csv", "nzd-chf-1d.csv", "eur-aud-1d.csv", "eur-gbp-1d.csv", "aud-cad-1d.csv")
-  val strategy        = TradeStrategy.ThresholdCrossing
-  val target          = thresholdCrossing
+  val testDataSets    = MarketDataProvider.majors
+  val strategy        = TradeStrategy.LinesCrossing
+  val target          = linesCrossing
   val otherIndicators = Nil
 
   override def run: IO[Unit] = for

@@ -6,6 +6,7 @@ import currexx.backtest.services.TestServices
 import syntax.*
 import currexx.core.trade.TradeStrategy
 import currexx.domain.market.{CurrencyPair, Indicator, MovingAverage, ValueSource, ValueTransformation}
+import currexx.domain.market.ValueTransformation.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import fs2.Stream
@@ -20,43 +21,23 @@ object Backtester extends IOApp.Simple {
     CurrencyPair(EUR, GBP),
     TradeStrategy.LinesCrossing,
     List(
-//      Indicator.TrendChangeDetection(
-//        source = ValueSource.Close,
-//        transformation = ValueTransformation.sequenced(
-//          ValueTransformation.JMA(21,100,7),
-//          ValueTransformation.RSX(3)
-//        )
-//      )
-//      Indicator.ThresholdCrossing(
-//        source = ValueSource.Close,
-//        transformation = ValueTransformation.RSX(3),
-//        upperBoundary = 52.0,
-//        lowerBoundary = 37.0
-//      )
-      Indicator.LinesCrossing(
-        source = ValueSource.Close,
-        line1Transformation = ValueTransformation.JMA(45,100,1),
-        line2Transformation = ValueTransformation.JMA(27,100,1)
-      ),
+      Indicator.LinesCrossing(ValueSource.Close, JMA(21,0,7),JMA(45,100,1)),
       Indicator.TrendChangeDetection(
         source = ValueSource.Close,
-        transformation = ValueTransformation.sequenced(
-          ValueTransformation.HMA(4),
-//          ValueTransformation.RSX(35)
-        )
+        transformation = ValueTransformation.sequenced(HMA(17), RSX(39))
       ),
-//      Indicator.ThresholdCrossing(
-//        source = ValueSource.Close,
-//        transformation = ValueTransformation.DoubleOutput.STOCH(20, 3, 3),
-//        upperBoundary = 75,
-//        lowerBoundary = 25
-//      )
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(35),
+        upperBoundary = 81,
+        lowerBoundary = 70
+      )
     )
   )
 
   override val run: IO[Unit] =
     Stream
-      .emits(MarketDataProvider.euusDataset)
+      .emits(MarketDataProvider.majors)
       .evalMap { filePath =>
         for
           _        <- logger.info(s"Processing $filePath")
