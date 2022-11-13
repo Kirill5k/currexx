@@ -12,6 +12,7 @@ final case class OrderStats(
     total: Int = 0,
     buys: Int = 0,
     sells: Int = 0,
+    losses: List[BigDecimal] = List.empty,
     totalProfit: BigDecimal = BigDecimal(0),
     biggestWin: BigDecimal = BigDecimal(0),
     biggestLoss: BigDecimal = BigDecimal(0),
@@ -19,10 +20,12 @@ final case class OrderStats(
 ):
   def medianProfitByMonth: BigDecimal = profitByMonth.values.toList.median.roundTo(5)
   def meanProfitByMonth: BigDecimal   = profitByMonth.values.toList.mean.roundTo(5)
+  def meanLoss: BigDecimal            = losses.mean.roundTo(5)
   def incBuy: OrderStats              = copy(total = total + 1, buys = buys + 1)
   def incSell: OrderStats             = copy(total = total + 1, sells = sells + 1)
   def close(profit: BigDecimal, time: Instant) =
     copy(
+      losses = if (profit < BigDecimal(0)) profit :: losses else losses,
       totalProfit = totalProfit + profit,
       biggestWin = profit.max(biggestWin),
       biggestLoss = profit.min(biggestLoss),
@@ -39,7 +42,9 @@ final case class OrderStats(
        |totalOrders=$total,
        |buys=$buys,
        |sells=$sells,
+       |losses=${losses.size},
        |biggestWin=$biggestWin,
+       |meanLoss=$meanLoss,
        |biggestLoss=$biggestLoss
        |)""".stripMargin.replaceAll("\n", "")
 

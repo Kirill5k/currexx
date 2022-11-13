@@ -19,10 +19,10 @@ object Backtester extends IOApp.Simple {
 
   val settings = TestSettings.make(
     CurrencyPair(EUR, GBP),
-    TradeStrategy.LinesCrossing,
+    TradeStrategy.TrendChangeAggressive,
     List(
-      Indicator.LinesCrossing(ValueSource.Close,HMA(39), HMA(9)),
-      Indicator.TrendChangeDetection(ValueSource.Close, sequenced(NMA(3,31,4.5, MovingAverage.Weighted))),
+      Indicator.LinesCrossing(ValueSource.Close,JMA(21,0,7),JMA(45,100,1)),
+      Indicator.TrendChangeDetection(ValueSource.Close, sequenced(NMA(6,21,13.0, MovingAverage.Hull))),
       Indicator.ThresholdCrossing(ValueSource.Close, RSX(41),44.0,13.0)
     )
   )
@@ -45,5 +45,7 @@ object Backtester extends IOApp.Simple {
       }
       .compile
       .toList
-      .flatMap(stats => logger.info(s"total profit: ${stats.map(_.totalProfit).sum}, median: ${stats.map(_.totalProfit).median}"))
+      .flatMap { stats =>
+        logger.info(s"total profit: ${stats.map(_.totalProfit).sum}, median: ${stats.map(_.totalProfit).median}, mean loss: ${stats.map(_.meanLoss).mean}")
+      }
 }
