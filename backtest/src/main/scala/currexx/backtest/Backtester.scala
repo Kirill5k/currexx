@@ -46,6 +46,6 @@ object Backtester extends IOApp.Simple {
       .compile
       .toList
       .flatMap { stats =>
-        logger.info(s"total profit: ${stats.map(_.totalProfit).sum}, median: ${stats.map(_.totalProfit).median}, mean loss: ${stats.map(_.meanLoss).mean}")
+        logger.info(s"total profit: ${stats.map(_.totalProfit).sum}, median: ${stats.map(_.totalProfit).median}, median loss: ${stats.map(_.meanLoss).median}")
       }
 }
