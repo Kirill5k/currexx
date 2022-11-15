@@ -53,6 +53,17 @@ class TradeControllerSpec extends ControllerSpec {
         verifyJsonResponse(res, Status.NoContent, None)
         verify(svc).closeOpenOrders(Users.uid)
       }
+
+      "close all for passed currency pair" in {
+        val svc = mock[TradeService[IO]]
+        when(svc.closeOpenOrders(any[UserId], any[CurrencyPair])).thenReturn(IO.unit)
+
+        val req = requestWithAuthHeader(uri"/trade/orders?currencyPair=GBPEUR", Method.DELETE)
+        val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        verifyJsonResponse(res, Status.NoContent, None)
+        verify(svc).closeOpenOrders(Users.uid, Markets.gbpeur)
+      }
     }
 
     "GET /trade/orders" should {
