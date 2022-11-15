@@ -3,7 +3,7 @@ package currexx.core.trade
 import cats.effect.IO
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.SearchParams
-import currexx.core.{IOWordSpec, ControllerSpec}
+import currexx.core.{ControllerSpec, IOWordSpec}
 import currexx.core.fixtures.{Markets, Sessions, Trades, Users}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, TradeOrder}
@@ -34,12 +34,24 @@ class TradeControllerSpec extends ControllerSpec {
              |}
              |""".stripMargin
 
-        val req = requestWithAuthHeader(uri"/trade/orders?closePendingOrders=false", Method.POST)
-          .withJsonBody(parseJson(requestBody))
+        val req = requestWithAuthHeader(uri"/trade/orders?closePendingOrders=false", Method.POST).withJsonBody(parseJson(requestBody))
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         verifyJsonResponse(res, Status.Created, None)
         verify(svc).placeOrder(Users.uid, Trades.order.order, false)
+      }
+    }
+
+    "DELETE /trade/orders" should {
+      "close all current positions" in {
+        val svc = mock[TradeService[IO]]
+        when(svc.closeOpenOrders(any[UserId])).thenReturn(IO.unit)
+
+        val req = requestWithAuthHeader(uri"/trade/orders", Method.DELETE)
+        val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        verifyJsonResponse(res, Status.NoContent, None)
+        verify(svc).closeOpenOrders(Users.uid)
       }
     }
 

@@ -22,7 +22,7 @@ object Backtester extends IOApp.Simple {
     TradeStrategy.TrendChangeAggressive,
     List(
       Indicator.LinesCrossing(ValueSource.Close,JMA(21,0,7),JMA(45,100,1)),
-      Indicator.TrendChangeDetection(ValueSource.Close, sequenced(NMA(6,21,13.0, MovingAverage.Hull))),
+      Indicator.TrendChangeDetection(ValueSource.Close, sequenced(NMA(5,17,9.5, MovingAverage.Hull))),
       Indicator.ThresholdCrossing(ValueSource.Close, RSX(41),44.0,13.0)
     )
   )

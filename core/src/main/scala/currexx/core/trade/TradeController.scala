@@ -41,6 +41,12 @@ final private class TradeController[F[_]](
           .voidResponse
       }
 
+  private def closeCurrentPositions(using auth: Authenticator[F]) =
+    closeCurrentPositionsEndpoint.withAuthenticatedSession
+      .serverLogic { session => _ =>
+        service.closeOpenOrders(session.userId).voidResponse
+      }
+  
   private def getTradeOrders(using auth: Authenticator[F]) =
     getTradeOrdersEndpoint.withAuthenticatedSession
       .serverLogic { session => sp =>
@@ -63,6 +69,7 @@ final private class TradeController[F[_]](
       List(
         getTradeSettings,
         updateTradeSettings,
+        closeCurrentPositions,
         getTradeOrders,
         submitTradeOrderPlacement
       )
@@ -105,6 +112,11 @@ object TradeController extends TapirSchema with TapirJson {
     .in(query[Boolean]("closePendingOrders").description("Close pending orders").default(true))
     .out(statusCode(StatusCode.Created))
     .description("Submit trade order placement")
+
+  val closeCurrentPositionsEndpoint = Controller.securedEndpoint.delete
+    .in(ordersPath)
+    .out(statusCode(StatusCode.NoContent))
+    .description("Close all current positions")
 
   val getTradeSettingsEndpoint = Controller.securedEndpoint.get
     .in(settingsPath)
