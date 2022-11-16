@@ -2,6 +2,7 @@ package currexx.core.trade
 
 import cats.Monad
 import cats.effect.Async
+import cats.effect.syntax.spawn.*
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import currexx.clients.broker.BrokerParameters
@@ -44,9 +45,11 @@ final private class TradeController[F[_]](
   private def closeCurrentPositions(using auth: Authenticator[F]) =
     closeCurrentPositionsEndpoint.withAuthenticatedSession
       .serverLogic { session => maybeCp =>
-        maybeCp
-          .fold(service.closeOpenOrders(session.userId))(cp => service.closeOpenOrders(session.userId, cp))
-          .voidResponse
+        val process = maybeCp match
+          case Some(cp) => service.closeOpenOrders(session.userId, cp)
+          case None     => service.closeOpenOrders(session.userId)
+
+        process.start.voidResponse
       }
 
   private def getTradeOrders(using auth: Authenticator[F]) =
