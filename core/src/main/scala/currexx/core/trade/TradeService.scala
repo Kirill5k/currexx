@@ -85,8 +85,14 @@ final private class LiveTradeService[F[_]](
       foundOrders <- brokerClient.find(settings.broker, cps)
       time        <- clock.currentTime
       _ <- foundOrders
-        .filter(o => limits.min.exists(_ > o.profit) || limits.max.exists(_ < o.profit))
-        .map(o => TradeOrderPlacement(uid, TradeOrder.Exit(o.currencyPair, o.currentPrice), settings.broker, time))
+        .collect {
+          case o if limits.max.exists(o.profit > _) && limits.trailing =>
+            List(TradeOrder.Exit(o.currencyPair, o.currentPrice), TradeOrder.Enter(o.position, o.currencyPair, o.currentPrice, o.volume))
+          case o if limits.min.exists(o.profit < _) || limits.max.exists(o.profit > _) =>
+            List(TradeOrder.Exit(o.currencyPair, o.currentPrice))
+        }
+        .flatten
+        .map(to => TradeOrderPlacement(uid, to, settings.broker, time))
         .traverse(submitOrderPlacement)
     yield ()
 

@@ -197,7 +197,7 @@ class TradeServiceSpec extends IOWordSpec {
         yield ()
 
         result.asserting { res =>
-          val exitOrder = TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close)
+          val exitOrder   = TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close)
           val placedOrder = TradeOrderPlacement(Users.uid, exitOrder, Trades.broker, now)
           verifyNoInteractions(settRepo)
           verify(dataClient).latestPrice(Markets.gbpeur)
@@ -241,11 +241,11 @@ class TradeServiceSpec extends IOWordSpec {
         val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(None, Some(10), None, None))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(None, Some(10), None, None, false))
         yield ()
 
         result.asserting { res =>
-          val exitOrder = TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close)
+          val exitOrder   = TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close)
           val placedOrder = TradeOrderPlacement(Users.uid, exitOrder, Trades.broker, now)
           verifyNoInteractions(dataClient)
           verify(settRepo).get(Users.uid)
@@ -253,6 +253,39 @@ class TradeServiceSpec extends IOWordSpec {
           verify(brokerClient).submit(Trades.broker, exitOrder)
           verify(orderRepo).save(placedOrder)
           disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
+          res mustBe ()
+        }
+      }
+
+      "submit close and open orders if profit is above max and is trailing" in {
+        val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
+        when(settRepo.get(any[UserId])).thenReturnIO(Trades.settings)
+        when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]])).thenReturnIO(List(Trades.openedOrder))
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
+        when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
+
+        val cps = NonEmptyList.of(Markets.gbpeur)
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(None, Some(10), None, None, true))
+        yield ()
+
+        result.asserting { res =>
+          val exitOrder        = TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close)
+          val enterOrder       = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, Markets.priceRange.close, BigDecimal(0.1))
+          val placedExitOrder  = TradeOrderPlacement(Users.uid, exitOrder, Trades.broker, now)
+          val placedEnterOrder = TradeOrderPlacement(Users.uid, enterOrder, Trades.broker, now)
+          verifyNoInteractions(dataClient)
+          verify(settRepo).get(Users.uid)
+          verify(brokerClient).find(Trades.broker, cps)
+          verify(brokerClient).submit(Trades.broker, exitOrder)
+          verify(brokerClient).submit(Trades.broker, enterOrder)
+          verify(orderRepo).save(placedExitOrder)
+          verify(orderRepo).save(placedEnterOrder)
+          disp.submittedActions mustBe List(
+            Action.ProcessTradeOrderPlacement(placedExitOrder),
+            Action.ProcessTradeOrderPlacement(placedEnterOrder)
+          )
           res mustBe ()
         }
       }
@@ -268,11 +301,11 @@ class TradeServiceSpec extends IOWordSpec {
         val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None, false))
         yield ()
 
         result.asserting { res =>
-          val exitOrder = TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close)
+          val exitOrder   = TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close)
           val placedOrder = TradeOrderPlacement(Users.uid, exitOrder, Trades.broker, now)
           verifyNoInteractions(dataClient)
           verify(settRepo).get(Users.uid)
@@ -293,7 +326,7 @@ class TradeServiceSpec extends IOWordSpec {
         val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None, false))
         yield ()
 
         result.asserting { res =>
@@ -314,7 +347,7 @@ class TradeServiceSpec extends IOWordSpec {
         val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None, false))
         yield ()
 
         result.asserting { res =>
@@ -364,7 +397,7 @@ class TradeServiceSpec extends IOWordSpec {
         yield ()
 
         result.asserting { res =>
-          val order = Trades.settings.trading.toOrder(TradeOrder.Position.Buy, Markets.gbpeur, 3.0)
+          val order       = Trades.settings.trading.toOrder(TradeOrder.Position.Buy, Markets.gbpeur, 3.0)
           val placedOrder = TradeOrderPlacement(Users.uid, order, Trades.broker, now)
           verify(settRepo).get(Users.uid)
           verify(brokerClient).submit(Trades.broker, TradeOrder.Exit(Markets.gbpeur, 3.0))
