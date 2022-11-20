@@ -31,7 +31,7 @@ class MonitorControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.Created, Some(s"""{"id":"${Monitors.mid}"}"""))
+        res mustHaveStatus (Status.Created, Some(s"""{"id":"${Monitors.mid}"}"""))
         verify(svc).create(Monitors.createMarketData())
       }
 
@@ -51,7 +51,7 @@ class MonitorControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.Conflict, Some("""{"message":"Monitor for currency pair GBPEUR already exists"}"""))
+        res mustHaveStatus (Status.Conflict, Some("""{"message":"Monitor for currency pair GBPEUR already exists"}"""))
         verify(svc).create(Monitors.createMarketData())
       }
 
@@ -87,7 +87,7 @@ class MonitorControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uriWith(Monitors.mid, "/pause"), method = Method.PUT)
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.NoContent, None)
+        res mustHaveStatus (Status.NoContent, None)
         verify(svc).pause(Users.uid, Monitors.mid)
       }
 
@@ -99,7 +99,7 @@ class MonitorControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/monitors/foo/pause", method = Method.PUT)
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.UnprocessableEntity, Some("""{"message":"Invalid hexadecimal representation of an id: foo"}"""))
+        res mustHaveStatus (Status.UnprocessableEntity, Some("""{"message":"Invalid hexadecimal representation of an id: foo"}"""))
         verifyNoInteractions(svc)
       }
 
@@ -112,7 +112,7 @@ class MonitorControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uriWith(Monitors.mid, "/pause"), method = Method.PUT)
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.NotFound, Some(s"""{"message":"Monitor with id ${Monitors.mid} does not exist"}"""))
+        res mustHaveStatus (Status.NotFound, Some(s"""{"message":"Monitor with id ${Monitors.mid} does not exist"}"""))
         verify(svc).pause(Users.uid, Monitors.mid)
       }
     }
@@ -127,7 +127,7 @@ class MonitorControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uriWith(Monitors.mid, "/resume"), method = Method.PUT)
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.NoContent, None)
+        res mustHaveStatus (Status.NoContent, None)
         verify(svc).resume(Users.uid, Monitors.mid)
       }
     }
@@ -142,7 +142,7 @@ class MonitorControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.DELETE)
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.NoContent, None)
+        res mustHaveStatus (Status.NoContent, None)
         verify(svc).delete(Users.uid, Monitors.mid)
       }
     }
@@ -157,7 +157,7 @@ class MonitorControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uriWith(Monitors.mid, "/query"), method = Method.POST)
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.NoContent, None)
+        res mustHaveStatus (Status.NoContent, None)
         verify(svc).triggerMonitor(Users.uid, Monitors.mid, true)
       }
     }
@@ -194,7 +194,7 @@ class MonitorControllerSpec extends ControllerSpec {
              |}
              |]""".stripMargin
 
-        verifyJsonResponse(res, Status.Ok, Some(responseBody))
+        res mustHaveStatus (Status.Ok, Some(responseBody))
         verify(svc).getAll(Users.uid)
       }
     }
@@ -219,7 +219,7 @@ class MonitorControllerSpec extends ControllerSpec {
              |"interval": "H1"
              |}""".stripMargin
 
-        verifyJsonResponse(res, Status.Ok, Some(responseBody))
+        res mustHaveStatus (Status.Ok, Some(responseBody))
         verify(svc).get(Users.uid, Monitors.mid)
       }
     }
@@ -244,7 +244,7 @@ class MonitorControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT).withJsonBody(parseJson(requestBody))
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.NoContent, None)
+        res mustHaveStatus (Status.NoContent, None)
         verify(svc).update(Monitors.marketData)
       }
 
@@ -267,7 +267,7 @@ class MonitorControllerSpec extends ControllerSpec {
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody = """{"message":"Id provided in the path does not match with id in the request body"}"""
-        verifyJsonResponse(res, Status.BadRequest, Some(responseBody))
+        res mustHaveStatus (Status.BadRequest, Some(responseBody))
         verifyNoInteractions(svc)
       }
     }
