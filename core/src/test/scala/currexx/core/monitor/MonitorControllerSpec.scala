@@ -189,7 +189,7 @@ class MonitorControllerSpec extends ControllerSpec {
              |"currencyPairs": ["${Markets.gbpeur}"],
              |"schedule": {"kind":"periodic","period":"3 hours"},
              |"lastQueriedAt": "${Monitors.queriedAt}",
-             |"limits": {"min": -10, "max": 150, "cumulativeMin" : null, "cumulativeMax" : null},
+             |"limits": {"min": -10, "max": 150, "cumulativeMin" : null, "cumulativeMax" : null, "trailing": false},
              |"kind": "profit"
              |}
              |]""".stripMargin
