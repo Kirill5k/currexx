@@ -37,7 +37,7 @@ class TradeControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/trade/orders?closePendingOrders=false", Method.POST).withJsonBody(parseJson(requestBody))
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.Created, None)
+        res mustHaveStatus (Status.Created, None)
         verify(svc).placeOrder(Users.uid, Trades.order.order, false)
       }
     }
@@ -50,7 +50,7 @@ class TradeControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/trade/orders", Method.DELETE)
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.NoContent, None)
+        res mustHaveStatus (Status.NoContent, None)
         verify(svc).closeOpenOrders(Users.uid)
       }
 
@@ -61,7 +61,7 @@ class TradeControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/trade/orders?currencyPair=GBPEUR", Method.DELETE)
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.NoContent, None)
+        res mustHaveStatus (Status.NoContent, None)
         verify(svc).closeOpenOrders(Users.uid, Markets.gbpeur)
       }
     }
@@ -91,7 +91,7 @@ class TradeControllerSpec extends ControllerSpec {
              |  "time" : "${Trades.ts}"
              |}
              |]""".stripMargin
-        verifyJsonResponse(res, Status.Ok, Some(responseBody))
+        res mustHaveStatus (Status.Ok, Some(responseBody))
         verify(svc).getAllOrders(Users.uid, SearchParams(Some(Instant.parse("2020-01-01T00:00:00Z")), None, Some(Markets.gbpeur)))
       }
     }
@@ -120,7 +120,7 @@ class TradeControllerSpec extends ControllerSpec {
              |  "takeProfit" : null
              |}
              |}""".stripMargin
-        verifyJsonResponse(res, Status.Ok, Some(responseBody))
+        res mustHaveStatus (Status.Ok, Some(responseBody))
         verify(svc).getSettings(Users.uid)
       }
 
@@ -131,7 +131,7 @@ class TradeControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/trade/settings", Method.GET)
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.NotFound, Some("""{"message":"Current account doesn't have Trade-settings set up"}"""))
+        res mustHaveStatus (Status.NotFound, Some("""{"message":"Current account doesn't have Trade-settings set up"}"""))
         verify(svc).getSettings(Users.uid)
       }
     }
@@ -161,7 +161,7 @@ class TradeControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/trade/settings", Method.PUT).withJsonBody(parseJson(requestBody))
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.NoContent, None)
+        res mustHaveStatus (Status.NoContent, None)
         verify(svc).updateSettings(Trades.settings.copy(strategy = TradeStrategy.TrendChange))
       }
     }

@@ -23,7 +23,7 @@ class MarketControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/market/state?dryRun=false", Method.DELETE)
         val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.NoContent, None)
+        res mustHaveStatus (Status.NoContent, None)
         verify(svc).clearState(Users.uid, true)
       }
 
@@ -34,7 +34,7 @@ class MarketControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/market/state?closePendingOrders=false&dryRun=false", Method.DELETE)
         val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.NoContent, None)
+        res mustHaveStatus (Status.NoContent, None)
         verify(svc).clearState(Users.uid, false)
       }
 
@@ -45,7 +45,7 @@ class MarketControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/market/state?closePendingOrders=false&dryRun=false&currencyPair=GBPEUR", Method.DELETE)
         val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.NoContent, None)
+        res mustHaveStatus (Status.NoContent, None)
         verify(svc).clearState(Users.uid, Markets.gbpeur, false)
       }
 
@@ -55,7 +55,7 @@ class MarketControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/market/state", Method.DELETE)
         val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.NoContent, None)
+        res mustHaveStatus (Status.NoContent, None)
         verifyNoInteractions(svc)
       }
     }
@@ -104,7 +104,7 @@ class MarketControllerSpec extends ControllerSpec {
              |}
              |""".stripMargin
 
-        verifyJsonResponse(res, Status.Ok, Some(responseBody))
+        res mustHaveStatus (Status.Ok, Some(responseBody))
         verify(svc).getState(Users.uid)
       }
     }

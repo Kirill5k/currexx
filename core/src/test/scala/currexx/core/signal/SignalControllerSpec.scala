@@ -42,7 +42,7 @@ class SignalControllerSpec extends ControllerSpec {
           now
         )
 
-        verifyJsonResponse(res, Status.NoContent, None)
+        res mustHaveStatus (Status.NoContent, None)
         verify(svc).submit(submittedSignal)
       }
 
@@ -58,7 +58,7 @@ class SignalControllerSpec extends ControllerSpec {
 
         val responseBody =
           """{"message":"Missing required field, Received unknown type: 'foo'. Exists only types: lines-crossing, threshold-crossing, trend-change-detection."}"""
-        verifyJsonResponse(res, Status.UnprocessableEntity, Some(responseBody))
+        res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
       }
 
@@ -75,7 +75,7 @@ class SignalControllerSpec extends ControllerSpec {
 
         val responseBody =
           """{"message":"Received unknown type: 'foo'. Exists only types: above-threshold, crossing-up, trend-direction-change, crossing-down, below-threshold."}"""
-        verifyJsonResponse(res, Status.UnprocessableEntity, Some(responseBody))
+        res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
       }
 
@@ -92,7 +92,7 @@ class SignalControllerSpec extends ControllerSpec {
 
         val responseBody =
           """{"message":"Unknown currency code FOO; Available currencies are: PLN, CAD, AUD, GBP, CHF, DKK, JPY, USD, RUB, NZD, NOK, EUR"}"""
-        verifyJsonResponse(res, Status.UnprocessableEntity, Some(responseBody))
+        res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
       }
 
@@ -107,7 +107,7 @@ class SignalControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withJsonBody(parseJson(reqBody))
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.UnprocessableEntity, Some("""{"message":"FOO-BAR is not valid currency pair representation"}"""))
+        res mustHaveStatus (Status.UnprocessableEntity, Some("""{"message":"FOO-BAR is not valid currency pair representation"}"""))
         verifyNoInteractions(svc)
       }
     }
@@ -126,7 +126,7 @@ class SignalControllerSpec extends ControllerSpec {
                |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
                |"condition": {"kind":"trend-direction-change","from":"downward","to":"upward","previousTrendLength":1}
                |}]""".stripMargin
-        verifyJsonResponse(res, Status.Ok, Some(responseBody))
+        res mustHaveStatus (Status.Ok, Some(responseBody))
         verify(svc).getAll(
           Users.uid,
           SearchParams(Some(Instant.parse("2020-01-01T00:00:00Z")), Some(Instant.parse("2021-01-01T04:01:00Z")), Some(Markets.gbpusd))
@@ -140,7 +140,7 @@ class SignalControllerSpec extends ControllerSpec {
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody = s"""{"message":"Date 'from' must be before date 'to'"}"""
-        verifyJsonResponse(res, Status.UnprocessableEntity, Some(responseBody))
+        res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
       }
     }
@@ -163,7 +163,7 @@ class SignalControllerSpec extends ControllerSpec {
               | "transformation": {"kind": "hma", "length": 16}
               |}
               |]}""".stripMargin
-        verifyJsonResponse(res, Status.Ok, Some(responseBody))
+        res mustHaveStatus (Status.Ok, Some(responseBody))
         verify(svc).getSettings(Users.uid)
       }
 
@@ -174,7 +174,7 @@ class SignalControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/signals/settings", Method.GET)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.NotFound, Some("""{"message":"Current account doesn't have Signal-settings set up"}"""))
+        res mustHaveStatus (Status.NotFound, Some("""{"message":"Current account doesn't have Signal-settings set up"}"""))
         verify(svc).getSettings(Users.uid)
       }
     }
@@ -198,7 +198,7 @@ class SignalControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/signals/settings", Method.PUT).withJsonBody(parseJson(requestBody))
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(res, Status.NoContent, None)
+        res mustHaveStatus (Status.NoContent, None)
         verify(svc).updateSettings(Signals.settings.copy(triggerFrequency = TriggerFrequency.Continuously))
       }
     }

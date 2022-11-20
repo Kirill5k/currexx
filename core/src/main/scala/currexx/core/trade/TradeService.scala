@@ -58,7 +58,7 @@ final private class LiveTradeService[F[_]](
   override def placeOrder(uid: UserId, order: TradeOrder, closePendingOrders: Boolean): F[Unit] =
     F.whenA(closePendingOrders)(closeOpenOrders(uid, order.currencyPair)) >>
       (clock.currentTime, settingsRepository.get(uid))
-        .mapN((time, sett) => TradeOrderPlacement(uid, order, sett.broker, time))
+        .mapN((time, sett) => sett.orderPlacement(order, time))
         .flatMap(submitOrderPlacement)
 
   override def closeOpenOrders(uid: UserId): F[Unit] =
@@ -92,7 +92,7 @@ final private class LiveTradeService[F[_]](
             List(TradeOrder.Exit(o.currencyPair, o.currentPrice))
         }
         .flatten
-        .map(to => TradeOrderPlacement(uid, to, settings.broker, time))
+        .map(to => settings.orderPlacement(to, time))
         .traverse(submitOrderPlacement)
     yield ()
 
@@ -107,7 +107,7 @@ final private class LiveTradeService[F[_]](
             case Decision.Sell  => settings.trading.toOrder(TradeOrder.Position.Sell, state.currencyPair, price.close)
             case Decision.Close => TradeOrder.Exit(state.currencyPair, price.close)
           }
-          .map(order => TradeOrderPlacement(state.userId, order, settings.broker, time))
+          .map(order => settings.orderPlacement(order, time))
       }
       .flatMap {
         case Some(top) =>
@@ -125,6 +125,9 @@ final private class LiveTradeService[F[_]](
       dispatcher.dispatch(Action.ProcessTradeOrderPlacement(top))
 
   extension (ms: MarketState) def hasOpenPosition: Boolean = ms.currentPosition.isDefined
+  extension (ts: TradeSettings)
+    def orderPlacement(to: TradeOrder, time: Instant): TradeOrderPlacement =
+      TradeOrderPlacement(ts.userId, to, ts.broker, time)
 }
 
 object TradeService:
