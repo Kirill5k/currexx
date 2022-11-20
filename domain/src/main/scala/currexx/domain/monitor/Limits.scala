@@ -18,7 +18,7 @@ object Limits {
     Either.cond(
       min.isDefined || max.isDefined || cumulativeMin.isDefined || cumulativeMax.isDefined,
       Limits(min, max, cumulativeMin, cumulativeMax),
-      "Limits must have at least one of the field defined"
+      "Limits must have at least one of the fields defined"
     )
   }
 }

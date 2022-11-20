@@ -71,8 +71,8 @@ class MonitorControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val responseBody = s"""{"message":"Limits must have at least one of the field defined"}"""
-        verifyJsonResponse(res, Status.UnprocessableEntity, Some(responseBody))
+        val responseBody = s"""{"message":"Limits must have at least one of the fields defined"}"""
+        res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
       }
     }

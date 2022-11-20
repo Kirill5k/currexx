@@ -42,4 +42,8 @@ trait ControllerSpec extends AnyWordSpec with MockitoMatchers with Matchers {
 
   def parseJson(jsonString: String): Json =
     parse(jsonString).getOrElse(throw new RuntimeException)
+    
+  extension (res: IO[Response[IO]])
+    def mustHaveStatus(expectedStatus: Status, expectedBody: Option[String] = None): Assertion =
+      verifyJsonResponse(res, expectedStatus, expectedBody)
 }

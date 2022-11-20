@@ -11,7 +11,7 @@ class LimitsSpec extends AnyWordSpec with Matchers {
     "not allow to create limits with empty fields" in {
       val result = decode[Limits]("{}")
 
-      result mustBe Left(DecodingFailure("Limits must have at least one of the field defined", Nil))
+      result mustBe Left(DecodingFailure("Limits must have at least one of the fields defined", Nil))
     }
 
     "parse limits from json" in {
