@@ -1,6 +1,6 @@
 package currexx.core.common
 
-import java.time.{Instant, LocalDate, LocalDateTime, ZoneOffset}
+import java.time.{DayOfWeek, Instant, LocalDate, LocalDateTime, ZoneOffset}
 import scala.concurrent.duration.*
 import scala.util.Try
 
@@ -15,6 +15,7 @@ object time:
 
   extension (ld: LocalDate) def toInstantAtStartOfDay: Instant = ld.atStartOfDay().toInstant(ZoneOffset.UTC)
   extension (ts: Instant)
+    def dayOfWeek: DayOfWeek   = ts.atZone(ZoneOffset.UTC).getDayOfWeek
     def toLocalDate: LocalDate = LocalDate.parse(ts.toString.slice(0, 10))
     def atStartOfDay: Instant  = toLocalDate.atStartOfDay().toInstant(ZoneOffset.UTC)
     def atEndOfDay: Instant    = toLocalDate.plusDays(1).atStartOfDay().minusSeconds(1).toInstant(ZoneOffset.UTC)
