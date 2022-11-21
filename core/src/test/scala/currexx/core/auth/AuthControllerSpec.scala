@@ -19,7 +19,7 @@ import java.time.Instant
 class AuthControllerSpec extends ControllerSpec {
 
   "An AuthController" when {
-    val now = Instant.now
+    val now         = Instant.now
     given Clock[IO] = MockClock[IO](now)
 
     "GET /auth/user" should {
@@ -91,11 +91,7 @@ class AuthControllerSpec extends ControllerSpec {
         val req     = Request[IO](uri = uri"/auth/user", method = Method.POST).withJsonBody(reqBody)
         val res     = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(
-          res,
-          Status.Conflict,
-          Some("""{"message":"An account with email foo@bar.com already exists"}""")
-        )
+        res mustHaveStatus (Status.Conflict, Some("""{"message":"An account with email foo@bar.com already exists"}"""))
         verify(usrSvc).create(
           UserDetails(UserEmail("foo@bar.com"), UserName("John", "Bloggs")),
           Password("pwd")
@@ -109,11 +105,7 @@ class AuthControllerSpec extends ControllerSpec {
         val req     = Request[IO](uri = uri"/auth/user", method = Method.POST).withJsonBody(reqBody)
         val res     = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
-        verifyJsonResponse(
-          res,
-          Status.UnprocessableEntity,
-          Some("""{"message":"password must not be empty"}""")
-        )
+        res mustHaveStatus (Status.UnprocessableEntity, Some("""{"message":"password must not be empty"}"""))
         verifyNoInteractions(usrSvc, sessSvc)
       }
 
@@ -153,9 +145,9 @@ class AuthControllerSpec extends ControllerSpec {
       "return bad req on parsing error" in {
         val (usrSvc, sessSvc) = mocks
 
-        val reqBody  = parseJson("""{"email":"foo","password":""}""")
-        val req      = Request[IO](uri = uri"/auth/login", method = Method.POST).withJsonBody(reqBody)
-        val res = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
+        val reqBody = parseJson("""{"email":"foo","password":""}""")
+        val req     = Request[IO](uri = uri"/auth/login", method = Method.POST).withJsonBody(reqBody)
+        val res     = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         val resBody = """{"message":"foo is not a valid email, password must not be empty"}"""
         res mustHaveStatus (Status.UnprocessableEntity, Some(resBody))
