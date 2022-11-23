@@ -9,6 +9,7 @@ import currexx.domain.user.UserId
 import currexx.calculations.{Filters, MomentumOscillators, MovingAverages}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
+import currexx.core.common.time.*
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{
@@ -70,12 +71,15 @@ final private class LiveSignalService[F[_]](
 object SignalService:
 
   extension (vs: VS)
-    private def extract(data: MarketTimeSeriesData): List[Double] =
+    private def extract(data: MarketTimeSeriesData): List[Double] = {
+      val hour = data.prices.head.time.hour
+      val prices = if (hour > 1 && hour < 12) data.prices.toList.drop(1) else data.prices.toList
       vs match
-        case VS.Close => data.prices.map(_.close).toList
-        case VS.Open  => data.prices.map(_.open).toList
-        case VS.HL2   => data.prices.map(p => (p.high + p.low) / 2).toList
-        case VS.HLC3  => data.prices.map(p => (p.high + p.low + p.close) / 3).toList
+        case VS.Close => prices.map(_.close)
+        case VS.Open  => prices.map(_.open)
+        case VS.HL2   => prices.map(p => (p.high + p.low) / 2)
+        case VS.HLC3  => prices.map(p => (p.high + p.low + p.close) / 3)
+    }
 
   extension (vt: VT)
     private def transform(data: List[Double], ref: MarketTimeSeriesData): List[Double] =

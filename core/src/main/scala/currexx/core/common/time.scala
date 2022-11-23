@@ -15,6 +15,7 @@ object time:
 
   extension (ld: LocalDate) def toInstantAtStartOfDay: Instant = ld.atStartOfDay().toInstant(ZoneOffset.UTC)
   extension (ts: Instant)
+    def hour: Int              = ts.atZone(ZoneOffset.UTC).getHour
     def dayOfWeek: DayOfWeek   = ts.atZone(ZoneOffset.UTC).getDayOfWeek
     def toLocalDate: LocalDate = LocalDate.parse(ts.toString.slice(0, 10))
     def atStartOfDay: Instant  = toLocalDate.atStartOfDay().toInstant(ZoneOffset.UTC)
