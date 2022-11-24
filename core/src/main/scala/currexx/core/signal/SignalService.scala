@@ -73,7 +73,7 @@ object SignalService:
   extension (vs: VS)
     private def extract(data: MarketTimeSeriesData): List[Double] = {
       val hour = data.prices.head.time.hour
-      val prices = if (hour > 1 && hour < 12) data.prices.toList.drop(1) else data.prices.toList
+      val prices = if (hour > 1 && hour < 12) data.prices.tail else data.prices.toList
       vs match
         case VS.Close => prices.map(_.close)
         case VS.Open  => prices.map(_.open)
