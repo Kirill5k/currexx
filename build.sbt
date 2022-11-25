@@ -37,8 +37,7 @@ val domain = project
   .settings(
     name       := "currexx-domain",
     moduleName := "currexx-domain",
-    libraryDependencies ++= Dependencies.domain ++ Dependencies.test,
-    libraryDependencies += compilerPlugin(Dependencies.zerowaste)
+    libraryDependencies ++= Dependencies.domain ++ Dependencies.test
   )
 
 val algorithms = project
@@ -46,8 +45,7 @@ val algorithms = project
   .settings(
     name       := "currexx-algorithms",
     moduleName := "currexx-algorithms",
-    libraryDependencies ++= Dependencies.algorithms ++ Dependencies.test,
-    libraryDependencies += compilerPlugin(Dependencies.zerowaste)
+    libraryDependencies ++= Dependencies.algorithms ++ Dependencies.test
   )
 
 val calculations = project
@@ -64,8 +62,7 @@ val clients = project
   .settings(
     name       := "currexx-clients",
     moduleName := "currexx-clients",
-    libraryDependencies ++= Dependencies.clients ++ Dependencies.test,
-    libraryDependencies += compilerPlugin(Dependencies.zerowaste)
+    libraryDependencies ++= Dependencies.clients ++ Dependencies.test
   )
 
 val core = project
@@ -76,8 +73,7 @@ val core = project
   .settings(
     name       := "currexx-core",
     moduleName := "currexx-core",
-    libraryDependencies ++= Dependencies.core,
-    libraryDependencies += compilerPlugin(Dependencies.zerowaste)
+    libraryDependencies ++= Dependencies.core
   )
 
 val backtest = project
@@ -86,8 +82,7 @@ val backtest = project
   .settings(
     name       := "currexx-backtest",
     moduleName := "currexx-backtest",
-    libraryDependencies ++= Dependencies.test,
-    libraryDependencies += compilerPlugin(Dependencies.zerowaste)
+    libraryDependencies ++= Dependencies.test
   )
 
 val root = project
