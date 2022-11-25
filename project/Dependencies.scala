@@ -20,6 +20,8 @@ object Dependencies {
 
     val scalaTest = "3.2.14"
     val mockito   = "3.2.14.0"
+
+    val zerowaste = "0.2.1"
   }
 
   object Libraries {
@@ -80,6 +82,8 @@ object Dependencies {
     val scalaTest = "org.scalatest"     %% "scalatest"   % Versions.scalaTest
     val mockito   = "org.scalatestplus" %% "mockito-4-6" % Versions.mockito
   }
+
+  val zerowaste = ("com.github.ghik" % "zerowaste" % Versions.zerowaste).cross(CrossVersion.full)
 
   val domain = Seq(
     Libraries.cronUtils,

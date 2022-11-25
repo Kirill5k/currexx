@@ -13,6 +13,7 @@ import sttp.client3.{SttpBackend, SttpBackendOptions}
 
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.*
+import scala.annotation.nowarn
 
 final class Resources[F[_]] private (
     val mongo: MongoDatabase[F],
@@ -21,15 +22,15 @@ final class Resources[F[_]] private (
 
 object Resources:
 
-  private def mongoDb[F[_] : Async](config: MongoConfig): Resource[F, MongoDatabase[F]] =
+  private def mongoDb[F[_]: Async](config: MongoConfig): Resource[F, MongoDatabase[F]] =
     val settings = MongoClientSettings
       .builder()
       .applyConnectionString(ConnectionString(config.connectionUri))
       .applyToSocketSettings { builder =>
-        builder.connectTimeout(3, TimeUnit.MINUTES).readTimeout(3, TimeUnit.MINUTES)
+        builder.connectTimeout(3, TimeUnit.MINUTES).readTimeout(3, TimeUnit.MINUTES): @nowarn("msg=discarded expression")
       }
       .applyToClusterSettings { builder =>
-        builder.serverSelectionTimeout(3, TimeUnit.MINUTES)
+        builder.serverSelectionTimeout(3, TimeUnit.MINUTES): @nowarn("msg=discarded expression")
       }
       .build()
     MongoClient.create[F](settings).evalMap(_.getDatabase("currexx"))
