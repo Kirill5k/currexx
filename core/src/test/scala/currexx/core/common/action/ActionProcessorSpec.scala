@@ -8,6 +8,7 @@ import currexx.core.market.MarketService
 import currexx.core.monitor.MonitorService
 import currexx.core.signal.{Signal, SignalService}
 import currexx.core.trade.TradeService
+import currexx.core.settings.SettingsService
 import currexx.domain.market.CurrencyPair
 import currexx.domain.user.UserId
 
@@ -17,13 +18,13 @@ class ActionProcessorSpec extends IOWordSpec {
 
   "An ActionProcessor" should {
     "process submitted signals" in {
-      val (monsvc, sigsvc, marksvc, tradesvc) = mocks
+      val (monsvc, sigsvc, marksvc, tradesvc, settvc) = mocks
 
       when(marksvc.processSignals(any[UserId], any[CurrencyPair], anyList[Signal])).thenReturn(IO.unit)
 
       val result = for
         dispatcher <- ActionDispatcher.make[IO]
-        processor  <- ActionProcessor.make[IO](dispatcher, monsvc, sigsvc, marksvc, tradesvc)
+        processor  <- ActionProcessor.make[IO](dispatcher, monsvc, sigsvc, marksvc, tradesvc, settvc)
         _          <- dispatcher.dispatch(Action.ProcessSignals(Users.uid, Markets.gbpeur, List(Signals.trendDirectionChanged)))
         res        <- processor.run.interruptAfter(2.second).compile.drain
       yield res
@@ -35,6 +36,6 @@ class ActionProcessorSpec extends IOWordSpec {
     }
   }
 
-  def mocks: (MonitorService[IO], SignalService[IO], MarketService[IO], TradeService[IO]) =
-    (mock[MonitorService[IO]], mock[SignalService[IO]], mock[MarketService[IO]], mock[TradeService[IO]])
+  def mocks: (MonitorService[IO], SignalService[IO], MarketService[IO], TradeService[IO], SettingsService[IO]) =
+    (mock[MonitorService[IO]], mock[SignalService[IO]], mock[MarketService[IO]], mock[TradeService[IO]], mock[SettingsService[IO]])
 }

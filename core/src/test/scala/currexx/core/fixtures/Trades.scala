@@ -2,7 +2,7 @@ package currexx.core.fixtures
 
 import currexx.clients.broker.BrokerParameters
 import currexx.domain.market.{OpenedTradeOrder, TradeOrder}
-import currexx.core.trade.{TradeOrderPlacement, TradeSettings, TradeStrategy, TradingParameters}
+import currexx.core.trade.{TradeOrderPlacement, TradeStrategy}
 
 import java.time.Instant
 import java.time.temporal.ChronoField

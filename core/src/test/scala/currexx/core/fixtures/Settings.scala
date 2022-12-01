@@ -1,14 +1,13 @@
 package currexx.core.fixtures
 
 import currexx.clients.broker.BrokerParameters
-import currexx.core.settings.{GlobalSettings, SignalParameters, TradeParameters}
-import currexx.core.signal.{SignalSettings, TriggerFrequency}
-import currexx.core.trade.{TradeSettings, TradeStrategy, TradingParameters}
+import currexx.core.settings.{GlobalSettings, SignalSettings, TradeSettings, TradingParameters, TriggerFrequency}
+import currexx.core.trade.TradeStrategy
 
 object Settings {
 
-  lazy val signal = SignalParameters(TriggerFrequency.OncePerDay, List(Markets.trendChangeDetection))
-  lazy val trade = TradeParameters(
+  lazy val signal = SignalSettings(TriggerFrequency.OncePerDay, List(Markets.trendChangeDetection))
+  lazy val trade = TradeSettings(
     TradeStrategy.Disabled,
     BrokerParameters.Vindaloo("1"),
     TradingParameters(BigDecimal(0.1)),

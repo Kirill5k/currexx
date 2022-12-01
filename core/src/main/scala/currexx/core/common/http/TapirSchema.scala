@@ -9,7 +9,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import currexx.domain.validations.{EmailString, IdString}
 import currexx.domain.user.UserId
 import currexx.core.monitor.MonitorId
-import currexx.core.signal.TriggerFrequency
+import currexx.core.settings.TriggerFrequency
 import currexx.core.trade.TradeStrategy
 import currexx.domain.monitor.Schedule
 import sttp.tapir.generic.auto.SchemaDerivation

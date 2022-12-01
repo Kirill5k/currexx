@@ -42,8 +42,8 @@ final private class SettingsController[F[_]](
 object SettingsController extends TapirSchema with TapirJson {
 
   final case class GlobalSettingsView(
-      signal: Option[SignalParameters],
-      trade: Option[TradeParameters]
+      signal: Option[SignalSettings],
+      trade: Option[TradeSettings]
   ) derives Codec.AsObject:
     def toDomain(uid: UserId): GlobalSettings = GlobalSettings(uid, signal, trade)
 

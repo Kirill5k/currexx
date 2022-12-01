@@ -10,6 +10,7 @@ import currexx.domain.user.UserId
 trait SettingsService[F[_]] {
   def get(uid: UserId): F[GlobalSettings]
   def update(gs: GlobalSettings): F[Unit]
+  def createFor(uid: UserId): F[Unit]
 }
 
 final private class LiveSettingsService[F[_]](
@@ -22,6 +23,9 @@ final private class LiveSettingsService[F[_]](
 
   override def update(gs: GlobalSettings): F[Unit] =
     repository.update(gs)
+
+  override def createFor(uid: UserId): F[Unit] =
+    repository.createFor(uid)
 }
 
 object SettingsService:

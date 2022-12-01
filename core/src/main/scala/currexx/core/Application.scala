@@ -33,7 +33,7 @@ object Application extends IOApp.Simple:
             trades          <- Trades.make(res.mongo, clients, dispatcher)
             settings        <- Settings.make(res.mongo)
             http            <- Http.make[IO](health, auth, signals, monitors, markets, trades, settings)
-            actionProcessor <- ActionProcessor.make[IO](dispatcher, monitors.service, signals.service, markets.service, trades.service)
+            actionProcessor <- ActionProcessor.make[IO](dispatcher, monitors.service, signals.service, markets.service, trades.service, settings.service)
             logProcessor    <- LogEventProcessor.make[IO](res.mongo)
             _ <- Server
               .serve[IO](config.server, http.app)

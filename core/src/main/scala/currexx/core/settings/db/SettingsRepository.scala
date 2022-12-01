@@ -4,7 +4,7 @@ import cats.effect.Async
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.core.common.db.Repository
-import currexx.core.settings.{GlobalSettings, SignalParameters, TradeParameters}
+import currexx.core.settings.{GlobalSettings, SignalSettings, TradeSettings}
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
 import mongo4cats.bson.Document
@@ -65,5 +65,5 @@ final private class LiveSettingsRepository[F[_]](
 object SettingsRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[SettingsRepository[F]] =
     db.getCollectionWithCodec[GlobalSettingsEntity]("settings")
-      .map(_.withAddedCodec[SignalParameters].withAddedCodec[TradeParameters])
+      .map(_.withAddedCodec[SignalSettings].withAddedCodec[TradeSettings])
       .map(LiveSettingsRepository[F](_))

@@ -6,6 +6,7 @@ import cats.syntax.apply.*
 import cats.syntax.applicativeError.*
 import currexx.core.monitor.MonitorService
 import currexx.core.market.MarketService
+import currexx.core.settings.SettingsService
 import currexx.core.signal.SignalService
 import currexx.core.trade.TradeService
 import currexx.domain.errors.AppError
@@ -22,7 +23,8 @@ final private class LiveActionProcessor[F[_]](
     private val monitorService: MonitorService[F],
     private val signalService: SignalService[F],
     private val marketService: MarketService[F],
-    private val tradeService: TradeService[F]
+    private val tradeService: TradeService[F],
+    private val settingsService: SettingsService[F]
 )(using
     F: Temporal[F],
     logger: Logger[F]
@@ -53,7 +55,7 @@ final private class LiveActionProcessor[F[_]](
       case Action.ProcessTradeOrderPlacement(order) =>
         logger.info(s"processing trade order placement $order") *> marketService.processTradeOrderPlacement(order)
       case Action.SetupNewUser(uid) =>
-        logger.info(s"setting up new user account for $uid")
+        logger.info(s"setting up new user account for $uid") *> settingsService.createFor(uid)
     ).handleErrorWith {
       case error: AppError =>
         logger.warn(error)(s"domain error while processing action $action")
@@ -69,6 +71,7 @@ object ActionProcessor:
       monitorService: MonitorService[F],
       signalService: SignalService[F],
       marketService: MarketService[F],
-      tradeService: TradeService[F]
+      tradeService: TradeService[F],
+      settingsService: SettingsService[F]
   ): F[ActionProcessor[F]] =
-    Monad[F].pure(LiveActionProcessor[F](dispatcher, monitorService, signalService, marketService, tradeService))
+    Monad[F].pure(LiveActionProcessor[F](dispatcher, monitorService, signalService, marketService, tradeService, settingsService))
