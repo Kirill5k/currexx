@@ -3,7 +3,7 @@ package currexx.core.settings.db
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import io.circe.syntax.given
-import currexx.core.fixtures.{Signals, Trades, Users}
+import currexx.core.fixtures.{Settings, Users}
 import currexx.core.MongoSpec
 import currexx.core.settings.{GlobalSettings, SignalParameters, TradeParameters}
 import currexx.domain.errors.AppError
@@ -42,8 +42,8 @@ class SettingsRepositorySpec extends MongoSpec {
           result.map { settings =>
             settings mustBe GlobalSettings(
               Users.uid,
-              Some(SignalParameters(Signals.settings.triggerFrequency, Signals.settings.indicators)),
-              Some(TradeParameters(Trades.settings.strategy, Trades.settings.broker, Trades.settings.trading, Trades.settings.comment))
+              Some(SignalParameters(Settings.signal.triggerFrequency, Settings.signal.indicators)),
+              Some(TradeParameters(Settings.trade.strategy, Settings.trade.broker, Settings.trade.trading, Settings.trade.comment))
             )
           }
         }
@@ -88,16 +88,16 @@ class SettingsRepositorySpec extends MongoSpec {
             _  <- db.getCollection("settings").flatMap(_.insertOne(Document("userId" := Users.uid.toObjectId)))
             signal = Document(
               "userId"           := Users.uid.toObjectId,
-              "triggerFrequency" := Signals.settings.triggerFrequency,
-              "indicators"       := Signals.settings.indicators
+              "triggerFrequency" := Settings.signal.triggerFrequency,
+              "indicators"       := Settings.signal.indicators
             )
             _ <- db.getCollection("signal-settings").flatMap(_.insertOne(signal))
             trade = Document(
               "userId"   := Users.uid.toObjectId,
-              "strategy" := Trades.settings.strategy,
-              "broker"   := Trades.settings.broker,
-              "trading"  := Trades.settings.trading,
-              "comment"  := Trades.settings.comment
+              "strategy" := Settings.trade.strategy,
+              "broker"   := Settings.trade.broker,
+              "trading"  := Settings.trade.trading,
+              "comment"  := Settings.trade.comment
             )
             _   <- db.getCollection("trade-settings").flatMap(_.insertOne(trade))
             res <- test(db)
