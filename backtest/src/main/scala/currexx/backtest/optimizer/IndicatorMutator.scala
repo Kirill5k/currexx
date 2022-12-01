@@ -27,7 +27,7 @@ object IndicatorMutator:
 
         def mutateVt(vt: VT): VT = vt match
           case VT.Sequenced(sequence) => VT.Sequenced(sequence.map(mutateVt))
-          case VT.Kalman(gain)        => VT.Kalman(mutateDouble(gain, stepSize = 0.025))
+          case VT.Kalman(gain)        => VT.Kalman(math.max(mutateDouble(gain, stepSize = 0.025), 0.025D))
           case VT.STOCH(length)       => VT.STOCH(mutateInt(length, 45))
           case VT.RSX(length)         => VT.RSX(mutateInt(length, 45))
           case VT.WMA(length)         => VT.WMA(mutateInt(length, 45))
