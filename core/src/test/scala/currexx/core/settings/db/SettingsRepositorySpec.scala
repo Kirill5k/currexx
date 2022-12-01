@@ -21,31 +21,41 @@ class SettingsRepositorySpec extends MongoSpec {
 
   "SettingsRepository" when {
     "get" should {
-      "return empty option when settings do not exist" in {
-        withEmbeddedMongoDb { db =>
-          val result = for
-            repo <- SettingsRepository.make[IO](db)
-            res  <- repo.get(Users.uid2)
-          yield res
-
-          result.attempt.map(_ mustBe Left(AppError.NotSetup("Global")))
-        }
-      }
-
-      "join data from 2 tables and return single object" in {
+      "return error settings do not exist" in {
         withEmbeddedMongoDb { db =>
           val result = for
             repo <- SettingsRepository.make[IO](db)
             res  <- repo.get(Users.uid)
           yield res
 
-          result.map { settings =>
-            settings mustBe GlobalSettings(
-              Users.uid,
-              Some(Settings.signal),
-              Some(Settings.trade)
-            )
-          }
+          result.attempt.map(_ mustBe Left(AppError.NotSetup("Global")))
+        }
+      }
+    }
+
+    "update" should {
+      "create new entry if settings do not exist" in {
+        withEmbeddedMongoDb { db =>
+          val result = for
+            repo <- SettingsRepository.make[IO](db)
+            _    <- repo.update(Settings.global)
+            res  <- repo.get(Users.uid)
+          yield res
+
+          result.map(_ mustBe Settings.global)
+        }
+      }
+
+      "update existing settings" in {
+        withEmbeddedMongoDb { db =>
+          val result = for
+            repo <- SettingsRepository.make[IO](db)
+            _    <- repo.update(Settings.global)
+            _    <- repo.update(Settings.global.copy(trade = None, note = Some("update")))
+            res  <- repo.get(Users.uid)
+          yield res
+
+          result.map(_ mustBe Settings.global.copy(trade = None, note = Some("update")))
         }
       }
     }
@@ -55,11 +65,11 @@ class SettingsRepositorySpec extends MongoSpec {
         withEmbeddedMongoDb { db =>
           val result = for
             repo <- SettingsRepository.make[IO](db)
-            _    <- repo.createFor(Users.uid2)
-            res  <- repo.get(Users.uid2)
+            _    <- repo.createFor(Users.uid)
+            res  <- repo.get(Users.uid)
           yield res
 
-          result.map(_.userId mustBe Users.uid2)
+          result.map(_.userId mustBe Users.uid)
         }
       }
 
@@ -67,9 +77,9 @@ class SettingsRepositorySpec extends MongoSpec {
         withEmbeddedMongoDb { db =>
           val result = for
             repo <- SettingsRepository.make[IO](db)
-            _    <- repo.createFor(Users.uid2)
-            _    <- repo.createFor(Users.uid2)
-            res  <- db.getCollection("settings").flatMap(_.count(Filter.eq("userId", Users.uid2.toObjectId)))
+            _    <- repo.createFor(Users.uid)
+            _    <- repo.createFor(Users.uid)
+            res  <- db.getCollection("settings").flatMap(_.count(Filter.eq("userId", Users.uid.toObjectId)))
           yield res
 
           result.map(_ mustBe 1)
@@ -84,22 +94,8 @@ class SettingsRepositorySpec extends MongoSpec {
         .fromConnectionString[IO](s"mongodb://$mongoHost:$mongoPort")
         .use { client =>
           for
-            db <- client.getDatabase("currexx")
-            _  <- db.getCollection("settings").flatMap(_.insertOne(Document("userId" := Users.uid.toObjectId)))
-            signal = Document(
-              "userId"           := Users.uid.toObjectId,
-              "triggerFrequency" := Settings.signal.triggerFrequency,
-              "indicators"       := Settings.signal.indicators
-            )
-            _ <- db.getCollection("signal-settings").flatMap(_.insertOne(signal))
-            trade = Document(
-              "userId"   := Users.uid.toObjectId,
-              "strategy" := Settings.trade.strategy,
-              "broker"   := Settings.trade.broker,
-              "trading"  := Settings.trade.trading,
-              "comment"  := Settings.trade.comment
-            )
-            _   <- db.getCollection("trade-settings").flatMap(_.insertOne(trade))
+            db  <- client.getDatabase("currexx")
+            _   <- db.getCollection("settings").flatMap(_.insertOne(Document("userId" := Users.uid2.toObjectId)))
             res <- test(db)
           yield res
         }

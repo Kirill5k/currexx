@@ -29,12 +29,12 @@ final case class TradingParameters(
 final case class TradeSettings(
     strategy: TradeStrategy,
     broker: BrokerParameters,
-    trading: TradingParameters,
-    comment: Option[String]
+    trading: TradingParameters
 ) derives Codec.AsObject
 
 final case class GlobalSettings(
     userId: UserId,
     signal: Option[SignalSettings],
-    trade: Option[TradeSettings]
+    trade: Option[TradeSettings],
+    note: Option[String]
 )

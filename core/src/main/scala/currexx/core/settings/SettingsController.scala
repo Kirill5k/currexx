@@ -23,7 +23,7 @@ final private class SettingsController[F[_]](
       .serverLogic { session => _ =>
         service
           .get(session.userId)
-          .mapResponse(s => GlobalSettingsView(s.signal, s.trade))
+          .mapResponse(s => GlobalSettingsView(s.signal, s.trade, s.note))
       }
 
   private def updateSettings(using auth: Authenticator[F]) =
@@ -43,9 +43,10 @@ object SettingsController extends TapirSchema with TapirJson {
 
   final case class GlobalSettingsView(
       signal: Option[SignalSettings],
-      trade: Option[TradeSettings]
+      trade: Option[TradeSettings],
+      note: Option[String]
   ) derives Codec.AsObject:
-    def toDomain(uid: UserId): GlobalSettings = GlobalSettings(uid, signal, trade)
+    def toDomain(uid: UserId): GlobalSettings = GlobalSettings(uid, signal, trade, note)
 
   private val basePath = "settings"
 

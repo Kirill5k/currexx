@@ -7,12 +7,12 @@ import currexx.core.trade.TradeStrategy
 object Settings {
 
   lazy val signal = SignalSettings(TriggerFrequency.OncePerDay, List(Markets.trendChangeDetection))
+
   lazy val trade = TradeSettings(
     TradeStrategy.Disabled,
     BrokerParameters.Vindaloo("1"),
-    TradingParameters(BigDecimal(0.1)),
-    Some("test")
+    TradingParameters(BigDecimal(0.1))
   )
 
-  lazy val global = GlobalSettings(Users.uid, Some(signal), Some(trade))
+  lazy val global = GlobalSettings(Users.uid, Some(signal), Some(trade), Some("test"))
 }

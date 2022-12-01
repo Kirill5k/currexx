@@ -11,13 +11,15 @@ final case class GlobalSettingsEntity(
     _id: ObjectId,
     userId: ObjectId,
     signal: Option[SignalSettings],
-    trade: Option[TradeSettings]
+    trade: Option[TradeSettings],
+    note: Option[String]
 ) derives Codec.AsObject:
-  def toDomain: GlobalSettings = GlobalSettings(UserId(userId), signal, trade)
+  def toDomain: GlobalSettings = GlobalSettings(UserId(userId), signal, trade, note)
 
 object GlobalSettingsEntity:
   def from(
       uid: UserId,
       signal: Option[SignalSettings] = None,
-      trade: Option[TradeSettings] = None
-  ): GlobalSettingsEntity = GlobalSettingsEntity(ObjectId.gen, uid.toObjectId, signal, trade)
+      trade: Option[TradeSettings] = None,
+      note: Option[String] = None
+  ): GlobalSettingsEntity = GlobalSettingsEntity(ObjectId.gen, uid.toObjectId, signal, trade, note)

@@ -12,7 +12,7 @@ import org.mockito.Mockito.times
 class SettingsServiceSpec extends IOWordSpec {
 
   "SettingsService" when {
-    val settings = GlobalSettings(Users.uid, None, None)
+    val settings = GlobalSettings(Users.uid, None, None, None)
     "get" should {
       "return settings from repository" in {
         val repo = mock[SettingsRepository[IO]]
@@ -25,11 +25,11 @@ class SettingsServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(repo).get(Users.uid)
-          res mustBe GlobalSettings(Users.uid, None, None)
+          res mustBe GlobalSettings(Users.uid, None, None, None)
         }
       }
 
-      "create new settings in these do not exist" in {
+      "create new settings if these do not exist" in {
         val repo = mock[SettingsRepository[IO]]
         when(repo.get(any[UserId])).thenReturnError(AppError.NotSetup("Global")).thenReturnIO(settings)
         when(repo.createFor(any[UserId])).thenReturn(IO.unit)
@@ -42,7 +42,7 @@ class SettingsServiceSpec extends IOWordSpec {
         result.asserting { res =>
           verify(repo, times(2)).get(Users.uid)
           verify(repo).createFor(Users.uid)
-          res mustBe GlobalSettings(Users.uid, None, None)
+          res mustBe GlobalSettings(Users.uid, None, None, None)
         }
       }
     }

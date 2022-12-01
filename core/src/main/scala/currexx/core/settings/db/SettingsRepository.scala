@@ -29,24 +29,15 @@ final private class LiveSettingsRepository[F[_]](
     collection
       .count(userIdEq(gs.userId))
       .flatMap {
-        case 0 => collection.insertOne(GlobalSettingsEntity.from(gs.userId, gs.signal, gs.trade)).void
-        case _ => collection.updateOne(userIdEq(gs.userId), Update.set("signal", gs.signal).set("trade", gs.trade)).void
+        case 0 =>
+          collection.insertOne(GlobalSettingsEntity.from(gs.userId, gs.signal, gs.trade, gs.note)).void
+        case _ =>
+          collection.updateOne(userIdEq(gs.userId), Update.set("signal", gs.signal).set("trade", gs.trade).set("note", gs.note)).void
       }
 
   override def get(uid: UserId): F[GlobalSettings] =
     collection
-      .aggregate[GlobalSettingsEntity] {
-        Aggregate
-          .matchBy(userIdEq(uid))
-          .lookup("signal-settings", Field.UId, Field.UId, "signals")
-          .lookup("trade-settings", Field.UId, Field.UId, "trades")
-          .project(
-            Projection
-              .include(Field.UId)
-              .computed("trade", Document("$first" := "$trades"))
-              .computed("signal", Document("$first" := "$signals"))
-          )
-      }
+      .find(userIdEq(uid))
       .first
       .flatMap {
         case Some(settings) => F.pure(settings.toDomain)
