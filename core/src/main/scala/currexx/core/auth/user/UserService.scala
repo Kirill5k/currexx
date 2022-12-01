@@ -6,6 +6,7 @@ import cats.syntax.apply.*
 import cats.syntax.functor.*
 import cats.syntax.applicativeError.*
 import currexx.core.auth.user.db.UserRepository
+import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.domain.errors.AppError.*
 import currexx.domain.user.*
 
@@ -21,13 +22,17 @@ trait UserService[F[_]]:
 
 final private class LiveUserService[F[_]](
     private val repository: UserRepository[F],
-    private val encryptor: PasswordEncryptor[F]
+    private val encryptor: PasswordEncryptor[F],
+    private val dispatcher: ActionDispatcher[F]
 )(using
     F: MonadError[F, Throwable]
 ) extends UserService[F] {
 
   override def create(details: UserDetails, password: Password): F[UserId] =
-    encryptor.hash(password).flatMap(h => repository.create(details, h))
+    encryptor
+      .hash(password)
+      .flatMap(h => repository.create(details, h))
+      .flatTap(uid => dispatcher.dispatch(Action.SetupNewUser(uid)))
 
   override def login(login: Login): F[User] =
     repository
@@ -57,5 +62,11 @@ final private class LiveUserService[F[_]](
 }
 
 object UserService:
-  def make[F[_]](repo: UserRepository[F], encr: PasswordEncryptor[F])(using F: MonadError[F, Throwable]): F[UserService[F]] =
-    F.pure(LiveUserService[F](repo, encr))
+  def make[F[_]](
+      repo: UserRepository[F],
+      encr: PasswordEncryptor[F],
+      dispatcher: ActionDispatcher[F]
+  )(using
+      F: MonadError[F, Throwable]
+  ): F[UserService[F]] =
+    F.pure(LiveUserService[F](repo, encr, dispatcher))

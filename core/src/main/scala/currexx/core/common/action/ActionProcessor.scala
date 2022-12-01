@@ -52,6 +52,8 @@ final private class LiveActionProcessor[F[_]](
         logger.info(s"processing market state update triggered by $indicators") *> tradeService.processMarketStateUpdate(state, indicators)
       case Action.ProcessTradeOrderPlacement(order) =>
         logger.info(s"processing trade order placement $order") *> marketService.processTradeOrderPlacement(order)
+      case Action.SetupNewUser(uid) =>
+        logger.info(s"setting up new user account for $uid")
     ).handleErrorWith {
       case error: AppError =>
         logger.warn(error)(s"domain error while processing action $action")

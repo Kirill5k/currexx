@@ -22,3 +22,4 @@ enum Action:
   case ProcessTradeOrderPlacement(order: TradeOrderPlacement)
   case CloseOpenOrders(uid: UserId, currencyPair: CurrencyPair)
   case CloseAllOpenOrders(uid: UserId)
+  case SetupNewUser(uid: UserId)

@@ -26,7 +26,7 @@ object Application extends IOApp.Simple:
             dispatcher      <- ActionDispatcher.make[IO].flatTap(_.dispatch(Action.RescheduleAllMonitors))
             clients         <- Clients.make[IO](config.clients, res.sttpBackend)
             health          <- Health.make[IO]
-            auth            <- Auth.make(config.auth, res.mongo)
+            auth            <- Auth.make(config.auth, res.mongo, dispatcher)
             signals         <- Signals.make(res.mongo, dispatcher)
             monitors        <- Monitors.make(res.mongo, dispatcher)
             markets         <- Markets.make(res.mongo, dispatcher)
