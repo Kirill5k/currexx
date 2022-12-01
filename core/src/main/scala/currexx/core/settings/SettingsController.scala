@@ -4,8 +4,10 @@ import cats.Monad
 import cats.effect.Async
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
+import currexx.domain.user.UserId
 import io.circe.Codec
 import org.http4s.HttpRoutes
+import sttp.model.StatusCode
 import sttp.tapir.*
 import sttp.tapir.server.http4s.Http4sServerInterpreter
 
@@ -24,10 +26,15 @@ final private class SettingsController[F[_]](
           .mapResponse(s => GlobalSettingsView(s.signal, s.trade))
       }
 
+  private def updateSettings(using auth: Authenticator[F]) =
+    updateGlobalSettingsEndpoint.withAuthenticatedSession
+      .serverLogic(session => req => service.update(req.toDomain(session.userId)).voidResponse)
+
   override def routes(using authenticator: Authenticator[F]): HttpRoutes[F] =
     Http4sServerInterpreter[F](Controller.serverOptions).toRoutes(
       List(
-        getSettings
+        getSettings,
+        updateSettings
       )
     )
 }
@@ -37,7 +44,8 @@ object SettingsController extends TapirSchema with TapirJson {
   final case class GlobalSettingsView(
       signal: Option[SignalParameters],
       trade: Option[TradeParameters]
-  ) derives Codec.AsObject
+  ) derives Codec.AsObject:
+    def toDomain(uid: UserId): GlobalSettings = GlobalSettings(uid, signal, trade)
 
   private val basePath = "settings"
 
@@ -45,6 +53,12 @@ object SettingsController extends TapirSchema with TapirJson {
     .in(basePath)
     .out(jsonBody[GlobalSettingsView])
     .description("Retrieve global settings")
+
+  val updateGlobalSettingsEndpoint = Controller.securedEndpoint.put
+    .in(basePath)
+    .in(jsonBody[GlobalSettingsView])
+    .out(statusCode(StatusCode.NoContent))
+    .description("Update global settings")
 
   def make[F[_]: Async](monitorService: SettingsService[F]): F[Controller[F]] =
     Monad[F].pure(SettingsController[F](monitorService))

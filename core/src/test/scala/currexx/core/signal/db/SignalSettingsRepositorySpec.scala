@@ -15,36 +15,14 @@ class SignalSettingsRepositorySpec extends MongoSpec {
   override protected val mongoPort: Int = 12349
 
   "A SignalSettingsRepository" when {
-    "update" should {
-      "create new signal-settings in a repository if it is new" in withEmbeddedMongoDb { db =>
-        val result = for
-          repo <- SignalSettingsRepository.make(db)
-          _    <- repo.update(Signals.settings)
-          res  <- repo.get(Users.uid)
-        yield res
-
-        result.map(_ mustBe Signals.settings)
-      }
-
-      "update existing signal-settings" in withEmbeddedMongoDb { db =>
-        val ema = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.EMA(16))
-        val result = for
-          repo <- SignalSettingsRepository.make(db)
-          _    <- repo.update(Signals.settings)
-          _    <- repo.update(Signals.settings.copy(indicators = List(ema)))
-          res  <- repo.get(Users.uid)
-        yield res
-
-        result.map(_ mustBe Signals.settings.copy(indicators = List(ema)))
-      }
-
+    "get" should {
       "return error when signals do not exist" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- SignalSettingsRepository.make(db)
           res  <- repo.get(Users.uid)
         yield res
 
-        result.attempt.map(_ mustBe Left(AppError.NotSetup("Signal")))
+        result.attempt.map(_ mustBe Left(AppError.NotSetup("Global")))
       }
     }
   }

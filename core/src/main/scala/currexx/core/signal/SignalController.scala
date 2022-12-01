@@ -46,29 +46,11 @@ final private class SignalController[F[_]](
             .mapResponse(_.map(SignalView.from))
       }
 
-  private def getSignalSettings(using auth: Authenticator[F]) =
-    getSignalSettingsEndpoint.withAuthenticatedSession
-      .serverLogic { session => _ =>
-        service
-          .getSettings(session.userId)
-          .mapResponse(s => SignalSettingsView(s.triggerFrequency, s.indicators))
-      }
-
-  private def updateSignalSettings(using auth: Authenticator[F]) =
-    updateSignalSettingsEndpoint.withAuthenticatedSession
-      .serverLogic { session => settings =>
-        service
-          .updateSettings(settings.toDomain(session.userId))
-          .voidResponse
-      }
-
   def routes(using authenticator: Authenticator[F]): HttpRoutes[F] =
     Http4sServerInterpreter[F](Controller.serverOptions).toRoutes(
       List(
         submitSignal,
         getAllSignals,
-        getSignalSettings,
-        updateSignalSettings
       )
     )
 }
@@ -91,15 +73,8 @@ object SignalController extends TapirSchema with TapirJson {
   object SignalView:
     def from(signal: Signal): SignalView =
       SignalView(signal.currencyPair, signal.condition, signal.triggeredBy, signal.time)
-
-  final case class SignalSettingsView(
-      triggerFrequency: TriggerFrequency,
-      indicators: List[Indicator]
-  ) derives Codec.AsObject:
-    def toDomain(userId: UserId): SignalSettings = SignalSettings(userId, triggerFrequency, indicators)
-
+  
   private val basePath     = "signals"
-  private val settingsPath = basePath / "settings"
 
   val submitSignalEndpoint = Controller.securedEndpoint.post
     .in(basePath)
@@ -112,17 +87,6 @@ object SignalController extends TapirSchema with TapirJson {
     .in(Controller.searchParams)
     .out(jsonBody[List[SignalView]])
     .description("Retrieve all submitted signals")
-
-  val getSignalSettingsEndpoint = Controller.securedEndpoint.get
-    .in(settingsPath)
-    .out(jsonBody[SignalSettingsView])
-    .description("Retrieve settings for active indicators and emitted signals")
-
-  val updateSignalSettingsEndpoint = Controller.securedEndpoint.put
-    .in(settingsPath)
-    .in(jsonBody[SignalSettingsView])
-    .out(statusCode(StatusCode.NoContent))
-    .description("Update settings for active indicators")
 
   def make[F[_]: Async: Clock](service: SignalService[F]): F[Controller[F]] =
     Monad[F].pure(SignalController[F](service))

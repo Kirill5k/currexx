@@ -12,14 +12,6 @@ object Trades {
 
   lazy val broker = BrokerParameters.Vindaloo("1")
 
-  lazy val settings = TradeSettings(
-    Users.uid,
-    TradeStrategy.Disabled,
-    BrokerParameters.Vindaloo("1"),
-    TradingParameters(BigDecimal(0.1)),
-    Some("test")
-  )
-
   lazy val order = TradeOrderPlacement(
     Users.uid,
     TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, Markets.priceRange.close, BigDecimal(0.1)),

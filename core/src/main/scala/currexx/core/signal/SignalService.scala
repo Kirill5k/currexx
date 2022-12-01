@@ -30,8 +30,6 @@ import scala.util.{Failure, Success, Try}
 trait SignalService[F[_]]:
   def submit(signal: Signal): F[Unit]
   def getAll(uid: UserId, sp: SearchParams): F[List[Signal]]
-  def getSettings(uid: UserId): F[SignalSettings]
-  def updateSettings(settings: SignalSettings): F[Unit]
   def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit]
 
 final private class LiveSignalService[F[_]](
@@ -41,13 +39,12 @@ final private class LiveSignalService[F[_]](
 )(using
     F: Concurrent[F]
 ) extends SignalService[F] {
-  override def getSettings(uid: UserId): F[SignalSettings]            = settingsRepo.get(uid)
-  override def updateSettings(settings: SignalSettings): F[Unit]      = settingsRepo.update(settings)
   override def getAll(uid: UserId, sp: SearchParams): F[List[Signal]] = signalRepo.getAll(uid, sp)
   override def submit(signal: Signal): F[Unit]                        = save(signal.userId, signal.currencyPair, List(signal))
 
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
-    getSettings(uid)
+    settingsRepo
+      .get(uid)
       .flatMap { settings =>
         settings.indicators
           .flatMap {
@@ -72,7 +69,7 @@ object SignalService:
 
   extension (vs: VS)
     private def extract(data: MarketTimeSeriesData): List[Double] = {
-      val hour = data.prices.head.time.hour
+      val hour   = data.prices.head.time.hour
       val prices = if (hour > 1 && hour < 12) data.prices.tail else data.prices.toList
       vs match
         case VS.Close => prices.map(_.close)

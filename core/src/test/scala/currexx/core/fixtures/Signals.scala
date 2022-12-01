@@ -25,6 +25,4 @@ object Signals {
     Markets.thresholdCrossing,
     ts
   )
-
-  lazy val settings = SignalSettings(Users.uid, TriggerFrequency.OncePerDay, List(Markets.trendChangeDetection))
 }

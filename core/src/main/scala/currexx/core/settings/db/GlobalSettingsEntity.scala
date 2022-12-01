@@ -16,4 +16,8 @@ final case class GlobalSettingsEntity(
   def toDomain: GlobalSettings = GlobalSettings(UserId(userId), signal, trade)
 
 object GlobalSettingsEntity:
-  def from(uid: UserId): GlobalSettingsEntity = GlobalSettingsEntity(ObjectId.gen, uid.toObjectId, None, None)
+  def from(
+      uid: UserId,
+      signal: Option[SignalParameters] = None,
+      trade: Option[TradeParameters] = None
+  ): GlobalSettingsEntity = GlobalSettingsEntity(ObjectId.gen, uid.toObjectId, signal, trade)

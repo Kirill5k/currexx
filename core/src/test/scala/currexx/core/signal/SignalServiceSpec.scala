@@ -2,12 +2,12 @@ package currexx.core.signal
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import currexx.core.{IOWordSpec, FileReader, MockActionDispatcher}
+import currexx.core.{FileReader, IOWordSpec, MockActionDispatcher}
 import currexx.domain.user.UserId
 import currexx.domain.market.{Condition, CurrencyPair, Indicator, MovingAverage, PriceRange, Trend, ValueSource, ValueTransformation as VT}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
-import currexx.core.fixtures.{Markets, Signals, Users}
+import currexx.core.fixtures.{Markets, Signals, Users, Settings}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import io.circe.JsonObject
 
@@ -17,43 +17,6 @@ import scala.collection.immutable.ListMap
 class SignalServiceSpec extends IOWordSpec {
 
   "A SignalService" when {
-    "getSettings" should {
-      "store signal-settings in the repository" in {
-        val (signRepo, settRepo, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturnIO(Signals.settings)
-
-        val result = for
-          svc <- SignalService.make[IO](signRepo, settRepo, disp)
-          _   <- svc.getSettings(Users.uid)
-        yield ()
-
-        result.asserting { res =>
-          verify(settRepo).get(Users.uid)
-          disp.submittedActions mustBe empty
-          res mustBe ()
-        }
-      }
-    }
-
-    "updateSettings" should {
-      "store signal-settings in the repository" in {
-        val (signRepo, settRepo, disp) = mocks
-        when(settRepo.update(any[SignalSettings])).thenReturnUnit
-
-        val result = for
-          svc <- SignalService.make[IO](signRepo, settRepo, disp)
-          _   <- svc.updateSettings(Signals.settings)
-        yield ()
-
-        result.asserting { res =>
-          verify(settRepo).update(Signals.settings)
-          verifyNoInteractions(signRepo)
-          disp.submittedActions mustBe empty
-          res mustBe ()
-        }
-      }
-    }
-
     "submit" should {
       "store new signal in the repository and dispatch an action" in {
         val (signRepo, settRepo, disp) = mocks
@@ -94,7 +57,7 @@ class SignalServiceSpec extends IOWordSpec {
     "processMarketData" should {
       "not do anything when there are no changes in market data since last point" in {
         val (signRepo, settRepo, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturnIO(Signals.settings)
+        when(settRepo.get(any[UserId])).thenReturnIO(Settings.signal)
 
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
@@ -111,7 +74,7 @@ class SignalServiceSpec extends IOWordSpec {
 
       "not submit a signal if such signal has already been submitted on that date" in {
         val (signRepo, settRepo, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturnIO(Signals.settings)
+        when(settRepo.get(any[UserId])).thenReturnIO(Settings.signal)
         when(signRepo.isFirstOfItsKindForThatDate(any[Signal])).thenReturnIO(false)
 
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
@@ -138,7 +101,7 @@ class SignalServiceSpec extends IOWordSpec {
 
       "create signal when trend direction changes" in {
         val (signRepo, settRepo, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturnIO(Signals.settings.copy(triggerFrequency = TriggerFrequency.Continuously))
+        when(settRepo.get(any[UserId])).thenReturnIO(Settings.signal.copy(triggerFrequency = TriggerFrequency.Continuously))
         when(signRepo.saveAll(anyList[Signal])).thenReturnUnit
 
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
@@ -165,7 +128,7 @@ class SignalServiceSpec extends IOWordSpec {
 
       "not do anything when there are no changes in trend" in {
         val (signRepo, settRepo, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturnIO(Signals.settings)
+        when(settRepo.get(any[UserId])).thenReturnIO(Settings.signal)
         when(signRepo.isFirstOfItsKindForThatDate(any[Signal])).thenReturnIO(false)
 
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
