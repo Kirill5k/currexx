@@ -8,8 +8,9 @@ import currexx.clients.broker.{BrokerClient, BrokerParameters}
 import currexx.clients.data.MarketDataClient
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.SearchParams
+import currexx.core.settings.TradeSettings
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
-import currexx.core.trade.{TradeOrderPlacement, TradeService, TradeSettings}
+import currexx.core.trade.{TradeOrderPlacement, TradeService}
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange, TradeOrder}
 import currexx.domain.time.Clock
 import currexx.domain.user.UserId
@@ -17,7 +18,6 @@ import currexx.domain.user.UserId
 final private class TestTradeSettingsRepository[F[_]](
     private val settings: Ref[F, TradeSettings]
 ) extends TradeSettingsRepository[F]:
-  override def update(ts: TradeSettings): F[Unit] = settings.update(_ => ts)
   override def get(uid: UserId): F[TradeSettings] = settings.get
 
 final private class TestTradeOrderRepository[F[_]: Async](

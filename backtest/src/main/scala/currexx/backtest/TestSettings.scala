@@ -3,8 +3,8 @@ package currexx.backtest
 import currexx.clients.broker.BrokerParameters
 import currexx.domain.user.UserId
 import currexx.core.market.MarketState
-import currexx.core.signal.{SignalSettings, TriggerFrequency}
-import currexx.core.trade.{TradeSettings, TradeStrategy, TradingParameters}
+import currexx.core.settings.{SignalSettings, TradeSettings, TradingParameters, TriggerFrequency}
+import currexx.core.trade.TradeStrategy
 import currexx.domain.market.{CurrencyPair, Indicator, ValueSource, ValueTransformation}
 import mongo4cats.bson.ObjectId
 import currexx.domain.market.Currency.{EUR, GBP}
@@ -28,7 +28,7 @@ object TestSettings:
       userId = userId,
       currencyPair = currencyPair,
       marketState = MarketState(userId, currencyPair, None, Map.empty, None, None),
-      signal = SignalSettings(userId, TriggerFrequency.OncePerDay, indicators),
-      trade = TradeSettings(userId, strategy, BrokerParameters.Vindaloo("1"), TradingParameters(BigDecimal(0.1)), None)
+      signal = SignalSettings(TriggerFrequency.OncePerDay, indicators),
+      trade = TradeSettings(strategy, BrokerParameters.Vindaloo("1"), TradingParameters(BigDecimal(0.1)))
     )
   }
