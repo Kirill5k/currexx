@@ -19,7 +19,7 @@ object IndicatorInitialiser:
         case _: VT.SMA              => VT.SMA(rand.nextInt(41) + 2)
         case _: VT.EMA              => VT.EMA(rand.nextInt(41) + 2)
         case _: VT.HMA              => VT.HMA(rand.nextInt(41) + 2)
-        case _: VT.JMA              => VT.JMA(rand.nextInt(41) + 2, rand.nextInt(40) * 5 - 100, rand.nextInt(6) + 1)
+        case _: VT.JMA              => VT.JMA(rand.nextInt(41) + 2, rand.nextInt(40) * 5 - 100, rand.nextInt(2) + 1)
         case nma: VT.NMA            => VT.NMA(rand.nextInt(48) + 2, rand.nextInt(28) + 2, (1 + rand.nextInt(80)) * 0.25d, nma.maCalc)
 
       F.delay {
