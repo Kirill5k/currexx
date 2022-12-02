@@ -13,7 +13,7 @@ object Mutator:
     override def mutate(ind: Array[Int], mutationProbability: Double)(using r: Random): Id[Array[Int]] =
       val result = ind.clone()
       var i      = 0
-      while (i < result.length - 1) {
+      while (i < result.length) {
         if (r.nextDouble() < mutationProbability) {
           val curr = result(i)
           result(i) = if (curr == 0) 1 else 0

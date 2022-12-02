@@ -2,8 +2,16 @@ package currexx.backtest
 
 import scala.annotation.tailrec
 import scala.math.BigDecimal.RoundingMode
+import scala.util.Random
 
 object syntax {
+  extension (r: Random)
+    def pickOne[A](element1: A, element2: A, elements: A*): A =
+      r.nextInt(2 + elements.size) match
+        case 0 => element1
+        case 1 => element2
+        case n => elements.toIndexedSeq(n-2)
+
   extension (bd: BigDecimal)
     def roundTo(scale: Int): BigDecimal = bd.setScale(scale, RoundingMode.HALF_UP)
 
@@ -37,16 +45,20 @@ object syntax {
 
   extension (num: Int)
     def toBinaryArray(maxValue: Int): Array[Int] = {
-      val bitLength = Integer.SIZE - Integer.numberOfLeadingZeros(maxValue)
-      val array     = Array.fill(bitLength)(0)
-      var i         = 0
-      var j         = num
-      while (i < array.length) {
-        if (j % 2 == 1)
-          array(array.length - i - 1) = 1
-        j = j / 2
-        i = i + 1
+      val bitLength = math.max(Integer.SIZE - Integer.numberOfLeadingZeros(maxValue), 1)
+      val array = Array.fill(bitLength)(0)
+      
+      if (num == 0) array
+      else {
+        var i = 0
+        var j = num
+        while (i < array.length) {
+          if (j % 2 == 1)
+            array(array.length - i - 1) = 1
+          j = j / 2
+          i = i + 1
+        }
+        array
       }
-      array
     }
 }

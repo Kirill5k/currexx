@@ -13,8 +13,9 @@ object IndicatorMutator:
       private val bitFlitMutator = Mutator.pureBitFlip
       override def mutate(ind: Indicator, mutationProbability: Double)(using r: Random): F[Indicator] = {
         def mutateInt(int: Int, maxValue: Int = 100, minValue: Int = 1): Int = {
-          val res = math.min(bitFlitMutator.mutate(int.toBinaryArray(maxValue), mutationProbability).toInt, maxValue)
-          math.max(minValue, res)
+          val binArray = int.toBinaryArray(maxValue)
+          val res = bitFlitMutator.mutate(binArray, mutationProbability).toInt
+          math.max(minValue, math.min(res, maxValue))
         }
 
         def mutateDouble(dbl: Double, maxValue: Double = 1d, stepSize: Double = 0.05d): Double = {

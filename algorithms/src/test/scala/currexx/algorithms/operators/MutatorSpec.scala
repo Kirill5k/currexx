@@ -24,13 +24,13 @@ class MutatorSpec extends IOWordSpec {
 
   "Mutator.bitFlip" should {
     "flip arbitrary bit in a genetic sequence from its original state" in {
-      val individual = Array(0, 1, 0, 1, 0, 1, 0, 1)
+      val individual = Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
       given r: Random = Random(40)
       val result      = Mutator.bitFlip[IO].flatMap(_.mutate(individual, 0.25))
 
       result.asserting { mutated =>
-        mutated mustBe Array(0, 0, 0, 1, 0, 0, 0, 1)
+        mutated mustBe Array(0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1)
       }
     }
   }
