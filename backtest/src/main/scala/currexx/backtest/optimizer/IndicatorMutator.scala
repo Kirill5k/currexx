@@ -27,7 +27,7 @@ object IndicatorMutator:
 
         def mutateVt(vt: VT): VT = vt match
           case VT.Sequenced(sequence) => VT.Sequenced(sequence.map(mutateVt))
-          case VT.Kalman(gain)        => VT.Kalman(math.max(mutateDouble(gain, stepSize = 0.025), 0.025D))
+          case VT.Kalman(gain)        => VT.Kalman(math.max(mutateDouble(gain, stepSize = 0.025), 0.025d))
           case VT.STOCH(length)       => VT.STOCH(mutateInt(length, 45))
           case VT.RSX(length)         => VT.RSX(mutateInt(length, 45))
           case VT.WMA(length)         => VT.WMA(mutateInt(length, 45))
@@ -35,7 +35,7 @@ object IndicatorMutator:
           case VT.EMA(length)         => VT.EMA(mutateInt(length, 45))
           case VT.HMA(length)         => VT.HMA(mutateInt(length, 45, 5))
           case VT.JMA(length, phase, power) =>
-            VT.JMA(mutateInt(length, 45, 5), mutateInt((phase + 100) / 5, 40) * 5 - 100, mutateInt(power, 3, 2))
+            VT.JMA(mutateInt(length, 45, 5), mutateInt((phase + 100) / 5, 40) * 5 - 100, mutateInt(power - 2, 1, 0) + 2)
           case VT.NMA(length, signalLength, lambda, maCalc) =>
             VT.NMA(mutateInt(length, 50), mutateInt(signalLength, 31), math.max(mutateDouble(lambda, 15d, 0.5d), 0.25), maCalc)
 

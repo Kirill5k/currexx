@@ -27,7 +27,7 @@ object IndicatorCrossover:
 
         def crossInt(i1: Int, i2: Int, minValue: Option[Int] = None): Int = {
           val max    = math.max(i1, i2)
-          val result = threeWaySplitCrossover.cross(i1.toBinaryArray(max), i2.toBinaryArray(max)).toInt
+          val result = if (max == 0) 0 else threeWaySplitCrossover.cross(i1.toBinaryArray(max), i2.toBinaryArray(max)).toInt
           minValue.fold(result)(math.max(_, result))
         }
 
