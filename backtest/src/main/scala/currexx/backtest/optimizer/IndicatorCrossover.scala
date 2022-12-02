@@ -40,7 +40,7 @@ object IndicatorCrossover:
           case (VT.EMA(l1), VT.EMA(l2))       => Right(VT.EMA(crossInt(l1, l2, Some(5))))
           case (VT.Kalman(g1), VT.Kalman(g2)) => Right(VT.Kalman(crossDouble(g1, g2, 0.05)))
           case (VT.JMA(l1, ph1, po1), VT.JMA(l2, ph2, po2)) =>
-            Right(VT.JMA(crossInt(l1, l2, Some(5)), crossInt((ph1 + 100) / 5, (ph2 + 100) / 5) * 5 - 100, crossInt(po1, po2, Some(1))))
+            Right(VT.JMA(crossInt(l1, l2, Some(5)), crossInt((ph1 + 100) / 5, (ph2 + 100) / 5) * 5 - 100, crossInt(po1, po2, Some(2))))
           case (VT.NMA(l1, sl1, d1, ma1), VT.NMA(l2, sl2, d2, _)) =>
             Right(VT.NMA(crossInt(l1, l2), crossInt(sl1, sl2), crossDouble(d1, d2, 0.5), ma1))
           case (VT.Sequenced(s1), VT.Sequenced(s2)) => s1.zip(s2).traverse(crossVt _).map(VT.Sequenced(_))

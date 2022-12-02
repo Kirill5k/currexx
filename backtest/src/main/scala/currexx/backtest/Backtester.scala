@@ -21,7 +21,7 @@ object Backtester extends IOApp.Simple {
     CurrencyPair(EUR, GBP),
     TradeStrategy.LinesCrossing,
     List(
-      Indicator.LinesCrossing(ValueSource.Close,JMA(40,50,2),JMA(7,100,2)),
+      Indicator.LinesCrossing(ValueSource.Close,JMA(45,100,3),JMA(9,100,2)),
       Indicator.TrendChangeDetection(ValueSource.Close, sequenced(NMA(5,17,9.5, MovingAverage.Hull))),
       Indicator.ThresholdCrossing(ValueSource.Close, RSX(41),44.0,13.0)
     )
