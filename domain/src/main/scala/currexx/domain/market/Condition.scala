@@ -55,11 +55,11 @@ object Condition {
     (line.head, line.drop(1).head) match
       case (c, p) if c > max && p <= max => Some(Condition.AboveThreshold(max, c))
       case (c, p) if c < min && p >= min => Some(Condition.BelowThreshold(min, c))
-      case _                            => None
+      case _                             => None
 
   def linesCrossing(line1: List[Double], line2: List[Double]): Option[Condition] =
     (line1.head, line2.head, line1.drop(1).head, line2.drop(1).head) match
-      case (l1c, l2c, l1p, l2p) if l1c > l2c && l1p < l2p => Some(Condition.CrossingUp)
-      case (l1c, l2c, l1p, l2p) if l1c < l2c && l1p > l2p => Some(Condition.CrossingDown)
-      case _                                              => None
+      case (l1c, l2c, l1p, l2p) if l1c >= l2c && l1p < l2p => Some(Condition.CrossingUp)
+      case (l1c, l2c, l1p, l2p) if l1c <= l2c && l1p > l2p => Some(Condition.CrossingDown)
+      case _                                               => None
 }
