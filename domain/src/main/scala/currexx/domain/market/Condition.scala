@@ -57,6 +57,8 @@ object Condition {
       case (c, p) if c < min && p >= min => Some(Condition.BelowThreshold(min, c))
       case _                             => None
 
+  // line1=SLOW, line2=FAST
+  // CrossingUp=Sell, CrossingDown=Buy
   def linesCrossing(line1: List[Double], line2: List[Double]): Option[Condition] =
     (line1.head, line2.head, line1.drop(1).head, line2.drop(1).head) match
       case (l1c, l2c, l1p, l2p) if l1c >= l2c && l1p < l2p => Some(Condition.CrossingUp)

@@ -24,16 +24,11 @@ object IndicatorInitialiser:
 
       F.delay {
         ind match
-          case Indicator.TrendChangeDetection(source, transformation) =>
-            Indicator.TrendChangeDetection(source, randomiseVt(transformation))
-          case Indicator.ThresholdCrossing(source, transformation, _, _) =>
-            Indicator.ThresholdCrossing(
-              source,
-              randomiseVt(transformation),
-              rand.nextInt(49) + 50,
-              rand.nextInt(49) + 1
-            )
-          case Indicator.LinesCrossing(source, slow, fast) =>
-            Indicator.LinesCrossing(source, randomiseVt(slow), randomiseVt(fast))
+          case Indicator.TrendChangeDetection(vs, vt) =>
+            Indicator.TrendChangeDetection(vs, randomiseVt(vt))
+          case Indicator.ThresholdCrossing(vs, vt, _, _) =>
+            Indicator.ThresholdCrossing(vs, randomiseVt(vt), rand.nextInt(49) + 50, rand.nextInt(49) + 1)
+          case Indicator.LinesCrossing(vs, vt1, vt2) =>
+            Indicator.LinesCrossing(vs, randomiseVt(vt1), randomiseVt(vt2))
       }
     }
