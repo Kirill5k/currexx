@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import currexx.clients.broker.BrokerParameters
 import currexx.core.market.{IndicatorState, MarketState, PositionState}
 import currexx.domain.market.Currency.{EUR, GBP, USD}
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorKind, Interval, MarketTimeSeriesData, PriceRange, TradeOrder, Trend, ValueSource, ValueTransformation}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorKind, Interval, MarketTimeSeriesData, PriceRange, TradeOrder, ValueSource, ValueTransformation}
 
 import java.time.{Instant, LocalDate, LocalDateTime, ZoneOffset}
 

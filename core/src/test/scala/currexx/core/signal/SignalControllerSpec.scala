@@ -7,7 +7,7 @@ import currexx.core.common.http.SearchParams
 import currexx.domain.user.UserId
 import currexx.core.fixtures.{Markets, Sessions, Signals, Users}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, Trend, ValueSource, ValueTransformation}
+import currexx.domain.market.{Condition, CurrencyPair, Direction, Indicator, ValueSource, ValueTransformation}
 import currexx.domain.time.Clock
 import org.http4s.implicits.*
 import org.http4s.{Method, Request, Status, Uri}
@@ -37,7 +37,7 @@ class SignalControllerSpec extends ControllerSpec {
         val submittedSignal = Signal(
           Users.uid,
           Markets.gbpeur,
-          Condition.TrendDirectionChange(Trend.Downward, Trend.Upward, None),
+          Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, None),
           Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(16)),
           now
         )
@@ -74,7 +74,7 @@ class SignalControllerSpec extends ControllerSpec {
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody =
-          """{"message":"Received unknown type: 'foo'. Exists only types: above-threshold, crossing-up, trend-direction-change, crossing-down, below-threshold."}"""
+          """{"message":"Received unknown type: 'foo'. Exists only types: above-threshold, crossing-up, trend-direction-change, crossing-down, below-threshold, lines-crossing."}"""
         res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
       }

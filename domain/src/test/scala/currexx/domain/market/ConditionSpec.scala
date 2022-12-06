@@ -26,7 +26,7 @@ class ConditionSpec extends AnyWordSpec with Matchers {
       }
 
       "decode trend-direction-change condition from json" in {
-        val condition: Condition = Condition.TrendDirectionChange(Trend.Upward, Trend.Downward)
+        val condition: Condition = Condition.TrendDirectionChange(Direction.Upward, Direction.Downward)
         val json                 = """{"from":"upward","to":"downward","previousTrendLength":null,"kind":"trend-direction-change"}"""
 
         condition.asJson.noSpaces mustBe json
@@ -81,7 +81,7 @@ class ConditionSpec extends AnyWordSpec with Matchers {
       "return TrendDirectionChange when trend changes from Upward to Consolidation" in {
         val line = List(1.1522, 1.1464, 1.1346, 1.1239, 1.1134, 1.1109, 1.1177, 1.1339, 1.1443, 1.1417, 1.1382, 1.1393)
 
-        Condition.trendDirectionChange(line) mustBe Some(Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, Some(4)))
+        Condition.trendDirectionChange(line) mustBe Some(Condition.TrendDirectionChange(Direction.Upward, Direction.Still, Some(4)))
       }
 
       "return None when trend doesn't change" in {

@@ -3,20 +3,22 @@ package currexx.domain.market
 import currexx.domain.types.EnumType
 import org.latestbit.circe.adt.codec.*
 
-object Trend extends EnumType[Trend](() => Trend.values)
-enum Trend:
-  case Upward, Downward, Consolidation
+object Direction extends EnumType[Direction](() => Direction.values)
+enum Direction:
+  case Upward, Downward, Still
 
 enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+  case LinesCrossing(direction: Direction)
   case CrossingUp
   case CrossingDown
   case AboveThreshold(threshold: BigDecimal, value: BigDecimal)
   case BelowThreshold(threshold: BigDecimal, value: BigDecimal)
-  case TrendDirectionChange(from: Trend, to: Trend, previousTrendLength: Option[Int] = None)
+  case TrendDirectionChange(from: Direction, to: Direction, previousTrendLength: Option[Int] = None)
 
 object Condition {
   given JsonTaggedAdt.Config[Condition] = JsonTaggedAdt.Config.Values[Condition](
     mappings = Map(
+      "lines-crossing"         -> JsonTaggedAdt.tagged[Condition.LinesCrossing],
       "crossing-up"            -> JsonTaggedAdt.tagged[Condition.CrossingUp.type],
       "crossing-down"          -> JsonTaggedAdt.tagged[Condition.CrossingDown.type],
       "above-threshold"        -> JsonTaggedAdt.tagged[Condition.AboveThreshold],
@@ -38,9 +40,9 @@ object Condition {
     val trend = LazyList
       .range(0, line.size - 3)
       .map { i =>
-        if (!isGrowing(i) && !isDeclining(i)) Trend.Consolidation
-        else if (current(i) > previous(i)) Trend.Upward
-        else Trend.Downward
+        if (!isGrowing(i) && !isDeclining(i)) Direction.Still
+        else if (current(i) > previous(i)) Direction.Upward
+        else Direction.Downward
       }
 
     val currTrend = trend.head

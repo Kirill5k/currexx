@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import currexx.core.{FileReader, IOWordSpec, MockActionDispatcher}
 import currexx.domain.user.UserId
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, MovingAverage, PriceRange, Trend, ValueSource, ValueTransformation as VT}
+import currexx.domain.market.{Condition, CurrencyPair, Direction, Indicator, MovingAverage, PriceRange, ValueSource, ValueTransformation as VT}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Settings, Signals, Users}
@@ -88,7 +88,7 @@ class SignalServiceSpec extends IOWordSpec {
           val expectedSignal = Signal(
             Users.uid,
             Markets.gbpeur,
-            Condition.TrendDirectionChange(Trend.Consolidation, Trend.Upward, Some(1)),
+            Condition.TrendDirectionChange(Direction.Still, Direction.Upward, Some(1)),
             Markets.trendChangeDetection,
             timeSeriesData.prices.head.time
           )
@@ -115,7 +115,7 @@ class SignalServiceSpec extends IOWordSpec {
           val expectedSignal = Signal(
             Users.uid,
             Markets.gbpeur,
-            Condition.TrendDirectionChange(Trend.Consolidation, Trend.Upward, Some(1)),
+            Condition.TrendDirectionChange(Direction.Still, Direction.Upward, Some(1)),
             Markets.trendChangeDetection,
             timeSeriesData.prices.head.time
           )
@@ -155,7 +155,7 @@ class SignalServiceSpec extends IOWordSpec {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val signal = SignalService.detectTrendChange(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.TrendChangeDetection])
 
-        val expectedCondition = Condition.TrendDirectionChange(Trend.Upward, Trend.Consolidation, Some(1))
+        val expectedCondition = Condition.TrendDirectionChange(Direction.Upward, Direction.Still, Some(1))
         signal mustBe Some(Signal(Users.uid, Markets.gbpeur, expectedCondition, indicator, timeSeriesData.prices.head.time))
       }
 

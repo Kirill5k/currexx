@@ -1,7 +1,7 @@
 package currexx.core.fixtures
 
 import currexx.core.signal.*
-import currexx.domain.market.{Condition, Indicator, Trend, ValueSource, ValueTransformation}
+import currexx.domain.market.{Condition, Direction, Indicator, ValueSource, ValueTransformation}
 import currexx.domain.market.Currency.{EUR, GBP}
 
 import java.time.Instant
@@ -13,7 +13,7 @@ object Signals {
   lazy val trendDirectionChanged = Signal(
     Users.uid,
     Markets.gbpeur,
-    Condition.TrendDirectionChange(Trend.Downward, Trend.Upward, Some(1)),
+    Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(1)),
     Markets.trendChangeDetection,
     ts
   )

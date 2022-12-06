@@ -4,7 +4,7 @@ import cats.syntax.option.*
 import currexx.clients.broker.BrokerParameters
 import currexx.core.market.MarketController.MarketStateView
 import currexx.core.monitor.MonitorController.{CreateMonitorRequest, MonitorView}
-import currexx.domain.market.{Condition, Currency, CurrencyPair, Indicator, Interval, TradeOrder, Trend}
+import currexx.domain.market.{Condition, Currency, CurrencyPair, Direction, Indicator, Interval, TradeOrder}
 import eu.timepit.refined.types.string.NonEmptyString
 import currexx.domain.validations.{EmailString, IdString}
 import currexx.domain.user.UserId
@@ -30,7 +30,7 @@ transparent trait TapirSchema extends SchemaDerivation {
   given Schema[MonitorView]          = Schema.string
   given Schema[CreateMonitorRequest] = Schema.string
   given Schema[FiniteDuration]       = Schema.string
-  given Schema[Trend]                = Schema.string
+  given Schema[Direction]            = Schema.string
   given Schema[Schedule]             = Schema.string
   given Schema[TradeOrder]           = Schema.string
   given Schema[TradeOrder.Position]  = Schema.string
