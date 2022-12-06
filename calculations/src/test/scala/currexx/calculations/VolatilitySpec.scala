@@ -8,9 +8,9 @@ class VolatilitySpec extends AnyWordSpec with Matchers {
   "A Volatility" should {
 
     "calculate average true range for the specified period" in {
-      val closes = values.map(_._4.toDouble)
-      val highs  = values.map(_._2.toDouble)
-      val lows   = values.map(_._3.toDouble)
+      val closes = values.map(_._4)
+      val highs  = values.map(_._2)
+      val lows   = values.map(_._3)
 
       val result = Volatility.averageTrueRange(closes, highs, lows, 14)
 
@@ -18,7 +18,7 @@ class VolatilitySpec extends AnyWordSpec with Matchers {
     }
   }
 
-  // AUDUSD - 06/12/2022 - OHLC
+  // AUDUSD - 06/12/2022 - Open/High/Low/Close
   val values = List(
     ("0.67042", "0.67443", "0.66850", "0.66982"),
     ("0.67740", "0.68508", "0.66830", "0.66975"),
@@ -120,5 +120,5 @@ class VolatilitySpec extends AnyWordSpec with Matchers {
     ("0.69329", "0.69774", "0.68900", "0.69240"),
     ("0.68877", "0.69390", "0.68550", "0.69330"),
     ("0.68976", "0.69304", "0.68690", "0.68870")
-  ).map((o, h, l, c) => (BigDecimal(o), BigDecimal(h), BigDecimal(l), BigDecimal(c)))
+  ).map((o, h, l, c) => (o.toDouble, h.toDouble, l.toDouble, c.toDouble))
 }
