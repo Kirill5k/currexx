@@ -63,7 +63,7 @@ object Condition {
   // CrossingUp=Sell, CrossingDown=Buy
   def linesCrossing(line1: List[Double], line2: List[Double]): Option[Condition] =
     (line1.head, line2.head, line1.drop(1).head, line2.drop(1).head) match
-      case (l1c, l2c, l1p, l2p) if l1c >= l2c && l1p < l2p => Some(Condition.CrossingUp)
-      case (l1c, l2c, l1p, l2p) if l1c <= l2c && l1p > l2p => Some(Condition.CrossingDown)
+      case (l1c, l2c, l1p, l2p) if l1c >= l2c && l1p < l2p => Some(Condition.LinesCrossing(Direction.Upward))
+      case (l1c, l2c, l1p, l2p) if l1c <= l2c && l1p > l2p => Some(Condition.LinesCrossing(Direction.Downward))
       case _                                               => None
 }

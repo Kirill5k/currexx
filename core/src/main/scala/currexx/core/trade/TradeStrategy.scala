@@ -2,7 +2,7 @@ package currexx.core.trade
 
 import cats.syntax.applicative.*
 import currexx.core.market.MarketState
-import currexx.domain.market.{Condition, IndicatorKind, TradeOrder, Direction}
+import currexx.domain.market.{Condition, Direction, IndicatorKind, TradeOrder}
 import currexx.domain.types.EnumType
 
 object TradeStrategy extends EnumType[TradeStrategy](() => TradeStrategy.values)
@@ -51,8 +51,8 @@ object TradeStrategyExecutor {
         .find(_ == IndicatorKind.LinesCrossing)
         .flatMap { lc =>
           state.signals.getOrElse(lc, Nil).headOption.map(_.condition).collect {
-            case Condition.CrossingUp   => Decision.Sell
-            case Condition.CrossingDown => Decision.Buy
+            case Condition.LinesCrossing(Direction.Upward)   => Decision.Sell
+            case Condition.LinesCrossing(Direction.Downward) => Decision.Buy
           }
         }
 
@@ -69,11 +69,11 @@ object TradeStrategyExecutor {
 
   def get(strategy: TradeStrategy): TradeStrategyExecutor =
     strategy match
-      case TradeStrategy.Disabled                    => Disabled
-      case TradeStrategy.TrendChange                 => TrendChange
-      case TradeStrategy.TrendChangeAggressive       => TrendChangeAggressive
-      case TradeStrategy.LinesCrossing               => LinesCrossing
-      case TradeStrategy.ThresholdCrossing           => ThresholdCrossing
+      case TradeStrategy.Disabled              => Disabled
+      case TradeStrategy.TrendChange           => TrendChange
+      case TradeStrategy.TrendChangeAggressive => TrendChangeAggressive
+      case TradeStrategy.LinesCrossing         => LinesCrossing
+      case TradeStrategy.ThresholdCrossing     => ThresholdCrossing
 
   extension (state: MarketState)
     def buying: Boolean  = state.currentPosition.map(_.position).contains(TradeOrder.Position.Buy)

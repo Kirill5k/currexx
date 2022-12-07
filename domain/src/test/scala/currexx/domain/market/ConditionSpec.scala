@@ -9,6 +9,14 @@ class ConditionSpec extends AnyWordSpec with Matchers {
 
   "A Condition" when {
     "working with json codecs" should {
+      "decode lines-crossing condition from json" in {
+        val condition: Condition = Condition.LinesCrossing(Direction.Upward)
+        val json = """{"direction":"upward","kind":"lines-crossing"}"""
+
+        condition.asJson.noSpaces mustBe json
+        decode[Condition](json) mustBe Right(condition)
+      }
+
       "decode crossing-up condition from json" in {
         val condition: Condition = Condition.CrossingUp
         val json                 = """{"kind":"crossing-up"}"""
@@ -59,14 +67,14 @@ class ConditionSpec extends AnyWordSpec with Matchers {
         val line1 = List(1.0, 3.0, 3.0, 3.0, 3.0)
         val line2 = List(3.0, 1.0, 1.0, 1.0, 1.0)
 
-        Condition.linesCrossing(line1, line2) mustBe Some(Condition.CrossingDown)
+        Condition.linesCrossing(line1, line2) mustBe Some(Condition.LinesCrossing(Direction.Downward))
       }
 
       "return CrossingUp when line 1 (slow) crosses line 2 (fast) from below" in {
         val line1 = List(3.0, 1.0, 1.0, 1.0, 1.0)
         val line2 = List(2.0, 2.0, 2.0, 2.0, 2.0)
 
-        Condition.linesCrossing(line1, line2) mustBe Some(Condition.CrossingUp)
+        Condition.linesCrossing(line1, line2) mustBe Some(Condition.LinesCrossing(Direction.Upward))
       }
 
       "return None when lines do not intersect" in {
