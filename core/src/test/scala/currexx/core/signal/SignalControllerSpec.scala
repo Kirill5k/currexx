@@ -74,7 +74,7 @@ class SignalControllerSpec extends ControllerSpec {
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody =
-          """{"message":"Received unknown type: 'foo'. Exists only types: above-threshold, crossing-up, trend-direction-change, crossing-down, below-threshold, lines-crossing."}"""
+          """{"message":"Received unknown type: 'foo'. Exists only types: above-threshold, crossing-up, trend-direction-change, crossing-down, inside-channel, below-threshold, lines-crossing."}"""
         res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
       }
