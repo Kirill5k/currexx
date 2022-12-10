@@ -26,7 +26,7 @@ class SignalControllerSpec extends ControllerSpec {
         val svc = mock[SignalService[IO]]
         when(svc.submit(any[Signal])).thenReturn(IO.unit)
 
-        val reqBody = s"""{
+        val reqBody = """{
              |"currencyPair":"GBP/EUR",
              |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
              |"condition": {"kind":"trend-direction-change", "from":"downward", "to":"upward"}
@@ -49,12 +49,9 @@ class SignalControllerSpec extends ControllerSpec {
       "return error on unrecognized indicator" in {
         val svc = mock[SignalService[IO]]
 
-        val reqBody = s"""{
-             |  "currencyPair":"GBP/EUR",
-             |  "triggeredBy": {"kind": "foo"}
-             |}""".stripMargin
-        val req = requestWithAuthHeader(uri"/signals", Method.POST).withJsonBody(parseJson(reqBody))
-        val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+        val reqBody = """{"currencyPair":"GBP/EUR","triggeredBy": {"kind": "foo"}}""".stripMargin
+        val req     = requestWithAuthHeader(uri"/signals", Method.POST).withJsonBody(parseJson(reqBody))
+        val res     = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val validIndicators = "keltner-channel, lines-crossing, threshold-crossing, trend-change-detection"
         val responseBody = s"""{"message":"Missing required field, Received unknown type: 'foo'. Exists only types: $validIndicators."}"""
@@ -73,9 +70,9 @@ class SignalControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withJsonBody(parseJson(reqBody))
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val validIndicators =
+        val validCondition =
           "above-threshold, crossing-up, lower-band-crossing, crossing-down, trend-direction-change, upper-band-crossing, below-threshold, lines-crossing"
-        val responseBody = s"""{"message":"Received unknown type: 'foo'. Exists only types: $validIndicators."}"""
+        val responseBody = s"""{"message":"Received unknown type: 'foo'. Exists only types: $validCondition."}"""
         res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
       }
@@ -83,7 +80,7 @@ class SignalControllerSpec extends ControllerSpec {
       "return error on invalid currency pair signal" in {
         val svc = mock[SignalService[IO]]
 
-        val reqBody = s"""{
+        val reqBody = """{
              |"currencyPair":"FOO/BAR",
              |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
              |"condition": {"kind":"trend-direction-change", "from":"downward", "to":"upward"}
@@ -100,7 +97,7 @@ class SignalControllerSpec extends ControllerSpec {
       "return error on malformed currency pair signal" in {
         val svc = mock[SignalService[IO]]
 
-        val reqBody = s"""{
+        val reqBody = """{
                |"currencyPair":"FOO-BAR",
                |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
                |"condition": {"kind":"trend-direction-change", "from":"downward", "to":"upward"}
