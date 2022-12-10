@@ -6,22 +6,14 @@ import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import cats.syntax.traverse.*
 import currexx.domain.user.UserId
-import currexx.calculations.{Filters, MomentumOscillators, MovingAverages}
+import currexx.calculations.{Filters, MomentumOscillators, MovingAverages, Volatility}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.common.time.*
 import currexx.core.settings.TriggerFrequency
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{
-  Condition,
-  CurrencyPair,
-  Indicator,
-  MarketTimeSeriesData,
-  MovingAverage,
-  ValueSource as VS,
-  ValueTransformation as VT
-}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, MarketTimeSeriesData, MovingAverage, ValueSource as VS, ValueTransformation as VT}
 import fs2.Stream
 
 import java.time.Instant
@@ -51,6 +43,7 @@ final private class LiveSignalService[F[_]](
             case tcd: Indicator.TrendChangeDetection => SignalService.detectTrendChange(uid, data, tcd)
             case tc: Indicator.ThresholdCrossing     => SignalService.detectThresholdCrossing(uid, data, tc)
             case ls: Indicator.LinesCrossing         => SignalService.detectLinesCrossing(uid, data, ls)
+            case kc: Indicator.KeltnerChannel        => SignalService.detectBarrierCrossing(uid, data, kc)
           }
           .traverse { signal =>
             settings.triggerFrequency match
@@ -123,6 +116,15 @@ object SignalService:
     Condition
       .linesCrossing(line1, line2)
       .map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))
+  }
+
+  def detectBarrierCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.KeltnerChannel): Option[Signal] = {
+    val source = indicator.source.extract(data)
+    val line1 = indicator.line1Transformation.transform(source, data)
+    val line2 = indicator.line2Transformation.transform(source, data)
+    val atr = Volatility.averageTrueRange(source, data.highs, data.lows, indicator.atrLength)
+
+    None
   }
 
   def make[F[_]: Concurrent](

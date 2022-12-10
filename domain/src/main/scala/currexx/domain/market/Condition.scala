@@ -8,7 +8,8 @@ enum Direction:
   case Upward, Downward, Still
 
 enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
-  case InsideChannel(direction: Direction)
+  case UpperBandCrossing(direction: Direction)
+  case LowerBandCrossing(direction: Direction)
   case LinesCrossing(direction: Direction)
   case CrossingUp
   case CrossingDown
@@ -19,7 +20,8 @@ enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWit
 object Condition {
   given JsonTaggedAdt.Config[Condition] = JsonTaggedAdt.Config.Values[Condition](
     mappings = Map(
-      "inside-channel"         -> JsonTaggedAdt.tagged[Condition.InsideChannel],
+      "upper-band-crossing"    -> JsonTaggedAdt.tagged[Condition.UpperBandCrossing],
+      "lower-band-crossing"    -> JsonTaggedAdt.tagged[Condition.LowerBandCrossing],
       "lines-crossing"         -> JsonTaggedAdt.tagged[Condition.LinesCrossing],
       "crossing-up"            -> JsonTaggedAdt.tagged[Condition.CrossingUp.type],
       "crossing-down"          -> JsonTaggedAdt.tagged[Condition.CrossingDown.type],

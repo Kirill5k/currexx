@@ -56,8 +56,8 @@ class SignalControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withJsonBody(parseJson(reqBody))
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val responseBody =
-          """{"message":"Missing required field, Received unknown type: 'foo'. Exists only types: lines-crossing, threshold-crossing, trend-change-detection."}"""
+        val validIndicators = "keltner-channel, lines-crossing, threshold-crossing, trend-change-detection"
+        val responseBody = s"""{"message":"Missing required field, Received unknown type: 'foo'. Exists only types: $validIndicators."}"""
         res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
       }
@@ -65,7 +65,7 @@ class SignalControllerSpec extends ControllerSpec {
       "return error on unrecognized condition" in {
         val svc = mock[SignalService[IO]]
 
-        val reqBody = s"""{
+        val reqBody = """{
              |"currencyPair":"GBP/EUR",
              |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
              |"condition": {"kind":"foo","value":0.05}
@@ -73,8 +73,9 @@ class SignalControllerSpec extends ControllerSpec {
         val req = requestWithAuthHeader(uri"/signals", Method.POST).withJsonBody(parseJson(reqBody))
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val responseBody =
-          """{"message":"Received unknown type: 'foo'. Exists only types: above-threshold, crossing-up, trend-direction-change, crossing-down, inside-channel, below-threshold, lines-crossing."}"""
+        val validIndicators =
+          "above-threshold, crossing-up, lower-band-crossing, crossing-down, trend-direction-change, upper-band-crossing, below-threshold, lines-crossing"
+        val responseBody = s"""{"message":"Received unknown type: 'foo'. Exists only types: $validIndicators."}"""
         res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
       }

@@ -55,7 +55,7 @@ object ValueTransformation {
 
 object IndicatorKind extends EnumType[IndicatorKind](() => IndicatorKind.values)
 enum IndicatorKind:
-  case TrendChangeDetection, ThresholdCrossing, LinesCrossing
+  case TrendChangeDetection, ThresholdCrossing, LinesCrossing, KeltnerChannel
 
 enum Indicator(val kind: IndicatorKind) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case TrendChangeDetection(
@@ -73,13 +73,21 @@ enum Indicator(val kind: IndicatorKind) derives JsonTaggedAdt.EncoderWithConfig,
       line1Transformation: ValueTransformation, // SLOW
       line2Transformation: ValueTransformation  // FAST
   ) extends Indicator(IndicatorKind.LinesCrossing)
+  case KeltnerChannel(
+      source: ValueSource,
+      line1Transformation: ValueTransformation, // SLOW
+      line2Transformation: ValueTransformation, // FAST
+      atrLength: Int,
+      atrRatio: Double
+  ) extends Indicator(IndicatorKind.KeltnerChannel)
 
 object Indicator:
   given JsonTaggedAdt.Config[Indicator] = JsonTaggedAdt.Config.Values[Indicator](
     mappings = Map(
       IndicatorKind.TrendChangeDetection.print -> JsonTaggedAdt.tagged[Indicator.TrendChangeDetection],
       IndicatorKind.ThresholdCrossing.print    -> JsonTaggedAdt.tagged[Indicator.ThresholdCrossing],
-      IndicatorKind.LinesCrossing.print        -> JsonTaggedAdt.tagged[Indicator.LinesCrossing]
+      IndicatorKind.LinesCrossing.print        -> JsonTaggedAdt.tagged[Indicator.LinesCrossing],
+      IndicatorKind.KeltnerChannel.print       -> JsonTaggedAdt.tagged[Indicator.KeltnerChannel]
     ),
     strict = true,
     typeFieldName = "kind"
