@@ -123,7 +123,8 @@ object SignalService:
     val line1 = indicator.line1Transformation.transform(source, data)
     val line2 = indicator.line2Transformation.transform(source, data)
     val atr = Volatility.averageTrueRange(source, data.highs, data.lows, indicator.atrLength)
-
+    val upperBand = line1.lazyZip(atr).map((l1, a) => l1 + (a * indicator.atrRatio))
+    val lowerBand = line1.lazyZip(atr).map((l1, a) => l1 - (a * indicator.atrRatio))
     None
   }
 

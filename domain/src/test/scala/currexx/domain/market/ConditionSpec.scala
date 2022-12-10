@@ -98,5 +98,31 @@ class ConditionSpec extends AnyWordSpec with Matchers {
         Condition.trendDirectionChange(line) mustBe None
       }
     }
+
+    "barrierCrossing" should {
+      val upperBarrier = List(5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0)
+      val lowerBarrier = List(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
+
+      "return UpperBandCrossing when line crosses upper barrier" in {
+        val line1 = List(4.0, 6.0, 6.0, 6.0)
+        Condition.barrierCrossing(line1, upperBarrier, lowerBarrier) mustBe Some(Condition.UpperBandCrossing(Direction.Downward))
+
+        val line2 = List(6.0, 4.0, 4.0, 4.0)
+        Condition.barrierCrossing(line2, upperBarrier, lowerBarrier) mustBe Some(Condition.UpperBandCrossing(Direction.Upward))
+      }
+
+      "return LowerBandCrossing when line crosses lower barrier" in {
+        val line1 = List(0.0, 2.0, 2.0, 2.0)
+        Condition.barrierCrossing(line1, upperBarrier, lowerBarrier) mustBe Some(Condition.LowerBandCrossing(Direction.Downward))
+
+        val line2 = List(2.0, 0.0, 0.0, 0.0)
+        Condition.barrierCrossing(line2, upperBarrier, lowerBarrier) mustBe Some(Condition.LowerBandCrossing(Direction.Upward))
+      }
+
+      "return None when line doesn't cross boundaries" in {
+        val line1 = List(4.0, 3.0, 3.0, 3.0)
+        Condition.barrierCrossing(line1, upperBarrier, lowerBarrier) mustBe None
+      }
+    }
   }
 }
