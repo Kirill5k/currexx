@@ -23,18 +23,19 @@ object Application extends IOApp.Simple:
         config <- AppConfig.load[IO]
         _ <- Resources.make[IO](config).use { res =>
           for
-            dispatcher      <- ActionDispatcher.make[IO].flatTap(_.dispatch(Action.RescheduleAllMonitors))
-            clients         <- Clients.make[IO](config.clients, res.sttpBackend)
-            health          <- Health.make[IO]
-            auth            <- Auth.make(config.auth, res.mongo, dispatcher)
-            signals         <- Signals.make(res.mongo, dispatcher)
-            monitors        <- Monitors.make(res.mongo, dispatcher)
-            markets         <- Markets.make(res.mongo, dispatcher)
-            trades          <- Trades.make(res.mongo, clients, dispatcher)
-            settings        <- Settings.make(res.mongo)
-            http            <- Http.make[IO](health, auth, signals, monitors, markets, trades, settings)
-            actionProcessor <- ActionProcessor.make[IO](dispatcher, monitors.service, signals.service, markets.service, trades.service, settings.service)
-            logProcessor    <- LogEventProcessor.make[IO](res.mongo)
+            dispatcher <- ActionDispatcher.make[IO].flatTap(_.dispatch(Action.RescheduleAllMonitors))
+            clients    <- Clients.make[IO](config.clients, res.sttpBackend)
+            health     <- Health.make[IO]
+            auth       <- Auth.make(config.auth, res.mongo, dispatcher)
+            signals    <- Signals.make(res.mongo, dispatcher)
+            monitors   <- Monitors.make(res.mongo, dispatcher)
+            markets    <- Markets.make(res.mongo, dispatcher)
+            trades     <- Trades.make(res.mongo, clients, dispatcher)
+            settings   <- Settings.make(res.mongo)
+            http       <- Http.make[IO](health, auth, signals, monitors, markets, trades, settings)
+            actionProcessor <- ActionProcessor
+              .make[IO](dispatcher, monitors.service, signals.service, markets.service, trades.service, settings.service)
+            logProcessor <- LogEventProcessor.make[IO](res.mongo)
             _ <- Server
               .serve[IO](config.server, http.app)
               .concurrently(actionProcessor.run)

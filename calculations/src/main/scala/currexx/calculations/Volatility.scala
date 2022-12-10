@@ -11,17 +11,17 @@ object Volatility {
       lows: List[Double],
       length: Int
   ): List[Double] = {
-    val highsArr = highs.toArray
-    val lowsArr = lows.toArray
+    val highsArr    = highs.toArray
+    val lowsArr     = lows.toArray
     val closingsArr = closings.toArray
-    val trs = MQueue.empty[Double]
-    val atrs = ListBuffer.empty[Double]
-    var i = closings.size - 2
+    val trs         = MQueue.empty[Double]
+    val atrs        = ListBuffer.empty[Double]
+    var i           = closings.size - 2
     while (i >= 0) {
       val prevClose = closingsArr(i + 1)
-      val high = highsArr(i)
-      val low = lowsArr(i)
-      val tr = math.max(math.max(high - low, math.abs(high - prevClose)), math.abs(low - prevClose))
+      val high      = highsArr(i)
+      val low       = lowsArr(i)
+      val tr        = math.max(math.max(high - low, math.abs(high - prevClose)), math.abs(low - prevClose))
       trs.addOne(tr)
       if (trs.size == length && atrs.isEmpty) {
         val atr = trs.sum / length

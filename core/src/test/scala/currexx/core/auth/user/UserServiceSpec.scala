@@ -3,7 +3,7 @@ package currexx.core.auth.user
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import currexx.core.{IOWordSpec, MockActionDispatcher}
-import currexx.core.common.action.{Action}
+import currexx.core.common.action.Action
 import currexx.core.fixtures.Users
 import currexx.core.auth.user.db.UserRepository
 import currexx.domain.user.*

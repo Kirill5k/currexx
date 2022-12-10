@@ -13,7 +13,15 @@ import currexx.core.common.time.*
 import currexx.core.settings.TriggerFrequency
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, MarketTimeSeriesData, MovingAverage, ValueSource as VS, ValueTransformation as VT}
+import currexx.domain.market.{
+  Condition,
+  CurrencyPair,
+  Indicator,
+  MarketTimeSeriesData,
+  MovingAverage,
+  ValueSource as VS,
+  ValueTransformation as VT
+}
 import fs2.Stream
 
 import java.time.Instant

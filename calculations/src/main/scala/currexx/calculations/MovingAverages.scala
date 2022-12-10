@@ -70,7 +70,7 @@ object MovingAverages {
     val divider = (n * (n + 1)) / 2
     val window  = collection.mutable.Queue.empty[Double]
     var i       = size - n
-    while (values.hasNext) {
+    while (values.hasNext)
       if (window.size < n) {
         window.enqueue(values.next())
       } else {
@@ -79,7 +79,6 @@ object MovingAverages {
         wmas(i - 1) = window.zipWithIndex.foldLeft(0d) { case (sum, (v, i)) => sum + (n + i + 1 - n) * v } / divider
         i = i - 1
       }
-    }
     wmas
   }
 

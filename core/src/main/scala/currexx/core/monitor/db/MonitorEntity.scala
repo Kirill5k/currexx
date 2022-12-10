@@ -76,13 +76,13 @@ object MonitorEntity {
   inline given Decoder[MonitorEntity] = Decoder.instance { c =>
     c.downField("kind").as[String].flatMap {
       case "market-data" => c.as[MarketData]
-      case "profit" => c.as[Profit]
-      case kind => Left(DecodingFailure(s"Unexpected monitor kind $kind", List(CursorOp.Field("kind"))))
+      case "profit"      => c.as[Profit]
+      case kind          => Left(DecodingFailure(s"Unexpected monitor kind $kind", List(CursorOp.Field("kind"))))
     }
   }
 
   inline given Encoder[MonitorEntity] = Encoder.instance {
     case marketData: MarketData => marketData.asJsonObject.add("kind", Json.fromString(marketData.kind)).asJson
-    case profit: Profit => profit.asJsonObject.add("kind", Json.fromString(profit.kind)).asJson
+    case profit: Profit         => profit.asJsonObject.add("kind", Json.fromString(profit.kind)).asJson
   }
 }

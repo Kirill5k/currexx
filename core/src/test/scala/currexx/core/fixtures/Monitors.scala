@@ -16,7 +16,7 @@ object Monitors {
   lazy val queriedAt: Instant = Instant.now.truncatedTo(ChronoUnit.MILLIS)
 
   lazy val limits = Limits(Some(-10), Some(150), None, None, false)
-  
+
   private val cps     = NonEmptyList.of(Markets.gbpeur)
   lazy val marketData = Monitor.MarketData(mid, Users.uid, true, cps, Schedule.Periodic(3.hours), Some(queriedAt), Interval.H1)
   lazy val profit     = Monitor.Profit(mid, Users.uid, true, cps, Schedule.Periodic(3.hours), Some(queriedAt), limits)

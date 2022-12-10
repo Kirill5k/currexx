@@ -49,7 +49,7 @@ object Monitor:
       currencyPairs: NonEmptyList[CurrencyPair],
       schedule: Schedule,
       lastQueriedAt: Option[Instant],
-      limits: Limits,
+      limits: Limits
   ) extends Monitor("profit")
 
 sealed trait CreateMonitor(val kind: String):

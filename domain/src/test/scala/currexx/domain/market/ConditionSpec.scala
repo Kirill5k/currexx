@@ -11,7 +11,7 @@ class ConditionSpec extends AnyWordSpec with Matchers {
     "working with json codecs" should {
       "decode lines-crossing condition from json" in {
         val condition: Condition = Condition.LinesCrossing(Direction.Upward)
-        val json = """{"direction":"upward","kind":"lines-crossing"}"""
+        val json                 = """{"direction":"upward","kind":"lines-crossing"}"""
 
         condition.asJson.noSpaces mustBe json
         decode[Condition](json) mustBe Right(condition)

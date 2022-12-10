@@ -29,9 +29,9 @@ class MarketStateRepositorySpec extends MongoSpec {
       "update existing state if it exists" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- MarketStateRepository.make(db)
-          _ <- repo.update(Users.uid, Markets.gbpeur, Map.empty)
-          _ <- repo.update(Users.uid, Markets.gbpeur, Markets.indicatorStates)
-          res <- repo.getAll(Users.uid)
+          _    <- repo.update(Users.uid, Markets.gbpeur, Map.empty)
+          _    <- repo.update(Users.uid, Markets.gbpeur, Markets.indicatorStates)
+          res  <- repo.getAll(Users.uid)
         yield res
 
         result.map(_ must have size 1)
@@ -92,14 +92,14 @@ class MarketStateRepositorySpec extends MongoSpec {
         result.map(_ mustBe Nil)
       }
     }
-    
+
     "delete" should {
       "delete market currency state" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- MarketStateRepository.make(db)
-          _ <- repo.update(Users.uid, Markets.gbpeur, Map.empty)
-          _ <- repo.delete(Users.uid, Markets.gbpeur)
-          res <- repo.find(Users.uid, Markets.gbpeur)
+          _    <- repo.update(Users.uid, Markets.gbpeur, Map.empty)
+          _    <- repo.delete(Users.uid, Markets.gbpeur)
+          res  <- repo.find(Users.uid, Markets.gbpeur)
         yield res
 
         result.map(_ mustBe None)
@@ -108,7 +108,7 @@ class MarketStateRepositorySpec extends MongoSpec {
       "return error when market state does not exist" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- MarketStateRepository.make(db)
-          _ <- repo.delete(Users.uid, Markets.gbpeur)
+          _    <- repo.delete(Users.uid, Markets.gbpeur)
         yield ()
 
         result.attempt.map(_ mustBe Left(AppError.NotTracked(List(Markets.gbpeur))))

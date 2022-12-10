@@ -64,7 +64,7 @@ final private class TradeController[F[_]](
 }
 
 object TradeController extends TapirSchema with TapirJson with TapirCodecs {
-  
+
   final case class TradeOrderView(
       order: TradeOrder,
       broker: BrokerParameters,
@@ -75,8 +75,8 @@ object TradeController extends TapirSchema with TapirJson with TapirCodecs {
     def from(top: TradeOrderPlacement): TradeOrderView =
       TradeOrderView(top.order, top.broker, top.time)
 
-  private val basePath     = "trade"
-  private val ordersPath   = basePath / "orders"
+  private val basePath   = "trade"
+  private val ordersPath = basePath / "orders"
 
   val getTradeOrdersEndpoint = Controller.securedEndpoint.get
     .in(ordersPath)

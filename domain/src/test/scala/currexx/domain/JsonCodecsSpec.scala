@@ -27,7 +27,12 @@ class JsonCodecsSpec extends AnyWordSpec with Matchers with JsonCodecs {
 
     "return error on unrecognized currency code" in {
       val currency: String = """"FOO""""
-      decode[Currency](currency) mustBe Left(DecodingFailure("Unknown currency code FOO; Available currencies are: PLN, CAD, AUD, GBP, CHF, DKK, JPY, USD, RUB, NZD, NOK, EUR", Nil))
+      decode[Currency](currency) mustBe Left(
+        DecodingFailure(
+          "Unknown currency code FOO; Available currencies are: PLN, CAD, AUD, GBP, CHF, DKK, JPY, USD, RUB, NZD, NOK, EUR",
+          Nil
+        )
+      )
     }
 
     "convert json to currency" in {

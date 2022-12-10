@@ -31,7 +31,7 @@ object FileReader {
           high  <- ohlc("2. high").flatMap(_.asString).map(_.toDouble).toRight(new RuntimeException("missing high"))
           low   <- ohlc("3. low").flatMap(_.asString).map(_.toDouble).toRight(new RuntimeException("missing low"))
           close <- ohlc("4. close").flatMap(_.asString).map(_.toDouble).toRight(new RuntimeException("missing close"))
-        yield PriceRange(open, high, low, close, 0D, LocalDate.parse(date).toInstantAtStartOfDay)
+        yield PriceRange(open, high, low, close, 0d, LocalDate.parse(date).toInstantAtStartOfDay)
       }
       priceValues <- NonEmptyList.fromList(priceRange).toRight(new RuntimeException("empty price range list"))
     yield priceValues

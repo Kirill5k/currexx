@@ -40,7 +40,7 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
     }
   }
 
-  def stateInterpreter[G]: Op[*, G] ~> State[List[String], *] = new (Op[*, G] ~> State[List[String], *]) {
+  def stateInterpreter[G]: Op[*, G] ~> State[List[String], *] = new (~>[Op[*, G], State[List[String], *]]) {
     def apply[A](fa: Op[A, G]): State[List[String], A] = fa match {
       case Op.InitPopulation(seed, size, shuffle) =>
         State.modify[List[String]](_ :+ s"Initialise population of size $size with shuffle=$shuffle\n") >>

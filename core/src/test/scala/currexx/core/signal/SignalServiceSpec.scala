@@ -4,7 +4,16 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import currexx.core.{FileReader, IOWordSpec, MockActionDispatcher}
 import currexx.domain.user.UserId
-import currexx.domain.market.{Condition, CurrencyPair, Direction, Indicator, MovingAverage, PriceRange, ValueSource, ValueTransformation as VT}
+import currexx.domain.market.{
+  Condition,
+  CurrencyPair,
+  Direction,
+  Indicator,
+  MovingAverage,
+  PriceRange,
+  ValueSource,
+  ValueTransformation as VT
+}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Settings, Signals, Users}
@@ -168,12 +177,12 @@ class SignalServiceSpec extends IOWordSpec {
     }
 
     "detectThresholdCrossing" should {
-      val indicator     = Indicator.ThresholdCrossing(ValueSource.Close, VT.STOCH(14), 80D, 20D)
+      val indicator = Indicator.ThresholdCrossing(ValueSource.Close, VT.STOCH(14), 80d, 20d)
       "create signal when current value is below threshold" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val signal = SignalService.detectThresholdCrossing(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.ThresholdCrossing])
 
-        val expectedCondition = Condition.BelowThreshold(20D, BigDecimal(15.03657545380666))
+        val expectedCondition = Condition.BelowThreshold(20d, BigDecimal(15.03657545380666))
         signal mustBe Some(Signal(Users.uid, Markets.gbpeur, expectedCondition, indicator, timeSeriesData.prices.head.time))
       }
 

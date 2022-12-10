@@ -21,7 +21,7 @@ object Selector:
           val ((pickedInd, indFitness), remaining) = pickOne(remPop, remFitness)
           go(newPop :+ pickedInd, remaining, remFitness - indFitness)
         }
-      val fTotal       = popByFitness.map(_._2).reduce(_ + _)
+      val fTotal = popByFitness.map(_._2).reduce(_ + _)
       go(Vector.empty, popByFitness, fTotal).pairs
 
     private def pickOne(

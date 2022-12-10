@@ -50,7 +50,7 @@ final private class SignalController[F[_]](
     Http4sServerInterpreter[F](Controller.serverOptions).toRoutes(
       List(
         submitSignal,
-        getAllSignals,
+        getAllSignals
       )
     )
 }
@@ -73,8 +73,8 @@ object SignalController extends TapirSchema with TapirJson {
   object SignalView:
     def from(signal: Signal): SignalView =
       SignalView(signal.currencyPair, signal.condition, signal.triggeredBy, signal.time)
-  
-  private val basePath     = "signals"
+
+  private val basePath = "signals"
 
   val submitSignalEndpoint = Controller.securedEndpoint.post
     .in(basePath)

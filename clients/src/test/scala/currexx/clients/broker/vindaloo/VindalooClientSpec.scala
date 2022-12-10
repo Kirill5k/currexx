@@ -21,7 +21,7 @@ class VindalooClientSpec extends ClientSpec {
       val testingBackend: SttpBackend[IO, Any] = backendStub
         .whenRequestMatchesPartial {
           case r if r.isPost && r.isGoingTo("vindaloo.com/15/0/0/0/buy/GBPUSD/0.1") => Response.ok("ok")
-          case _                                                                     => throw new RuntimeException()
+          case _                                                                    => throw new RuntimeException()
         }
 
       val result = for

@@ -18,7 +18,7 @@ object Trades {
     broker,
     ts
   )
-  
+
   lazy val openedOrder = OpenedTradeOrder(
     Markets.gbpeur,
     TradeOrder.Position.Buy,

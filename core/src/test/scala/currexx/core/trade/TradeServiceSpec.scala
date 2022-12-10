@@ -7,7 +7,7 @@ import currexx.clients.data.MarketDataClient
 import currexx.core.{IOWordSpec, MockActionDispatcher, MockClock}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
-import currexx.core.fixtures.{Markets, Trades, Users, Settings}
+import currexx.core.fixtures.{Markets, Settings, Trades, Users}
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId

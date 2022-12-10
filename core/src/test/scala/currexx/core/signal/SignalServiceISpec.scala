@@ -5,7 +5,7 @@ import cats.effect.IO
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.fixtures.{Markets, Signals, Users}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
-import currexx.core.{IOWordSpec, FileReader}
+import currexx.core.{FileReader, IOWordSpec}
 import currexx.domain.market.*
 import currexx.domain.user.UserId
 import io.circe.JsonObject

@@ -9,6 +9,6 @@ trait Clock[F[_]]:
 
 final private class LiveClock[F[_]](using F: Temporal[F]) extends Clock[F]:
   override def currentTime: F[Instant] = F.realTimeInstant
-  
+
 object Clock:
   def default[F[_]: Temporal]: Clock[F] = LiveClock[F]

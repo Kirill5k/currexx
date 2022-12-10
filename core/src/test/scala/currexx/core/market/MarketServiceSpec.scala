@@ -174,7 +174,9 @@ class MarketServiceSpec extends IOWordSpec {
           )
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verify(stateRepo).update(Users.uid, Markets.gbpeur, finalSignalState)
-          disp.submittedActions mustBe List(Action.ProcessMarketStateUpdate(Markets.state, List(IndicatorKind.ThresholdCrossing, IndicatorKind.TrendChangeDetection)))
+          disp.submittedActions mustBe List(
+            Action.ProcessMarketStateUpdate(Markets.state, List(IndicatorKind.ThresholdCrossing, IndicatorKind.TrendChangeDetection))
+          )
           res mustBe ()
         }
       }

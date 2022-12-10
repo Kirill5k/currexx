@@ -34,7 +34,7 @@ class TradeSettingsRepositorySpec extends MongoSpec {
       "return error when trade-settings do not exist" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- TradeSettingsRepository.make(db)
-          res <- repo.get(Users.uid2)
+          res  <- repo.get(Users.uid2)
         yield res
 
         result.attempt.map(_ mustBe Left(AppError.NotSetup("Trade")))
@@ -43,7 +43,7 @@ class TradeSettingsRepositorySpec extends MongoSpec {
       "return trade-settings" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- TradeSettingsRepository.make(db)
-          res <- repo.get(Users.uid)
+          res  <- repo.get(Users.uid)
         yield res
 
         result.map(_ mustBe Settings.trade)

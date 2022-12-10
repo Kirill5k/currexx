@@ -1,7 +1,7 @@
 package currexx.core.settings.db
 
 import currexx.clients.broker.BrokerParameters
-import currexx.core.settings.{SignalSettings, TradeSettings, GlobalSettings}
+import currexx.core.settings.{GlobalSettings, SignalSettings, TradeSettings}
 import currexx.domain.user.UserId
 import io.circe.Codec
 import mongo4cats.bson.ObjectId

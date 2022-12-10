@@ -57,7 +57,8 @@ final private class LiveTwelveDataClient[F[_]](
             .flatMap { r =>
               r.body match
                 case Right(res) =>
-                  val prices = res.values.zipWithIndex.map((v, i) => PriceRange(v.open, v.high, v.low, v.close, 0d, v.datetime.toInstant(i)))
+                  val prices =
+                    res.values.zipWithIndex.map((v, i) => PriceRange(v.open, v.high, v.low, v.close, 0d, v.datetime.toInstant(i)))
                   MarketTimeSeriesData(pair, interval, prices).pure[F]
                 case Left(DeserializationException(responseBody, error)) =>
                   if (responseBody.matches(".*\"code\":( )?429.*"))
@@ -72,14 +73,17 @@ final private class LiveTwelveDataClient[F[_]](
                   logger.error(s"$name-client/${status.code}\n$responseBody") >>
                     F.sleep(delayBetweenConnectionFailures) >> fetchTimeSeriesData(pair, interval, numOfTicks)
             }
-          .flatTap(data => cache.put(pair -> interval, data))
+            .flatTap(data => cache.put(pair -> interval, data))
       }
 
   extension (dateString: String)
     def toInstant(i: Int): Instant =
-      if (dateString.length == 10 && i == 0) LocalDate.parse(dateString).atTime(LocalTime.now().truncatedTo(ChronoUnit.MINUTES)).toInstant(ZoneOffset.UTC)
-      else if (dateString.length == 10) LocalDate.parse(dateString).atStartOfDay().toInstant(ZoneOffset.UTC)
-      else Instant.parse(s"${dateString.replaceFirst(" ", "T")}Z")
+      if (dateString.length == 10 && i == 0)
+        LocalDate.parse(dateString).atTime(LocalTime.now().truncatedTo(ChronoUnit.MINUTES)).toInstant(ZoneOffset.UTC)
+      else if (dateString.length == 10)
+        LocalDate.parse(dateString).atStartOfDay().toInstant(ZoneOffset.UTC)
+      else
+        Instant.parse(s"${dateString.replaceFirst(" ", "T")}Z")
 }
 
 private[clients] object TwelveDataClient {
