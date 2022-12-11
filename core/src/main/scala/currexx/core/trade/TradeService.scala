@@ -119,8 +119,6 @@ final private class LiveTradeService[F[_]](
     brokerClient.submit(top.broker, top.order) *>
       orderRepository.save(top) *>
       dispatcher.dispatch(Action.ProcessTradeOrderPlacement(top))
-
-  extension (ms: MarketState) def hasOpenPosition: Boolean = ms.currentPosition.isDefined
 }
 
 object TradeService:

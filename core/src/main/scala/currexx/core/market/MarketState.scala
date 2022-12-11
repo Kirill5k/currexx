@@ -25,4 +25,5 @@ final case class MarketState(
     signals: Map[IndicatorKind, List[IndicatorState]],
     lastUpdatedAt: Option[Instant],
     createdAt: Option[Instant]
-) derives Codec.AsObject
+) derives Codec.AsObject:
+  def hasOpenPosition: Boolean = currentPosition.isDefined
