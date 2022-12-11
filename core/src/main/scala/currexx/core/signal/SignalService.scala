@@ -125,7 +125,10 @@ object SignalService:
     val atr = Volatility.averageTrueRange(source, data.highs, data.lows, indicator.atrLength)
     val upperBand = line1.lazyZip(atr).map((l1, a) => l1 + (a * indicator.atrRatio))
     val lowerBand = line1.lazyZip(atr).map((l1, a) => l1 - (a * indicator.atrRatio))
-    None
+    Condition
+      .barrierCrossing(line2, upperBand, lowerBand)
+      .orElse(Condition.linesCrossing(line1, line2))
+      .map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))
   }
 
   def make[F[_]: Concurrent](
