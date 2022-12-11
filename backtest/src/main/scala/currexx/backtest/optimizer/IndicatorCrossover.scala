@@ -59,6 +59,8 @@ object IndicatorCrossover:
                   val lb = math.min(crossInt(lb1.toInt, lb2.toInt), 100)
                   Indicator.ThresholdCrossing(s, t, ub, lb)
                 }
+            case (Indicator.KeltnerChannel(vs, st1, ft1, al, ar), Indicator.KeltnerChannel(_, st2, ft2, _, _)) =>
+              F.fromEither((crossVt(st1, st2), crossVt(ft1, ft2)).mapN((st, ft) => Indicator.KeltnerChannel(vs, st, ft, al, ar)))
             case _ =>
               F.raiseError(new IllegalArgumentException("both parents must be of the same type"))
         }.handleErrorWith { e =>

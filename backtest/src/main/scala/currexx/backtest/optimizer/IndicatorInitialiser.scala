@@ -30,5 +30,7 @@ object IndicatorInitialiser:
             Indicator.ThresholdCrossing(vs, randomiseVt(vt), rand.nextInt(49) + 50, rand.nextInt(49) + 1)
           case Indicator.LinesCrossing(vs, vt1, vt2) =>
             Indicator.LinesCrossing(vs, randomiseVt(vt1), randomiseVt(vt2))
+          case Indicator.KeltnerChannel(vs, vt1, vt2, atrL, atrR) =>
+            Indicator.KeltnerChannel(vs, randomiseVt(vt1), randomiseVt(vt2), atrL, atrR)
       }
     }

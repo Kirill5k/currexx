@@ -14,7 +14,7 @@ object IndicatorMutator:
       override def mutate(ind: Indicator, mutationProbability: Double)(using r: Random): F[Indicator] = {
         def mutateInt(int: Int, maxValue: Int = 100, minValue: Int = 1): Int = {
           val binArray = int.toBinaryArray(maxValue)
-          val res = bitFlitMutator.mutate(binArray, mutationProbability).toInt
+          val res      = bitFlitMutator.mutate(binArray, mutationProbability).toInt
           math.max(minValue, math.min(res, maxValue))
         }
 
@@ -45,14 +45,11 @@ object IndicatorMutator:
             case Indicator.TrendChangeDetection(vs, vt) =>
               Indicator.TrendChangeDetection(vs, mutateVt(vt))
             case Indicator.ThresholdCrossing(vs, vt, ub, lb) =>
-              Indicator.ThresholdCrossing(
-                vs,
-                mutateVt(vt),
-                mutateInt(ub.toInt, 100),
-                mutateInt(lb.toInt, 100)
-              )
-            case Indicator.LinesCrossing(vs, st, ft) =>
-              Indicator.LinesCrossing(vs, mutateVt(st), mutateVt(ft))
+              Indicator.ThresholdCrossing(vs, mutateVt(vt), mutateInt(ub.toInt, 100), mutateInt(lb.toInt, 100))
+            case Indicator.LinesCrossing(vs, vt1, vt2) =>
+              Indicator.LinesCrossing(vs, mutateVt(vt1), mutateVt(vt2))
+            case Indicator.KeltnerChannel(vs, vt1, vt2, atrL, atrR) =>
+              Indicator.KeltnerChannel(vs, mutateVt(vt1), mutateVt(vt2), atrL, atrR)
         }
       }
     }
