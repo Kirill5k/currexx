@@ -27,8 +27,8 @@ object IndicatorEvaluator {
         s"${ind.kind}-${vs.print}-${transformation}-lb$lowerBoundary-up$upperBoundary"
       case Indicator.LinesCrossing(vs, slowTransformation, fastTransformation) =>
         s"${ind.kind}-${vs.print}-${slowTransformation}-${fastTransformation}"
-      case Indicator.KeltnerChannel(vs, vs1, vs2, atrLength, atrRatio) =>
-        s"${ind.kind}-${vs.print}-$vs1-$vs2-$atrLength-$atrRatio"
+      case Indicator.KeltnerChannel(vs, vs1, vs2, atrLength, atrMultiplier) =>
+        s"${ind.kind}-${vs.print}-$vs1-$vs2-$atrLength-$atrMultiplier"
 
   def make[F[_]: Async](
       testFilePaths: List[String],

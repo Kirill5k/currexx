@@ -78,7 +78,7 @@ enum Indicator(val kind: IndicatorKind) derives JsonTaggedAdt.EncoderWithConfig,
       line1Transformation: ValueTransformation, // SLOW
       line2Transformation: ValueTransformation, // FAST
       atrLength: Int,
-      atrRatio: Double
+      atrMultiplier: Double
   ) extends Indicator(IndicatorKind.KeltnerChannel)
 
 object Indicator:
