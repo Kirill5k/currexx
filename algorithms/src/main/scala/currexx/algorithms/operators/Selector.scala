@@ -6,6 +6,7 @@ import currexx.algorithms.{DistributedPopulation, EvaluatedPopulation, Fitness, 
 import currexx.algorithms.collections.*
 
 import scala.annotation.tailrec
+import scala.collection.mutable.ListBuffer
 import scala.util.Random
 
 trait Selector[F[_], I]:
@@ -13,16 +14,18 @@ trait Selector[F[_], I]:
 
 object Selector:
   def pureRouletteWheel[I] = new Selector[Id, I] {
-    override def selectPairs(popByFitness: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): Id[DistributedPopulation[I]] =
-      @tailrec
-      def go(newPop: Population[I], remPop: EvaluatedPopulation[I], remFitness: Fitness): Population[I] =
-        if (remPop.isEmpty || newPop.size >= populationLimit) newPop
-        else {
-          val ((pickedInd, indFitness), remaining) = pickOne(remPop, remFitness)
-          go(newPop :+ pickedInd, remaining, remFitness - indFitness)
-        }
-      val fTotal = popByFitness.map(_._2).reduce(_ + _)
-      go(Vector.empty, popByFitness, fTotal).pairs
+    override def selectPairs(popByFitness: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): Id[DistributedPopulation[I]] = {
+      val newPop     = ListBuffer.empty[I]
+      var remPop     = popByFitness
+      var remFitness = popByFitness.map(_._2).reduce(_ + _)
+      while (remPop.nonEmpty && newPop.size < populationLimit) {
+        val ((pickedInd, indFitness), remainingIndividuals) = pickOne(remPop, remFitness)
+        newPop.addOne(pickedInd)
+        remPop = remainingIndividuals
+        remFitness = remFitness - indFitness
+      }
+      newPop.toVector.pairs
+    }
 
     private def pickOne(
         popByFitness: EvaluatedPopulation[I],
@@ -34,8 +37,9 @@ object Selector:
       val indIndex = LazyList
         .from(popByFitness)
         .map { case (i, f) =>
-          val res = (i, remFitness)
-          remFitness = remFitness - (f / fTotal).value
+          val res   = (i, remFitness)
+          val ratio = if (fTotal.isZero) f else f / fTotal
+          remFitness = remFitness - ratio.value
           res
         }
         .indexWhere(_._2 < chance, 0) - 1

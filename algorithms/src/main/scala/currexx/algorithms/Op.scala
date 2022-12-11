@@ -14,6 +14,7 @@ opaque type Fitness = BigDecimal
 object Fitness:
   def apply(value: BigDecimal): Fitness = value
   extension (fitness: Fitness)
+    def isZero: Boolean            = fitness == BigDecimal(0)
     def -(other: Fitness): Fitness = fitness - other
     def +(other: Fitness): Fitness = fitness + other
     def /(other: Fitness): Fitness = fitness / other

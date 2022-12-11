@@ -7,7 +7,8 @@ import currexx.algorithms.Parameters
 import currexx.algorithms.operators.{Elitism, Selector}
 import currexx.backtest.optimizer.{IndicatorCrossover, IndicatorEvaluator, IndicatorInitialiser, IndicatorMutator, OptimisationAlgorithm}
 import currexx.core.trade.TradeStrategy
-import currexx.domain.market.{Indicator, MovingAverage, ValueSource, ValueTransformation}
+import currexx.domain.market.ValueTransformation.*
+import currexx.domain.market.{Indicator, MovingAverage, ValueSource}
 import fs2.Stream
 
 import scala.util.Random
@@ -27,28 +28,36 @@ object Optimizer extends IOApp.Simple {
 
   val trendChangeDetection = Indicator.TrendChangeDetection(
     source = ValueSource.Close,
-    transformation = ValueTransformation.sequenced(
-      ValueTransformation.JMA(21, 100, 3),
+    transformation = sequenced(
+      JMA(21, 100, 3),
 //      ValueTransformation.RSX(3)
     )
   )
 
   val linesCrossing = Indicator.LinesCrossing(
     ValueSource.Close,
-    ValueTransformation.HMA(20),
-    ValueTransformation.HMA(10)
+    HMA(20),
+    HMA(10)
   )
 
   val thresholdCrossing = Indicator.ThresholdCrossing(
     ValueSource.Close,
-    ValueTransformation.RSX(40),
+    RSX(40),
     70D,
     20D
   )
 
+  val keltnerChannel = Indicator.KeltnerChannel(
+    ValueSource.Close,
+    JMA(45,100,3),
+    JMA(9,100,2),
+    30,
+    1.5
+  )
+
   val testDataSets    = MarketDataProvider.majors
-  val strategy        = TradeStrategy.LinesCrossing
-  val target          = linesCrossing
+  val strategy        = TradeStrategy.KeltnerChannel
+  val target          = keltnerChannel
   val otherIndicators = Nil
 
   override def run: IO[Unit] = for
