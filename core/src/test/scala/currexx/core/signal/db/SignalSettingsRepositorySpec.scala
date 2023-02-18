@@ -52,7 +52,7 @@ class SignalSettingsRepositorySpec extends MongoSpec {
   def withEmbeddedMongoDb[A](test: MongoDatabase[IO] => IO[A]): Future[A] =
     withRunningEmbeddedMongo {
       MongoClient
-        .fromConnectionString[IO](s"mongodb://$mongoHost:$mongoPort")
+        .fromConnectionString[IO](s"mongodb://localhost:$mongoPort")
         .use { client =>
           for
             db   <- client.getDatabase("currexx")
