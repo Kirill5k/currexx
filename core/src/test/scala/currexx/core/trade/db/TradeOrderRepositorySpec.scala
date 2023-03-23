@@ -12,7 +12,7 @@ import mongo4cats.database.MongoDatabase
 import scala.concurrent.Future
 
 class TradeOrderRepositorySpec extends MongoSpec {
-  override protected val mongoPort: Int = 12351
+  override protected val mongoPort: Int = 12355
 
   val emptySearchParams = SearchParams()
 

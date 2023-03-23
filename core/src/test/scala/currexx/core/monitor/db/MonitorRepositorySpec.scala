@@ -16,7 +16,7 @@ import scala.concurrent.duration.*
 
 class MonitorRepositorySpec extends MongoSpec {
 
-  override protected val mongoPort: Int = 12349
+  override protected val mongoPort: Int = 12356
 
   "A MonitorRepository" when {
     "create" should {
