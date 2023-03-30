@@ -13,7 +13,15 @@ import currexx.core.common.time.*
 import currexx.core.settings.TriggerFrequency
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, MarketTimeSeriesData, MovingAverage, ValueSource as VS, ValueTransformation as VT}
+import currexx.domain.market.{
+  Condition,
+  CurrencyPair,
+  Indicator,
+  MarketTimeSeriesData,
+  MovingAverage,
+  ValueSource as VS,
+  ValueTransformation as VT
+}
 import fs2.Stream
 
 import java.time.Instant
@@ -35,30 +43,30 @@ final private class LiveSignalService[F[_]](
   override def submit(signal: Signal): F[Unit]                        = save(signal.userId, signal.currencyPair, List(signal))
 
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
-    settingsRepo
-      .get(uid)
-      .flatMap { settings =>
-        settings.indicators
-          .flatMap {
-            case tcd: Indicator.TrendChangeDetection => SignalService.detectTrendChange(uid, data, tcd)
-            case tc: Indicator.ThresholdCrossing     => SignalService.detectThresholdCrossing(uid, data, tc)
-            case ls: Indicator.LinesCrossing         => SignalService.detectLinesCrossing(uid, data, ls)
-            case kc: Indicator.KeltnerChannel        => SignalService.detectBarrierCrossing(uid, data, kc)
-          }
-          .traverse { signal =>
-            settings.triggerFrequency match
-              case TriggerFrequency.Continuously => F.pure(Some(signal))
-              case TriggerFrequency.OncePerDay   => signalRepo.isFirstOfItsKindForThatDate(signal).map(Option.when(_)(signal))
-          }
-          .map(_.flatten)
-      }
-      .flatMap(signals => F.whenA(signals.nonEmpty)(save(uid, data.currencyPair, signals)))
+    for
+      settings <- settingsRepo.get(uid)
+      signals <- settings.indicators
+        .flatMap {
+          case tcd: Indicator.TrendChangeDetection => SignalService.detectTrendChange(uid, data, tcd)
+          case tc: Indicator.ThresholdCrossing     => SignalService.detectThresholdCrossing(uid, data, tc)
+          case ls: Indicator.LinesCrossing         => SignalService.detectLinesCrossing(uid, data, ls)
+          case kc: Indicator.KeltnerChannel        => SignalService.detectBarrierCrossing(uid, data, kc)
+        }
+        .traverse { signal =>
+          settings.triggerFrequency match
+            case TriggerFrequency.Continuously => F.pure(Some(signal))
+            case TriggerFrequency.OncePerDay   => signalRepo.isFirstOfItsKindForThatDate(signal).map(Option.when(_)(signal))
+        }
+        .map(_.flatten)
+      _ <- F.whenA(signals.nonEmpty)(save(uid, data.currencyPair, signals))
+    yield ()
 
   private def save(uid: UserId, cp: CurrencyPair, signals: List[Signal]) =
-    signalRepo.saveAll(signals) >> dispatcher.dispatch(Action.ProcessSignals(uid, cp, signals))
+    signalRepo.saveAll(signals) >> 
+      dispatcher.dispatch(Action.ProcessSignals(uid, cp, signals))
 }
 
-object SignalService:
+object SignalService {
 
   extension (vs: VS)
     private def extract(data: MarketTimeSeriesData): List[Double] = {
@@ -119,10 +127,10 @@ object SignalService:
   }
 
   def detectBarrierCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.KeltnerChannel): Option[Signal] = {
-    val source = indicator.source.extract(data)
-    val line1 = indicator.line1Transformation.transform(source, data)
-    val line2 = indicator.line2Transformation.transform(source, data)
-    val atr = Volatility.averageTrueRange(source, data.highs, data.lows, indicator.atrLength)
+    val source    = indicator.source.extract(data)
+    val line1     = indicator.line1Transformation.transform(source, data)
+    val line2     = indicator.line2Transformation.transform(source, data)
+    val atr       = Volatility.averageTrueRange(source, data.highs, data.lows, indicator.atrLength)
     val upperBand = line1.lazyZip(atr).map((l1, a) => l1 + (a * indicator.atrMultiplier))
     val lowerBand = line1.lazyZip(atr).map((l1, a) => l1 - (a * indicator.atrMultiplier))
     Condition
@@ -137,3 +145,5 @@ object SignalService:
       dispatcher: ActionDispatcher[F]
   ): F[SignalService[F]] =
     Monad[F].pure(LiveSignalService[F](signalRepo, settingsRepo, dispatcher))
+
+}

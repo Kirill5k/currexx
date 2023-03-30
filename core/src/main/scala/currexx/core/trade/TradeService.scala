@@ -11,6 +11,7 @@ import currexx.clients.broker.BrokerClient
 import currexx.clients.data.MarketDataClient
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
+import currexx.core.common.effects.*
 import currexx.core.market.{MarketState, PositionState}
 import currexx.core.trade.TradeStrategyExecutor.Decision
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
@@ -52,10 +53,12 @@ final private class LiveTradeService[F[_]](
     }.void
 
   override def placeOrder(uid: UserId, order: TradeOrder, closePendingOrders: Boolean): F[Unit] =
-    F.whenA(closePendingOrders)(closeOpenOrders(uid, order.currencyPair)) >>
-      (clock.currentTime, settingsRepository.get(uid))
-        .mapN((time, ts) => TradeOrderPlacement(uid, order, ts.broker, time))
-        .flatMap(submitOrderPlacement)
+    for
+      _    <- F.whenA(closePendingOrders)(closeOpenOrders(uid, order.currencyPair))
+      ts   <- settingsRepository.get(uid)
+      time <- clock.currentTime
+      _    <- submitOrderPlacement(TradeOrderPlacement(uid, order, ts.broker, time))
+    yield ()
 
   override def closeOpenOrders(uid: UserId): F[Unit] =
     Stream
@@ -67,12 +70,12 @@ final private class LiveTradeService[F[_]](
   override def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit] =
     orderRepository
       .findLatestBy(uid, cp)
-      .flatMap {
-        case Some(top) if top.order.isEnter =>
+      .flatMapOption(F.unit) { top =>
+        F.whenA(top.order.isEnter) {
           (clock.currentTime, marketDataClient.latestPrice(cp))
             .mapN((time, price) => top.copy(time = time, order = TradeOrder.Exit(cp, price.close)))
             .flatMap(submitOrderPlacement)
-        case _ => F.unit
+        }
       }
 
   override def closeOrderIfProfitIsOutsideRange(uid: UserId, cps: NonEmptyList[CurrencyPair], limits: Limits): F[Unit] =
@@ -105,14 +108,10 @@ final private class LiveTradeService[F[_]](
           }
           .map(order => TradeOrderPlacement(state.userId, order, settings.broker, time))
       }
-      .flatMap {
-        case Some(top) =>
-          F.whenA(state.hasOpenPosition && top.order.isEnter)(
-            brokerClient.submit(top.broker, TradeOrder.Exit(top.order.currencyPair, top.order.price))
-          ) *>
-            submitOrderPlacement(top)
-        case None =>
-          F.unit
+      .flatMapOption(F.unit) { top =>
+        def to = TradeOrder.Exit(top.order.currencyPair, top.order.price)
+        F.whenA(state.hasOpenPosition && top.order.isEnter)(brokerClient.submit(top.broker, to)) >>
+          submitOrderPlacement(top)
       }
 
   private def submitOrderPlacement(top: TradeOrderPlacement): F[Unit] =

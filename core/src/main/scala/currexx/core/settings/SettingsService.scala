@@ -19,7 +19,9 @@ final private class LiveSettingsService[F[_]](
     F: Async[F]
 ) extends SettingsService[F] {
   override def get(uid: UserId): F[GlobalSettings] =
-    repository.get(uid).recoverWith { case _: AppError.NotSetup => repository.createFor(uid) >> get(uid) }
+    repository
+      .get(uid)
+      .recoverWith { case _: AppError.NotSetup => repository.createFor(uid) >> get(uid) }
 
   override def update(gs: GlobalSettings): F[Unit] =
     repository.update(gs)

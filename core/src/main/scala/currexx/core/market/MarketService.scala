@@ -6,6 +6,7 @@ import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.time.*
+import currexx.core.common.effects.*
 import currexx.core.signal.Signal
 import currexx.core.market.db.MarketStateRepository
 import currexx.core.trade.TradeOrderPlacement
@@ -58,9 +59,8 @@ final private class LiveMarketService[F[_]](
         if (existingSignals == updatedSignals) F.pure(None)
         else stateRepo.update(uid, cp, updatedSignals).map(Some(_))
       }
-      .flatMap {
-        case Some(state) => dispatcher.dispatch(Action.ProcessMarketStateUpdate(state, signals.map(_.triggeredBy.kind)))
-        case None        => F.unit
+      .flatMapOption(F.unit) { state =>
+        dispatcher.dispatch(Action.ProcessMarketStateUpdate(state, signals.map(_.triggeredBy.kind)))
       }
 }
 
