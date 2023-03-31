@@ -7,6 +7,7 @@ import cats.syntax.functor.*
 import cats.syntax.applicativeError.*
 import currexx.core.auth.user.db.UserRepository
 import currexx.core.common.action.{Action, ActionDispatcher}
+import currexx.core.common.effects.*
 import currexx.domain.errors.AppError.*
 import currexx.domain.user.*
 
@@ -37,9 +38,8 @@ final private class LiveUserService[F[_]](
   override def login(login: Login): F[User] =
     repository
       .findBy(login.email)
-      .flatMap {
-        case Some(acc) => encryptor.isValid(login.password, acc.password).map(if (_) LoginResult.Success(acc) else LoginResult.Fail)
-        case None      => F.pure(LoginResult.Fail)
+      .flatMapOption(F.pure(LoginResult.Fail)) { acc =>
+        encryptor.isValid(login.password, acc.password).map(if (_) LoginResult.Success(acc) else LoginResult.Fail)
       }
       .flatMap {
         case LoginResult.Fail       => InvalidEmailOrPassword.raiseError[F, User]
