@@ -6,6 +6,7 @@ import cats.syntax.functor.*
 import currexx.domain.time.Clock
 
 import java.time.Instant
+import scala.concurrent.duration.*
 
 final class TestClock[F[_]](
     private val time: Ref[F, Option[Instant]]
@@ -15,7 +16,13 @@ final class TestClock[F[_]](
   def setTime(newTime: Instant): F[Unit] =
     time.set(Some(newTime))
 
-  override def currentTime: F[Instant] =
+  override def durationBetweenNowAnd(time: Instant): F[FiniteDuration] =
+    now.map(n => math.abs(n.toEpochMilli - time.toEpochMilli).millis)
+
+  override def sleep(duration: FiniteDuration): F[Unit] =
+    F.unit
+
+  override def now: F[Instant] =
     time.get.flatMap {
       case Some(t) => F.pure(t)
       case None    => F.realTimeInstant

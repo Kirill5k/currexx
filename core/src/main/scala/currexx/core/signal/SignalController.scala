@@ -31,7 +31,7 @@ final private class SignalController[F[_]](
     submitSignalEndpoint.withAuthenticatedSession
       .serverLogic { session => req =>
         for
-          time <- clock.currentTime
+          time <- clock.now
           signal = Signal(session.userId, req.currencyPair, req.condition, req.triggeredBy, time)
           res <- service.submit(signal).voidResponse
         yield res

@@ -14,9 +14,9 @@ import currexx.core.trade.Trades
 import currexx.core.monitor.Monitors
 import currexx.core.settings.Settings
 import currexx.domain.time.Clock
+import fs2.Stream
 
 object Application extends IOApp.Simple:
-  given Clock[IO] = Clock.default[IO]
   override val run: IO[Unit] =
     Logger.make[IO].flatMap { implicit logger =>
       for
@@ -36,12 +36,11 @@ object Application extends IOApp.Simple:
             actionProcessor <- ActionProcessor
               .make[IO](dispatcher, monitors.service, signals.service, markets.service, trades.service, settings.service)
             logProcessor <- LogEventProcessor.make[IO](res.mongo)
-            _ <- Server
-              .serve[IO](config.server, http.app)
-              .concurrently(actionProcessor.run)
-              .concurrently(logProcessor.run)
-              .compile
-              .drain
+            _ <- Stream(
+              Server.serve[IO](config.server, http.app),
+              actionProcessor.run,
+              logProcessor.run
+            ).parJoinUnbounded.compile.drain
           yield ()
         }
       yield ()

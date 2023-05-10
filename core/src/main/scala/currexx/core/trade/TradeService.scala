@@ -56,7 +56,7 @@ final private class LiveTradeService[F[_]](
     for
       _    <- F.whenA(closePendingOrders)(closeOpenOrders(uid, order.currencyPair))
       ts   <- settingsRepository.get(uid)
-      time <- clock.currentTime
+      time <- clock.now
       _    <- submitOrderPlacement(TradeOrderPlacement(uid, order, ts.broker, time))
     yield ()
 
@@ -72,7 +72,7 @@ final private class LiveTradeService[F[_]](
       .findLatestBy(uid, cp)
       .flatMapOption(F.unit) { top =>
         F.whenA(top.order.isEnter) {
-          (clock.currentTime, marketDataClient.latestPrice(cp))
+          (clock.now, marketDataClient.latestPrice(cp))
             .mapN((time, price) => top.copy(time = time, order = TradeOrder.Exit(cp, price.close)))
             .flatMap(submitOrderPlacement)
         }
@@ -82,7 +82,7 @@ final private class LiveTradeService[F[_]](
     for
       settings    <- settingsRepository.get(uid)
       foundOrders <- brokerClient.find(settings.broker, cps)
-      time        <- clock.currentTime
+      time        <- clock.now
       _ <- foundOrders
         .collect {
           case o if limits.max.exists(o.profit > _) && limits.trailing =>
@@ -96,7 +96,7 @@ final private class LiveTradeService[F[_]](
     yield ()
 
   override def processMarketStateUpdate(state: MarketState, triggers: List[IndicatorKind]): F[Unit] =
-    (settingsRepository.get(state.userId), marketDataClient.latestPrice(state.currencyPair), clock.currentTime)
+    (settingsRepository.get(state.userId), marketDataClient.latestPrice(state.currencyPair), clock.now)
       .mapN { (settings, price, time) =>
         TradeStrategyExecutor
           .get(settings.strategy)

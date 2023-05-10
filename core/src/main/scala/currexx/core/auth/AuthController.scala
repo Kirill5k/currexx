@@ -73,7 +73,7 @@ final private class AuthController[F[_]](
       .serverLogic { (ip, login) =>
         for
           acc  <- userService.login(login.toDomain)
-          time <- clock.currentTime
+          time <- clock.now
           res  <- sessionService.create(CreateSession(acc.id, ip, time)).mapResponse(LoginResponse.bearer)
         yield res
       }

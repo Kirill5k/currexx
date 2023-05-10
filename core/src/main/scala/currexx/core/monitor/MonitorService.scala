@@ -43,7 +43,7 @@ final private class LiveMonitorService[F[_]](
   override def resume(uid: UserId, id: MonitorId): F[Unit] = repository.activate(uid, id, true).void
 
   override def update(mon: Monitor): F[Unit]           = repository.update(mon).void
-  override def create(cm: CreateMonitor): F[MonitorId] = repository.create(cm).flatTap(scheduleMonitor(clock.currentTime)).map(_.id)
+  override def create(cm: CreateMonitor): F[MonitorId] = repository.create(cm).flatTap(scheduleMonitor(clock.now)).map(_.id)
 
   override def triggerMonitor(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit] =
     for
@@ -54,11 +54,11 @@ final private class LiveMonitorService[F[_]](
           case p: Monitor.Profit      => actionDispatcher.dispatch(Action.AssertProfit(uid, mon.currencyPairs, p.limits))
         )
       }
-      _ <- F.unlessA(manual)(scheduleMonitor(clock.currentTime)(mon))
+      _ <- F.unlessA(manual)(scheduleMonitor(clock.now)(mon))
     yield ()
 
   override def rescheduleAll: F[Unit] =
-    clock.currentTime.flatMap { now =>
+    clock.now.flatMap { now =>
       repository.stream
         .map(scheduleMonitor(F.pure(now)))
         .map(Stream.eval)
