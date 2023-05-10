@@ -5,7 +5,7 @@ import currexx.domain.user.UserId
 import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.monitor.{Limits, Schedule}
 import currexx.domain.types.IdType
-import currexx.core.common.time.*
+import currexx.domain.time.syntax.*
 
 import java.time.Instant
 import scala.concurrent.duration.{Duration, FiniteDuration}

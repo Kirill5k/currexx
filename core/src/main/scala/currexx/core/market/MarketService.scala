@@ -5,7 +5,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import currexx.core.common.action.{Action, ActionDispatcher}
-import currexx.core.common.time.*
+import currexx.domain.time.syntax.*
 import currexx.core.common.effects.*
 import currexx.core.signal.Signal
 import currexx.core.market.db.MarketStateRepository

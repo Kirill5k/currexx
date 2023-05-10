@@ -7,7 +7,7 @@ import cats.syntax.traverse.*
 import currexx.backtest.TestSettings
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
-import currexx.core.common.time.*
+import currexx.domain.time.syntax.*
 import currexx.core.signal.SignalService
 import currexx.core.market.MarketService
 import currexx.core.trade.{TradeOrderPlacement, TradeService}

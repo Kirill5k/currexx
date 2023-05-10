@@ -4,6 +4,7 @@ import cats.effect.{Ref, Temporal}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.domain.time.Clock
+import currexx.domain.time.syntax.*
 
 import java.time.Instant
 import scala.concurrent.duration.*
@@ -16,8 +17,8 @@ final class TestClock[F[_]](
   def setTime(newTime: Instant): F[Unit] =
     time.set(Some(newTime))
 
-  override def durationBetweenNowAnd(time: Instant): F[FiniteDuration] =
-    now.map(n => math.abs(n.toEpochMilli - time.toEpochMilli).millis)
+  override def durationBetweenNowAnd(otherTs: Instant): F[FiniteDuration] =
+    now.map(_.durationBetween(otherTs))
 
   override def sleep(duration: FiniteDuration): F[Unit] =
     F.unit

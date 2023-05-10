@@ -3,7 +3,7 @@ package currexx.core
 import cats.data.NonEmptyList
 import cats.syntax.traverse.*
 import currexx.domain.market.PriceRange
-import currexx.core.common.time.*
+import currexx.domain.time.syntax.*
 import io.circe.{Decoder, JsonObject}
 import io.circe.parser.decode
 

@@ -6,7 +6,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.clients.data.MarketDataClient
 import currexx.core.common.action.{Action, ActionDispatcher}
-import currexx.core.common.time.*
+import currexx.domain.time.syntax.*
 import currexx.core.monitor.db.MonitorRepository
 import currexx.domain.errors.AppError
 import currexx.domain.market.CurrencyPair

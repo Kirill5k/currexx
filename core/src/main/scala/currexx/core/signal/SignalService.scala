@@ -9,7 +9,7 @@ import currexx.domain.user.UserId
 import currexx.calculations.{Filters, MomentumOscillators, MovingAverages, Volatility}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
-import currexx.core.common.time.*
+import currexx.domain.time.syntax.*
 import currexx.core.settings.TriggerFrequency
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.errors.AppError

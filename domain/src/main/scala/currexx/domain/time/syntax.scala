@@ -1,10 +1,10 @@
-package currexx.core.common
+package currexx.domain.time
 
 import java.time.{DayOfWeek, Instant, LocalDate, LocalDateTime, ZoneOffset}
 import scala.concurrent.duration.*
 import scala.util.Try
 
-object time:
+object syntax {
   extension (dateString: String)
     def toInstant: Either[Throwable, Instant] =
       val localDate = dateString.length match
@@ -38,3 +38,4 @@ object time:
          |${if seconds > 0 then s"${seconds}s" else ""}
          |""".stripMargin.replaceAll("\n", "")
     }
+}
