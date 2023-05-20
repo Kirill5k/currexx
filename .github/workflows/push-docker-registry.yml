@@ -24,4 +24,4 @@ jobs:
         with:
           java-version: amazon-corretto@1.17
       - name: Build and push Docker images
-        run: sbt docker:publish
+        run: sbt "project core" docker:publish

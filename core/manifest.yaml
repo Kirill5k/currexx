@@ -31,7 +31,7 @@ spec:
     spec:
       containers:
         - name: "core"
-          image: "registry.cloud.okteto.net/kirill5k/currexx-core:latest"
+          image: "kirill1/currexx-core:latest"
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
