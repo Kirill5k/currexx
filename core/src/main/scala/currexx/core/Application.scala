@@ -23,6 +23,7 @@ object Application extends IOApp.Simple:
         config <- AppConfig.load[IO]
         _ <- Resources.make[IO](config).use { res =>
           for
+            _          <- logger.info(s"starting currexx-core ${sys.env.getOrElse("VERSION", "")}")
             dispatcher <- ActionDispatcher.make[IO].flatTap(_.dispatch(Action.RescheduleAllMonitors))
             clients    <- Clients.make[IO](config.clients, res.sttpBackend)
             health     <- Health.make[IO]

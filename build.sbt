@@ -23,6 +23,7 @@ val docker = Seq(
   dockerUsername     := sys.env.get("DOCKER_USERNAME"),
   dockerRepository   := sys.env.get("DOCKER_REPO_URI"),
   makeBatScripts     := Nil,
+  dockerEnvVars ++= Map("VERSION" -> version.value),
   dockerCommands := {
     val commands         = dockerCommands.value
     val (stage0, stage1) = commands.span(_ != DockerStageBreak)
