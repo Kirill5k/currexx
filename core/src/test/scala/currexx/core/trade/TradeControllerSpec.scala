@@ -3,13 +3,12 @@ package currexx.core.trade
 import cats.effect.IO
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.SearchParams
-import currexx.core.{ControllerSpec, IOWordSpec}
+import currexx.core.ControllerSpec
 import currexx.core.fixtures.{Markets, Sessions, Trades, Users}
-import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, TradeOrder}
 import currexx.domain.user.UserId
 import org.http4s.implicits.*
-import org.http4s.{Method, Request, Status, Uri}
+import org.http4s.{Method, Status, Uri}
 
 import java.time.Instant
 

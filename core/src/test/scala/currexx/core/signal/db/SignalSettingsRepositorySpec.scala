@@ -5,7 +5,6 @@ import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
 import currexx.core.fixtures.{Settings, Users}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{Indicator, ValueSource, ValueTransformation}
 import currexx.domain.user.UserId
 import mongo4cats.bson.{Document, ObjectId}
 import mongo4cats.bson.syntax.*

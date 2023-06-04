@@ -3,14 +3,12 @@ package currexx.core
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import io.circe.parser.*
-import io.circe.{Json, JsonObject}
+import io.circe.Json
 import org.http4s.{Header, Headers, Method, Request, Response, Status}
 import org.scalatest.Assertion
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.typelevel.ci.CIString
-
-import scala.io.Source
 
 trait ControllerSpec extends AnyWordSpec with MockitoMatchers with Matchers {
 

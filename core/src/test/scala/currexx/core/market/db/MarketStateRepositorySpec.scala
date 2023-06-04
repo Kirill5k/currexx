@@ -6,7 +6,6 @@ import currexx.core.MongoSpec
 import currexx.core.fixtures.{Markets, Users}
 import currexx.core.market.{IndicatorState, MarketState}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{Condition, Indicator, TradeOrder}
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
 

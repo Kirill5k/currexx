@@ -4,19 +4,15 @@ import cats.effect.IO
 import cats.data.NonEmptyList
 import currexx.clients.ClientSpec
 import currexx.clients.broker.BrokerParameters
-import currexx.clients.broker.vindaloo.{VindalooClient, VindalooConfig}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, TradeOrder}
-import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.slf4j.Slf4jLogger
 import currexx.domain.market.Currency.{CAD, EUR}
 import sttp.capabilities.WebSockets
 import sttp.capabilities.fs2.Fs2Streams
 import sttp.client3.httpclient.fs2.HttpClientFs2Backend
 import sttp.client3.testing.SttpBackendStub
-import sttp.client3.{Response, SttpBackend, SttpBackendOptions}
-import sttp.model.StatusCode
-import sttp.ws.{WebSocket, WebSocketFrame}
+import sttp.client3.{SttpBackend, SttpBackendOptions}
+import sttp.ws.WebSocketFrame
 import sttp.ws.testing.WebSocketStub
 
 import scala.concurrent.duration.*

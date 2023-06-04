@@ -2,11 +2,8 @@ package currexx.core.trade.db
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import currexx.clients.broker.BrokerParameters
 import currexx.core.MongoSpec
-import currexx.core.fixtures.{Settings, Trades, Users}
-import currexx.core.trade.db.TradeSettingsRepository
-import currexx.core.trade.TradeStrategy
+import currexx.core.fixtures.{Settings, Users}
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
 import mongo4cats.bson.{Document, ObjectId}

@@ -7,7 +7,6 @@ import currexx.domain.market.{CurrencyPair, Interval, PriceRange}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import sttp.client3.{Response, SttpBackend}
-import sttp.model.StatusCode
 
 import java.time.{Instant, LocalTime}
 import scala.concurrent.duration.*

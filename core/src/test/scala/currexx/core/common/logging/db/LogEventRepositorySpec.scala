@@ -3,7 +3,6 @@ package currexx.core.common.logging.db
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
-import currexx.core.fixtures.{Signals, Users}
 import currexx.core.common.logging.{LogEvent, LogLevel}
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase

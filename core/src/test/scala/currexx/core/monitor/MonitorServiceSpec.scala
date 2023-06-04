@@ -1,19 +1,16 @@
 package currexx.core.monitor
 
-import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.IO
 import currexx.core.{IOWordSpec, MockActionDispatcher, MockClock}
-import currexx.core.common.action.{Action, ActionDispatcher}
+import currexx.core.common.action.Action
 import currexx.core.fixtures.{Markets, Monitors, Users}
 import currexx.core.monitor.db.MonitorRepository
-import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.monitor.Schedule
 import currexx.domain.time.Clock
 import currexx.domain.user.UserId
 import fs2.Stream
-import org.mockito.Mockito
 
 import java.time.Instant
 import scala.concurrent.duration.*

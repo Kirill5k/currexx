@@ -2,7 +2,6 @@ package currexx.core.settings.db
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import io.circe.syntax.given
 import currexx.core.fixtures.{Settings, Users}
 import currexx.core.MongoSpec
 import currexx.core.settings.{GlobalSettings, SignalSettings}

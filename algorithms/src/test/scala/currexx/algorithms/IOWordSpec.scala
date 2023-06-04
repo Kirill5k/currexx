@@ -4,7 +4,7 @@ import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
-import org.scalatest.{Assertion, EitherValues}
+import org.scalatest.Assertion
 
 import scala.concurrent.Future
 

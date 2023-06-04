@@ -4,11 +4,10 @@ import cats.effect.IO
 import currexx.core.ControllerSpec
 import currexx.core.auth.Authenticator
 import currexx.core.fixtures.{Markets, Sessions, Signals, Users}
-import currexx.domain.errors.AppError
 import currexx.domain.market.CurrencyPair
 import currexx.domain.user.UserId
 import org.http4s.implicits.*
-import org.http4s.{Method, Request, Status, Uri}
+import org.http4s.{Method, Status, Uri}
 
 class MarketControllerSpec extends ControllerSpec {
 

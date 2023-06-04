@@ -6,11 +6,10 @@ import currexx.core.auth.Authenticator
 import currexx.core.common.http.SearchParams
 import currexx.domain.user.UserId
 import currexx.core.fixtures.{Markets, Sessions, Signals, Users}
-import currexx.domain.errors.AppError
-import currexx.domain.market.{Condition, CurrencyPair, Direction, Indicator, ValueSource, ValueTransformation}
+import currexx.domain.market.{Condition, Direction, Indicator, ValueSource, ValueTransformation}
 import currexx.domain.time.Clock
 import org.http4s.implicits.*
-import org.http4s.{Method, Request, Status, Uri}
+import org.http4s.{Method, Status, Uri}
 
 import java.time.Instant
 

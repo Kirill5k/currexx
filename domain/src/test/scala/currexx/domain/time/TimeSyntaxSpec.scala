@@ -4,7 +4,6 @@ import currexx.domain.time.syntax.*
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.time.format.DateTimeParseException
 import java.time.temporal.ChronoUnit
 import java.time.{DayOfWeek, Instant, LocalDate}
 import scala.concurrent.duration.*

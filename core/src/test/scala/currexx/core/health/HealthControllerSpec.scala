@@ -1,6 +1,6 @@
 package currexx.core.health
 
-import cats.effect.{Async, IO, Ref}
+import cats.effect.IO
 import currexx.core.ControllerSpec
 import currexx.core.auth.Authenticator
 import org.http4s.implicits.*

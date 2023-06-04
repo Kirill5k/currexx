@@ -12,7 +12,6 @@ import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
 
 import scala.concurrent.Future
-import scala.concurrent.duration.*
 
 class MonitorRepositorySpec extends MongoSpec {
 

@@ -2,16 +2,11 @@ package currexx.core.signal
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import currexx.core.common.action.{Action, ActionDispatcher}
-import currexx.core.fixtures.{Markets, Signals, Users}
+import currexx.core.common.action.ActionDispatcher
+import currexx.core.fixtures.{Markets, Users}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.core.{FileReader, IOWordSpec}
 import currexx.domain.market.*
-import currexx.domain.user.UserId
-import io.circe.JsonObject
-
-import java.time.LocalDate
-import scala.collection.immutable.ListMap
 
 class SignalServiceISpec extends IOWordSpec {
 

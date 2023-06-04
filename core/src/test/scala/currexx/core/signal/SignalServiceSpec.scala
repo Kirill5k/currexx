@@ -2,7 +2,7 @@ package currexx.core.signal
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import currexx.core.{FileReader, IOWordSpec, MockActionDispatcher}
+import currexx.core.{IOWordSpec, MockActionDispatcher}
 import currexx.domain.user.UserId
 import currexx.domain.market.{
   Condition,
@@ -14,15 +14,11 @@ import currexx.domain.market.{
   ValueSource,
   ValueTransformation as VT
 }
-import currexx.core.common.action.{Action, ActionDispatcher}
+import currexx.core.common.action.Action
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Settings, Signals, Users}
 import currexx.core.settings.TriggerFrequency
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
-import io.circe.JsonObject
-
-import java.time.{Instant, LocalDate}
-import scala.collection.immutable.ListMap
 
 class SignalServiceSpec extends IOWordSpec {
 

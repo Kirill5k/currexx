@@ -3,15 +3,13 @@ package currexx.core.auth.user.db
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
-import currexx.domain.user.{PasswordHash, User, UserDetails, UserEmail, UserId, UserName}
+import currexx.domain.user.{PasswordHash, User, UserEmail, UserId}
 import currexx.domain.errors.AppError.{AccountAlreadyExists, EntityDoesNotExist}
 import currexx.core.fixtures.Users
 import mongo4cats.bson.ObjectId
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
-import mongo4cats.embedded.EmbeddedMongo
 
-import java.time.Instant
 import scala.concurrent.Future
 
 class UserRepositorySpec extends MongoSpec {

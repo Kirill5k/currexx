@@ -9,8 +9,6 @@ import currexx.domain.user.UserId
 import currexx.domain.session.*
 import currexx.domain.errors.AppError
 import currexx.core.fixtures.{Sessions, Users}
-import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito.{verify, verifyNoInteractions, when}
 
 import java.time.Instant
 

@@ -10,8 +10,7 @@ import currexx.domain.errors.AppError.{AccountAlreadyExists, InvalidEmailOrPassw
 import currexx.core.auth.jwt.BearerToken
 import currexx.core.fixtures.{Sessions, Users}
 import org.http4s.implicits.*
-import org.http4s.{HttpDate, Method, Request, Status, Uri}
-import currexx.domain.market.Currency.USD
+import org.http4s.{Method, Request, Status, Uri}
 import currexx.domain.time.Clock
 
 import java.time.Instant

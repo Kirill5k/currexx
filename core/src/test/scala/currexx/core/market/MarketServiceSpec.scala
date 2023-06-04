@@ -3,11 +3,10 @@ package currexx.core.market
 import cats.effect.IO
 import currexx.core.{IOWordSpec, MockActionDispatcher}
 import currexx.domain.user.UserId
-import currexx.core.common.action.{Action, ActionDispatcher}
+import currexx.core.common.action.Action
 import currexx.core.market.db.MarketStateRepository
 import currexx.core.fixtures.{Markets, Signals, Trades, Users}
-import currexx.domain.errors.AppError
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorKind, PriceRange, TradeOrder}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorKind, TradeOrder}
 
 import java.time.Instant
 import scala.concurrent.duration.*

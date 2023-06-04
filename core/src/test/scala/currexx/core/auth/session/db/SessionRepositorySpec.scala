@@ -6,14 +6,10 @@ import cats.syntax.apply.*
 import cats.syntax.option.*
 import currexx.core.MongoSpec
 import currexx.core.fixtures.{Sessions, Users}
-import currexx.domain.user.UserId
 import currexx.domain.session.*
-import mongo4cats.bson.ObjectId
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
 
-import java.time.Instant
-import java.time.temporal.ChronoField
 import scala.concurrent.Future
 
 class SessionRepositorySpec extends MongoSpec {

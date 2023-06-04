@@ -1,7 +1,6 @@
 package currexx.algorithms.operators
 
 import cats.effect.IO
-import cats.effect.unsafe.implicits.global
 import currexx.algorithms.IOWordSpec
 
 import scala.util.Random

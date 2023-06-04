@@ -3,7 +3,7 @@ package currexx.clients.broker.vindaloo
 import cats.effect.IO
 import currexx.clients.ClientSpec
 import currexx.clients.broker.BrokerParameters
-import currexx.domain.market.{CurrencyPair, Interval, TradeOrder}
+import currexx.domain.market.{CurrencyPair, TradeOrder}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import currexx.domain.market.Currency.{GBP, USD}

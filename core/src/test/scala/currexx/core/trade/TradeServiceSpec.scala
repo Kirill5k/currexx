@@ -5,13 +5,12 @@ import cats.data.NonEmptyList
 import currexx.clients.broker.{BrokerClient, BrokerParameters}
 import currexx.clients.data.MarketDataClient
 import currexx.core.{IOWordSpec, MockActionDispatcher, MockClock}
-import currexx.core.common.action.{Action, ActionDispatcher}
+import currexx.core.common.action.Action
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Settings, Trades, Users}
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
-import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
-import currexx.domain.market.{CurrencyPair, Indicator, IndicatorKind, TradeOrder}
+import currexx.domain.market.{CurrencyPair, IndicatorKind, TradeOrder}
 import currexx.domain.monitor.Limits
 import currexx.domain.time.Clock
 
