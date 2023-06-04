@@ -1,10 +1,8 @@
 package currexx.domain.market
 
 import cats.syntax.functor.*
-import currexx.domain.market.MarketTimeSeriesData
 import currexx.domain.types.EnumType
 import io.circe.{Decoder, Encoder}
-import io.circe.syntax.*
 import org.latestbit.circe.adt.codec.*
 
 object MovingAverage extends EnumType[MovingAverage](() => MovingAverage.values)

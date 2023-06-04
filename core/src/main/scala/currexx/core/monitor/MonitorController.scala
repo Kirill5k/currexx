@@ -3,10 +3,7 @@ package currexx.core.monitor
 import cats.Monad
 import cats.data.NonEmptySet
 import cats.effect.Async
-import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
-import cats.syntax.functor.*
-import cats.syntax.traverse.*
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
 import currexx.domain.errors.AppError

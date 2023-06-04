@@ -1,6 +1,6 @@
 package currexx.domain.time
 
-import cats.effect.{Async, Temporal}
+import cats.effect.Temporal
 import cats.syntax.functor.*
 import currexx.domain.time.syntax.*
 

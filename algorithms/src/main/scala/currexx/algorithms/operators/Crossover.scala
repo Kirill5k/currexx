@@ -2,8 +2,6 @@ package currexx.algorithms.operators
 
 import cats.Id
 import cats.effect.Sync
-import cats.syntax.option.*
-import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 
 import scala.reflect.ClassTag

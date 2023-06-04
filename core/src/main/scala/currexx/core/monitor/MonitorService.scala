@@ -4,19 +4,13 @@ import cats.Monad
 import cats.effect.Temporal
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import currexx.clients.data.MarketDataClient
 import currexx.core.common.action.{Action, ActionDispatcher}
-import currexx.domain.time.syntax.*
 import currexx.core.monitor.db.MonitorRepository
-import currexx.domain.errors.AppError
-import currexx.domain.market.CurrencyPair
-import currexx.domain.monitor.Schedule
 import currexx.domain.time.Clock
 import currexx.domain.user.UserId
 import fs2.Stream
 
 import java.time.Instant
-import scala.concurrent.duration.{Duration, FiniteDuration}
 
 trait MonitorService[F[_]]:
   def rescheduleAll: F[Unit]

@@ -3,7 +3,6 @@ package currexx.core.monitor
 import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import currexx.clients.Clients
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.Controller
 import currexx.core.monitor.db.MonitorRepository

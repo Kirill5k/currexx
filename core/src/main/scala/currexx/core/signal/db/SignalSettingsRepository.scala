@@ -12,8 +12,6 @@ import mongo4cats.circe.*
 import mongo4cats.collection.MongoCollection
 import mongo4cats.database.MongoDatabase
 
-import scala.jdk.CollectionConverters.*
-
 trait SignalSettingsRepository[F[_]] extends Repository[F]:
   def get(uid: UserId): F[SignalSettings]
 

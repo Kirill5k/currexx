@@ -2,7 +2,7 @@ package currexx.core.auth.session
 
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import cats.{ApplicativeThrow, Monad, MonadThrow}
+import cats.{Monad, MonadThrow}
 import currexx.core.auth.jwt.{BearerToken, JwtEncoder, JwtToken}
 import currexx.core.auth.session.db.SessionRepository
 import currexx.domain.user.UserId

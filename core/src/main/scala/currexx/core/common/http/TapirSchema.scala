@@ -1,10 +1,9 @@
 package currexx.core.common.http
 
-import cats.syntax.option.*
 import currexx.clients.broker.BrokerParameters
 import currexx.core.market.MarketController.MarketStateView
 import currexx.core.monitor.MonitorController.{CreateMonitorRequest, MonitorView}
-import currexx.domain.market.{Condition, Currency, CurrencyPair, Direction, Indicator, Interval, TradeOrder}
+import currexx.domain.market.{Condition, Currency, Direction, Indicator, TradeOrder}
 import eu.timepit.refined.types.string.NonEmptyString
 import currexx.domain.validations.{EmailString, IdString}
 import currexx.domain.user.UserId
@@ -13,9 +12,7 @@ import currexx.core.settings.TriggerFrequency
 import currexx.core.trade.TradeStrategy
 import currexx.domain.monitor.Schedule
 import sttp.tapir.generic.auto.SchemaDerivation
-import sttp.tapir.{FieldName, Schema}
-import sttp.tapir.Schema.SName
-import sttp.tapir.SchemaType.{SProduct, SProductField}
+import sttp.tapir.Schema
 
 import scala.concurrent.duration.FiniteDuration
 

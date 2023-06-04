@@ -1,6 +1,6 @@
 package currexx.core.market
 
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorKind, PriceRange, TradeOrder}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorKind, TradeOrder}
 import currexx.domain.user.UserId
 import io.circe.Codec
 

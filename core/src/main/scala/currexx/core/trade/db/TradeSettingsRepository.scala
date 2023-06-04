@@ -5,7 +5,6 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.common.db.Repository
 import currexx.core.settings.TradeSettings
-import currexx.core.trade.db.TradeSettingsRepository
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
 import mongo4cats.bson.Document

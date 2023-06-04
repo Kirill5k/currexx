@@ -17,7 +17,6 @@ import sttp.capabilities.fs2.Fs2Streams
 import sttp.client3.SttpBackend
 import sttp.ws.WebSocketFrame
 import sttp.client3.*
-import sttp.model.Uri
 import fs2.{Pipe, Stream}
 import io.circe.Encoder
 import sttp.ws.WebSocketFrame.Text

@@ -31,7 +31,6 @@ final private class LiveAlphaVantageClient[F[_]](
     F: Temporal[F],
     logger: Logger[F]
 ) extends AlphaVantageClient[F]:
-  import AlphaVantageClient.*
 
   override protected val name: String                                   = "alpha-vantage"
   override protected val delayBetweenConnectionFailures: FiniteDuration = 5.seconds

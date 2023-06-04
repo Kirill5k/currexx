@@ -3,7 +3,6 @@ package currexx.core.common.http
 import cats.Monad
 import cats.effect.Async
 import cats.implicits.*
-import currexx.core.auth.jwt.BearerToken
 import currexx.core.auth.{Auth, Authenticator}
 import currexx.core.health.Health
 import currexx.core.market.Markets

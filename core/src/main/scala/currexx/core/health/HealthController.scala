@@ -1,9 +1,7 @@
 package currexx.core.health
 
 import cats.effect.Async
-import cats.effect.Ref
 import cats.effect.Temporal
-import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.Controller

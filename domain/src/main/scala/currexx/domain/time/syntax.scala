@@ -1,6 +1,6 @@
 package currexx.domain.time
 
-import java.time.{DayOfWeek, Instant, LocalDate, LocalDateTime, ZoneOffset}
+import java.time.{DayOfWeek, Instant, LocalDate, ZoneOffset}
 import scala.concurrent.duration.*
 import scala.util.Try
 

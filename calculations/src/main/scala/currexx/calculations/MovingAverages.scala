@@ -124,23 +124,6 @@ object MovingAverages {
     nwma1.zip(nwma2).map { case (v1, v2) => (1 + alpha) * v1 - alpha * v2 }
   }
 
-  def jurik(
-      values: List[Double],
-      length: Int,
-      phase: Int,
-      power: Int
-  ): List[Double] = {
-    // periodic ratio
-    val beta = 0.45 * (length - 1) / (0.45 * (length - 1) + 2)
-    // phase ratio
-    val pr = if (phase < -100) 0.5 else if (phase > 100) 2.5 else phase / 100 + 1.5
-    // additional periodic factor
-    val len1  = math.max(math.log(math.sqrt(length)) / math.log(2.0) + 2, 0d)
-    val pow1  = math.max(len1 - 2, 0.5)
-    val alpha = ???
-    ???
-  }
-
   def jurikSimplified(
       values: List[Double],
       length: Int,

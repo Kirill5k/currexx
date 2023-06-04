@@ -1,7 +1,7 @@
 package currexx.algorithms.operators
 
 import cats.effect.Sync
-import currexx.algorithms.{EvaluatedPopulation, Fitness, Population}
+import currexx.algorithms.{EvaluatedPopulation, Population}
 
 trait Elitism[F[_], I]:
   def select(population: EvaluatedPopulation[I], n: Double): F[Population[I]]

@@ -2,7 +2,6 @@ package currexx.core.auth.user
 
 import cats.MonadError
 import cats.syntax.flatMap.*
-import cats.syntax.apply.*
 import cats.syntax.functor.*
 import cats.syntax.applicativeError.*
 import currexx.core.auth.user.db.UserRepository

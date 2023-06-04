@@ -2,7 +2,6 @@ package currexx.core.trade
 
 import cats.syntax.applicative.*
 import currexx.core.market.MarketState
-import currexx.core.signal.Signal
 import currexx.domain.market.{Condition, Direction, IndicatorKind, TradeOrder}
 import currexx.domain.types.EnumType
 

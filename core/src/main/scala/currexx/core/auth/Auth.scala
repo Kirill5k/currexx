@@ -1,10 +1,9 @@
 package currexx.core.auth
 
-import cats.effect.{Async, Temporal}
+import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import currexx.core.Resources
-import currexx.core.auth.user.{PasswordEncryptor, UserService}
+import currexx.core.auth.user.UserService
 import currexx.core.auth.user.db.UserRepository
 import currexx.core.auth.session.db.SessionRepository
 import currexx.core.auth.session.SessionService
@@ -15,7 +14,6 @@ import currexx.core.common.http.Controller
 import currexx.domain.time.Clock
 import jwt.JwtEncoder
 import mongo4cats.database.MongoDatabase
-import org.http4s.HttpRoutes
 
 final class Auth[F[_]] private (
     val authenticator: Authenticator[F],

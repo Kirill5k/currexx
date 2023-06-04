@@ -2,7 +2,6 @@ package currexx.clients.data
 
 import cats.{Monad, MonadThrow}
 import cats.syntax.applicativeError.*
-import currexx.clients.HttpClient
 import currexx.clients.data.alphavantage.AlphaVantageClient
 import currexx.clients.data.twelvedata.TwelveDataClient
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}

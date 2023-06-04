@@ -1,7 +1,6 @@
 package currexx.core.common.logging.db
 
 import cats.effect.Async
-import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.core.common.db.Repository

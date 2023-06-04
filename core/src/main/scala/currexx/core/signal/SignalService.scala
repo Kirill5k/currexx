@@ -12,7 +12,6 @@ import currexx.core.common.http.SearchParams
 import currexx.domain.time.syntax.*
 import currexx.core.settings.TriggerFrequency
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
-import currexx.domain.errors.AppError
 import currexx.domain.market.{
   Condition,
   CurrencyPair,
@@ -22,10 +21,6 @@ import currexx.domain.market.{
   ValueSource as VS,
   ValueTransformation as VT
 }
-import fs2.Stream
-
-import java.time.Instant
-import scala.util.{Failure, Success, Try}
 
 trait SignalService[F[_]]:
   def submit(signal: Signal): F[Unit]

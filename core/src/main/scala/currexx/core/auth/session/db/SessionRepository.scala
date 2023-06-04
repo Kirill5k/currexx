@@ -5,7 +5,6 @@ import cats.syntax.functor.*
 import currexx.core.common.db.Repository
 import currexx.domain.session.{CreateSession, Session, SessionId, SessionStatus}
 import currexx.domain.user.UserId
-import currexx.domain.json.given
 import mongo4cats.database.MongoDatabase
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.operations.Update

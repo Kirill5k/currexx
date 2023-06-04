@@ -6,9 +6,8 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.effect.Async
 import currexx.core.auth.Authenticator
-import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema}
+import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
 import currexx.domain.errors.AppError
-import currexx.domain.user.UserId
 import currexx.domain.market.{Condition, CurrencyPair, Indicator}
 import currexx.domain.time.Clock
 import io.circe.Codec

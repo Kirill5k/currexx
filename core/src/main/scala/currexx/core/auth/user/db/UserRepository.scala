@@ -2,7 +2,6 @@ package currexx.core.auth.user.db
 
 import cats.effect.Async
 import cats.syntax.flatMap.*
-import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.applicativeError.*
 import currexx.domain.user.*

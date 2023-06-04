@@ -6,17 +6,13 @@ import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.applicativeError.*
 import currexx.core.auth.Authenticator
-import eu.timepit.refined.types.string.NonEmptyString
 import currexx.core.auth.jwt.BearerToken
 import currexx.domain.errors.AppError
-import currexx.domain.session.Session
-import currexx.domain.JsonCodecs
 import currexx.domain.market.CurrencyPair
 import currexx.domain.session.Session
 import io.circe.Codec
 import mongo4cats.bson.ObjectId
 import org.http4s.HttpRoutes
-import sttp.tapir.json.circe.TapirJsonCirce
 import sttp.tapir.*
 import sttp.model.StatusCode
 import sttp.tapir.DecodeResult.Error.JsonDecodeException

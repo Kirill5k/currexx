@@ -3,12 +3,9 @@ package currexx.core.market
 import cats.Monad
 import cats.effect.Async
 import cats.syntax.flatMap.*
-import currexx.clients.broker.BrokerParameters
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema}
-import currexx.domain.errors.AppError
-import currexx.domain.market.{CurrencyPair, Indicator, IndicatorKind, PriceRange}
-import currexx.domain.user.UserId
+import currexx.domain.market.{CurrencyPair, IndicatorKind}
 import io.circe.Codec
 import org.http4s.HttpRoutes
 import sttp.model.StatusCode

@@ -12,17 +12,14 @@ import currexx.clients.data.MarketDataClient
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.common.effects.*
-import currexx.core.market.{MarketState, PositionState}
+import currexx.core.market.MarketState
 import currexx.core.trade.TradeStrategyExecutor.Decision
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
-import currexx.domain.errors.AppError
-import currexx.domain.market.{CurrencyPair, Indicator, IndicatorKind, Interval, TradeOrder}
+import currexx.domain.market.{CurrencyPair, IndicatorKind, Interval, TradeOrder}
 import currexx.domain.monitor.Limits
 import currexx.domain.time.Clock
 import currexx.domain.user.UserId
 import fs2.Stream
-
-import java.time.Instant
 
 trait TradeService[F[_]]:
   def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]]

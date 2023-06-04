@@ -10,7 +10,6 @@ import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.monitor.{Limits, Schedule}
 import currexx.domain.user.UserId
 import fs2.Stream
-import mongo4cats.bson.BsonValue
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
 import mongo4cats.operations.{Filter, Update}

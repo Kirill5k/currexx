@@ -3,14 +3,13 @@ package currexx.core.market
 import cats.Monad
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import cats.syntax.traverse.*
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.domain.time.syntax.*
 import currexx.core.common.effects.*
 import currexx.core.signal.Signal
 import currexx.core.market.db.MarketStateRepository
 import currexx.core.trade.TradeOrderPlacement
-import currexx.domain.market.{CurrencyPair, Indicator, IndicatorKind, MarketTimeSeriesData, TradeOrder}
+import currexx.domain.market.{CurrencyPair, IndicatorKind, TradeOrder}
 import currexx.domain.user.UserId
 
 trait MarketService[F[_]]:

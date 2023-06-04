@@ -1,11 +1,8 @@
 package currexx.clients.broker.xtb
 
 import cats.syntax.option.*
-import currexx.clients.broker.xtb.XtbResponse.SymbolData
 import currexx.domain.market.{CurrencyPair, TradeOrder}
 import io.circe.Codec
-
-import java.time.Instant
 
 sealed trait RequestArguments
 object RequestArguments:

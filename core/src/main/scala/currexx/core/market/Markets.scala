@@ -3,7 +3,6 @@ package currexx.core.market
 import cats.effect.Async
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
-import currexx.clients.Clients
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.Controller
 import currexx.core.market.db.MarketStateRepository

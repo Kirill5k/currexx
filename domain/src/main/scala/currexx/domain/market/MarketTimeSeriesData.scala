@@ -5,7 +5,6 @@ import io.circe.Codec
 import org.latestbit.circe.adt.codec.*
 
 import java.time.Instant
-import scala.util.Try
 
 enum Interval(val number: Int, val unit: String) derives JsonTaggedAdt.PureEncoder, JsonTaggedAdt.PureDecoder:
   case M1  extends Interval(1, "minute")

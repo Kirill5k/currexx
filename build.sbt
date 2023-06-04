@@ -6,6 +6,7 @@ ThisBuild / version                             := scala.sys.process.Process("gi
 ThisBuild / organization                        := "io.github.kirill5k"
 ThisBuild / githubWorkflowPublishTargetBranches := Nil
 ThisBuild / githubWorkflowJavaVersions          := Seq(JavaSpec.temurin("20"))
+ThisBuild / scalacOptions ++= Seq("-Wunused:all")
 
 val noPublish = Seq(
   publish         := {},

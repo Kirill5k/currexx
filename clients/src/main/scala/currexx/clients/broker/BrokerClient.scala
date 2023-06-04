@@ -2,8 +2,6 @@ package currexx.clients.broker
 
 import cats.Monad
 import cats.data.NonEmptyList
-import cats.effect.Async
-import currexx.clients.HttpClient
 import currexx.clients.broker.vindaloo.VindalooClient
 import currexx.clients.broker.xtb.XtbClient
 import currexx.domain.market.{CurrencyPair, OpenedTradeOrder, TradeOrder}

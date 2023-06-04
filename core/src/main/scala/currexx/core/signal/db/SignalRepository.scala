@@ -1,7 +1,6 @@
 package currexx.core.signal.db
 
 import cats.effect.Async
-import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.core.common.db.Repository
@@ -15,8 +14,6 @@ import mongo4cats.collection.MongoCollection
 import mongo4cats.operations.Filter
 import mongo4cats.models.database.CreateCollectionOptions
 import mongo4cats.database.MongoDatabase
-
-import java.time.Instant
 
 trait SignalRepository[F[_]] extends Repository[F]:
   def saveAll(signals: List[Signal]): F[Unit]

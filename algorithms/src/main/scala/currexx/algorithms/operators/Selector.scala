@@ -2,10 +2,9 @@ package currexx.algorithms.operators
 
 import cats.Id
 import cats.effect.Sync
-import currexx.algorithms.{DistributedPopulation, EvaluatedPopulation, Fitness, Population}
+import currexx.algorithms.{DistributedPopulation, EvaluatedPopulation, Fitness}
 import currexx.algorithms.collections.*
 
-import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
 import scala.util.Random
 

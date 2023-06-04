@@ -3,7 +3,6 @@ package currexx.core.signal
 import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import currexx.core.Resources
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.Controller
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}

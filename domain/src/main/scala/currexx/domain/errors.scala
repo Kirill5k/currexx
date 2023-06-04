@@ -2,7 +2,7 @@ package currexx.domain
 
 import currexx.domain.market.CurrencyPair
 import currexx.domain.session.SessionId
-import currexx.domain.user.{UserEmail, UserId}
+import currexx.domain.user.UserEmail
 
 import scala.collection.immutable.Iterable
 

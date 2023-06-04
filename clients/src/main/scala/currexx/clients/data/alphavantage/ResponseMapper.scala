@@ -4,10 +4,10 @@ import cats.data.NonEmptyList
 import cats.syntax.either.*
 import currexx.clients.data.alphavantage.AlphaVantageClient.{DailyResponseMetadata, IntradayResponseMetadata, OHLC}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{MarketTimeSeriesData, PriceRange}
+import currexx.domain.market.PriceRange
 import io.circe.JsonObject
 
-import java.time.{LocalDate, LocalDateTime, ZoneId}
+import java.time.{LocalDateTime, ZoneId}
 import scala.collection.immutable.ListMap
 
 private[alphavantage] object ResponseMapper {

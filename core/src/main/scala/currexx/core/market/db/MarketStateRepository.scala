@@ -4,9 +4,8 @@ import cats.effect.Async
 import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
-import io.circe.syntax.*
 import com.mongodb.client.model.ReturnDocument
-import currexx.domain.market.{CurrencyPair, Indicator, IndicatorKind, PriceRange}
+import currexx.domain.market.{CurrencyPair, IndicatorKind}
 import currexx.domain.user.UserId
 import currexx.domain.errors.AppError
 import currexx.core.common.db.Repository

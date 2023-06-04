@@ -3,7 +3,6 @@ package currexx.clients
 import cats.effect.Temporal
 import cats.syntax.apply.*
 import cats.syntax.applicativeError.*
-import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData}
 import org.typelevel.log4cats.Logger
 import sttp.client3.{Request, Response, SttpBackend}
 import fs2.Stream

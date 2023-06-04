@@ -9,7 +9,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string.MatchesRegex
 import eu.timepit.refined.types.string.NonEmptyString
 import currexx.domain.user.*
-import currexx.domain.session.{CreateSession, IpAddress, Session}
+import currexx.domain.session.{CreateSession, IpAddress}
 import currexx.domain.errors.AppError.SomeoneElsesSession
 import currexx.domain.validations.*
 import currexx.core.auth.jwt.BearerToken
@@ -25,7 +25,6 @@ import sttp.tapir.*
 import sttp.tapir.server.http4s.Http4sServerInterpreter
 
 import java.time.Instant
-import java.time.temporal.Temporal
 
 final private class AuthController[F[_]](
     private val userService: UserService[F],

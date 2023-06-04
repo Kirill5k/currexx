@@ -1,13 +1,12 @@
 package currexx.algorithms
 
 import cats.~>
-import cats.effect.{Async, Sync}
+import cats.effect.Async
 import cats.free.Free
 import cats.syntax.functor.*
 import currexx.algorithms.operators.*
 import fs2.Stream
 
-import scala.reflect.ClassTag
 import scala.util.Random
 
 opaque type Fitness = BigDecimal
