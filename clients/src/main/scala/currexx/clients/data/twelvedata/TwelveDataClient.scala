@@ -5,7 +5,6 @@ import cats.effect.Temporal
 import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import cats.syntax.applicativeError.*
 import currexx.clients.HttpClient
 import currexx.clients.data.MarketDataClient
 import currexx.domain.cache.Cache
