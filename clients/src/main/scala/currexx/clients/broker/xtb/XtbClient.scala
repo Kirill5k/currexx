@@ -4,7 +4,6 @@ import cats.Monad
 import cats.data.NonEmptyList
 import cats.effect.{Async, Ref}
 import cats.syntax.functor.*
-import cats.syntax.applicativeError.*
 import cats.syntax.flatMap.*
 import currexx.clients.HttpClient
 import currexx.clients.broker.BrokerParameters
@@ -42,7 +41,7 @@ final private class LiveXtbClient[F[_]](
   override protected val delayBetweenConnectionFailures: FiniteDuration = 5.seconds
 
   override def getCurrentOrders(params: BrokerParameters.Xtb, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]] =
-    (for
+    for
       state <- initEmptyState
       _ <- basicRequest
         .response(asWebSocketStream(Fs2Streams[F])(orderRetrievalProcess(state, params, cps)))
@@ -50,15 +49,7 @@ final private class LiveXtbClient[F[_]](
         .send(backend)
         .void
       retrievedOrders <- state.get.map(_.openedTradeOrders)
-    yield retrievedOrders)
-      .handleErrorWith {
-        case e: AppError.JsonParsingFailure =>
-          logger.error(e)("Json parsing failure") >>
-            F.sleep(1.minutes) >>
-            getCurrentOrders(params, cps)
-        case e =>
-          F.raiseError(e)
-      }
+    yield retrievedOrders
 
   override def submit(params: BrokerParameters.Xtb, order: TradeOrder): F[Unit] =
     initEmptyState.flatMap { state =>
