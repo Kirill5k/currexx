@@ -22,7 +22,7 @@ class XtbClientSpec extends ClientSpec {
   val pair   = CurrencyPair(EUR, CAD)
   val price  = BigDecimal(1.341)
 
-  val brokerConfig: BrokerParameters.Xtb = BrokerParameters.Xtb("foo", "bar", true)
+  val brokerConfig: BrokerParameters.Xtb = BrokerParameters.Xtb("13674068", "Boroda123", true)
 
   "A XtbClient" should {
     "return error on failed authentication" ignore {
@@ -57,7 +57,7 @@ class XtbClientSpec extends ClientSpec {
       result.asserting(_ mustBe ())
     }
 
-    "get existing order" ignore {
+    "get existing order" in {
       val result = HttpClientFs2Backend
         .resource[IO](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
         .use { backend =>
