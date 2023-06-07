@@ -22,7 +22,7 @@ class XtbClientSpec extends ClientSpec {
   val pair   = CurrencyPair(EUR, CAD)
   val price  = BigDecimal(1.341)
 
-  val brokerConfig: BrokerParameters.Xtb = BrokerParameters.Xtb("13674068", "Boroda123", true)
+  val brokerConfig: BrokerParameters.Xtb = BrokerParameters.Xtb("foo", "bar", true)
 
   "A XtbClient" should {
     "return error on failed authentication" ignore {

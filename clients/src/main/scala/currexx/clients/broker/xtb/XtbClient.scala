@@ -140,11 +140,22 @@ final private class LiveXtbClient[F[_]](
         }
   }
 
-  private val parseXtbResponse: Pipe[F, WebSocketFrame.Data[_], XtbResponse] = _.map {
-    case WebSocketFrame.Text(jsonPayload, _, _) => XtbResponse.fromJson(jsonPayload)
-    case WebSocketFrame.Binary(bytes, _, _) => XtbResponse.fromJson(new String(bytes, StandardCharsets.UTF_8))
-    case _ | null => Right(XtbResponse.Void)
-  }.rethrow
+  private val parseXtbResponse: Pipe[F, WebSocketFrame.Data[_], XtbResponse] = _.scan(("", Option.empty[String])) {
+    case ((msg, _), wsFrame) =>
+      wsFrame match
+        case WebSocketFrame.Text(jsonPayload, false, _) => (msg + jsonPayload, None)
+        case WebSocketFrame.Text(jsonPayload, true, _)  => ("", Some(msg + jsonPayload))
+        case WebSocketFrame.Binary(bytes, true, _)      => (msg + new String(bytes, StandardCharsets.UTF_8), None)
+        case WebSocketFrame.Binary(bytes, false, _)     => ("", Some(msg + new String(bytes, StandardCharsets.UTF_8)))
+        case _ | null                                   => ("", Some(""))
+  }
+    .map(_._2)
+    .unNone
+    .map {
+      case ""          => Right(XtbResponse.Void)
+      case jsonPayload => XtbResponse.fromJson(jsonPayload)
+    }
+    .rethrow
 
   private def login(params: BrokerParameters.Xtb): Stream[F, Text] =
     Stream.emit(XtbRequest.login(params.userId, params.password).asText)
