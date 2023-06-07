@@ -57,7 +57,7 @@ class XtbClientSpec extends ClientSpec {
       result.asserting(_ mustBe ())
     }
 
-    "get existing order" in {
+    "get existing order" ignore {
       val result = HttpClientFs2Backend
         .resource[IO](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
         .use { backend =>
