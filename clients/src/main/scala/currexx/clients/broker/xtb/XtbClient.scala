@@ -105,8 +105,8 @@ final private class LiveXtbClient[F[_]](
                   .map(td => XtbRequest.closeTransaction(sid, order.currencyPair, td).asText)
               }
           case XtbResponse.OrderPlacement(_) => Stream.emit(WebSocketFrame.close)
-          case XtbResponse.Error("SE199", _) =>
-            Stream.logError(s"$name-client/server-${params.userId}: failed to close transaction for $order") ++
+          case XtbResponse.Error("SE199", errorDescr) =>
+            Stream.logError(s"$name-client/server-${params.userId}: failed to close transaction for $order - $errorDescr") ++
               obtainSessionId(state).delayBy(delayBetweenConnectionFailures).map(sid => XtbRequest.currentTrades(sid).asText)
           case error: XtbResponse.Error => handError(params.userId, error)
           case _                        => Stream.empty
@@ -149,8 +149,7 @@ final private class LiveXtbClient[F[_]](
         case WebSocketFrame.Binary(bytes, false, _)     => ("", Some(msg + new String(bytes, StandardCharsets.UTF_8)))
         case _ | null                                   => ("", Some(""))
   }
-    .map(_._2)
-    .unNone
+    .collect { case (_, Some(msg)) => msg }
     .map {
       case ""          => Right(XtbResponse.Void)
       case jsonPayload => XtbResponse.fromJson(jsonPayload)
