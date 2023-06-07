@@ -140,11 +140,23 @@ final private class LiveXtbClient[F[_]](
         }
   }
 
-  private val parseXtbResponse: Pipe[F, WebSocketFrame.Data[_], XtbResponse] = _.map {
-    case WebSocketFrame.Text(jsonPayload, _, _) => XtbResponse.fromJson(jsonPayload)
-    case WebSocketFrame.Binary(bytes, _, _)     => XtbResponse.fromJson(new String(bytes, StandardCharsets.UTF_8))
-    case _ | null                               => Right(XtbResponse.Void)
-  }.rethrow
+  private val parseXtbResponse: Pipe[F, WebSocketFrame.Data[_], XtbResponse] = input =>
+    Stream
+      .eval(
+        input
+          .scan("") { (msg, wsFrame) =>
+            wsFrame match
+              case Text(payload, _, _)                => msg + payload
+              case WebSocketFrame.Binary(bytes, _, _) => msg + new String(bytes, StandardCharsets.UTF_8)
+          }
+          .compile
+          .last
+      )
+      .map {
+        case None              => Right(XtbResponse.Void)
+        case Some(jsonPayload) => XtbResponse.fromJson(jsonPayload)
+      }
+      .rethrow
 
   private def login(params: BrokerParameters.Xtb): Stream[F, Text] =
     Stream.emit(XtbRequest.login(params.userId, params.password).asText)
