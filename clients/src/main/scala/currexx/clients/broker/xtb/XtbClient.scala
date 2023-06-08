@@ -147,7 +147,6 @@ final private class LiveXtbClient[F[_]](
         case WebSocketFrame.Text(jsonPayload, true, _)  => ("", Some(msg + jsonPayload))
         case WebSocketFrame.Binary(bytes, true, _)      => (msg + new String(bytes, StandardCharsets.UTF_8), None)
         case WebSocketFrame.Binary(bytes, false, _)     => ("", Some(msg + new String(bytes, StandardCharsets.UTF_8)))
-        case _ | null                                   => ("", Some(""))
   }
     .collect { case (_, Some(msg)) => msg }
     .map {
