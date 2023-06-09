@@ -14,11 +14,11 @@ object Dependencies {
     val bcrypt         = "4.3.0"
     val refined        = "0.10.3"
     val tapir          = "1.5.1"
-    val jwt            = "9.2.0"
-    val cronUtils      = "9.2.0"
-    val taggedAdtCodec = "0.10.1"
+    val jwt            = "9.3.0"
+    val cronUtils      = "9.2.1"
+    val taggedAdtCodec = "0.11.0"
 
-    val scalaTest = "3.2.15"
+    val scalaTest = "3.2.16"
     val mockito   = "3.2.15.0"
   }
 
