@@ -107,7 +107,9 @@ final private class LiveXtbClient[F[_]](
           case XtbResponse.OrderPlacement(_) => Stream.emit(WebSocketFrame.close)
           case XtbResponse.Error("SE199", errorDescr) =>
             Stream.logError(s"$name-client/server-${params.userId}: failed to close transaction for $order - $errorDescr") ++
-              obtainSessionId(state).delayBy(delayBetweenConnectionFailures).map(sid => XtbRequest.currentTrades(sid).asText)
+              obtainSessionId(state)
+                .delayBy(delayBetweenConnectionFailures)
+                .map(sid => XtbRequest.currentTrades(sid).asText)
           case error: XtbResponse.Error => handError(params.userId, error)
           case _                        => Stream.empty
         }
