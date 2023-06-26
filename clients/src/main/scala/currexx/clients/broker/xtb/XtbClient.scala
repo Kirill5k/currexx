@@ -134,8 +134,7 @@ final private class LiveXtbClient[F[_]](
               Stream.eval(state.update(_.withRetrievedOrders(orders))).drain ++
                 Stream.emit(WebSocketFrame.close)
             else
-              Stream.logInfo(s"$name-client/noprofit-${params.userId}-${symbols.mkString("-")}") ++
-                incGetTradesAttempt(state) ++
+              incGetTradesAttempt(params.userId, state) ++
                 obtainSessionId(state).map(sid => XtbRequest.currentTrades(sid).asText)
           case error: XtbResponse.Error => handError(params.userId, error)
           case _                        => Stream.empty
@@ -166,7 +165,7 @@ final private class LiveXtbClient[F[_]](
   private def obtainSessionId(state: Ref[F, XtbClient.WsState]): Stream[F, String] =
     Stream.eval(state.get.map(_.sessionId.toRight(AppError.ClientFailure(name, "no session id")))).rethrow
 
-  private def incGetTradesAttempt(state: Ref[F, XtbClient.WsState]): Stream[F, WebSocketFrame] =
+  private def incGetTradesAttempt(userId: String, state: Ref[F, XtbClient.WsState]): Stream[F, WebSocketFrame] =
     Stream
       .eval(state.get.map(_.retryCount < 50))
       .flatMap {
@@ -174,7 +173,7 @@ final private class LiveXtbClient[F[_]](
           Stream.eval(state.update(_.incRetry)).drain
         case false =>
           Stream.emit(WebSocketFrame.close) ++
-            Stream.raiseError(AppError.ClientFailure(name, "Unable to obtain orders with calculated profit"))
+            Stream.raiseError(AppError.ClientFailure(name, s"Unable to obtain orders with calculated profit for $userId"))
       }
       .delayBy(100.millis)
 
