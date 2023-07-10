@@ -57,7 +57,7 @@ final private class LiveSignalService[F[_]](
     yield ()
 
   private def save(uid: UserId, cp: CurrencyPair, signals: List[Signal]) =
-    signalRepo.saveAll(signals) >> 
+    signalRepo.saveAll(signals) >>
       dispatcher.dispatch(Action.ProcessSignals(uid, cp, signals))
 }
 

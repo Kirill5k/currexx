@@ -11,7 +11,7 @@ enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWit
   case UpperBandCrossing(direction: Direction)
   case LowerBandCrossing(direction: Direction)
   case LinesCrossing(direction: Direction)
-  case CrossingUp // TODO: deprecated; delete
+  case CrossingUp   // TODO: deprecated; delete
   case CrossingDown // TODO: deprecated; delete
   case AboveThreshold(threshold: BigDecimal, value: BigDecimal)
   case BelowThreshold(threshold: BigDecimal, value: BigDecimal)
@@ -23,7 +23,7 @@ object Condition {
       "upper-band-crossing"    -> JsonTaggedAdt.tagged[Condition.UpperBandCrossing],
       "lower-band-crossing"    -> JsonTaggedAdt.tagged[Condition.LowerBandCrossing],
       "lines-crossing"         -> JsonTaggedAdt.tagged[Condition.LinesCrossing],
-      "crossing-up"            -> JsonTaggedAdt.tagged[Condition.CrossingUp.type], // TODO: deprecated; delete
+      "crossing-up"            -> JsonTaggedAdt.tagged[Condition.CrossingUp.type],   // TODO: deprecated; delete
       "crossing-down"          -> JsonTaggedAdt.tagged[Condition.CrossingDown.type], // TODO: deprecated; delete
       "above-threshold"        -> JsonTaggedAdt.tagged[Condition.AboveThreshold],
       "below-threshold"        -> JsonTaggedAdt.tagged[Condition.BelowThreshold],

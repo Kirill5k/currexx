@@ -48,7 +48,7 @@ object Op:
       selector: Selector[F, I],
       elitism: Elitism[F, I],
       updateFn: Option[(Int, Int) => F[Unit]] = None
-  )(using F: Async[F], rand: Random): Op[*, I] ~> F = new (~>[Op[*, I], F]) {
+  )(using F: Async[F], rand: Random): Op[*, I] ~> F = new ~>[Op[*, I], F] {
     def apply[A](fa: Op[A, I]): F[A] =
       fa match
         case Op.UpdateOnProgress(iteration, maxGen) =>
