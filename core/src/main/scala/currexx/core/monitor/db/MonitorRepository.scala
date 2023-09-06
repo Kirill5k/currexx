@@ -40,19 +40,22 @@ final private class LiveMonitorRepository[F[_]](
     collection
       .find(idEq(id.value) && userIdEq(uid))
       .first
-      .flatMap(maybeMon => F.fromOption(maybeMon.map(_.toDomain), AppError.EntityDoesNotExist("Monitor", id.value)))
+      .mapOption(_.toDomain)
+      .flatMap(maybeMon => F.fromOption(maybeMon, AppError.EntityDoesNotExist("Monitor", id.value)))
 
   override def getAll(uid: UserId): F[List[Monitor]] =
     collection.find(userIdEq(uid)).all.mapIterable(_.toDomain)
 
   override def create(mon: CreateMonitor): F[Monitor] =
-    val entity = MonitorEntity.from(mon)
-    val cps    = mon.currencyPairs.toList
+    val cps = mon.currencyPairs.toList
     collection
       .count(uidAndKindAndCurrencyPairs(mon.userId, mon.kind, cps))
       .flatMap {
-        case 0 => collection.insertOne(entity).as(entity.toDomain)
-        case _ => alreadyBeingMonitoredError(mon.userId, mon.kind, cps)
+        case 0 =>
+          val entity = MonitorEntity.from(mon)
+          collection.insertOne(entity).as(entity.toDomain)
+        case _ =>
+          alreadyBeingMonitoredError(mon.userId, mon.kind, cps)
       }
 
   override def activate(uid: UserId, id: MonitorId, active: Boolean): F[Monitor] =
@@ -64,12 +67,14 @@ final private class LiveMonitorRepository[F[_]](
   private def runUpdate(uid: UserId, id: MonitorId)(update: Update): F[Monitor] =
     collection
       .findOneAndUpdate(idEq(id.value) && userIdEq(uid), update.currentDate(Field.LastUpdatedAt))
-      .flatMap(maybeMon => F.fromOption(maybeMon.map(_.toDomain), AppError.EntityDoesNotExist("Monitor", id.value)))
+      .mapOption(_.toDomain)
+      .flatMap(maybeMon => F.fromOption(maybeMon, AppError.EntityDoesNotExist("Monitor", id.value)))
 
   override def delete(uid: UserId, id: MonitorId): F[Monitor] =
     collection
       .findOneAndDelete(idEq(id.value) && userIdEq(uid))
-      .flatMap(maybeMon => F.fromOption(maybeMon.map(_.toDomain), AppError.EntityDoesNotExist("Monitor", id.value)))
+      .mapOption(_.toDomain)
+      .flatMap(maybeMon => F.fromOption(maybeMon, AppError.EntityDoesNotExist("Monitor", id.value)))
 
   override def update(mon: Monitor): F[Monitor] =
     val baseUpdate = Update

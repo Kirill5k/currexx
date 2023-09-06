@@ -44,4 +44,4 @@ object SessionRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[SessionRepository[F]] =
     db.getCollectionWithCodec[SessionEntity]("sessions")
       .map(_.withAddedCodec[SessionStatus])
-      .map(coll => LiveSessionRepository[F](coll))
+      .map(LiveSessionRepository[F](_))

@@ -45,7 +45,8 @@ final private class LiveUserRepository[F[_]](
     collection
       .find(idEq(uid.value))
       .first
-      .flatMap(maybeUser => F.fromOption(maybeUser.map(_.toDomain), EntityDoesNotExist("User", uid.value)))
+      .mapOption(_.toDomain)
+      .flatMap(maybeUser => F.fromOption(maybeUser, EntityDoesNotExist("User", uid.value)))
 
   override def updatePassword(uid: UserId)(password: PasswordHash): F[Unit] =
     collection
@@ -55,5 +56,4 @@ final private class LiveUserRepository[F[_]](
 
 object UserRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[UserRepository[F]] =
-    db.getCollectionWithCodec[UserEntity]("users")
-      .map(coll => LiveUserRepository[F](coll))
+    db.getCollectionWithCodec[UserEntity]("users").map(LiveUserRepository[F](_))

@@ -28,13 +28,26 @@ final private class LiveTradeOrderRepository[F[_]: Async](
     collection.insertOne(TradeOrderEntity.from(top)).void
 
   def getAllTradedCurrencies(uid: UserId): F[List[CurrencyPair]] =
-    collection.distinct[CurrencyPair](Field.OrderCurrencyPair).filter(userIdEq(uid)).all.map(_.toList)
+    collection
+      .distinct[CurrencyPair](Field.OrderCurrencyPair)
+      .filter(userIdEq(uid))
+      .all
+      .map(_.toList)
 
   def getAll(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]] =
-    collection.find(searchBy(uid, sp)).sortByDesc(Field.Time).limit(sp.limit.getOrElse(Int.MaxValue)).all.mapIterable(_.toDomain)
+    collection
+      .find(searchBy(uid, sp))
+      .sortByDesc(Field.Time)
+      .limit(sp.limit.getOrElse(Int.MaxValue))
+      .all
+      .mapIterable(_.toDomain)
 
   def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]] =
-    collection.find(userIdEq(uid) && Filter.eq(Field.OrderCurrencyPair, cp)).sortByDesc(Field.Time).first.mapOption(_.toDomain)
+    collection
+      .find(userIdEq(uid) && Filter.eq(Field.OrderCurrencyPair, cp))
+      .sortByDesc(Field.Time)
+      .first
+      .mapOption(_.toDomain)
 
 object TradeOrderRepository extends MongoJsonCodecs:
   private val collectionName    = "trade-orders"

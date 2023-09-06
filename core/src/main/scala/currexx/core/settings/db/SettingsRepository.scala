@@ -30,17 +30,16 @@ final private class LiveSettingsRepository[F[_]](
         case 0 =>
           collection.insertOne(GlobalSettingsEntity.from(gs.userId, gs.signal, gs.trade, gs.note)).void
         case _ =>
-          collection.updateOne(userIdEq(gs.userId), Update.set("signal", gs.signal).set("trade", gs.trade).set("note", gs.note)).void
+          val settingsUpdate = Update.set("signal", gs.signal).set("trade", gs.trade).set("note", gs.note)
+          collection.updateOne(userIdEq(gs.userId), settingsUpdate).void
       }
 
   override def get(uid: UserId): F[GlobalSettings] =
     collection
       .find(userIdEq(uid))
       .first
-      .flatMap {
-        case Some(settings) => F.pure(settings.toDomain)
-        case None           => F.raiseError(AppError.NotSetup("Global"))
-      }
+      .mapOption(_.toDomain)
+      .flatMap(settings => F.fromOption(settings, AppError.NotSetup("Global")))
 
   override def createFor(uid: UserId): F[Unit] =
     collection
