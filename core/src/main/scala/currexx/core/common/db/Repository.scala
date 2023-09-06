@@ -31,8 +31,8 @@ trait Repository[F[_]] {
   }
 
   private def idEqFilter(name: String, id: String): Filter = Filter.eq(name, ObjectId(id))
-  protected def idEq(id: String): Filter                           = idEqFilter(Field.Id, id)
-  protected def userIdEq(uid: UserId): Filter                      = idEqFilter(Field.UId, uid.value)
+  protected def idEq(id: String): Filter                   = idEqFilter(Field.Id, id)
+  protected def userIdEq(uid: UserId): Filter              = idEqFilter(Field.UId, uid.value)
 
   protected def userIdAndCurrencyPairEq(uid: UserId, pair: CurrencyPair): Filter =
     userIdEq(uid) && Filter.eq(Field.CurrencyPair, pair)
