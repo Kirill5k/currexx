@@ -27,11 +27,13 @@ object Volatility {
         val atr = trs.sum / length
         atrs.addOne(atr)
         trs.dequeue()
+        ()
       }
       if (trs.size == length && atrs.nonEmpty) {
         val atr = (atrs.last * (length - 1) + tr) / length
         atrs.addOne(atr)
         trs.dequeue()
+        ()
       }
       i -= 1
     }

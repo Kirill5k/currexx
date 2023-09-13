@@ -26,13 +26,10 @@ object Resources:
       .builder()
       .applyConnectionString(ConnectionString(config.connectionUri))
       .applyToSocketSettings { builder =>
-        builder
-          .connectTimeout(3, TimeUnit.MINUTES)
-          .readTimeout(3, TimeUnit.MINUTES)
+        val _ = builder.connectTimeout(3, TimeUnit.MINUTES).readTimeout(3, TimeUnit.MINUTES)
       }
       .applyToClusterSettings { builder =>
-        builder
-          .serverSelectionTimeout(3, TimeUnit.MINUTES)
+        val _ = builder.serverSelectionTimeout(3, TimeUnit.MINUTES)
       }
       .build()
     MongoClient.create[F](settings).evalMap(_.getDatabase("currexx"))

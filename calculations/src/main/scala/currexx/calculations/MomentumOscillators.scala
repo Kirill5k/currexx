@@ -48,6 +48,7 @@ object MomentumOscillators {
         stochs(i - length) = (closingsArr(i) - ll.min) / (hh.max - ll.min) * 100d
         hh.dequeue()
         ll.dequeue()
+        ()
       }
       i += 1
     }
