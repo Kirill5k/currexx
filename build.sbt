@@ -5,7 +5,7 @@ ThisBuild / scalaVersion                        := "3.3.1"
 ThisBuild / version                             := scala.sys.process.Process("git rev-parse HEAD").!!.trim.slice(0, 7)
 ThisBuild / organization                        := "io.github.kirill5k"
 ThisBuild / githubWorkflowPublishTargetBranches := Nil
-ThisBuild / githubWorkflowJavaVersions          := Seq(JavaSpec.temurin("20"))
+ThisBuild / githubWorkflowJavaVersions          := Seq(JavaSpec.temurin("21"))
 ThisBuild / scalacOptions ++= Seq("-Wunused:all")
 
 val noPublish = Seq(

@@ -21,6 +21,7 @@ import sttp.tapir.server.http4s.Http4sServerOptions
 import sttp.tapir.server.interceptor.DecodeFailureContext
 import sttp.tapir.server.interceptor.exception.{ExceptionContext, ExceptionHandler}
 import sttp.tapir.server.model.ValuedEndpointOutput
+import sttp.tapir.server.interceptor.decodefailure.DecodeFailureHandler
 
 import java.time.Instant
 
@@ -75,7 +76,7 @@ object Controller extends TapirSchema with TapirJson with TapirCodecs {
     val errorEndpointOut = (e: Throwable) => Some(ValuedEndpointOutput(error, Controller.mapError(e)))
     Http4sServerOptions.customiseInterceptors
       .exceptionHandler(ExceptionHandler.pure((ctx: ExceptionContext) => errorEndpointOut(ctx.e)))
-      .decodeFailureHandler { (ctx: DecodeFailureContext) =>
+      .decodeFailureHandler(DecodeFailureHandler.pure { (ctx: DecodeFailureContext) =>
         if (ctx.failingInput.toString.matches("Header.Authorization.*")) {
           ctx.failure match
             case DecodeResult.Error(_, e)     => errorEndpointOut(AppError.InvalidAuthorizationHeader(e.getMessage.trim))
@@ -90,7 +91,7 @@ object Controller extends TapirSchema with TapirJson with TapirCodecs {
               errorEndpointOut(AppError.FailedValidation(msgs.mkString(", ")))
             case _ => None
         }
-      }
+      })
       .options
   }
 
