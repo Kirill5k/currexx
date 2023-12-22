@@ -4,7 +4,7 @@ object Dependencies {
   object Versions {
     val fs2            = "3.9.3"
     val cats           = "2.10.0"
-    val mongo4cats     = "0.6.16"
+    val mongo4cats     = "0.6.17"
     val pureConfig     = "0.17.4"
     val circe          = "0.14.6"
     val sttp           = "3.9.1"
@@ -13,7 +13,7 @@ object Dependencies {
     val log4cats       = "2.6.0"
     val bcrypt         = "4.3.0"
     val refined        = "0.11.0"
-    val tapir          = "1.9.3"
+    val tapir          = "1.9.6"
     val jwt            = "9.4.5"
     val cronUtils      = "9.2.1"
     val taggedAdtCodec = "0.11.0"
