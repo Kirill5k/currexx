@@ -35,7 +35,7 @@ val docker = Seq(
 )
 
 val domain = project
-  .in(file("domain"))
+  .in(file("modules/domain"))
   .settings(
     name       := "currexx-domain",
     moduleName := "currexx-domain",
@@ -43,7 +43,7 @@ val domain = project
   )
 
 val algorithms = project
-  .in(file("algorithms"))
+  .in(file("modules/algorithms"))
   .settings(
     name       := "currexx-algorithms",
     moduleName := "currexx-algorithms",
@@ -51,7 +51,7 @@ val algorithms = project
   )
 
 val calculations = project
-  .in(file("calculations"))
+  .in(file("modules/calculations"))
   .settings(
     name       := "currexx-calculations",
     moduleName := "currexx-calculations",
@@ -59,7 +59,7 @@ val calculations = project
   )
 
 val clients = project
-  .in(file("clients"))
+  .in(file("modules/clients"))
   .dependsOn(domain % "compile->compile;test->test")
   .settings(
     name       := "currexx-clients",
@@ -68,7 +68,7 @@ val clients = project
   )
 
 val core = project
-  .in(file("core"))
+  .in(file("modules/core"))
   .enablePlugins(JavaAppPackaging, JavaAgent, DockerPlugin)
   .dependsOn(domain % "compile->compile;test->test", clients, calculations)
   .settings(docker)
@@ -79,7 +79,7 @@ val core = project
   )
 
 val backtest = project
-  .in(file("backtest"))
+  .in(file("modules/backtest"))
   .dependsOn(core, algorithms)
   .settings(
     name       := "currexx-backtest",
