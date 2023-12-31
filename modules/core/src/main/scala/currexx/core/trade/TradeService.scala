@@ -40,7 +40,8 @@ final private class LiveTradeService[F[_]](
     F: Temporal[F],
     clock: Clock[F]
 ) extends TradeService[F] {
-  override def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]] = orderRepository.getAll(uid, sp)
+  override def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]] = 
+    orderRepository.getAll(uid, sp)
 
   override def fetchMarketData(uid: UserId, cps: NonEmptyList[CurrencyPair], interval: Interval): F[Unit] =
     cps.traverse { cp =>

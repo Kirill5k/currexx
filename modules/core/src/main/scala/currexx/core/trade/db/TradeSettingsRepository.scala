@@ -29,4 +29,5 @@ final private class LiveTradeSettingsRepository[F[_]](
 
 object TradeSettingsRepository:
   def make[F[_]: Async](db: MongoDatabase[F]): F[TradeSettingsRepository[F]] =
-    db.getCollectionWithCodec[Document]("settings").map(LiveTradeSettingsRepository[F](_))
+    db.getCollectionWithCodec[Document]("settings")
+      .map(LiveTradeSettingsRepository[F](_))

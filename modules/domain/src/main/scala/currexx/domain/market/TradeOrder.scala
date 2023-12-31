@@ -25,7 +25,11 @@ object TradeOrder {
       derives Codec.AsObject:
     def isEnter: Boolean = true
 
-  final case class Exit(currencyPair: CurrencyPair, price: BigDecimal) extends TradeOrder("exit") derives Codec.AsObject:
+  final case class Exit(
+      currencyPair: CurrencyPair,
+      price: BigDecimal
+  ) extends TradeOrder("exit")
+      derives Codec.AsObject:
     def isEnter: Boolean = false
 
   inline given Decoder[TradeOrder] = Decoder.instance { c =>
