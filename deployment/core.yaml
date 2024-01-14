@@ -1,6 +1,18 @@
 apiVersion: v1
 kind: Service
 metadata:
+  name: "currexx-extlb"
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 8080
+  selector:
+    app: "currexx-core"
+---
+apiVersion: v1
+kind: Service
+metadata:
   name: "currexx"
 spec:
   ports:
