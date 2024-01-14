@@ -41,11 +41,11 @@ spec:
                 name: "currexx-secret"
           resources:
             requests:
-              memory: "256Mi"
+              memory: "192Mi"
               cpu: "0.2"
             limits:
-              memory: "512Mi"
-              cpu: "0.5"
+              memory: "320Mi"
+              cpu: "0.4"
           readinessProbe:
             httpGet:
               path: /health/status
