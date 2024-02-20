@@ -1,10 +1,9 @@
 package currexx.core.auth.user
 
 import cats.effect.IO
-import cats.effect.unsafe.implicits.global
-import currexx.core.IOWordSpec
 import currexx.core.common.config.{AuthConfig, JwtConfig}
 import currexx.domain.user.*
+import currexx.domain.IOWordSpec
 
 class PasswordEncryptorSpec extends IOWordSpec {
 
@@ -19,7 +18,7 @@ class PasswordEncryptorSpec extends IOWordSpec {
         isValid <- e.isValid(Password("Password123!"), hash)
       yield isValid
 
-      result.unsafeToFuture().map(_ mustBe true)
+      result.asserting(_ mustBe true)
     }
   }
 }

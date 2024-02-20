@@ -9,6 +9,7 @@ import org.scalatest.Assertion
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.typelevel.ci.CIString
+import currexx.domain.MockitoMatchers
 
 trait ControllerSpec extends AnyWordSpec with MockitoMatchers with Matchers {
 

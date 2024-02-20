@@ -1,13 +1,13 @@
 package currexx.core.auth.user
 
 import cats.effect.IO
-import cats.effect.unsafe.implicits.global
-import currexx.core.{IOWordSpec, MockActionDispatcher}
+import currexx.core.MockActionDispatcher
 import currexx.core.common.action.Action
 import currexx.core.fixtures.Users
 import currexx.core.auth.user.db.UserRepository
 import currexx.domain.user.*
 import currexx.domain.errors.AppError.{InvalidEmailOrPassword, InvalidPassword}
+import currexx.domain.IOWordSpec
 
 class UserServiceSpec extends IOWordSpec {
 
@@ -23,7 +23,7 @@ class UserServiceSpec extends IOWordSpec {
           res     <- service.create(Users.details, Users.pwd)
         yield res
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           disp.submittedActions mustBe List(Action.SetupNewUser(Users.uid))
           verify(encr).hash(Users.pwd)
           verify(repo).create(Users.details, Users.hash)
@@ -47,7 +47,7 @@ class UserServiceSpec extends IOWordSpec {
           res     <- service.changePassword(cp)
         yield res
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verify(repo).find(cp.id)
           verify(encr).isValid(cp.currentPassword, Users.user.password)
           verify(encr).hash(cp.newPassword)
@@ -66,7 +66,7 @@ class UserServiceSpec extends IOWordSpec {
           res     <- service.changePassword(cp)
         yield res
 
-        result.attempt.unsafeToFuture().map { res =>
+        result.attempt.asserting { res =>
           verify(repo).find(cp.id)
           verify(encr).isValid(cp.currentPassword, Users.user.password)
           verifyNoMoreInteractions(repo, encr)
@@ -85,7 +85,7 @@ class UserServiceSpec extends IOWordSpec {
           res     <- service.find(Users.uid)
         yield res
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verifyNoInteractions(encr)
           verify(repo).find(Users.uid)
           res mustBe Users.user
@@ -105,7 +105,7 @@ class UserServiceSpec extends IOWordSpec {
           res     <- service.login(Login(Users.details.email, Users.pwd))
         yield res
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verify(repo).findBy(Users.details.email)
           verify(encr).isValid(Users.pwd, Users.hash)
           res mustBe Users.user
@@ -121,7 +121,7 @@ class UserServiceSpec extends IOWordSpec {
           res     <- service.login(Login(Users.details.email, Users.pwd))
         yield res
 
-        result.attempt.unsafeToFuture().map { res =>
+        result.attempt.asserting { res =>
           verify(repo).findBy(Users.details.email)
           verifyNoInteractions(encr)
           res mustBe Left(InvalidEmailOrPassword)
@@ -138,7 +138,7 @@ class UserServiceSpec extends IOWordSpec {
           res     <- service.login(Login(Users.details.email, Users.pwd))
         yield res
 
-        result.attempt.unsafeToFuture().map { res =>
+        result.attempt.asserting { res =>
           verify(repo).findBy(Users.details.email)
           verify(encr).isValid(Users.pwd, Users.hash)
           res mustBe Left(InvalidEmailOrPassword)

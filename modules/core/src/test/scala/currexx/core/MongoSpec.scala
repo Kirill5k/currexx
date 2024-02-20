@@ -1,6 +1,7 @@
 package currexx.core
 
 import currexx.domain.user.*
+import currexx.domain.IOWordSpec
 import mongo4cats.bson.{Document, ObjectId}
 import mongo4cats.bson.syntax.*
 import mongo4cats.embedded.EmbeddedMongo

@@ -2,7 +2,7 @@ package currexx.core.signal
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import currexx.core.{IOWordSpec, MockActionDispatcher}
+import currexx.core.MockActionDispatcher
 import currexx.domain.user.UserId
 import currexx.domain.market.{
   Condition,
@@ -14,6 +14,7 @@ import currexx.domain.market.{
   ValueSource,
   ValueTransformation as VT
 }
+import currexx.domain.IOWordSpec
 import currexx.core.common.action.Action
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Settings, Signals, Users}

@@ -19,7 +19,7 @@ object Dependencies {
     val taggedAdtCodec = "0.11.0"
 
     val scalaTest = "3.2.18"
-    val mockito   = "3.2.15.0"
+    val mockito   = "3.2.17.0"
   }
 
   object Libraries {
@@ -78,7 +78,7 @@ object Dependencies {
     }
 
     val scalaTest = "org.scalatest"     %% "scalatest"   % Versions.scalaTest
-    val mockito   = "org.scalatestplus" %% "mockito-4-6" % Versions.mockito
+    val mockito   = "org.scalatestplus" %% "mockito-4-11" % Versions.mockito
   }
 
   val domain = Seq(
