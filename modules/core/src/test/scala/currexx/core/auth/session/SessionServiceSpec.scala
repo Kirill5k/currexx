@@ -1,13 +1,12 @@
 package currexx.core.auth.session
 
 import cats.effect.IO
-import cats.effect.unsafe.implicits.global
-import currexx.core.IOWordSpec
 import currexx.core.auth.jwt.{BearerToken, JwtEncoder, JwtToken}
 import currexx.core.auth.session.db.SessionRepository
 import currexx.domain.user.UserId
 import currexx.domain.session.*
 import currexx.domain.errors.AppError
+import currexx.domain.IOWordSpec
 import currexx.core.fixtures.{Sessions, Users}
 
 import java.time.Instant
@@ -30,7 +29,7 @@ class SessionServiceSpec extends IOWordSpec {
           sid <- svc.authenticate(bearerToken)
         yield sid
 
-        result.attempt.unsafeToFuture().map { res =>
+        result.attempt.asserting { res =>
           verifyNoInteractions(repo)
           verify(jwtEnc).decode(bearerToken)
           res mustBe Left(AppError.InvalidJwtToken("error"))
@@ -48,7 +47,7 @@ class SessionServiceSpec extends IOWordSpec {
           sid <- svc.authenticate(bearerToken)
         yield sid
 
-        result.attempt.unsafeToFuture().map { res =>
+        result.attempt.asserting { res =>
           verify(jwtEnc).decode(bearerToken)
           verify(repo).find(Sessions.sid)
           res mustBe Left(AppError.SessionDoesNotExist(Sessions.sid))
@@ -66,7 +65,7 @@ class SessionServiceSpec extends IOWordSpec {
           sid <- svc.authenticate(bearerToken)
         yield sid
 
-        result.attempt.unsafeToFuture().map { res =>
+        result.attempt.asserting { res =>
           verify(jwtEnc).decode(bearerToken)
           verify(repo).find(Sessions.sid)
           res mustBe Left(AppError.SomeoneElsesSession)
@@ -84,7 +83,7 @@ class SessionServiceSpec extends IOWordSpec {
           sid <- svc.authenticate(bearerToken)
         yield sid
 
-        result.attempt.unsafeToFuture().map { res =>
+        result.attempt.asserting { res =>
           verify(jwtEnc).decode(bearerToken)
           verify(repo).find(Sessions.sid)
           res mustBe Left(AppError.ExpiredSession)
@@ -102,7 +101,7 @@ class SessionServiceSpec extends IOWordSpec {
           sid <- svc.authenticate(bearerToken)
         yield sid
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verify(jwtEnc).decode(bearerToken)
           verify(repo).find(Sessions.sid)
           res mustBe Sessions.sess
@@ -122,7 +121,7 @@ class SessionServiceSpec extends IOWordSpec {
           tok <- svc.create(Sessions.create())
         yield tok
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verify(jwtEnc).encode(JwtToken(Sessions.sid, Users.uid))
           verify(repo).create(Sessions.create())
           res mustBe BearerToken("token")
@@ -141,7 +140,7 @@ class SessionServiceSpec extends IOWordSpec {
           sess <- svc.find(Sessions.sid)
         yield sess
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verifyNoInteractions(jwtEnc)
           verify(repo).find(Sessions.sid)
           res mustBe Some(Sessions.sess)
@@ -160,7 +159,7 @@ class SessionServiceSpec extends IOWordSpec {
           res <- svc.unauth(Sessions.sid)
         yield res
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verifyNoInteractions(jwtEnc)
           verify(repo).unauth(Sessions.sid)
           res mustBe ()
@@ -179,7 +178,7 @@ class SessionServiceSpec extends IOWordSpec {
           res <- svc.invalidateAll(Users.uid)
         yield res
 
-        result.unsafeToFuture().map { res =>
+        result.asserting { res =>
           verifyNoInteractions(jwtEnc)
           verify(repo).invalidatedAll(Users.uid)
           res mustBe ()

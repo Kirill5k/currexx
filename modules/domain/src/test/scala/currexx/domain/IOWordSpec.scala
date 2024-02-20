@@ -1,12 +1,12 @@
-package currexx.core
+package currexx.domain
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
+import org.scalatest.{Assertion, EitherValues}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import org.scalatest.{Assertion, EitherValues}
 
 import scala.concurrent.Future
 

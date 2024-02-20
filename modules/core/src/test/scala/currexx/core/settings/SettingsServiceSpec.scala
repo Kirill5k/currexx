@@ -1,11 +1,11 @@
 package currexx.core.settings
 
 import cats.effect.IO
-import currexx.core.IOWordSpec
 import currexx.core.fixtures.Users
 import currexx.core.settings.db.SettingsRepository
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
+import currexx.domain.IOWordSpec
 import org.mockito.Mockito.times
 
 class SettingsServiceSpec extends IOWordSpec {

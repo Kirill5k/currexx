@@ -1,11 +1,8 @@
-package currexx.core
+package currexx.domain
 
 import cats.effect.IO
-import org.mockito.ArgumentMatchers
-import org.mockito.Mockito
-import org.mockito.stubbing.Answer
-import org.mockito.stubbing.OngoingStubbing
-import org.mockito.stubbing.Stubber
+import org.mockito.{ArgumentMatchers, Mockito}
+import org.mockito.stubbing.{Answer, OngoingStubbing, Stubber}
 import org.mockito.verification.VerificationMode
 import org.scalatestplus.mockito.MockitoSugar
 

@@ -1,15 +1,14 @@
 package currexx.domain.cache
 
 import cats.effect.IO
-import cats.effect.unsafe.IORuntime
+import currexx.domain.IOWordSpec
 import org.scalatest.Assertion
-import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.concurrent.Future
 import scala.concurrent.duration.*
 
-class CacheSpec extends AsyncWordSpec with Matchers {
+class CacheSpec extends IOWordSpec {
   "A RefbasedCache" should {
     "return non-expired elements" in {
       val result = for
@@ -33,8 +32,4 @@ class CacheSpec extends AsyncWordSpec with Matchers {
       result.asserting(_ mustBe None)
     }
   }
-
-  extension [A](io: IO[A])
-    def asserting(f: A => Assertion): Future[Assertion] =
-      io.map(f).unsafeToFuture()(IORuntime.global)
 }

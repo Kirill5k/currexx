@@ -2,7 +2,7 @@ package currexx.core.monitor
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import currexx.core.{IOWordSpec, MockActionDispatcher, MockClock}
+import currexx.core.{MockActionDispatcher, MockClock}
 import currexx.core.common.action.Action
 import currexx.core.fixtures.{Markets, Monitors, Users}
 import currexx.core.monitor.db.MonitorRepository
@@ -10,6 +10,7 @@ import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.monitor.Schedule
 import currexx.domain.time.Clock
 import currexx.domain.user.UserId
+import currexx.domain.IOWordSpec
 import fs2.Stream
 
 import java.time.Instant

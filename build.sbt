@@ -64,7 +64,7 @@ val clients = project
   .settings(
     name       := "currexx-clients",
     moduleName := "currexx-clients",
-    libraryDependencies ++= Dependencies.clients ++ Dependencies.test
+    libraryDependencies ++= Dependencies.clients
   )
 
 val core = project
