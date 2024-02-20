@@ -40,7 +40,7 @@ class XtbClientSpec extends ClientSpec {
         res    <- client.submit(brokerConfig, TradeOrder.Exit(pair, price))
       yield res
 
-      result.assertError(AppError.AccessDenied("foo"))
+      result.throws(AppError.AccessDenied("foo"))
     }
 
     "send enter market request" ignore {
@@ -54,7 +54,7 @@ class XtbClientSpec extends ClientSpec {
           yield res
         }
 
-      result.asserting(_ mustBe ())
+      result.assertVoid
     }
 
     "get existing order" ignore {
@@ -83,7 +83,7 @@ class XtbClientSpec extends ClientSpec {
           yield res
         }
 
-      result.asserting(_ mustBe ())
+      result.assertVoid
     }
   }
 }

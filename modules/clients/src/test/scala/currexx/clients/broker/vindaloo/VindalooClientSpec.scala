@@ -11,8 +11,6 @@ import sttp.client3.{Response, SttpBackend}
 
 class VindalooClientSpec extends ClientSpec {
 
-  given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
-
   val config = VindalooConfig("http://vindaloo.com")
   val pair   = CurrencyPair(GBP, USD)
 
@@ -30,7 +28,7 @@ class VindalooClientSpec extends ClientSpec {
         res <- client.submit(BrokerParameters.Vindaloo("15"), order)
       yield res
 
-      result.assertIsVoid
+      result.assertVoid
     }
 
     "send exit market requests" in {
@@ -45,7 +43,7 @@ class VindalooClientSpec extends ClientSpec {
         res    <- client.submit(BrokerParameters.Vindaloo("15"), TradeOrder.Exit(pair, BigDecimal(1.3)))
       yield res
 
-      result.assertIsVoid
+      result.assertVoid
     }
   }
 }

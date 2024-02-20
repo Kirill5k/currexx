@@ -13,8 +13,6 @@ import scala.concurrent.duration.*
 
 class TwelveDataClientSpec extends ClientSpec {
 
-  given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
-
   val config = TwelveDataConfig("http://twelve-data.com", "api-key")
   val pair   = CurrencyPair(EUR, USD)
 

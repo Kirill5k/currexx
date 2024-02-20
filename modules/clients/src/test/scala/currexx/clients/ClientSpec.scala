@@ -1,12 +1,8 @@
 package currexx.clients
 
 import cats.effect.IO
-import cats.effect.unsafe.IORuntime
-import org.scalatest.Assertion
-import org.scalatest.matchers.must.Matchers
+import currexx.domain.IOWordSpec
 import org.scalatest.wordspec.AsyncWordSpec
-import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.slf4j.Slf4jLogger
 import sttp.capabilities.WebSockets
 import sttp.capabilities.fs2.Fs2Streams
 import sttp.client3
@@ -14,19 +10,10 @@ import sttp.client3.httpclient.fs2.HttpClientFs2Backend
 import sttp.client3.testing.SttpBackendStub
 import sttp.model.{Header, Method}
 
-import scala.concurrent.Future
 import scala.io.Source
 
-trait ClientSpec extends AsyncWordSpec with Matchers {
-  given Logger[IO] = Slf4jLogger.getLogger[IO]
-
-  extension [A](io: IO[A])
-    def asserting(f: A => Assertion): Future[Assertion] =
-      io.map(f).unsafeToFuture()(IORuntime.global)
-    def assertIsVoid: Future[Assertion] = asserting(_ mustBe ())
-    def assertError(error: Throwable): Future[Assertion] =
-      io.attempt.asserting(_ mustBe Left(error))
-
+trait ClientSpec extends IOWordSpec {
+  
   def backendStub: SttpBackendStub[IO, Fs2Streams[IO] with WebSockets] =
     HttpClientFs2Backend.stub[IO]
 

@@ -15,8 +15,6 @@ import scala.concurrent.duration.*
 
 class AlphaVantageClientSpec extends ClientSpec {
 
-  given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
-
   val config = AlphaVantageConfig("http://alpha-vantage.com", "api-key")
   val pair   = CurrencyPair(GBP, USD)
 
@@ -119,9 +117,7 @@ class AlphaVantageClientSpec extends ClientSpec {
         res    <- client.timeSeriesData(pair, Interval.D1)
       yield res
 
-      result.attempt.asserting { res =>
-        res mustBe Left(AppError.NotEnoughDataPoints("alpha-vantage", 2))
-      }
+      result.throws(AppError.NotEnoughDataPoints("alpha-vantage", 2))
     }
   }
 }
