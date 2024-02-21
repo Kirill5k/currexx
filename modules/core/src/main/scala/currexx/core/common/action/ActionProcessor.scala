@@ -36,20 +36,20 @@ final private class LiveActionProcessor[F[_]](
     (action match
       case Action.RescheduleAllMonitors =>
         logger.info("rescheduling all monitors") *> monitorService.rescheduleAll
-      case Action.CloseAllOpenOrders(uid) =>
-        logger.info(s"closing all opened orders for $uid") *> tradeService.closeOpenOrders(uid)
-      case Action.CloseOpenOrders(uid, pair) =>
-        logger.info(s"closing opened order for $uid/$pair currency pair") *> tradeService.closeOpenOrders(uid, pair)
       case Action.ScheduleMonitor(uid, mid, period) =>
         F.sleep(period) *> logger.info(s"triggering monitor $uid/$mid") *> monitorService.triggerMonitor(uid, mid)
-      case Action.AssertProfit(uid, cps, limits) =>
-        logger.info(s"verifying current position for $uid/$cps") *> tradeService.closeOrderIfProfitIsOutsideRange(uid, cps, limits)
       case Action.FetchMarketData(uid, cps, interval) =>
         logger.info(s"fetching market data for $uid/$cps") *> tradeService.fetchMarketData(uid, cps, interval)
       case Action.ProcessMarketData(uid, data) =>
         logger.info(s"processing market data for $uid/${data.currencyPair}") *> signalService.processMarketData(uid, data)
       case Action.ProcessSignals(uid, cp, signals) =>
         logger.info(s"processing submitted signals for $uid/$cp") *> marketService.processSignals(uid, cp, signals)
+      case Action.AssertProfit(uid, cps, limits) =>
+        logger.info(s"verifying current position for $uid/$cps") *> tradeService.closeOrderIfProfitIsOutsideRange(uid, cps, limits)
+      case Action.CloseAllOpenOrders(uid) =>
+        logger.info(s"closing all opened orders for $uid") *> tradeService.closeOpenOrders(uid)
+      case Action.CloseOpenOrders(uid, pair) =>
+        logger.info(s"closing opened order for $uid/$pair currency pair") *> tradeService.closeOpenOrders(uid, pair)
       case Action.ProcessMarketStateUpdate(state, indicators) =>
         logger.info(s"processing market state update triggered by $indicators") *> tradeService.processMarketStateUpdate(state, indicators)
       case Action.ProcessTradeOrderPlacement(order) =>

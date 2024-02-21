@@ -40,14 +40,15 @@ final private class LiveTradeService[F[_]](
     F: Temporal[F],
     clock: Clock[F]
 ) extends TradeService[F] {
-  override def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]] = 
+  override def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]] =
     orderRepository.getAll(uid, sp)
 
   override def fetchMarketData(uid: UserId, cps: NonEmptyList[CurrencyPair], interval: Interval): F[Unit] =
     cps.traverse { cp =>
       marketDataClient
         .timeSeriesData(cp, interval)
-        .flatMap(data => dispatcher.dispatch(Action.ProcessMarketData(uid, data)))
+        .map(Action.ProcessMarketData(uid, _))
+        .flatMap(dispatcher.dispatch)
     }.void
 
   override def placeOrder(uid: UserId, order: TradeOrder, closePendingOrders: Boolean): F[Unit] =
@@ -83,12 +84,9 @@ final private class LiveTradeService[F[_]](
       time        <- clock.now
       _ <- foundOrders
         .collect {
-          case o if limits.max.exists(o.profit > _) && limits.trailing =>
-            List(TradeOrder.Exit(o.currencyPair, o.currentPrice), TradeOrder.Enter(o.position, o.currencyPair, o.currentPrice, o.volume))
           case o if limits.min.exists(o.profit < _) || limits.max.exists(o.profit > _) =>
-            List(TradeOrder.Exit(o.currencyPair, o.currentPrice))
+            TradeOrder.Exit(o.currencyPair, o.currentPrice)
         }
-        .flatten
         .map(to => TradeOrderPlacement(uid, to, settings.broker, time))
         .traverse(submitOrderPlacement)
     yield ()

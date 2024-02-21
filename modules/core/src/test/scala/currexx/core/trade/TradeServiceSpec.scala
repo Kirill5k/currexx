@@ -186,7 +186,7 @@ class TradeServiceSpec extends IOWordSpec {
         val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(None, Some(10), None, None, false))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(None, Some(10), None, None))
         yield ()
 
         result.asserting { res =>
@@ -202,39 +202,6 @@ class TradeServiceSpec extends IOWordSpec {
         }
       }
 
-      "submit close and open orders if profit is above max and is trailing" in {
-        val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
-        when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]])).thenReturnIO(List(Trades.openedOrder))
-        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
-        when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
-
-        val cps = NonEmptyList.of(Markets.gbpeur)
-        val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(None, Some(10), None, None, true))
-        yield ()
-
-        result.asserting { res =>
-          val exitOrder        = TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close)
-          val enterOrder       = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, Markets.priceRange.close, BigDecimal(0.1))
-          val placedExitOrder  = TradeOrderPlacement(Users.uid, exitOrder, Trades.broker, now)
-          val placedEnterOrder = TradeOrderPlacement(Users.uid, enterOrder, Trades.broker, now)
-          verifyNoInteractions(dataClient)
-          verify(settRepo).get(Users.uid)
-          verify(brokerClient).find(Trades.broker, cps)
-          verify(brokerClient).submit(Trades.broker, exitOrder)
-          verify(brokerClient).submit(Trades.broker, enterOrder)
-          verify(orderRepo).save(placedExitOrder)
-          verify(orderRepo).save(placedEnterOrder)
-          disp.submittedActions mustBe List(
-            Action.ProcessTradeOrderPlacement(placedExitOrder),
-            Action.ProcessTradeOrderPlacement(placedEnterOrder)
-          )
-          res mustBe ()
-        }
-      }
-
       "submit close order if profit is below min" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
@@ -246,7 +213,7 @@ class TradeServiceSpec extends IOWordSpec {
         val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None, false))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None))
         yield ()
 
         result.asserting { res =>
@@ -271,7 +238,7 @@ class TradeServiceSpec extends IOWordSpec {
         val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None, false))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None))
         yield ()
 
         result.asserting { res =>
@@ -292,7 +259,7 @@ class TradeServiceSpec extends IOWordSpec {
         val cps = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None, false))
+          _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None))
         yield ()
 
         result.asserting { res =>

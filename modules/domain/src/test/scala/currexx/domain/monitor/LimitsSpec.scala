@@ -15,9 +15,9 @@ class LimitsSpec extends AnyWordSpec with Matchers {
     }
 
     "parse limits from json" in {
-      val result = decode[Limits]("""{"min":10,"trailing":true}""")
+      val result = decode[Limits]("""{"min":10}""")
 
-      result mustBe Right(Limits(Some(10), None, None, None, true))
+      result mustBe Right(Limits(Some(10), None, None, None))
     }
   }
 }

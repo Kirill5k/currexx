@@ -64,7 +64,8 @@ final private class LiveMonitorService[F[_]](
   private def scheduleMonitor(now: => F[Instant])(mon: Monitor): F[Unit] =
     now
       .map(mon.durationBetweenNextQuery)
-      .flatMap(db => actionDispatcher.dispatch(Action.ScheduleMonitor(mon.userId, mon.id, db)))
+      .map(Action.ScheduleMonitor(mon.userId, mon.id, _))
+      .flatMap(actionDispatcher.dispatch)
 }
 
 object MonitorService:
