@@ -35,7 +35,7 @@ final private class LiveSignalService[F[_]](
     F: Concurrent[F]
 ) extends SignalService[F] {
   override def getAll(uid: UserId, sp: SearchParams): F[List[Signal]] = signalRepo.getAll(uid, sp)
-  override def submit(signal: Signal): F[Unit]                        = save(signal.userId, signal.currencyPair, List(signal))
+  override def submit(signal: Signal): F[Unit] = saveAndDispatchAction(signal.userId, signal.currencyPair, List(signal))
 
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
     for
@@ -53,10 +53,10 @@ final private class LiveSignalService[F[_]](
             case TriggerFrequency.OncePerDay   => signalRepo.isFirstOfItsKindForThatDate(signal).map(Option.when(_)(signal))
         }
         .map(_.flatten)
-      _ <- F.whenA(signals.nonEmpty)(save(uid, data.currencyPair, signals))
+      _ <- F.whenA(signals.nonEmpty)(saveAndDispatchAction(uid, data.currencyPair, signals))
     yield ()
 
-  private def save(uid: UserId, cp: CurrencyPair, signals: List[Signal]) =
+  private def saveAndDispatchAction(uid: UserId, cp: CurrencyPair, signals: List[Signal]) =
     signalRepo.saveAll(signals) >>
       dispatcher.dispatch(Action.ProcessSignals(uid, cp, signals))
 }
