@@ -4,6 +4,7 @@ object Dependencies {
   object Versions {
     val fs2            = "3.9.4"
     val cats           = "2.10.0"
+    val commonScala    = "0.1.14"
     val mongo4cats     = "0.7.2"
     val pureConfig     = "0.17.5"
     val circe          = "0.14.6"
@@ -29,6 +30,14 @@ object Dependencies {
     val jwt            = "com.github.jwt-scala" %% "jwt-circe"              % Versions.jwt
     val cronUtils      = "com.cronutils"         % "cron-utils"             % Versions.cronUtils
     val taggedAdtCodec = "org.latestbit"        %% "circe-tagged-adt-codec" % Versions.taggedAdtCodec
+
+    object commonScala {
+      val cats       = "io.github.kirill5k" %% "common-cats"        % Versions.commonScala
+      val http4s     = "io.github.kirill5k" %% "common-http4s"      % Versions.commonScala
+      val syntax     = "io.github.kirill5k" %% "common-syntax"      % Versions.commonScala
+      val testHttp4s = "io.github.kirill5k" %% "common-http4s-test" % Versions.commonScala
+      val testSttp   = "io.github.kirill5k" %% "common-sttp-test"   % Versions.commonScala
+    }
 
     object mongo4cats {
       val core     = "io.github.kirill5k" %% "mongo4cats-core"     % Versions.mongo4cats
@@ -77,7 +86,7 @@ object Dependencies {
       val emberServer = "org.http4s" %% "http4s-ember-server" % Versions.http4s
     }
 
-    val scalaTest = "org.scalatest"     %% "scalatest"   % Versions.scalaTest
+    val scalaTest = "org.scalatest"     %% "scalatest"    % Versions.scalaTest
     val mockito   = "org.scalatestplus" %% "mockito-4-11" % Versions.mockito
   }
 
@@ -107,9 +116,9 @@ object Dependencies {
     Libraries.tapir.all
 
   val test = Seq(
-    Libraries.scalaTest           % Test,
-    Libraries.mockito             % Test,
-    Libraries.mongo4cats.embedded % Test
+    Libraries.commonScala.testHttp4s % Test,
+    Libraries.commonScala.testSttp   % Test,
+    Libraries.mongo4cats.embedded    % Test
   )
 
 }
