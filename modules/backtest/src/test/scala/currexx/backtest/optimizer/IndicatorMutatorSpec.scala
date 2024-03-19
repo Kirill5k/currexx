@@ -2,10 +2,11 @@ package currexx.backtest.optimizer
 
 import cats.effect.IO
 import currexx.domain.market.{Indicator, ValueSource, ValueTransformation}
+import kirill5k.common.cats.test.IOWordSpec
 
 import scala.util.Random
 
-class IndicatorMutatorSpec extends CatsSpec {
+class IndicatorMutatorSpec extends IOWordSpec {
 
   "An IndicatorMutator" when {
 

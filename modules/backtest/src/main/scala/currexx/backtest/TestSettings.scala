@@ -1,13 +1,12 @@
 package currexx.backtest
 
 import currexx.clients.broker.BrokerParameters
-import currexx.domain.user.UserId
 import currexx.core.market.MarketState
 import currexx.core.settings.{SignalSettings, TradeSettings, TradingParameters, TriggerFrequency}
 import currexx.core.trade.TradeStrategy
-import currexx.domain.market.{CurrencyPair, Indicator, ValueSource, ValueTransformation}
+import currexx.domain.market.{CurrencyPair, Indicator}
+import currexx.domain.user.UserId
 import mongo4cats.bson.ObjectId
-import currexx.domain.market.Currency.{EUR, GBP}
 
 final case class TestSettings(
     userId: UserId,

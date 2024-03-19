@@ -1,7 +1,8 @@
 package currexx.algorithms.operators
 
 import cats.effect.IO
-import currexx.algorithms.{Fitness, IOWordSpec}
+import currexx.algorithms.Fitness
+import kirill5k.common.cats.test.IOWordSpec
 
 class ElitismSpec extends IOWordSpec {
 

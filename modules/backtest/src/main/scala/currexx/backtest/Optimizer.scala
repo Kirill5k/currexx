@@ -5,11 +5,10 @@ import cats.effect.{IO, IOApp}
 import cats.syntax.traverse.*
 import currexx.algorithms.Parameters
 import currexx.algorithms.operators.{Elitism, Selector}
-import currexx.backtest.optimizer.{IndicatorCrossover, IndicatorEvaluator, IndicatorInitialiser, IndicatorMutator, OptimisationAlgorithm}
+import currexx.backtest.optimizer.*
 import currexx.core.trade.TradeStrategy
 import currexx.domain.market.ValueTransformation.*
-import currexx.domain.market.{Indicator, MovingAverage, ValueSource}
-import fs2.Stream
+import currexx.domain.market.{Indicator, ValueSource}
 
 import scala.util.Random
 

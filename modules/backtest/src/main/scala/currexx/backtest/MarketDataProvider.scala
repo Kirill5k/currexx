@@ -1,13 +1,12 @@
 package currexx.backtest
 
-import cats.effect.Sync
+import cats.effect.Async
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
-import fs2.{Stream, text}
 import fs2.io.file.{Files, Path}
+import fs2.{Stream, text}
 
-import java.nio.file.Paths
-import java.time.{Instant, LocalDate, ZoneOffset}
 import java.time.format.DateTimeFormatter
+import java.time.{LocalDate, ZoneOffset}
 
 object MarketDataProvider:
   val majors = List(
@@ -53,12 +52,13 @@ object MarketDataProvider:
   
   private val timePattern = DateTimeFormatter.ofPattern("dd.MM.yyyy")
   
-  def read[F[_]: Sync: Files](
+  def read[F[_]: Async](
       filePath: String,
       currencyPair: CurrencyPair,
       interval: Interval = Interval.D1
   ): Stream[F, MarketTimeSeriesData] =
-    Files[F]
+    Files
+      .forAsync[F]
       .readAll(Path(getClass.getClassLoader.getResource(filePath).getPath))
       .through(text.utf8.decode)
       .through(text.lines)

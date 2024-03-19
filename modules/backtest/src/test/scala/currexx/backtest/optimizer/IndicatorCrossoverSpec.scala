@@ -2,10 +2,11 @@ package currexx.backtest.optimizer
 
 import cats.effect.IO
 import currexx.domain.market.{Indicator, ValueSource, ValueTransformation}
+import kirill5k.common.cats.test.IOWordSpec
 
 import scala.util.Random
 
-class IndicatorCrossoverSpec extends CatsSpec {
+class IndicatorCrossoverSpec extends IOWordSpec {
 
   "An IndicatorCrossover" should {
     "cross 2 indicators with HMA transformations together" in {

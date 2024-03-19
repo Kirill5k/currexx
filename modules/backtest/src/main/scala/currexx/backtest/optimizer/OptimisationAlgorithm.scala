@@ -3,9 +3,8 @@ package currexx.backtest.optimizer
 import cats.effect.Async
 import cats.syntax.functor.*
 import currexx.algorithms.operators.*
-import currexx.algorithms.{Alg, Algorithm, EvaluatedPopulation, Op, Parameters}
+import currexx.algorithms.*
 
-import scala.reflect.ClassTag
 import scala.util.Random
 
 trait OptimisationAlgorithm[F[_], A <: Alg, P <: Parameters[A], T]:

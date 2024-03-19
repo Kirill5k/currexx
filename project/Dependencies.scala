@@ -18,9 +18,6 @@ object Dependencies {
     val jwt            = "10.0.0"
     val cronUtils      = "9.2.1"
     val taggedAdtCodec = "0.11.0"
-
-    val scalaTest = "3.2.18"
-    val mockito   = "3.2.17.0"
   }
 
   object Libraries {
@@ -85,9 +82,6 @@ object Dependencies {
     object http4s {
       val emberServer = "org.http4s" %% "http4s-ember-server" % Versions.http4s
     }
-
-    val scalaTest = "org.scalatest"     %% "scalatest"    % Versions.scalaTest
-    val mockito   = "org.scalatestplus" %% "mockito-4-11" % Versions.mockito
   }
 
   val domain = Seq(

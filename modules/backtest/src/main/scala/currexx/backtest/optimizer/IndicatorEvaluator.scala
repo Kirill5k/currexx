@@ -6,13 +6,13 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import currexx.algorithms.Fitness
-import currexx.algorithms.operators.{Evaluator, Initialiser}
-import currexx.backtest.{MarketDataProvider, OrderStatsCollector, TestSettings}
+import currexx.algorithms.operators.Evaluator
 import currexx.backtest.services.TestServices
 import currexx.backtest.syntax.*
+import currexx.backtest.{MarketDataProvider, OrderStatsCollector, TestSettings}
 import currexx.core.trade.TradeStrategy
 import currexx.domain.market.Currency.{EUR, GBP}
-import currexx.domain.market.{CurrencyPair, Indicator, MovingAverage}
+import currexx.domain.market.{CurrencyPair, Indicator}
 import fs2.Stream
 
 object IndicatorEvaluator {

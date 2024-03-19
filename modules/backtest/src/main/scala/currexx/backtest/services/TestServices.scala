@@ -7,15 +7,11 @@ import cats.syntax.traverse.*
 import currexx.backtest.TestSettings
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
-import currexx.domain.time.syntax.*
-import currexx.core.signal.SignalService
 import currexx.core.market.MarketService
+import currexx.core.signal.SignalService
 import currexx.core.trade.{TradeOrderPlacement, TradeService}
 import currexx.domain.market.MarketTimeSeriesData
-import currexx.domain.user.UserId
-import fs2.{Pipe, Stream}
-
-import java.time.DayOfWeek
+import fs2.Pipe
 
 final class TestServices[F[_]] private (
     private val settings: TestSettings,

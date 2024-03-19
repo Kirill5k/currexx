@@ -7,7 +7,7 @@ import cats.syntax.functor.*
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.market.db.MarketStateRepository
 import currexx.core.market.{IndicatorState, MarketService, MarketState, PositionState}
-import currexx.domain.market.{CurrencyPair, Indicator, IndicatorKind, MarketTimeSeriesData, PriceRange}
+import currexx.domain.market.{CurrencyPair, IndicatorKind}
 import currexx.domain.user.UserId
 
 final private class TestMarketStateRepository[F[_]: Monad](

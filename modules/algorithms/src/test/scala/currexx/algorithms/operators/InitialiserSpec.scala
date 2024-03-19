@@ -1,7 +1,7 @@
 package currexx.algorithms.operators
 
 import cats.effect.IO
-import currexx.algorithms.IOWordSpec
+import kirill5k.common.cats.test.IOWordSpec
 
 import scala.util.Random
 

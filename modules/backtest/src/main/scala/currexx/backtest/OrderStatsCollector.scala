@@ -1,12 +1,11 @@
 package currexx.backtest
 
+import currexx.backtest.syntax.*
 import currexx.core.trade.TradeOrderPlacement
 import currexx.domain.market.TradeOrder
-import currexx.backtest.syntax.*
 
 import java.time.Instant
 import scala.collection.immutable.ListMap
-import scala.math.BigDecimal.RoundingMode
 
 final case class OrderStats(
     total: Int = 0,

@@ -1,6 +1,5 @@
 package currexx.backtest
 
-import scala.annotation.tailrec
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 

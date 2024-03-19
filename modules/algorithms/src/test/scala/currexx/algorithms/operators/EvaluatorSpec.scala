@@ -2,7 +2,8 @@ package currexx.algorithms.operators
 
 import cats.Show
 import cats.effect.{IO, Ref}
-import currexx.algorithms.{Fitness, IOWordSpec}
+import currexx.algorithms.Fitness
+import kirill5k.common.cats.test.IOWordSpec
 
 class EvaluatorSpec extends IOWordSpec {
 

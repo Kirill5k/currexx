@@ -1,17 +1,14 @@
 package currexx.backtest.services
 
-import cats.Monad
 import cats.effect.{Async, Ref}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import currexx.clients.broker.{BrokerClient, BrokerParameters}
-import currexx.clients.data.MarketDataClient
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.SearchParams
 import currexx.core.settings.TradeSettings
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import currexx.core.trade.{TradeOrderPlacement, TradeService}
-import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange, TradeOrder}
+import currexx.domain.market.CurrencyPair
 import currexx.domain.time.Clock
 import currexx.domain.user.UserId
 
