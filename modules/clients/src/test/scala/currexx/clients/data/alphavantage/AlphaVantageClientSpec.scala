@@ -1,20 +1,22 @@
 package currexx.clients.data.alphavantage
 
 import cats.effect.IO
-import currexx.clients.ClientSpec
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval, PriceRange}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import currexx.domain.market.Currency.{GBP, USD}
+import kirill5k.common.sttp.test.SttpWordSpec
 import sttp.client3.{Response, SttpBackend}
 import sttp.model.StatusCode
 
 import java.time.Instant
 import scala.concurrent.duration.*
 
-class AlphaVantageClientSpec extends ClientSpec {
+class AlphaVantageClientSpec extends SttpWordSpec {
 
+  given Logger[IO] = Slf4jLogger.getLogger[IO]
+  
   val config = AlphaVantageConfig("http://alpha-vantage.com", "api-key")
   val pair   = CurrencyPair(GBP, USD)
 
@@ -30,7 +32,7 @@ class AlphaVantageClientSpec extends ClientSpec {
       val testingBackend: SttpBackend[IO, Any] = backendStub
         .whenRequestMatchesPartial {
           case r if r.isGet && r.isGoingTo("alpha-vantage.com/query") && r.hasParams(params) =>
-            Response.ok(json("alphavantage/gbp-usd-hourly-prices-response.json"))
+            Response.ok(readJson("alphavantage/gbp-usd-hourly-prices-response.json"))
           case _ => throw new RuntimeException()
         }
 
@@ -53,7 +55,7 @@ class AlphaVantageClientSpec extends ClientSpec {
       val testingBackend: SttpBackend[IO, Any] = backendStub
         .whenRequestMatchesPartial {
           case r if r.isGet && r.isGoingTo("alpha-vantage.com/query") && r.hasParams(params) =>
-            Response.ok(json("alphavantage/gbp-usd-daily-prices-response.json"))
+            Response.ok(readJson("alphavantage/gbp-usd-daily-prices-response.json"))
           case _ => throw new RuntimeException()
         }
 
@@ -75,7 +77,7 @@ class AlphaVantageClientSpec extends ClientSpec {
       val testingBackend: SttpBackend[IO, Any] = backendStub
         .whenRequestMatchesPartial {
           case r if r.isGet && r.isGoingTo("alpha-vantage.com/query") =>
-            Response.ok(json("alphavantage/gbp-usd-daily-prices-response.json"))
+            Response.ok(readJson("alphavantage/gbp-usd-daily-prices-response.json"))
           case _ => throw new RuntimeException()
         }
 
@@ -93,7 +95,7 @@ class AlphaVantageClientSpec extends ClientSpec {
       val testingBackend: SttpBackend[IO, Any] = backendStub.whenAnyRequest
         .thenRespondCyclicResponses(
           Response("uh-oh!", StatusCode.BadRequest),
-          Response.ok(json("alphavantage/gbp-usd-hourly-prices-response.json"))
+          Response.ok(readJson("alphavantage/gbp-usd-hourly-prices-response.json"))
         )
 
       val result = for
@@ -110,14 +112,14 @@ class AlphaVantageClientSpec extends ClientSpec {
 
     "return error when not enough data points" in {
       val testingBackend: SttpBackend[IO, Any] = backendStub.whenAnyRequest
-        .thenRespond(Response.ok(json("alphavantage/gbp-usd-daily-almost-empty-response.json")))
+        .thenRespond(Response.ok(readJson("alphavantage/gbp-usd-daily-almost-empty-response.json")))
 
       val result = for
         client <- AlphaVantageClient.make[IO](config, testingBackend, 100.millis)
         res    <- client.timeSeriesData(pair, Interval.D1)
       yield res
 
-      result.throws(AppError.NotEnoughDataPoints("alpha-vantage", 2))
+      result.assertThrows(AppError.NotEnoughDataPoints("alpha-vantage", 2))
     }
   }
 }

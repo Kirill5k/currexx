@@ -60,11 +60,11 @@ val calculations = project
 
 val clients = project
   .in(file("modules/clients"))
-  .dependsOn(domain % "compile->compile;test->test")
+  .dependsOn(domain)
   .settings(
     name       := "currexx-clients",
     moduleName := "currexx-clients",
-    libraryDependencies ++= Dependencies.clients
+    libraryDependencies ++= Dependencies.clients ++ Dependencies.test
   )
 
 val core = project

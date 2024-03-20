@@ -1,15 +1,17 @@
 package currexx.clients.broker.vindaloo
 
 import cats.effect.IO
-import currexx.clients.ClientSpec
 import currexx.clients.broker.BrokerParameters
 import currexx.domain.market.{CurrencyPair, TradeOrder}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import currexx.domain.market.Currency.{GBP, USD}
+import kirill5k.common.sttp.test.SttpWordSpec
 import sttp.client3.{Response, SttpBackend}
 
-class VindalooClientSpec extends ClientSpec {
+class VindalooClientSpec extends SttpWordSpec {
+
+  given Logger[IO] = Slf4jLogger.getLogger[IO]
 
   val config = VindalooConfig("http://vindaloo.com")
   val pair   = CurrencyPair(GBP, USD)

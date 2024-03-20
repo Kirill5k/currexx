@@ -7,7 +7,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.clients.HttpClient
 import currexx.clients.data.MarketDataClient
-import currexx.domain.cache.Cache
+import kirill5k.common.cats.Cache
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import org.typelevel.log4cats.Logger

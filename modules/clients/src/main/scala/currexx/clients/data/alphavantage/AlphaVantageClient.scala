@@ -8,7 +8,7 @@ import cats.syntax.functor.*
 import cats.syntax.applicativeError.*
 import currexx.clients.data.MarketDataClient
 import currexx.clients.HttpClient
-import currexx.domain.cache.Cache
+import kirill5k.common.cats.Cache
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import io.circe.{Codec, JsonObject}

@@ -1,23 +1,22 @@
 package currexx.clients.broker.xtb
 
-import cats.effect.IO
 import cats.data.NonEmptyList
-import currexx.clients.ClientSpec
+import cats.effect.IO
 import currexx.clients.broker.BrokerParameters
-import currexx.domain.errors.AppError
-import currexx.domain.market.{CurrencyPair, TradeOrder}
 import currexx.domain.market.Currency.{CAD, EUR}
-import sttp.capabilities.WebSockets
-import sttp.capabilities.fs2.Fs2Streams
+import currexx.domain.market.{CurrencyPair, TradeOrder}
+import kirill5k.common.sttp.test.SttpWordSpec
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
+import sttp.client3.SttpBackendOptions
 import sttp.client3.httpclient.fs2.HttpClientFs2Backend
-import sttp.client3.testing.SttpBackendStub
-import sttp.client3.{SttpBackend, SttpBackendOptions}
-import sttp.ws.WebSocketFrame
-import sttp.ws.testing.WebSocketStub
 
 import scala.concurrent.duration.*
 
-class XtbClientSpec extends ClientSpec {
+class XtbClientSpec extends SttpWordSpec {
+
+  given Logger[IO] = Slf4jLogger.getLogger[IO]
+  
   val config = XtbConfig("wss://ws.xtb.com")
   val pair   = CurrencyPair(EUR, CAD)
   val price  = BigDecimal(1.341)
@@ -25,24 +24,7 @@ class XtbClientSpec extends ClientSpec {
   val brokerConfig: BrokerParameters.Xtb = BrokerParameters.Xtb("foo", "bar", true)
 
   "A XtbClient" should {
-    "return error on failed authentication" ignore {
-      val testingBackend: SttpBackend[IO, Fs2Streams[IO] with WebSockets] = backendStub.whenAnyRequest
-        .thenRespond(
-          SttpBackendStub.RawStream(
-            WebSocketStub
-              .initialReceive(List(WebSocketFrame.text("Hello, World!")))
-              .thenRespond(_ => List(WebSocketFrame.text("Hello, World!")))
-          )
-        )
-
-      val result = for
-        client <- XtbClient.make[IO](config, testingBackend)
-        res    <- client.submit(brokerConfig, TradeOrder.Exit(pair, price))
-      yield res
-
-      result.throws(AppError.AccessDenied("foo"))
-    }
-
+    
     "send enter market request" ignore {
       val result = HttpClientFs2Backend
         .resource[IO](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))

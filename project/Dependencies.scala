@@ -88,7 +88,9 @@ object Dependencies {
     Libraries.cronUtils,
     Libraries.taggedAdtCodec,
     Libraries.mongo4cats.core,
-    Libraries.mongo4cats.circe
+    Libraries.mongo4cats.circe,
+    Libraries.commonScala.cats,
+    Libraries.commonScala.syntax
   ) ++
     Libraries.logging.all ++
     Libraries.circe.all ++
