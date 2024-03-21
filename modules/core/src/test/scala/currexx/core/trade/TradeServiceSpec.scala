@@ -1,19 +1,19 @@
 package currexx.core.trade
 
-import cats.effect.IO
 import cats.data.NonEmptyList
+import cats.effect.IO
 import currexx.clients.broker.{BrokerClient, BrokerParameters}
 import currexx.clients.data.MarketDataClient
-import currexx.core.{MockActionDispatcher, MockClock}
+import currexx.core.MockActionDispatcher
 import currexx.core.common.action.Action
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Settings, Trades, Users}
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
-import currexx.domain.user.UserId
+import currexx.domain.IOWordSpec
 import currexx.domain.market.{CurrencyPair, IndicatorKind, TradeOrder}
 import currexx.domain.monitor.Limits
+import currexx.domain.user.UserId
 import kirill5k.common.cats.Clock
-import currexx.domain.IOWordSpec
 
 import java.time.Instant
 
@@ -21,7 +21,7 @@ class TradeServiceSpec extends IOWordSpec {
 
   "A TradeService" when {
     val now         = Instant.now()
-    given Clock[IO] = MockClock[IO](now)
+    given Clock[IO] = Clock.mock[IO](now)
 
     "getAllOrders" should {
       "return all orders from the repository" in {

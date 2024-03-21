@@ -2,7 +2,7 @@ package currexx.core.monitor
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import currexx.core.{MockActionDispatcher, MockClock}
+import currexx.core.MockActionDispatcher
 import currexx.core.common.action.Action
 import currexx.core.fixtures.{Markets, Monitors, Users}
 import currexx.core.monitor.db.MonitorRepository
@@ -20,7 +20,7 @@ class MonitorServiceSpec extends IOWordSpec {
 
   "A MonitorService" when {
     val now         = Monitors.queriedAt.plusSeconds(1.hour.toSeconds)
-    given Clock[IO] = MockClock[IO](now)
+    given Clock[IO] = Clock.mock[IO](now)
 
     "update" should {
       "update monitor properties in the db" in {

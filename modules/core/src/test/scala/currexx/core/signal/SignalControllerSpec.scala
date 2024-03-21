@@ -1,12 +1,12 @@
 package currexx.core.signal
 
 import cats.effect.IO
-import currexx.core.{ControllerSpec, MockClock}
+import currexx.core.ControllerSpec
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.SearchParams
-import currexx.domain.user.UserId
 import currexx.core.fixtures.{Markets, Sessions, Signals, Users}
-import currexx.domain.market.{Condition, Direction, Indicator, ValueSource, ValueTransformation}
+import currexx.domain.market.*
+import currexx.domain.user.UserId
 import kirill5k.common.cats.Clock
 import org.http4s.implicits.*
 import org.http4s.{Method, Status, Uri}
@@ -17,7 +17,7 @@ class SignalControllerSpec extends ControllerSpec {
 
   "A SignalController" when {
     val now                       = Instant.now
-    given Clock[IO]               = MockClock[IO](now)
+    given Clock[IO]               = Clock.mock[IO](now)
     given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
     "POST /signals" should {

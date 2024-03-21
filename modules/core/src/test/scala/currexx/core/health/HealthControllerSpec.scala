@@ -1,11 +1,11 @@
 package currexx.core.health
 
 import cats.effect.IO
-import currexx.core.{ControllerSpec, MockClock}
+import currexx.core.ControllerSpec
 import currexx.core.auth.Authenticator
 import kirill5k.common.cats.Clock
-import org.http4s.implicits.*
 import org.http4s.*
+import org.http4s.implicits.*
 
 import java.time.Instant
 import scala.concurrent.duration.*
@@ -15,7 +15,7 @@ class HealthControllerSpec extends ControllerSpec {
   val ipAddress = "127.0.0.1"
   val ts = Instant.parse("2020-01-01T00:00:00Z")
 
-  given clock: Clock[IO] = MockClock[IO](ts)
+  given clock: Clock[IO] = Clock.mock[IO](ts)
 
   "A HealthController" should {
     given Authenticator[IO] = _ => IO.raiseError(new RuntimeException())

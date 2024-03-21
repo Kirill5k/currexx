@@ -1,7 +1,7 @@
 package currexx.core.auth
 
 import cats.effect.IO
-import currexx.core.{ControllerSpec, MockClock}
+import currexx.core.ControllerSpec
 import currexx.core.auth.session.SessionService
 import currexx.core.auth.user.UserService
 import currexx.domain.session.*
@@ -19,7 +19,7 @@ class AuthControllerSpec extends ControllerSpec {
 
   "An AuthController" when {
     val now         = Instant.now
-    given Clock[IO] = MockClock[IO](now)
+    given Clock[IO] = Clock.mock[IO](now)
 
     "GET /auth/user" should {
       "return current account" in {
