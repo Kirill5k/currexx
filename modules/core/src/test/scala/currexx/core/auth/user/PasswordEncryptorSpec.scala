@@ -3,7 +3,7 @@ package currexx.core.auth.user
 import cats.effect.IO
 import currexx.core.common.config.{AuthConfig, JwtConfig}
 import currexx.domain.user.*
-import currexx.domain.IOWordSpec
+import kirill5k.common.cats.test.IOWordSpec
 
 class PasswordEncryptorSpec extends IOWordSpec {
 

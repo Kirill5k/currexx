@@ -8,7 +8,7 @@ import currexx.domain.session.SessionId
 import currexx.domain.user.UserId
 import currexx.domain.JsonCodecs
 import currexx.domain.errors.AppError
-import currexx.domain.IOWordSpec
+import kirill5k.common.cats.test.IOWordSpec
 import org.scalatest.wordspec.AsyncWordSpec
 import pdi.jwt.algorithms.JwtUnknownAlgorithm
 
@@ -46,7 +46,7 @@ class JwtEncoderSpec extends IOWordSpec with JsonCodecs {
         accessToken <- encoder.decode(BearerToken("foo-bar"))
       yield accessToken
 
-      result.throws(AppError.InvalidJwtToken("Expected token [foo-bar] to be composed of 2 or 3 parts separated by dots."))
+      result.assertThrows(AppError.InvalidJwtToken("Expected token [foo-bar] to be composed of 2 or 3 parts separated by dots."))
     }
 
     "return error when unexpected json payload" in {
@@ -55,13 +55,13 @@ class JwtEncoderSpec extends IOWordSpec with JsonCodecs {
         accessToken <- encoder.decode(BearerToken("IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"))
       yield accessToken
 
-      result.throws(AppError.InvalidJwtToken("""expected whitespace or eof got ',"iat"...' (line 1, column 11)"""))
+      result.assertThrows(AppError.InvalidJwtToken("""expected whitespace or eof got ',"iat"...' (line 1, column 11)"""))
     }
 
     "return error when unknown algo" in {
       val result = JwtEncoder.circeJwtEncoder[IO](config.copy(alg = "foo"))
 
-      result.throws(AppError.InvalidJwtEncryptionAlgorithm(JwtUnknownAlgorithm("FOO").fullName))
+      result.assertThrows(AppError.InvalidJwtEncryptionAlgorithm(JwtUnknownAlgorithm("FOO").fullName))
     }
   }
 }

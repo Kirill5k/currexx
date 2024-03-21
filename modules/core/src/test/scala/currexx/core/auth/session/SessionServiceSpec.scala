@@ -6,7 +6,7 @@ import currexx.core.auth.session.db.SessionRepository
 import currexx.domain.user.UserId
 import currexx.domain.session.*
 import currexx.domain.errors.AppError
-import currexx.domain.IOWordSpec
+import kirill5k.common.cats.test.IOWordSpec
 import currexx.core.fixtures.{Sessions, Users}
 
 import java.time.Instant

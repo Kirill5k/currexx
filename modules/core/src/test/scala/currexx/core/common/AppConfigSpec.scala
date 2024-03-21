@@ -2,7 +2,7 @@ package currexx.core.common
 
 import cats.effect.IO
 import config.AppConfig
-import currexx.domain.IOWordSpec
+import kirill5k.common.cats.test.IOWordSpec
 
 class AppConfigSpec extends IOWordSpec {
 

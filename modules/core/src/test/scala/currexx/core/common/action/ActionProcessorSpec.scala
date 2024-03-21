@@ -9,11 +9,15 @@ import currexx.core.trade.TradeService
 import currexx.core.settings.SettingsService
 import currexx.domain.market.CurrencyPair
 import currexx.domain.user.UserId
-import currexx.domain.IOWordSpec
+import kirill5k.common.cats.test.IOWordSpec
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import scala.concurrent.duration.*
 
 class ActionProcessorSpec extends IOWordSpec {
+
+  given Logger[IO] = Slf4jLogger.getLogger[IO]
 
   "An ActionProcessor" should {
     "process submitted signals" in {

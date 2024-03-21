@@ -10,7 +10,7 @@ import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.monitor.Schedule
 import kirill5k.common.cats.Clock
 import currexx.domain.user.UserId
-import currexx.domain.IOWordSpec
+import kirill5k.common.cats.test.IOWordSpec
 import fs2.Stream
 
 import java.time.Instant

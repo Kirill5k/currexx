@@ -6,7 +6,7 @@ import currexx.core.common.action.ActionDispatcher
 import currexx.core.fixtures.{Markets, Users}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.core.FileReader
-import currexx.domain.IOWordSpec
+import kirill5k.common.cats.test.IOWordSpec
 import currexx.domain.market.*
 
 class SignalServiceISpec extends IOWordSpec {

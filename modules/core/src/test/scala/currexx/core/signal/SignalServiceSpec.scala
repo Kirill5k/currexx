@@ -14,7 +14,7 @@ import currexx.domain.market.{
   ValueSource,
   ValueTransformation as VT
 }
-import currexx.domain.IOWordSpec
+import kirill5k.common.cats.test.IOWordSpec
 import currexx.core.common.action.Action
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Settings, Signals, Users}

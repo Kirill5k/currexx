@@ -4,14 +4,14 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import io.circe.parser.*
 import io.circe.Json
+import kirill5k.common.cats.test.IOMockitoMatchers
 import org.http4s.{Header, Headers, Method, Request, Response, Status}
 import org.scalatest.Assertion
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.typelevel.ci.CIString
-import currexx.domain.MockitoMatchers
 
-trait ControllerSpec extends AnyWordSpec with MockitoMatchers with Matchers {
+trait ControllerSpec extends AnyWordSpec with IOMockitoMatchers with Matchers {
 
   extension (r: Request[IO])
     def withBody(requestBody: String): Request[IO] = r.withBodyStream(fs2.Stream.emits(requestBody.getBytes().toList))

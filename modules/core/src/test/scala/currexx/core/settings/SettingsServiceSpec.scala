@@ -5,7 +5,7 @@ import currexx.core.fixtures.Users
 import currexx.core.settings.db.SettingsRepository
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
-import currexx.domain.IOWordSpec
+import kirill5k.common.cats.test.IOWordSpec
 import org.mockito.Mockito.times
 
 class SettingsServiceSpec extends IOWordSpec {
@@ -30,7 +30,7 @@ class SettingsServiceSpec extends IOWordSpec {
 
       "create new settings if these do not exist" in {
         val repo = mock[SettingsRepository[IO]]
-        when(repo.get(any[UserId])).thenReturnError(AppError.NotSetup("Global")).thenReturnIO(settings)
+        when(repo.get(any[UserId])).thenRaiseError(AppError.NotSetup("Global")).thenReturnIO(settings)
         when(repo.createFor(any[UserId])).thenReturn(IO.unit)
 
         val result = for

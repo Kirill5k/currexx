@@ -9,7 +9,7 @@ import currexx.core.common.action.Action
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Settings, Trades, Users}
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
-import currexx.domain.IOWordSpec
+import kirill5k.common.cats.test.IOWordSpec
 import currexx.domain.market.{CurrencyPair, IndicatorKind, TradeOrder}
 import currexx.domain.monitor.Limits
 import currexx.domain.user.UserId

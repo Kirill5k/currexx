@@ -7,7 +7,7 @@ import currexx.core.fixtures.Users
 import currexx.core.auth.user.db.UserRepository
 import currexx.domain.user.*
 import currexx.domain.errors.AppError.{InvalidEmailOrPassword, InvalidPassword}
-import currexx.domain.IOWordSpec
+import kirill5k.common.cats.test.IOWordSpec
 
 class UserServiceSpec extends IOWordSpec {
 
