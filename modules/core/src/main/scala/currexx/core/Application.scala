@@ -13,7 +13,7 @@ import currexx.core.signal.Signals
 import currexx.core.trade.Trades
 import currexx.core.monitor.Monitors
 import currexx.core.settings.Settings
-import currexx.domain.time.Clock
+import kirill5k.common.cats.Clock
 import fs2.Stream
 
 object Application extends IOApp.Simple:

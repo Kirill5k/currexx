@@ -8,7 +8,7 @@ import currexx.core.fixtures.{Markets, Monitors, Users}
 import currexx.core.monitor.db.MonitorRepository
 import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.monitor.Schedule
-import currexx.domain.time.Clock
+import kirill5k.common.cats.Clock
 import currexx.domain.user.UserId
 import currexx.domain.IOWordSpec
 import fs2.Stream

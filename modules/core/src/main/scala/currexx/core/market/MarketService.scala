@@ -4,7 +4,7 @@ import cats.Monad
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.common.action.{Action, ActionDispatcher}
-import currexx.domain.time.syntax.*
+import kirill5k.common.syntax.time.*
 import currexx.core.common.effects.*
 import currexx.core.signal.Signal
 import currexx.core.market.db.MarketStateRepository

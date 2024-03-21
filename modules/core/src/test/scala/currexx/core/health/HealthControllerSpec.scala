@@ -3,7 +3,7 @@ package currexx.core.health
 import cats.effect.IO
 import currexx.core.{ControllerSpec, MockClock}
 import currexx.core.auth.Authenticator
-import currexx.domain.time.Clock
+import kirill5k.common.cats.Clock
 import org.http4s.implicits.*
 import org.http4s.*
 

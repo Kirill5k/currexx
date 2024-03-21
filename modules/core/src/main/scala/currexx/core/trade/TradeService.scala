@@ -17,7 +17,7 @@ import currexx.core.trade.TradeStrategyExecutor.Decision
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.market.{CurrencyPair, IndicatorKind, Interval, TradeOrder}
 import currexx.domain.monitor.Limits
-import currexx.domain.time.Clock
+import kirill5k.common.cats.Clock
 import currexx.domain.user.UserId
 import fs2.Stream
 

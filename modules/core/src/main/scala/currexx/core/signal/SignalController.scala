@@ -9,7 +9,7 @@ import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{Condition, CurrencyPair, Indicator}
-import currexx.domain.time.Clock
+import kirill5k.common.cats.Clock
 import io.circe.Codec
 import org.http4s.HttpRoutes
 import sttp.model.StatusCode

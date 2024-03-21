@@ -6,7 +6,7 @@ import cats.syntax.functor.*
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.Controller
 import currexx.core.monitor.db.MonitorRepository
-import currexx.domain.time.Clock
+import kirill5k.common.cats.Clock
 import mongo4cats.database.MongoDatabase
 
 final class Monitors[F[_]] private (

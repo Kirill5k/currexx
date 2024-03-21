@@ -12,7 +12,7 @@ import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.user.UserId
 import currexx.domain.market.{CurrencyPair, IndicatorKind, TradeOrder}
 import currexx.domain.monitor.Limits
-import currexx.domain.time.Clock
+import kirill5k.common.cats.Clock
 import currexx.domain.IOWordSpec
 
 import java.time.Instant

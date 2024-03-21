@@ -6,7 +6,7 @@ import cats.syntax.flatMap.*
 import currexx.core.common.db.Repository
 import currexx.core.common.http.SearchParams
 import currexx.core.signal.Signal
-import currexx.domain.time.syntax.*
+import kirill5k.common.syntax.time.*
 import currexx.domain.market.{CurrencyPair, Indicator}
 import currexx.domain.user.UserId
 import mongo4cats.circe.MongoJsonCodecs

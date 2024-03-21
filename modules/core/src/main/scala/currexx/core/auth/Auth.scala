@@ -11,7 +11,7 @@ import currexx.core.auth.user.PasswordEncryptor
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.config.AuthConfig
 import currexx.core.common.http.Controller
-import currexx.domain.time.Clock
+import kirill5k.common.cats.Clock
 import jwt.JwtEncoder
 import mongo4cats.database.MongoDatabase
 

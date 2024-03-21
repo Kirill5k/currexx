@@ -7,7 +7,7 @@ import currexx.core.common.http.SearchParams
 import currexx.domain.user.UserId
 import currexx.core.fixtures.{Markets, Sessions, Signals, Users}
 import currexx.domain.market.{Condition, Direction, Indicator, ValueSource, ValueTransformation}
-import currexx.domain.time.Clock
+import kirill5k.common.cats.Clock
 import org.http4s.implicits.*
 import org.http4s.{Method, Status, Uri}
 

@@ -7,7 +7,7 @@ import currexx.clients.Clients
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.Controller
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
-import currexx.domain.time.Clock
+import kirill5k.common.cats.Clock
 import mongo4cats.database.MongoDatabase
 
 final class Trades[F[_]] private (

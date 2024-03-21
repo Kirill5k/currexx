@@ -1,8 +1,8 @@
 package currexx.core
 
 import cats.Monad
-import currexx.domain.time.Clock
-import currexx.domain.time.syntax.*
+import kirill5k.common.cats.Clock
+import kirill5k.common.syntax.time.*
 
 import java.time.Instant
 import scala.concurrent.duration.*

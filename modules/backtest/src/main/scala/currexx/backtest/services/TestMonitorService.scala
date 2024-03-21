@@ -2,7 +2,7 @@ package currexx.backtest.services
 
 import cats.effect.Async
 import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId, MonitorService}
-import currexx.domain.time.Clock
+import kirill5k.common.cats.Clock
 import currexx.domain.user.UserId
 
 final private class TestMonitorService[F[_]](using

@@ -1,6 +1,6 @@
 package currexx.domain.time
 
-import currexx.domain.time.syntax.*
+import kirill5k.common.syntax.time.*
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 

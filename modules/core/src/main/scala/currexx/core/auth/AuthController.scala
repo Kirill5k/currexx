@@ -16,7 +16,7 @@ import currexx.core.auth.jwt.BearerToken
 import currexx.core.auth.session.SessionService
 import currexx.core.auth.user.UserService
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
-import currexx.domain.time.Clock
+import kirill5k.common.cats.Clock
 import io.circe.Codec
 import io.circe.refined.*
 import org.http4s.HttpRoutes

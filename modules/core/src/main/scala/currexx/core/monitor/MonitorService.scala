@@ -6,7 +6,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.monitor.db.MonitorRepository
-import currexx.domain.time.Clock
+import kirill5k.common.cats.Clock
 import currexx.domain.user.UserId
 import fs2.Stream
 

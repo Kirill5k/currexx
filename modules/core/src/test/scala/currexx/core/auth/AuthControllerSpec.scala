@@ -11,7 +11,7 @@ import currexx.core.auth.jwt.BearerToken
 import currexx.core.fixtures.{Sessions, Users}
 import org.http4s.implicits.*
 import org.http4s.{Method, Request, Status, Uri}
-import currexx.domain.time.Clock
+import kirill5k.common.cats.Clock
 
 import java.time.Instant
 

@@ -6,7 +6,7 @@ import cats.syntax.functor.*
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.Controller
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
-import currexx.domain.time.Clock
+import kirill5k.common.cats.Clock
 import mongo4cats.database.MongoDatabase
 
 final class Signals[F[_]] private (

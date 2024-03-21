@@ -3,8 +3,8 @@ package currexx.backtest.services
 import cats.effect.{Ref, Temporal}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import currexx.domain.time.Clock
-import currexx.domain.time.syntax.*
+import kirill5k.common.cats.Clock
+import kirill5k.common.syntax.time.*
 
 import java.time.Instant
 import scala.concurrent.duration.*

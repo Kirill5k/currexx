@@ -2,7 +2,7 @@ package currexx.core.common.http
 
 import sttp.tapir.Codec.PlainCodec
 import sttp.tapir.{Codec, DecodeResult}
-import currexx.domain.time.syntax.*
+import kirill5k.common.syntax.time.*
 import currexx.domain.errors.AppError
 import currexx.domain.market.{Currency, CurrencyPair}
 

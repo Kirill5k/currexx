@@ -5,8 +5,8 @@ import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
-import currexx.domain.time.Clock
-import currexx.domain.time.syntax.*
+import kirill5k.common.cats.Clock
+import kirill5k.common.syntax.time.*
 import io.circe.Codec
 
 import java.time.Instant

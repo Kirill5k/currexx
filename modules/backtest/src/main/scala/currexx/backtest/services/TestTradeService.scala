@@ -9,7 +9,7 @@ import currexx.core.settings.TradeSettings
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import currexx.core.trade.{TradeOrderPlacement, TradeService}
 import currexx.domain.market.CurrencyPair
-import currexx.domain.time.Clock
+import kirill5k.common.cats.Clock
 import currexx.domain.user.UserId
 
 final private class TestTradeSettingsRepository[F[_]](
