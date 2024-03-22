@@ -52,9 +52,8 @@ class AuthControllerSpec extends ControllerSpec {
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val reqBody = """{"newPassword":"new-pwd","currentPassword":"curr-pwd"}"""
         val req = requestWithAuthHeader(uri"/auth/user/60e70e87fb134e0c1a271122/password", Method.POST)
-          .withJsonBody(parseJson(reqBody))
+          .withBody("""{"newPassword":"new-pwd","currentPassword":"curr-pwd"}""")
         val res = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.Forbidden, Some("""{"message":"The current session belongs to a different user"}"""))
@@ -70,7 +69,7 @@ class AuthControllerSpec extends ControllerSpec {
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
         val req = requestWithAuthHeader(Uri.unsafeFromString(s"/auth/user/${Users.uid}/password"), Method.POST)
-          .withJsonBody(parseJson("""{"newPassword":"new-pwd","currentPassword":"curr-pwd"}"""))
+          .withBody("""{"newPassword":"new-pwd","currentPassword":"curr-pwd"}""")
         val res = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.NoContent, None)
@@ -86,8 +85,8 @@ class AuthControllerSpec extends ControllerSpec {
 
         when(usrSvc.create(any[UserDetails], any[Password])).thenReturn(IO.raiseError(AccountAlreadyExists(UserEmail("foo@bar.com"))))
 
-        val reqBody = parseJson("""{"email":"foo@bar.com","password":"pwd","firstName":"John","lastName":"Bloggs"}""")
-        val req     = Request[IO](uri = uri"/auth/user", method = Method.POST).withJsonBody(reqBody)
+        val req     = Request[IO](uri = uri"/auth/user", method = Method.POST)
+          .withBody("""{"email":"foo@bar.com","password":"pwd","firstName":"John","lastName":"Bloggs"}""")
         val res     = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.Conflict, Some("""{"message":"An account with email foo@bar.com already exists"}"""))
@@ -100,8 +99,8 @@ class AuthControllerSpec extends ControllerSpec {
       "return bad request when invalid request" in {
         val (usrSvc, sessSvc) = mocks
 
-        val reqBody = parseJson("""{"email":"foo@bar.com","password":"","firstName":"John","lastName":"Bloggs"}""")
-        val req     = Request[IO](uri = uri"/auth/user", method = Method.POST).withJsonBody(reqBody)
+        val req     = Request[IO](uri = uri"/auth/user", method = Method.POST)
+          .withBody("""{"email":"foo@bar.com","password":"","firstName":"John","lastName":"Bloggs"}""")
         val res     = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.UnprocessableEntity, Some("""{"message":"password must not be empty"}"""))
@@ -113,8 +112,8 @@ class AuthControllerSpec extends ControllerSpec {
 
         when(usrSvc.create(any[UserDetails], any[Password])).thenReturn(IO.pure(Users.uid))
 
-        val reqBody = parseJson("""{"email":"foo@bar.com","password":"pwd","firstName":"John","lastName":"Bloggs"}""")
-        val req     = Request[IO](uri = uri"/auth/user", method = Method.POST).withJsonBody(reqBody)
+        val req     = Request[IO](uri = uri"/auth/user", method = Method.POST)
+          .withBody("""{"email":"foo@bar.com","password":"pwd","firstName":"John","lastName":"Bloggs"}""")
         val res     = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.Created, Some(s"""{"id":"${Users.uid}"}"""))
@@ -144,8 +143,8 @@ class AuthControllerSpec extends ControllerSpec {
       "return bad req on parsing error" in {
         val (usrSvc, sessSvc) = mocks
 
-        val reqBody = parseJson("""{"email":"foo","password":""}""")
-        val req     = Request[IO](uri = uri"/auth/login", method = Method.POST).withJsonBody(reqBody)
+        val req     = Request[IO](uri = uri"/auth/login", method = Method.POST)
+          .withBody("""{"email":"foo","password":""}""")
         val res     = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         val resBody = """{"message":"foo is not a valid email, password must not be empty"}"""
@@ -158,8 +157,8 @@ class AuthControllerSpec extends ControllerSpec {
 
         when(usrSvc.login(any[Login])).thenReturn(IO.raiseError(InvalidEmailOrPassword))
 
-        val reqBody = parseJson("""{"email":"foo@bar.com","password":"bar"}""")
-        val req     = Request[IO](uri = uri"/auth/login", method = Method.POST).withJsonBody(reqBody)
+        val req     = Request[IO](uri = uri"/auth/login", method = Method.POST)
+          .withBody("""{"email":"foo@bar.com","password":"bar"}""")
         val res     = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.Unauthorized, Some("""{"message":"Invalid email or password"}"""))
@@ -172,8 +171,8 @@ class AuthControllerSpec extends ControllerSpec {
         when(usrSvc.login(any[Login])).thenReturn(IO.pure(Users.user))
         when(sessSvc.create(any[CreateSession])).thenReturn(IO.pure(BearerToken("token")))
 
-        val reqBody = parseJson("""{"email":"foo@bar.com","password":"bar"}""")
-        val req     = Request[IO](uri = uri"/auth/login", method = Method.POST).withJsonBody(reqBody)
+        val req     = Request[IO](uri = uri"/auth/login", method = Method.POST)
+          .withBody("""{"email":"foo@bar.com","password":"bar"}""")
         val res     = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.Ok, Some(s"""{"access_token":"token","token_type":"Bearer"}"""))

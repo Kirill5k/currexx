@@ -15,7 +15,6 @@ trait ControllerSpec extends AnyWordSpec with IOMockitoMatchers with Matchers {
 
   extension (r: Request[IO])
     def withBody(requestBody: String): Request[IO] = r.withBodyStream(fs2.Stream.emits(requestBody.getBytes().toList))
-    def withJsonBody(json: Json): Request[IO]      = withBody(json.noSpaces)
 
   def requestWithAuthHeader(
       uri: org.http4s.Uri,
@@ -38,9 +37,6 @@ trait ControllerSpec extends AnyWordSpec with IOMockitoMatchers with Matchers {
         }
       }
       .unsafeRunSync()
-
-  def parseJson(jsonString: String): Json =
-    parse(jsonString).getOrElse(throw new RuntimeException)
 
   extension (res: IO[Response[IO]])
     def mustHaveStatus(expectedStatus: Status, expectedBody: Option[String] = None): Assertion =

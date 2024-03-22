@@ -21,14 +21,14 @@ class MonitorControllerSpec extends ControllerSpec {
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val requestBody = s"""{
-             |"kind": "market-data",
-             |"currencyPairs": ["GBP/EUR"],
-             |"interval": "H1",
-             |"schedule": {"kind":"periodic","period":"3 hours"}
-             |}""".stripMargin
-
-        val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
+        val req = requestWithAuthHeader(uri"/monitors", method = Method.POST)
+          .withBody(
+            """{
+              |"kind": "market-data",
+              |"currencyPairs": ["GBP/EUR"],
+              |"interval": "H1",
+              |"schedule": {"kind":"periodic","period":"3 hours"}
+              |}""".stripMargin)
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.Created, Some(s"""{"id":"${Monitors.mid}"}"""))
@@ -41,14 +41,15 @@ class MonitorControllerSpec extends ControllerSpec {
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val requestBody = s"""{
-             |"kind": "market-data",
-             |"currencyPairs": ["GBP/EUR"],
-             |"interval": "H1",
-             |"schedule": {"kind":"periodic","period":"3 hours"}
-             |}""".stripMargin
 
-        val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
+        val req = requestWithAuthHeader(uri"/monitors", method = Method.POST)
+          .withBody(
+            """{
+              |"kind": "market-data",
+              |"currencyPairs": ["GBP/EUR"],
+              |"interval": "H1",
+              |"schedule": {"kind":"periodic","period":"3 hours"}
+              |}""".stripMargin)
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.Conflict, Some("""{"message":"Monitor for currency pair GBPEUR already exists"}"""))
@@ -61,14 +62,14 @@ class MonitorControllerSpec extends ControllerSpec {
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val requestBody = s"""{
-             |"currencyPairs": ["GBP/EUR"],
-             |"kind": "profit",
-             |"schedule": {"kind":"periodic","period":"3 hours"},
-             |"limits": {}
-             |}""".stripMargin
-
-        val req = requestWithAuthHeader(uri"/monitors", method = Method.POST).withJsonBody(parseJson(requestBody))
+        val req = requestWithAuthHeader(uri"/monitors", method = Method.POST)
+          .withBody(
+            """{
+              |"currencyPairs": ["GBP/EUR"],
+              |"kind": "profit",
+              |"schedule": {"kind":"periodic","period":"3 hours"},
+              |"limits": {}
+              |}""".stripMargin)
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody = s"""{"message":"Limits must have at least one of the fields defined"}"""
@@ -231,17 +232,17 @@ class MonitorControllerSpec extends ControllerSpec {
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val requestBody = s"""{
-             |"id": "${Monitors.mid}",
-             |"kind": "market-data",
-             |"active": true,
-             |"currencyPairs": ["${Markets.gbpeur}"],
-             |"schedule": {"kind":"periodic","period":"3 hours"},
-             |"lastQueriedAt": "${Monitors.queriedAt}",
-             |"interval": "H1"
-             |}""".stripMargin
-
-        val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT).withJsonBody(parseJson(requestBody))
+        val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT)
+          .withBody(
+            s"""{
+               |"id": "${Monitors.mid}",
+               |"kind": "market-data",
+               |"active": true,
+               |"currencyPairs": ["${Markets.gbpeur}"],
+               |"schedule": {"kind":"periodic","period":"3 hours"},
+               |"lastQueriedAt": "${Monitors.queriedAt}",
+               |"interval": "H1"
+               |}""".stripMargin)
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.NoContent, None)
@@ -250,20 +251,19 @@ class MonitorControllerSpec extends ControllerSpec {
 
       "return error when id in path is different from id in requesst" in {
         val svc = mock[MonitorService[IO]]
-
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val requestBody = s"""{
-             |"id": "foo",
-             |"kind": "market-data",
-             |"active": true,
-             |"currencyPairs": ["${Markets.gbpeur}"],
-             |"schedule": {"kind":"periodic","period":"3 hours"},
-             |"lastQueriedAt": "${Monitors.queriedAt}",
-             |"interval": "H1"
-             |}""".stripMargin
-
-        val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT).withJsonBody(parseJson(requestBody))
+        val req = requestWithAuthHeader(uriWith(Monitors.mid), method = Method.PUT)
+          .withBody(
+            s"""{
+               |"id": "foo",
+               |"kind": "market-data",
+               |"active": true,
+               |"currencyPairs": ["${Markets.gbpeur}"],
+               |"schedule": {"kind":"periodic","period":"3 hours"},
+               |"lastQueriedAt": "${Monitors.queriedAt}",
+               |"interval": "H1"
+               |}""".stripMargin)
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody = """{"message":"Id provided in the path does not match with id in the request body"}"""

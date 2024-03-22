@@ -15,14 +15,14 @@ import java.time.Instant
 class TradeControllerSpec extends ControllerSpec {
 
   "A TradeController" when {
-    given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
+    given Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
     "POST /trade/orders" should {
       "submit order placement request" in {
         val svc = mock[TradeService[IO]]
         when(svc.placeOrder(any[UserId], any[TradeOrder], any[Boolean])).thenReturn(IO.unit)
 
-        val requestBody = s"""
+        val requestBody = """
              |{
              |  "kind" : "enter",
              |  "currencyPair" : "GBP/EUR",
@@ -32,7 +32,7 @@ class TradeControllerSpec extends ControllerSpec {
              |}
              |""".stripMargin
 
-        val req = requestWithAuthHeader(uri"/trade/orders?closePendingOrders=false", Method.POST).withJsonBody(parseJson(requestBody))
+        val req = requestWithAuthHeader(uri"/trade/orders?closePendingOrders=false", Method.POST).withBody(requestBody)
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.Created, None)
@@ -67,7 +67,7 @@ class TradeControllerSpec extends ControllerSpec {
     "GET /trade/orders" should {
       "return placed orders" in {
         val svc = mock[TradeService[IO]]
-        when(svc.getAllOrders(any[UserId], any[SearchParams])).thenReturn(IO.pure(List(Trades.order)))
+        when(svc.getAllOrders(any[UserId], any[SearchParams])).thenReturnIO(List(Trades.order))
 
         val req = requestWithAuthHeader(uri"/trade/orders?from=2020-01-01&currencyPair=GBP/EUR", Method.GET)
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
