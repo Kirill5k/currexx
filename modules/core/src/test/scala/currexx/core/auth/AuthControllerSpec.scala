@@ -1,7 +1,7 @@
 package currexx.core.auth
 
 import cats.effect.IO
-import currexx.core.ControllerSpec
+import kirill5k.common.http4s.test.HttpRoutesWordSpec
 import currexx.core.auth.session.SessionService
 import currexx.core.auth.user.UserService
 import currexx.domain.session.*
@@ -15,7 +15,7 @@ import kirill5k.common.cats.Clock
 
 import java.time.Instant
 
-class AuthControllerSpec extends ControllerSpec {
+class AuthControllerSpec extends HttpRoutesWordSpec {
 
   "An AuthController" when {
     val now         = Instant.now
@@ -29,7 +29,7 @@ class AuthControllerSpec extends ControllerSpec {
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val req = requestWithAuthHeader(uri"/auth/user", Method.GET)
+        val req = Request[IO](Method.GET, uri"/auth/user").withAuthHeader()
         val res = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         val resBody =
@@ -52,7 +52,7 @@ class AuthControllerSpec extends ControllerSpec {
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val req = requestWithAuthHeader(uri"/auth/user/60e70e87fb134e0c1a271122/password", Method.POST)
+        val req = Request[IO](Method.POST, uri"/auth/user/60e70e87fb134e0c1a271122/password").withAuthHeader()
           .withBody("""{"newPassword":"new-pwd","currentPassword":"curr-pwd"}""")
         val res = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
@@ -68,7 +68,8 @@ class AuthControllerSpec extends ControllerSpec {
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val req = requestWithAuthHeader(Uri.unsafeFromString(s"/auth/user/${Users.uid}/password"), Method.POST)
+        val req = Request[IO](Method.POST, Uri.unsafeFromString(s"/auth/user/${Users.uid}/password"))
+          .withAuthHeader()
           .withBody("""{"newPassword":"new-pwd","currentPassword":"curr-pwd"}""")
         val res = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
@@ -187,7 +188,7 @@ class AuthControllerSpec extends ControllerSpec {
 
         given auth: Authenticator[IO] = _ => IO.raiseError(new RuntimeException("shouldn't reach this"))
 
-        val req = Request[IO](uri = uri"/auth/logout", method = Method.POST)
+        val req = Request[IO](Method.POST, uri"/auth/logout")
         val res = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.Forbidden, Some("""{"message":"Missing authorization header"}"""))
@@ -199,7 +200,7 @@ class AuthControllerSpec extends ControllerSpec {
 
         given auth: Authenticator[IO] = (auth: BearerToken) => IO.raiseError(SessionDoesNotExist(Sessions.sid))
 
-        val req = requestWithAuthHeader(uri"/auth/logout", method = Method.POST)
+        val req = Request[IO](Method.POST, uri"/auth/logout").withAuthHeader()
         val res = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.Forbidden, Some(s"""{"message":"Session with id ${Sessions.sid} does not exist"}"""))
@@ -213,7 +214,7 @@ class AuthControllerSpec extends ControllerSpec {
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val req = requestWithAuthHeader(uri"/auth/logout", method = Method.POST)
+        val req = Request[IO](Method.POST, uri"/auth/logout").withAuthHeader()
         val res = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.NoContent, None)

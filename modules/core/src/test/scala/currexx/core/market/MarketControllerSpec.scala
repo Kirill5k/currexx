@@ -1,15 +1,15 @@
 package currexx.core.market
 
 import cats.effect.IO
-import currexx.core.ControllerSpec
+import kirill5k.common.http4s.test.HttpRoutesWordSpec
 import currexx.core.auth.Authenticator
 import currexx.core.fixtures.{Markets, Sessions, Signals, Users}
 import currexx.domain.market.CurrencyPair
 import currexx.domain.user.UserId
 import org.http4s.implicits.*
-import org.http4s.{Method, Status, Uri}
+import org.http4s.{Method, Status, Uri, Request}
 
-class MarketControllerSpec extends ControllerSpec {
+class MarketControllerSpec extends HttpRoutesWordSpec {
 
   "A MarketController" when {
     given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
@@ -19,7 +19,7 @@ class MarketControllerSpec extends ControllerSpec {
         val svc = mock[MarketService[IO]]
         when(svc.clearState(any[UserId], any[Boolean])).thenReturn(IO.unit)
 
-        val req = requestWithAuthHeader(uri"/market/state?dryRun=false", Method.DELETE)
+        val req = Request[IO](Method.DELETE, uri"/market/state?dryRun=false").withAuthHeader()
         val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.NoContent, None)
@@ -30,7 +30,7 @@ class MarketControllerSpec extends ControllerSpec {
         val svc = mock[MarketService[IO]]
         when(svc.clearState(any[UserId], any[Boolean])).thenReturn(IO.unit)
 
-        val req = requestWithAuthHeader(uri"/market/state?closePendingOrders=false&dryRun=false", Method.DELETE)
+        val req = Request[IO](Method.DELETE, uri"/market/state?closePendingOrders=false&dryRun=false").withAuthHeader()
         val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.NoContent, None)
@@ -41,7 +41,7 @@ class MarketControllerSpec extends ControllerSpec {
         val svc = mock[MarketService[IO]]
         when(svc.clearState(any[UserId], any[CurrencyPair], any[Boolean])).thenReturn(IO.unit)
 
-        val req = requestWithAuthHeader(uri"/market/state?closePendingOrders=false&dryRun=false&currencyPair=GBPEUR", Method.DELETE)
+        val req = Request[IO](Method.DELETE, uri"/market/state?closePendingOrders=false&dryRun=false&currencyPair=GBPEUR").withAuthHeader()
         val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.NoContent, None)
@@ -51,7 +51,7 @@ class MarketControllerSpec extends ControllerSpec {
       "not do anything when dryRun is not provided" in {
         val svc = mock[MarketService[IO]]
 
-        val req = requestWithAuthHeader(uri"/market/state", Method.DELETE)
+        val req = Request[IO](Method.DELETE, uri"/market/state").withAuthHeader()
         val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.NoContent, None)
@@ -64,7 +64,7 @@ class MarketControllerSpec extends ControllerSpec {
         val svc = mock[MarketService[IO]]
         when(svc.getState(any[UserId])).thenReturn(IO.pure(List(Markets.stateWithSignal)))
 
-        val req = requestWithAuthHeader(uri"/market/state", Method.GET)
+        val req = Request[IO](Method.GET, uri"/market/state").withAuthHeader()
         val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody =

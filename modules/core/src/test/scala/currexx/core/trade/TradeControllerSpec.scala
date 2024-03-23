@@ -3,16 +3,16 @@ package currexx.core.trade
 import cats.effect.IO
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.SearchParams
-import currexx.core.ControllerSpec
+import kirill5k.common.http4s.test.HttpRoutesWordSpec
 import currexx.core.fixtures.{Markets, Sessions, Trades, Users}
 import currexx.domain.market.{CurrencyPair, TradeOrder}
 import currexx.domain.user.UserId
 import org.http4s.implicits.*
-import org.http4s.{Method, Status, Uri}
+import org.http4s.{Method, Request, Status, Uri}
 
 import java.time.Instant
 
-class TradeControllerSpec extends ControllerSpec {
+class TradeControllerSpec extends HttpRoutesWordSpec {
 
   "A TradeController" when {
     given Authenticator[IO] = _ => IO.pure(Sessions.sess)
@@ -32,7 +32,9 @@ class TradeControllerSpec extends ControllerSpec {
              |}
              |""".stripMargin
 
-        val req = requestWithAuthHeader(uri"/trade/orders?closePendingOrders=false", Method.POST).withBody(requestBody)
+        val req = Request[IO](Method.POST, uri"/trade/orders?closePendingOrders=false")
+          .withAuthHeader()
+          .withBody(requestBody)
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.Created, None)
@@ -45,7 +47,7 @@ class TradeControllerSpec extends ControllerSpec {
         val svc = mock[TradeService[IO]]
         when(svc.closeOpenOrders(any[UserId])).thenReturn(IO.unit)
 
-        val req = requestWithAuthHeader(uri"/trade/orders", Method.DELETE)
+        val req = Request[IO](Method.DELETE, uri"/trade/orders").withAuthHeader()
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.NoContent, None)
@@ -56,7 +58,7 @@ class TradeControllerSpec extends ControllerSpec {
         val svc = mock[TradeService[IO]]
         when(svc.closeOpenOrders(any[UserId], any[CurrencyPair])).thenReturn(IO.unit)
 
-        val req = requestWithAuthHeader(uri"/trade/orders?currencyPair=GBPEUR", Method.DELETE)
+        val req = Request[IO](Method.DELETE, uri"/trade/orders?currencyPair=GBPEUR").withAuthHeader()
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.NoContent, None)
@@ -69,7 +71,7 @@ class TradeControllerSpec extends ControllerSpec {
         val svc = mock[TradeService[IO]]
         when(svc.getAllOrders(any[UserId], any[SearchParams])).thenReturnIO(List(Trades.order))
 
-        val req = requestWithAuthHeader(uri"/trade/orders?from=2020-01-01&currencyPair=GBP/EUR", Method.GET)
+        val req = Request[IO](Method.GET, uri"/trade/orders?from=2020-01-01&currencyPair=GBP/EUR").withAuthHeader()
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody =
