@@ -6,7 +6,6 @@ import currexx.core.settings.db.SettingsRepository
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
 import kirill5k.common.cats.test.IOWordSpec
-import org.mockito.Mockito.times
 
 class SettingsServiceSpec extends IOWordSpec {
 
