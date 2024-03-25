@@ -4,18 +4,14 @@ import cats.data.NonEmptyList
 import cats.syntax.traverse.*
 import currexx.domain.market.PriceRange
 import kirill5k.common.syntax.time.*
+import kirill5k.common.test.FileReader.fromResources
 import io.circe.{Decoder, JsonObject}
 import io.circe.parser.decode
 
 import java.time.LocalDate
 import scala.collection.immutable.ListMap
-import scala.io.Source
 
 object FileReader {
-  def fromResources(path: String): String =
-    val source = Source.fromResource(path)
-    try source.getLines().toList.mkString
-    finally source.close()
 
   def parseFromResources[A: Decoder](path: String): A =
     decode[A](fromResources(path)).fold(e => throw new RuntimeException(e.getMessage), identity)
