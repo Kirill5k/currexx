@@ -9,7 +9,7 @@ object Dependencies {
     val pureConfig     = "0.17.7"
     val circe          = "0.14.8"
     val sttp           = "3.9.7"
-    val http4s         = "0.23"
+    val http4s         = "0.23.27"
     val logback        = "1.5.6"
     val log4cats       = "2.7.0"
     val bcrypt         = "4.3.0"
