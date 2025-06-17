@@ -1,6 +1,5 @@
 package currexx.domain.market
 
-import cats.syntax.functor.*
 import currexx.domain.types.EnumType
 import io.circe.{Decoder, Encoder}
 import org.latestbit.circe.adt.codec.*

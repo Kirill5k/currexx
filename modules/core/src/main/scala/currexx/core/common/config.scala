@@ -2,8 +2,7 @@ package currexx.core.common
 
 import cats.effect.Sync
 import currexx.clients.ClientsConfig
-import pureconfig.*
-import pureconfig.generic.derivation.default.*
+import pureconfig.{ConfigReader, ConfigSource}
 
 object config {
   final case class JwtConfig(

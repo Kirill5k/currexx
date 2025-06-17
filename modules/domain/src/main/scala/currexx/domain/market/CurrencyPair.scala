@@ -1,7 +1,6 @@
 package currexx.domain.market
 
 import cats.Order
-import cats.syntax.either.*
 import io.circe.{Decoder, Encoder}
 
 final case class CurrencyPair(base: Currency, quote: Currency):

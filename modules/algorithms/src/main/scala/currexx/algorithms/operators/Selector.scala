@@ -53,7 +53,7 @@ object Selector:
     }
   }
 
-  def rouletteWheel[F[_]: Sync, I](using F: Sync[F]): F[Selector[F, I]] =
+  def rouletteWheel[F[_], I](using F: Sync[F]): F[Selector[F, I]] =
     F.pure {
       new Selector[F, I] {
         val rouletteWheelSelector = pureRouletteWheel[I]

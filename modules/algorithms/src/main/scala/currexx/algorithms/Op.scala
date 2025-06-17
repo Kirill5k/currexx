@@ -3,7 +3,6 @@ package currexx.algorithms
 import cats.~>
 import cats.effect.Async
 import cats.free.Free
-import cats.syntax.functor.*
 import currexx.algorithms.operators.*
 import fs2.Stream
 
@@ -40,15 +39,15 @@ enum Op[A, I]:
 object Op:
   extension [A, I](fa: Op[A, I]) def freeM: Free[Op[*, I], A] = Free.liftF(fa)
 
-  inline def ioInterpreter[F[_], I](
+  private class OpInterpreter[F[_], I](
       initialiser: Initialiser[F, I],
       crossover: Crossover[F, I],
       mutator: Mutator[F, I],
       evaluator: Evaluator[F, I],
       selector: Selector[F, I],
       elitism: Elitism[F, I],
-      updateFn: Option[(Int, Int) => F[Unit]] = None
-  )(using F: Async[F], rand: Random): Op[*, I] ~> F = new ~>[Op[*, I], F] {
+      updateFn: Option[(Int, Int) => F[Unit]]
+  )(using F: Async[F], rand: Random) extends ~>[Op[*, I], F] {
     def apply[A](fa: Op[A, I]): F[A] =
       fa match
         case Op.UpdateOnProgress(iteration, maxGen) =>
@@ -68,9 +67,20 @@ object Op:
         case Op.SelectPairs(population, limit) =>
           selector.selectPairs(population, limit)
         case Op.SortByFitness(population) =>
-          F.delay(population.sortBy(_._2)(Ordering[Fitness].reverse))
+          F.delay(population.sortBy(_._2)(using Ordering[Fitness].reverse))
         case Op.ApplyToAll(population, op) =>
           Stream.emits(population).mapAsync(Int.MaxValue)(i => apply(op(i))).compile.toVector
         case _ | null =>
           F.raiseError(new IllegalArgumentException("Unexpected Op type: null or something else"))
   }
+
+  inline def ioInterpreter[F[_], I](
+      initialiser: Initialiser[F, I],
+      crossover: Crossover[F, I],
+      mutator: Mutator[F, I],
+      evaluator: Evaluator[F, I],
+      selector: Selector[F, I],
+      elitism: Elitism[F, I],
+      updateFn: Option[(Int, Int) => F[Unit]] = None
+  )(using F: Async[F], rand: Random): Op[*, I] ~> F = 
+    new OpInterpreter[F, I](initialiser, crossover, mutator, evaluator, selector, elitism, updateFn)
