@@ -3,15 +3,15 @@ package currexx.clients.data.twelvedata
 import cats.effect.IO
 import currexx.domain.market.Currency.{EUR, USD}
 import currexx.domain.market.{CurrencyPair, Interval, PriceRange}
-import kirill5k.common.sttp.test.SttpWordSpec
+import kirill5k.common.sttp.test.Sttp4WordSpec
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import sttp.client3.{Response, SttpBackend}
+import sttp.client4.testing.ResponseStub
 
 import java.time.{Instant, LocalTime}
 import scala.concurrent.duration.*
 
-class TwelveDataClientSpec extends SttpWordSpec {
+class TwelveDataClientSpec extends Sttp4WordSpec {
 
   given Logger[IO] = Slf4jLogger.getLogger[IO]
 
@@ -27,12 +27,13 @@ class TwelveDataClientSpec extends SttpWordSpec {
         "outputsize" -> "150"
       )
 
-      val testingBackend: SttpBackend[IO, Any] = backendStub
+      val testingBackend = fs2BackendStub
         .whenRequestMatchesPartial {
           case r if r.isGet && r.isGoingTo("twelve-data.com/time_series") && r.hasParams(requestParams) =>
-            Response.ok(readJson("twelvedata/eur-usd-daily-prices.response.json"))
+            ResponseStub.adjust(readJson("twelvedata/eur-usd-daily-prices.response.json"))
           case _ => throw new RuntimeException()
         }
+      
       val result = for
         client <- TwelveDataClient.make[IO](config, testingBackend, 100.millis)
         res    <- client.timeSeriesData(pair, Interval.D1)
@@ -49,11 +50,13 @@ class TwelveDataClientSpec extends SttpWordSpec {
     }
 
     "retry after some delay in case of api limit error" in {
-      val testingBackend: SttpBackend[IO, Any] = backendStub.whenAnyRequest
-        .thenRespondCyclicResponses(
-          Response.ok(readJson("twelvedata/limit-error.json")),
-          Response.ok(readJson("twelvedata/eur-usd-daily-prices.response.json"))
+      val testingBackend = fs2BackendStub
+        .whenAnyRequest
+        .thenRespondCyclic(
+          ResponseStub.adjust(readJson("twelvedata/limit-error.json")),
+          ResponseStub.adjust(readJson("twelvedata/eur-usd-daily-prices.response.json"))
         )
+      
       val result = for
         client <- TwelveDataClient.make[IO](config, testingBackend, 100.millis)
         res    <- client.timeSeriesData(pair, Interval.D1)

@@ -33,7 +33,7 @@ object Clients:
   ): F[Clients[F]] =
     for
       alphavantage <- AlphaVantageClient.make[F](config.alphaVantage, fs2Backend)
-      twelvedata   <- TwelveDataClient.make(config.twelveData, backend)
+      twelvedata   <- TwelveDataClient.make(config.twelveData, fs2Backend)
       xtb          <- XtbClient.make[F](config.xtb, backend)
       broker       <- BrokerClient.make[F](xtb)
       data         <- MarketDataClient.make[F](alphavantage, twelvedata)
