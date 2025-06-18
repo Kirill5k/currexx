@@ -79,7 +79,7 @@ final private class LiveXtbClient[F[_]](
             Stream.eval(state.update(_.withSessionId(sessionId))).drain ++
               Stream.emit(XtbRequest.openTransaction(sessionId, order).asText)
           case XtbResponse.OrderPlacement(_) => Stream.emit(WebSocketFrame.close)
-          case error: XtbResponse.Error      => handError(params.userId, error)
+          case error: XtbResponse.Error      => handleError(params.userId, error)
           case _                             => Stream.empty
         }
   }
@@ -110,7 +110,7 @@ final private class LiveXtbClient[F[_]](
               obtainSessionId(state)
                 .delayBy(delayBetweenConnectionFailures)
                 .map(sid => XtbRequest.currentTrades(sid).asText)
-          case error: XtbResponse.Error => handError(params.userId, error)
+          case error: XtbResponse.Error => handleError(params.userId, error)
           case _                        => Stream.empty
         }
   }
@@ -136,7 +136,7 @@ final private class LiveXtbClient[F[_]](
             else
               incGetTradesAttempt(params.userId, state) ++
                 obtainSessionId(state).map(sid => XtbRequest.currentTrades(sid).asText)
-          case error: XtbResponse.Error => handError(params.userId, error)
+          case error: XtbResponse.Error => handleError(params.userId, error)
           case _                        => Stream.empty
         }
   }
@@ -177,7 +177,7 @@ final private class LiveXtbClient[F[_]](
       }
       .delayBy(100.millis)
 
-  private def handError(userId: String, error: XtbResponse.Error): Stream[F, WebSocketFrame] =
+  private def handleError(userId: String, error: XtbResponse.Error): Stream[F, WebSocketFrame] =
     error match
       case XtbResponse.Error("EX027", desc) =>
         Stream.emit(WebSocketFrame.close) ++
