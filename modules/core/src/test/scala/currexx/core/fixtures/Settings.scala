@@ -10,7 +10,7 @@ object Settings {
 
   lazy val trade = TradeSettings(
     TradeStrategy.Disabled,
-    BrokerParameters.Vindaloo("1"),
+    BrokerParameters.Xtb("user1", "password", demo = true),
     TradingParameters(BigDecimal(0.1))
   )
 
