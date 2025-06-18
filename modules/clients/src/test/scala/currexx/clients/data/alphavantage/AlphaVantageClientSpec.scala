@@ -6,17 +6,17 @@ import currexx.domain.market.{CurrencyPair, Interval, PriceRange}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import currexx.domain.market.Currency.{GBP, USD}
-import kirill5k.common.sttp.test.SttpWordSpec
-import sttp.client3.{Response, SttpBackend}
+import kirill5k.common.sttp.test.Sttp4WordSpec
+import sttp.client4.testing.ResponseStub
 import sttp.model.StatusCode
 
 import java.time.Instant
 import scala.concurrent.duration.*
 
-class AlphaVantageClientSpec extends SttpWordSpec {
+class AlphaVantageClientSpec extends Sttp4WordSpec {
 
   given Logger[IO] = Slf4jLogger.getLogger[IO]
-  
+
   val config = AlphaVantageConfig("http://alpha-vantage.com", "api-key")
   val pair   = CurrencyPair(GBP, USD)
 
@@ -29,10 +29,10 @@ class AlphaVantageClientSpec extends SttpWordSpec {
         "apikey"      -> "api-key",
         "interval"    -> "60min"
       )
-      val testingBackend: SttpBackend[IO, Any] = backendStub
+      val testingBackend = fs2BackendStub
         .whenRequestMatchesPartial {
           case r if r.isGet && r.isGoingTo("alpha-vantage.com/query") && r.hasParams(params) =>
-            Response.ok(readJson("alphavantage/gbp-usd-hourly-prices-response.json"))
+            ResponseStub.adjust(readJson("alphavantage/gbp-usd-hourly-prices-response.json"))
           case _ => throw new RuntimeException()
         }
 
@@ -51,11 +51,11 @@ class AlphaVantageClientSpec extends SttpWordSpec {
     }
 
     "retrieve daily price time series data" in {
-      val params = Map("function" -> "FX_DAILY", "from_symbol" -> "GBP", "to_symbol" -> "USD", "apikey" -> "api-key")
-      val testingBackend: SttpBackend[IO, Any] = backendStub
+      val params         = Map("function" -> "FX_DAILY", "from_symbol" -> "GBP", "to_symbol" -> "USD", "apikey" -> "api-key")
+      val testingBackend = fs2BackendStub
         .whenRequestMatchesPartial {
           case r if r.isGet && r.isGoingTo("alpha-vantage.com/query") && r.hasParams(params) =>
-            Response.ok(readJson("alphavantage/gbp-usd-daily-prices-response.json"))
+            ResponseStub.adjust(readJson("alphavantage/gbp-usd-daily-prices-response.json"))
           case _ => throw new RuntimeException()
         }
 
@@ -74,10 +74,10 @@ class AlphaVantageClientSpec extends SttpWordSpec {
     }
 
     "retrieve the latest price for a given currency pair" in {
-      val testingBackend: SttpBackend[IO, Any] = backendStub
+      val testingBackend = fs2BackendStub
         .whenRequestMatchesPartial {
           case r if r.isGet && r.isGoingTo("alpha-vantage.com/query") =>
-            Response.ok(readJson("alphavantage/gbp-usd-daily-prices-response.json"))
+            ResponseStub.adjust(readJson("alphavantage/gbp-usd-daily-prices-response.json"))
           case _ => throw new RuntimeException()
         }
 
@@ -92,10 +92,10 @@ class AlphaVantageClientSpec extends SttpWordSpec {
     }
 
     "retry on client or server error" in {
-      val testingBackend: SttpBackend[IO, Any] = backendStub.whenAnyRequest
-        .thenRespondCyclicResponses(
-          Response("uh-oh!", StatusCode.BadRequest),
-          Response.ok(readJson("alphavantage/gbp-usd-hourly-prices-response.json"))
+      val testingBackend = fs2BackendStub.whenAnyRequest
+        .thenRespondCyclic(
+          ResponseStub.adjust("uh-oh!", StatusCode.BadRequest),
+          ResponseStub.adjust(readJson("alphavantage/gbp-usd-hourly-prices-response.json"))
         )
 
       val result = for
@@ -111,8 +111,8 @@ class AlphaVantageClientSpec extends SttpWordSpec {
     }
 
     "return error when not enough data points" in {
-      val testingBackend: SttpBackend[IO, Any] = backendStub.whenAnyRequest
-        .thenRespond(Response.ok(readJson("alphavantage/gbp-usd-daily-almost-empty-response.json")))
+      val testingBackend = fs2BackendStub.whenAnyRequest
+        .thenRespond(ResponseStub.adjust(readJson("alphavantage/gbp-usd-daily-almost-empty-response.json")))
 
       val result = for
         client <- AlphaVantageClient.make[IO](config, testingBackend, 100.millis)

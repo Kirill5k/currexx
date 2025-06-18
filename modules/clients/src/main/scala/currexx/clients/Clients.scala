@@ -12,6 +12,7 @@ import org.typelevel.log4cats.Logger
 import sttp.capabilities.WebSockets
 import sttp.capabilities.fs2.Fs2Streams
 import sttp.client3.SttpBackend
+import sttp.client4.WebSocketStreamBackend
 
 final case class ClientsConfig(
     alphaVantage: AlphaVantageConfig,
@@ -27,10 +28,11 @@ final class Clients[F[_]] private (
 object Clients:
   def make[F[_]: {Async, Logger}](
       config: ClientsConfig,
-      backend: SttpBackend[F, Fs2Streams[F] & WebSockets]
+      backend: SttpBackend[F, Fs2Streams[F] & WebSockets],
+      fs2Backend: WebSocketStreamBackend[F, Fs2Streams[F]]
   ): F[Clients[F]] =
     for
-      alphavantage <- AlphaVantageClient.make[F](config.alphaVantage, backend)
+      alphavantage <- AlphaVantageClient.make[F](config.alphaVantage, fs2Backend)
       twelvedata   <- TwelveDataClient.make(config.twelveData, backend)
       xtb          <- XtbClient.make[F](config.xtb, backend)
       broker       <- BrokerClient.make[F](xtb)

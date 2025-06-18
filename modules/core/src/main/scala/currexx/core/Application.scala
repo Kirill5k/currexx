@@ -29,7 +29,7 @@ object Application extends IOApp.Simple:
           for
             _          <- logger.info(s"starting currexx-core ${sys.env.getOrElse("VERSION", "")}")
             dispatcher <- ActionDispatcher.make[IO].flatTap(_.dispatch(Action.RescheduleAllMonitors))
-            clients    <- Clients.make[IO](config.clients, res.sttpBackend)
+            clients    <- Clients.make[IO](config.clients, res.sttpBackend, res.fs2Backend)
             health     <- Health.make[IO]
             auth       <- Auth.make(config.auth, res.mongo, dispatcher)
             signals    <- Signals.make(res.mongo, dispatcher)
