@@ -6,13 +6,11 @@ import io.circe.syntax.*
 import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId}
 import currexx.domain.user.UserId
-import currexx.domain.json.given
 import currexx.domain.monitor.{Limits, Schedule}
 import mongo4cats.bson.ObjectId
 import mongo4cats.circe.given
 
 import java.time.Instant
-import scala.concurrent.duration.FiniteDuration
 
 sealed trait MonitorEntity(val kind: String):
   def _id: ObjectId

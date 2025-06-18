@@ -41,7 +41,7 @@ class ScheduleSpec extends AnyWordSpec with Matchers with EitherValues {
         val schedule: Schedule = Schedule.Cron("0 7,20 * * 1-5").value
         val json               = schedule.asJson.noSpaces
 
-        decode[Schedule](json) mustBe a[Right[_, _]]
+        decode[Schedule](json) mustBe a[Right[?, ?]]
         json mustBe """{"kind":"cron","cron":"0 7,20 * * 1-5"}"""
       }
     }

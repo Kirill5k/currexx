@@ -6,12 +6,12 @@ import currexx.core.MockActionDispatcher
 import currexx.core.common.action.Action
 import currexx.core.fixtures.{Markets, Monitors, Users}
 import currexx.core.monitor.db.MonitorRepository
-import currexx.domain.market.{CurrencyPair, Interval}
+import currexx.domain.market.Interval
 import currexx.domain.monitor.Schedule
-import kirill5k.common.cats.Clock
 import currexx.domain.user.UserId
-import kirill5k.common.cats.test.IOWordSpec
 import fs2.Stream
+import kirill5k.common.cats.Clock
+import kirill5k.common.cats.test.IOWordSpec
 
 import java.time.Instant
 import scala.concurrent.duration.*

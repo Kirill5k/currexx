@@ -27,9 +27,9 @@ final class Clients[F[_]] private (
 )
 
 object Clients:
-  def make[F[_]: Async: Logger](
+  def make[F[_]: {Async, Logger}](
       config: ClientsConfig,
-      backend: SttpBackend[F, Fs2Streams[F] with WebSockets]
+      backend: SttpBackend[F, Fs2Streams[F] & WebSockets]
   ): F[Clients[F]] =
     for
       alphavantage <- AlphaVantageClient.make[F](config.alphaVantage, backend)

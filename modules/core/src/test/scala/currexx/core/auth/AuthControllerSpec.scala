@@ -198,7 +198,7 @@ class AuthControllerSpec extends HttpRoutesWordSpec {
       "return forbidden if session does not exist" in {
         val (usrSvc, sessSvc) = mocks
 
-        given auth: Authenticator[IO] = (auth: BearerToken) => IO.raiseError(SessionDoesNotExist(Sessions.sid))
+        given auth: Authenticator[IO] = (_: BearerToken) => IO.raiseError(SessionDoesNotExist(Sessions.sid))
 
         val req = Request[IO](Method.POST, uri"/auth/logout").withAuthHeader()
         val res = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))

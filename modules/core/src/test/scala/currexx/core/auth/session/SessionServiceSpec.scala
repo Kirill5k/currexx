@@ -9,8 +9,6 @@ import currexx.domain.errors.AppError
 import kirill5k.common.cats.test.IOWordSpec
 import currexx.core.fixtures.{Sessions, Users}
 
-import java.time.Instant
-
 class SessionServiceSpec extends IOWordSpec {
 
   "A SessionService" when {

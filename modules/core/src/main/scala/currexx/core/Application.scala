@@ -4,7 +4,7 @@ import cats.effect.{IO, IOApp}
 import currexx.clients.Clients
 import currexx.core.auth.Auth
 import currexx.core.common.action.{Action, ActionDispatcher, ActionProcessor}
-import currexx.core.common.config.AppConfig
+import currexx.core.common.config.{AppConfig, ServerConfig}
 import currexx.core.common.http.Http
 import currexx.core.common.logging.{LogEventProcessor, Logger}
 import currexx.core.health.Health
@@ -14,9 +14,13 @@ import currexx.core.trade.Trades
 import currexx.core.monitor.Monitors
 import currexx.core.settings.Settings
 import kirill5k.common.cats.Clock
+import kirill5k.common.http4s.Server
 import fs2.Stream
 
 object Application extends IOApp.Simple:
+  given Conversion[ServerConfig, Server.Config] =
+    (sc: ServerConfig) => Server.Config(sc.host, sc.port)
+  
   override val run: IO[Unit] =
     Logger.make[IO].flatMap { implicit logger =>
       for
@@ -38,7 +42,7 @@ object Application extends IOApp.Simple:
               .make[IO](dispatcher, monitors.service, signals.service, markets.service, trades.service, settings.service)
             logProcessor <- LogEventProcessor.make[IO](res.mongo)
             _ <- Stream(
-              Server.serve[IO](config.server, http.app),
+              Server.serveEmber[IO](config.server, http.app),
               actionProcessor.run,
               logProcessor.run
             ).parJoinUnbounded.compile.drain

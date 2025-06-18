@@ -29,7 +29,7 @@ final class HealthController[F[_]: Async](
 
   private val statusEndpoint: ServerEndpoint[Fs2Streams[F], F] =
     HealthController.statusEndpoint
-      .serverLogicSuccess { req =>
+      .serverLogicSuccess { _ =>
         clock
           .durationBetweenNowAnd(startupTime)
           .map { uptime =>

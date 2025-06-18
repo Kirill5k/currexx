@@ -61,5 +61,5 @@ class TradeSettingsRepositorySpec extends MongoSpec {
             res  <- test(db)
           yield res
         }
-    }.unsafeToFuture()(IORuntime.global)
+    }.unsafeToFuture()(using IORuntime.global)
 }

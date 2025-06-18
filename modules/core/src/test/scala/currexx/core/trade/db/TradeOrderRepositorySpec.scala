@@ -94,5 +94,5 @@ class TradeOrderRepositorySpec extends MongoSpec {
       MongoClient
         .fromConnectionString[IO](s"mongodb://localhost:$mongoPort")
         .use(_.getDatabase("currexx").flatMap(test))
-    }.unsafeToFuture()(IORuntime.global)
+    }.unsafeToFuture()(using IORuntime.global)
 }

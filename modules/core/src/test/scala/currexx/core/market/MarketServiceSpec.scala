@@ -6,7 +6,7 @@ import currexx.domain.user.UserId
 import currexx.core.common.action.Action
 import currexx.core.market.db.MarketStateRepository
 import currexx.core.fixtures.{Markets, Signals, Trades, Users}
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorKind, TradeOrder}
+import currexx.domain.market.{CurrencyPair, IndicatorKind, TradeOrder}
 import kirill5k.common.cats.test.IOWordSpec
 
 import java.time.Instant

@@ -34,7 +34,7 @@ object MovingAverages {
         window.enqueue(remaining.head)
         calc(remaining.tail, result)
       } else {
-        window.dequeue()
+        val _ = window.dequeue()
         window.enqueue(remaining.head)
         val sma = window.sum / n
         calc(remaining.tail, sma :: result)
@@ -74,7 +74,7 @@ object MovingAverages {
       if (window.size < n) {
         window.enqueue(values.next())
       } else {
-        window.dequeue()
+        val _ = window.dequeue()
         window.enqueue(values.next())
         wmas(i - 1) = window.zipWithIndex.foldLeft(0d) { case (sum, (v, i)) => sum + (n + i + 1 - n) * v } / divider
         i = i - 1

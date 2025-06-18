@@ -1,12 +1,14 @@
 import com.typesafe.sbt.packager.docker.*
+import org.typelevel.scalacoptions.ScalacOptions
 import sbtghactions.JavaSpec
 
-ThisBuild / scalaVersion                        := "3.3.1"
+ThisBuild / scalaVersion                        := "3.7.1"
 ThisBuild / version                             := scala.sys.process.Process("git rev-parse HEAD").!!.trim.slice(0, 7)
 ThisBuild / organization                        := "io.github.kirill5k"
 ThisBuild / githubWorkflowPublishTargetBranches := Nil
 ThisBuild / githubWorkflowJavaVersions          := Seq(JavaSpec.temurin("24"))
 ThisBuild / scalacOptions ++= Seq("-Wunused:all")
+ThisBuild / Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
 
 val noPublish = Seq(
   publish         := {},
@@ -39,7 +41,8 @@ val domain = project
   .settings(
     name       := "currexx-domain",
     moduleName := "currexx-domain",
-    libraryDependencies ++= Dependencies.domain ++ Dependencies.test
+    libraryDependencies ++= Dependencies.domain ++ Dependencies.test,
+    Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
   )
 
 val algorithms = project
@@ -47,7 +50,8 @@ val algorithms = project
   .settings(
     name       := "currexx-algorithms",
     moduleName := "currexx-algorithms",
-    libraryDependencies ++= Dependencies.algorithms ++ Dependencies.test
+    libraryDependencies ++= Dependencies.algorithms ++ Dependencies.test,
+    Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
   )
 
 val calculations = project
@@ -55,7 +59,8 @@ val calculations = project
   .settings(
     name       := "currexx-calculations",
     moduleName := "currexx-calculations",
-    libraryDependencies ++= Dependencies.test
+    libraryDependencies ++= Dependencies.test,
+    Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
   )
 
 val clients = project
@@ -64,7 +69,8 @@ val clients = project
   .settings(
     name       := "currexx-clients",
     moduleName := "currexx-clients",
-    libraryDependencies ++= Dependencies.clients ++ Dependencies.test
+    libraryDependencies ++= Dependencies.clients ++ Dependencies.test,
+    Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
   )
 
 val core = project
@@ -75,7 +81,8 @@ val core = project
   .settings(
     name       := "currexx-core",
     moduleName := "currexx-core",
-    libraryDependencies ++= Dependencies.core
+    libraryDependencies ++= Dependencies.core,
+    Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
   )
 
 val backtest = project
@@ -84,7 +91,8 @@ val backtest = project
   .settings(
     name       := "currexx-backtest",
     moduleName := "currexx-backtest",
-    libraryDependencies ++= Dependencies.test
+    libraryDependencies ++= Dependencies.test,
+    Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
   )
 
 val root = project

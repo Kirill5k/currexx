@@ -2,9 +2,9 @@ package currexx.core.trade
 
 import currexx.core.fixtures.Markets
 import currexx.core.market.{IndicatorState, PositionState}
-import currexx.domain.market.{Condition, Direction, IndicatorKind, TradeOrder}
-import org.scalatest.wordspec.AnyWordSpec
+import currexx.domain.market.{Condition, Direction, TradeOrder}
 import org.scalatest.matchers.must.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
 class TradeStrategyExecutorSpec extends AnyWordSpec with Matchers {
 

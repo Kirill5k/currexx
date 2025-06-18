@@ -4,7 +4,7 @@ import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
 import currexx.core.fixtures.{Markets, Users}
-import currexx.core.market.{IndicatorState, MarketState}
+import currexx.core.market.MarketState
 import currexx.domain.errors.AppError
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
@@ -122,5 +122,5 @@ class MarketStateRepositorySpec extends MongoSpec {
       MongoClient
         .fromConnectionString[IO](s"mongodb://localhost:$mongoPort")
         .use(_.getDatabase("currexx").flatMap(test))
-    }.unsafeToFuture()(IORuntime.global)
+    }.unsafeToFuture()(using IORuntime.global)
 }

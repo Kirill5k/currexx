@@ -1,8 +1,7 @@
 package currexx.core.monitor
 
-import currexx.domain.market.Interval
-import currexx.domain.monitor.Schedule
 import currexx.core.fixtures.Monitors
+import currexx.domain.monitor.Schedule
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 

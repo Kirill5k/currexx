@@ -3,23 +3,14 @@ package currexx.core.signal
 import cats.data.NonEmptyList
 import cats.effect.IO
 import currexx.core.MockActionDispatcher
-import currexx.domain.user.UserId
-import currexx.domain.market.{
-  Condition,
-  CurrencyPair,
-  Direction,
-  Indicator,
-  MovingAverage,
-  PriceRange,
-  ValueSource,
-  ValueTransformation as VT
-}
-import kirill5k.common.cats.test.IOWordSpec
 import currexx.core.common.action.Action
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Settings, Signals, Users}
 import currexx.core.settings.TriggerFrequency
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
+import currexx.domain.market.{Condition, Direction, Indicator, MovingAverage, ValueSource, ValueTransformation as VT}
+import currexx.domain.user.UserId
+import kirill5k.common.cats.test.IOWordSpec
 
 class SignalServiceSpec extends IOWordSpec {
 

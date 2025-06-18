@@ -111,5 +111,5 @@ class SessionRepositorySpec extends MongoSpec {
         .use { client =>
           client.getDatabase("currexx").flatMap(test)
         }
-    }.unsafeToFuture()(IORuntime.global)
+    }.unsafeToFuture()(using IORuntime.global)
 }

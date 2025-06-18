@@ -46,8 +46,8 @@ object MomentumOscillators {
       ll.enqueue(lowsArr(i))
       if (i > length) {
         stochs(i - length) = (closingsArr(i) - ll.min) / (hh.max - ll.min) * 100d
-        hh.dequeue()
-        ll.dequeue()
+        val _ = hh.dequeue()
+        val _ = ll.dequeue()
         ()
       }
       i += 1

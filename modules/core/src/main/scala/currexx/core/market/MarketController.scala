@@ -2,7 +2,6 @@ package currexx.core.market
 
 import cats.Monad
 import cats.effect.Async
-import cats.syntax.flatMap.*
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema}
 import currexx.domain.market.{CurrencyPair, IndicatorKind}

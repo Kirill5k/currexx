@@ -67,7 +67,7 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
           State.pure(population.map((i, _) => (i, i)))
       case Op.SortByFitness(population) =>
         State.modify[List[String]](_ :+ "Sorting evaluated population by fitness\n") >>
-          State.pure(population.sortBy(_._2)(Ordering[Fitness].reverse))
+          State.pure(population.sortBy(_._2)(using Ordering[Fitness].reverse))
       case Op.ApplyToAll(population, op) =>
         State.modify[List[String]](_ :+ "Applied to the entire population: ") >>
           apply(op(population.head)).map(r => Vector(r))

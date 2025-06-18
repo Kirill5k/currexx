@@ -16,7 +16,7 @@ import scala.concurrent.duration.*
 
 final class Resources[F[_]] private (
     val mongo: MongoDatabase[F],
-    val sttpBackend: SttpBackend[F, Fs2Streams[F] with WebSockets]
+    val sttpBackend: SttpBackend[F, Fs2Streams[F] & WebSockets]
 )
 
 object Resources:
@@ -34,7 +34,7 @@ object Resources:
       .build()
     MongoClient.create[F](settings).evalMap(_.getDatabase("currexx"))
 
-  private def sttpBackend[F[_]: Async]: Resource[F, SttpBackend[F, Fs2Streams[F] with WebSockets]] =
+  private def sttpBackend[F[_]: Async]: Resource[F, SttpBackend[F, Fs2Streams[F] & WebSockets]] =
     HttpClientFs2Backend.resource[F](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
 
   def make[F[_]: Async](config: AppConfig): Resource[F, Resources[F]] =

@@ -8,9 +8,8 @@ object Dependencies {
     val mongo4cats     = "0.7.13"
     val pureConfig     = "0.17.9"
     val circe          = "0.14.14"
-    val circeRefined          = "0.15.1"
+    val circeRefined   = "0.15.1"
     val sttp           = "3.11.0"
-    val http4s         = "0.23.30"
     val logback        = "1.5.18"
     val log4cats       = "2.7.0"
     val bcrypt         = "4.3.0"
@@ -79,10 +78,6 @@ object Dependencies {
       val http4s = "com.softwaremill.sttp.tapir" %% "tapir-http4s-server" % Versions.tapir
       val all    = Seq(core, circe, http4s)
     }
-
-    object http4s {
-      val emberServer = "org.http4s" %% "http4s-ember-server" % Versions.http4s
-    }
   }
 
   val domain = Seq(
@@ -105,8 +100,8 @@ object Dependencies {
   val clients = Libraries.sttp.all
 
   val core = Seq(
+    Libraries.commonScala.http4s,
     Libraries.pureconfig.core,
-    Libraries.http4s.emberServer,
     Libraries.jwt,
     Libraries.bcrypt.cross(CrossVersion.for3Use2_13)
   ) ++

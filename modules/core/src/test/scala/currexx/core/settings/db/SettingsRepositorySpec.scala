@@ -2,16 +2,16 @@ package currexx.core.settings.db
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import currexx.core.fixtures.{Settings, Users}
 import currexx.core.MongoSpec
-import currexx.core.settings.{GlobalSettings, SignalSettings}
+import currexx.core.fixtures.{Settings, Users}
+import currexx.core.settings.GlobalSettings
 import currexx.domain.errors.AppError
 import mongo4cats.bson.Document
 import mongo4cats.bson.syntax.*
 import mongo4cats.circe.given
 import mongo4cats.client.MongoClient
-import mongo4cats.operations.Filter
 import mongo4cats.database.MongoDatabase
+import mongo4cats.operations.Filter
 
 import scala.concurrent.Future
 
@@ -98,5 +98,5 @@ class SettingsRepositorySpec extends MongoSpec {
             res <- test(db)
           yield res
         }
-    }.unsafeToFuture()(IORuntime.global)
+    }.unsafeToFuture()(using IORuntime.global)
 }

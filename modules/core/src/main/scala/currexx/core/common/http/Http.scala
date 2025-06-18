@@ -11,7 +11,6 @@ import currexx.core.monitor.Monitors
 import currexx.core.settings.Settings
 import currexx.core.trade.Trades
 import org.http4s.*
-import org.http4s.implicits.*
 import org.http4s.server.Router
 import org.http4s.server.middleware.*
 
@@ -50,7 +49,7 @@ final class Http[F[_]: Async] private (
   private val loggers: HttpRoutes[F] => HttpRoutes[F] = { (http: HttpRoutes[F]) => RequestLogger.httpRoutes(true, true)(http) }
     .andThen((http: HttpRoutes[F]) => ResponseLogger.httpRoutes(true, true)(http))
 
-  val app: HttpApp[F] = (loggers(middleware(apiRoutes)) <+> healthRoutes).orNotFound
+  val app: HttpRoutes[F] = (loggers(middleware(apiRoutes)) <+> healthRoutes)
 }
 
 object Http:

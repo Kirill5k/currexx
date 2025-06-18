@@ -31,7 +31,7 @@ private[clients] trait XtbClient[F[_]] extends HttpClient[F]:
 
 final private class LiveXtbClient[F[_]](
     private val config: XtbConfig,
-    override protected val backend: SttpBackend[F, Fs2Streams[F] with WebSockets]
+    override protected val backend: SttpBackend[F, Fs2Streams[F] & WebSockets]
 )(using
     F: Async[F],
     logger: Logger[F]
@@ -70,7 +70,7 @@ final private class LiveXtbClient[F[_]](
       state: Ref[F, XtbClient.WsState],
       params: BrokerParameters.Xtb,
       order: TradeOrder.Enter
-  ): Pipe[F, WebSocketFrame.Data[_], WebSocketFrame] = { input =>
+  ): Pipe[F, WebSocketFrame.Data[?], WebSocketFrame] = { input =>
     login(params) ++
       input
         .through(parseXtbResponse)
@@ -88,7 +88,7 @@ final private class LiveXtbClient[F[_]](
       state: Ref[F, XtbClient.WsState],
       params: BrokerParameters.Xtb,
       order: TradeOrder.Exit
-  ): Pipe[F, WebSocketFrame.Data[_], WebSocketFrame] = { input =>
+  ): Pipe[F, WebSocketFrame.Data[?], WebSocketFrame] = { input =>
     login(params) ++
       input
         .through(parseXtbResponse)
@@ -119,7 +119,7 @@ final private class LiveXtbClient[F[_]](
       state: Ref[F, XtbClient.WsState],
       params: BrokerParameters.Xtb,
       cps: NonEmptyList[CurrencyPair]
-  ): Pipe[F, WebSocketFrame.Data[_], WebSocketFrame] = { input =>
+  ): Pipe[F, WebSocketFrame.Data[?], WebSocketFrame] = { input =>
     login(params) ++
       input
         .through(parseXtbResponse)
@@ -141,7 +141,7 @@ final private class LiveXtbClient[F[_]](
         }
   }
 
-  private val parseXtbResponse: Pipe[F, WebSocketFrame.Data[_], XtbResponse] = _.scan(("", Option.empty[String])) {
+  private val parseXtbResponse: Pipe[F, WebSocketFrame.Data[?], XtbResponse] = _.scan(("", Option.empty[String])) {
     case ((msg, _), wsFrame) =>
       wsFrame match
         case WebSocketFrame.Text(jsonPayload, false, _) => (msg + jsonPayload, None)
@@ -221,8 +221,8 @@ object XtbClient:
       }
   }
 
-  def make[F[_]: Async: Logger](
+  def make[F[_]: {Async, Logger}](
       config: XtbConfig,
-      backend: SttpBackend[F, Fs2Streams[F] with WebSockets]
+      backend: SttpBackend[F, Fs2Streams[F] & WebSockets]
   ): F[XtbClient[F]] =
     Monad[F].pure(LiveXtbClient(config, backend))
