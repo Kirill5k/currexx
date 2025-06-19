@@ -3,35 +3,34 @@ package currexx.clients.broker.xtb
 import cats.Monad
 import cats.data.NonEmptyList
 import cats.effect.{Async, Ref}
-import cats.syntax.functor.*
 import cats.syntax.flatMap.*
-import currexx.clients.HttpClient
+import cats.syntax.functor.*
+import currexx.clients.Fs2HttpClient
 import currexx.clients.broker.BrokerParameters
 import currexx.clients.broker.xtb.XtbResponse.{SymbolData, TradeData}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, OpenedTradeOrder, TradeOrder}
-import io.circe.syntax.*
-import org.typelevel.log4cats.Logger
-import sttp.capabilities.WebSockets
-import sttp.capabilities.fs2.Fs2Streams
-import sttp.client3.SttpBackend
-import sttp.ws.WebSocketFrame
-import sttp.client3.*
 import fs2.{Pipe, Stream}
 import io.circe.Encoder
+import io.circe.syntax.*
+import org.typelevel.log4cats.Logger
+import sttp.capabilities.fs2.Fs2Streams
+import sttp.client4.*
+import sttp.client4.ws.stream.asWebSocketStream
+import sttp.ws.WebSocketFrame
 import sttp.ws.WebSocketFrame.Text
 
-import scala.concurrent.duration.*
 import java.nio.charset.StandardCharsets
 import java.time.Instant
+import scala.concurrent.duration.*
 
-private[clients] trait XtbClient[F[_]] extends HttpClient[F]:
+private[clients] trait XtbClient[F[_]] extends Fs2HttpClient[F]:
   def submit(params: BrokerParameters.Xtb, order: TradeOrder): F[Unit]
   def getCurrentOrders(params: BrokerParameters.Xtb, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]]
 
 final private class LiveXtbClient[F[_]](
+    override protected val backend: WebSocketStreamBackend[F, Fs2Streams[F]],
     private val config: XtbConfig,
-    override protected val backend: SttpBackend[F, Fs2Streams[F] & WebSockets]
 )(using
     F: Async[F],
     logger: Logger[F]
@@ -44,8 +43,8 @@ final private class LiveXtbClient[F[_]](
     for
       state <- initEmptyState
       _ <- basicRequest
-        .response(asWebSocketStream(Fs2Streams[F])(orderRetrievalProcess(state, params, cps)))
         .get(uri"${config.baseUri}/${if (params.demo) "demo" else "real"}")
+        .response(asWebSocketStream(Fs2Streams[F])(orderRetrievalProcess(state, params, cps)))
         .send(backend)
         .void
       retrievedOrders <- state.get.map(_.openedTradeOrders)
@@ -54,6 +53,7 @@ final private class LiveXtbClient[F[_]](
   override def submit(params: BrokerParameters.Xtb, order: TradeOrder): F[Unit] =
     initEmptyState.flatMap { state =>
       basicRequest
+        .get(uri"${config.baseUri}/${if (params.demo) "demo" else "real"}")
         .response(
           asWebSocketStream(Fs2Streams[F])(
             order match
@@ -61,7 +61,6 @@ final private class LiveXtbClient[F[_]](
               case enter: TradeOrder.Enter => orderPlacementProcess(state, params, enter)
           )
         )
-        .get(uri"${config.baseUri}/${if (params.demo) "demo" else "real"}")
         .send(backend)
         .void
     }
@@ -223,6 +222,6 @@ object XtbClient:
 
   def make[F[_]: {Async, Logger}](
       config: XtbConfig,
-      backend: SttpBackend[F, Fs2Streams[F] & WebSockets]
+      backend: WebSocketStreamBackend[F, Fs2Streams[F]],
   ): F[XtbClient[F]] =
-    Monad[F].pure(LiveXtbClient(config, backend))
+    Monad[F].pure(LiveXtbClient(backend, config))

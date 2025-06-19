@@ -8,8 +8,8 @@ import currexx.domain.market.{CurrencyPair, TradeOrder}
 import kirill5k.common.sttp.test.SttpWordSpec
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import sttp.client3.SttpBackendOptions
-import sttp.client3.httpclient.fs2.HttpClientFs2Backend
+import sttp.client4.BackendOptions
+import sttp.client4.httpclient.fs2.HttpClientFs2Backend as Fs2Backend
 
 import scala.concurrent.duration.*
 
@@ -26,8 +26,8 @@ class XtbClientSpec extends SttpWordSpec {
   "A XtbClient" should {
     
     "send enter market request" ignore {
-      val result = HttpClientFs2Backend
-        .resource[IO](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
+      val result = Fs2Backend
+        .resource[IO](options = BackendOptions(3.minutes, None))
         .use { backend =>
           for
             client <- XtbClient.make[IO](config, backend)
@@ -40,8 +40,8 @@ class XtbClientSpec extends SttpWordSpec {
     }
 
     "get existing order" ignore {
-      val result = HttpClientFs2Backend
-        .resource[IO](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
+      val result = Fs2Backend
+        .resource[IO](options = BackendOptions(3.minutes, None))
         .use { backend =>
           for
             client <- XtbClient.make[IO](config, backend)
@@ -55,8 +55,8 @@ class XtbClientSpec extends SttpWordSpec {
     }
 
     "send exit market request" ignore {
-      val result = HttpClientFs2Backend
-        .resource[IO](SttpBackendOptions(connectionTimeout = 3.minutes, proxy = None))
+      val result = Fs2Backend
+        .resource[IO](options = BackendOptions(3.minutes, None))
         .use { backend =>
           for
             client <- XtbClient.make[IO](config, backend)

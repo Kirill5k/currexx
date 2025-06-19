@@ -9,9 +9,7 @@ import currexx.clients.data.MarketDataClient
 import currexx.clients.data.alphavantage.{AlphaVantageClient, AlphaVantageConfig}
 import currexx.clients.data.twelvedata.{TwelveDataClient, TwelveDataConfig}
 import org.typelevel.log4cats.Logger
-import sttp.capabilities.WebSockets
 import sttp.capabilities.fs2.Fs2Streams
-import sttp.client3.SttpBackend
 import sttp.client4.WebSocketStreamBackend
 
 final case class ClientsConfig(
@@ -28,13 +26,12 @@ final class Clients[F[_]] private (
 object Clients:
   def make[F[_]: {Async, Logger}](
       config: ClientsConfig,
-      backend: SttpBackend[F, Fs2Streams[F] & WebSockets],
       fs2Backend: WebSocketStreamBackend[F, Fs2Streams[F]]
   ): F[Clients[F]] =
     for
       alphavantage <- AlphaVantageClient.make[F](config.alphaVantage, fs2Backend)
       twelvedata   <- TwelveDataClient.make(config.twelveData, fs2Backend)
-      xtb          <- XtbClient.make[F](config.xtb, backend)
+      xtb          <- XtbClient.make[F](config.xtb, fs2Backend)
       broker       <- BrokerClient.make[F](xtb)
       data         <- MarketDataClient.make[F](alphavantage, twelvedata)
     yield Clients[F](data, broker)
