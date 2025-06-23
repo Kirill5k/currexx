@@ -15,14 +15,10 @@ final private class LiveMarketDataClient[F[_]: MonadThrow](
     private val twelveDataClient: TwelveDataClient[F]
 ) extends MarketDataClient[F] {
   def latestPrice(cp: CurrencyPair): F[PriceRange] =
-    alphaVantageClient
-      .latestPrice(cp)
-      .handleErrorWith(_ => twelveDataClient.latestPrice(cp))
+    twelveDataClient.latestPrice(cp)
 
   def timeSeriesData(cp: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] =
-    alphaVantageClient
-      .timeSeriesData(cp, interval)
-      .handleErrorWith(_ => twelveDataClient.timeSeriesData(cp, interval))
+    twelveDataClient.timeSeriesData(cp, interval)
 }
 
 object MarketDataClient:
