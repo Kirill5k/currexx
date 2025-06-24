@@ -66,7 +66,7 @@ final private class LiveActionProcessor[F[_]](
 }
 
 object ActionProcessor:
-  def make[F[_]: Temporal: Logger](
+  def make[F[_]: {Temporal, Logger}](
       dispatcher: ActionDispatcher[F],
       monitorService: MonitorService[F],
       signalService: SignalService[F],

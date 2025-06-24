@@ -117,7 +117,7 @@ final private class LiveTradeService[F[_]](
 }
 
 object TradeService:
-  def make[F[_]: Temporal: Clock](
+  def make[F[_]: {Temporal, Clock}](
       settingsRepo: TradeSettingsRepository[F],
       orderRepository: TradeOrderRepository[F],
       brokerClient: BrokerClient[F],

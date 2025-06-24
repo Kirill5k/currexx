@@ -54,6 +54,7 @@ object IndicatorKind extends EnumType[IndicatorKind](() => IndicatorKind.values)
 enum IndicatorKind:
   case TrendChangeDetection, ThresholdCrossing, LinesCrossing, KeltnerChannel
 
+//TODO: Consider adding combined indicator (e.g. TrendChangeDetection with ThresholdCrossing)
 enum Indicator(val kind: IndicatorKind) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case TrendChangeDetection(
       source: ValueSource,

@@ -69,7 +69,7 @@ final private class LiveMonitorService[F[_]](
 }
 
 object MonitorService:
-  def make[F[_]: Temporal: Clock](
+  def make[F[_]: {Temporal, Clock}](
       repository: MonitorRepository[F],
       actionDispatcher: ActionDispatcher[F]
   ): F[MonitorService[F]] =

@@ -33,6 +33,7 @@ object Condition {
     typeFieldName = "kind"
   )
 
+  // TODO: Revalidate this
   def trendDirectionChange(line: List[Double]): Option[Condition] = {
     val current  = line.toArray
     val previous = current.tail
@@ -71,6 +72,7 @@ object Condition {
 
   // line1=SLOW, line2=FAST
   // CrossingUp=Sell, CrossingDown=Buy
+  // TODO: Revalidate this
   def linesCrossing(line1: List[Double], line2: List[Double]): Option[Condition] =
     crossingDirection(line1, line2).map(Condition.LinesCrossing(_))
 
