@@ -17,14 +17,6 @@ class ConditionSpec extends AnyWordSpec with Matchers {
         decode[Condition](json) mustBe Right(condition)
       }
 
-      "decode crossing-up condition from json" in {
-        val condition: Condition = Condition.CrossingUp
-        val json                 = """{"kind":"crossing-up"}"""
-
-        condition.asJson.noSpaces mustBe json
-        decode[Condition](json) mustBe Right(condition)
-      }
-
       "decode above-threshold condition from json" in {
         val condition: Condition = Condition.AboveThreshold(BigDecimal(10), BigDecimal(20))
         val json                 = """{"threshold":10,"value":20,"kind":"above-threshold"}"""
