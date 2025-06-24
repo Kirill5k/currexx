@@ -72,8 +72,7 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
               |}""".stripMargin)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val validCondition =
-          "above-threshold, crossing-up, lower-band-crossing, crossing-down, trend-direction-change, upper-band-crossing, below-threshold, lines-crossing"
+        val validCondition = "above-threshold, lower-band-crossing, trend-direction-change, upper-band-crossing, below-threshold, lines-crossing"
         val responseBody = s"""{"message":"Received unknown type: 'foo'. Exists only types: $validCondition."}"""
         res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
