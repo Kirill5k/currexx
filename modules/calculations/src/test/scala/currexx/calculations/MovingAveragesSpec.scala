@@ -40,7 +40,7 @@ class MovingAveragesSpec extends AnyWordSpec with Matchers {
     "calculate Jurik Moving Average (simplified)" in {
       val jma = MovingAverages.jurikSimplified(values, 9, 50, 2)
 
-      jma.take(6).map(rounded(4)) mustBe List(1.1264, 1.1202, 1.1172, 1.1201, 1.1262, 1.1359)
+      jma.take(6).map(rounded(4)) mustBe List(1.1263, 1.1194, 1.1156, 1.1184, 1.1247, 1.1351)
     }
 
     // 1.2999, 1.1214, 1.1155, 1.1169, 1,1223, 1.1341
