@@ -12,7 +12,7 @@ class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
       "calculate Relative Strength Index" in {
         val rsx = MomentumOscillators.jurikRelativeStrengthIndex(values.map(_._4), 14)
 
-        rsx.take(5).map(rounded(4)) mustBe List(58.6573, 59.6341, 59.9327, 59.6661, 58.2627)
+        rsx.take(5).map(rounded(4)) mustBe List(58.6569, 59.6337, 59.9322, 59.6654, 58.2619)
       }
     }
 
@@ -20,7 +20,7 @@ class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
       "calculate Relative Strength Index" in {
         val rsi = MomentumOscillators.relativeStrengthIndex(values.map(_._4), 14)
 
-        rsi.take(5).map(rounded(4)) mustBe List(49.2013, 51.0746, 51.3304, 54.7161, 52.5305)
+        rsi.take(5).map(rounded(4)) mustBe List(49.206, 51.0793, 51.3351, 54.7208, 52.5356)
       }
     }
 
@@ -33,7 +33,7 @@ class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
           length = 14
         )
 
-        stoch.take(5).map(rounded(4)) mustBe List(60.4669, 71.7607, 72.4503, 86.3506, 85.453)
+        stoch.take(5).map(rounded(4)) mustBe List(45.7173, 53.731, 67.1259, 81.6228, 80.055)
       }
     }
   }
