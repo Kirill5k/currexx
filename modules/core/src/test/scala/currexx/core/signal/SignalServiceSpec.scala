@@ -170,7 +170,7 @@ class SignalServiceSpec extends IOWordSpec {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val signal = SignalService.detectThresholdCrossing(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.ThresholdCrossing])
 
-        val expectedCondition = Condition.BelowThreshold(20d, BigDecimal(15.03657545380666))
+        val expectedCondition = Condition.BelowThreshold(20d, BigDecimal(16.294773928361835))
         signal mustBe Some(Signal(Users.uid, Markets.gbpeur, expectedCondition, indicator, timeSeriesData.prices.head.time))
       }
 
