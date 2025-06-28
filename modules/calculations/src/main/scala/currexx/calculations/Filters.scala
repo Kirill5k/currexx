@@ -1,83 +1,87 @@
 package currexx.calculations
 
-import scala.annotation.tailrec
+import breeze.linalg.{DenseMatrix, DenseVector, inv}
 
 object Filters {
 
   def kalman(values: List[Double], gain: Double): List[Double] = {
-    @tailrec
-    def calc(
-        remainingValues: List[Double],
-        kf: Double,
-        velocity: Double,
-        result: List[Double]
-    ): List[Double] =
-      if (remainingValues.isEmpty) result
-      else {
-        val dk          = remainingValues.head - kf
-        val smooth      = kf + dk * math.sqrt(gain * 2)
-        val newVelocity = velocity + gain * dk
-        val newKf       = smooth + newVelocity
-        calc(remainingValues.tail, newKf, newVelocity, smooth :: result)
-      }
+    val filteredStates = kalmanFilter1D(
+      measurements = values,
+      processNoise = gain,
+      measurementNoise = 1.0
+    )
 
-    val reversed = values.reverse
-    calc(reversed, reversed.head, 0.0d, Nil)
+    filteredStates.map(_.x(0))
   }
 
-  def ghKalman(
-      values: List[Double],
-      alpha: Double,
-      beta: Double,
-      initialGuess: Double,
-      initialVelocity: Double,
-      time: Int
-  ): List[Double] = {
-    @tailrec
-    def calc(
-        measurements: List[Double],
-        prevEstimate: Double,
-        prevVelocity: Double,
-        predictions: List[Double]
-    ): List[Double] =
-      if (measurements.isEmpty) predictions
-      else {
-        val currentEstimate = prevEstimate + alpha * (measurements.head - prevEstimate)
-        val currentVelocity = prevVelocity + beta * ((measurements.head - prevEstimate) / time)
-        val nextEstimate    = currentEstimate + time * currentVelocity
-        calc(measurements.tail, nextEstimate, currentVelocity, currentEstimate :: predictions)
-      }
-    calc(values.reverse, initialGuess + time * initialVelocity, initialVelocity, Nil)
-  }
+  /** Represents the state of the Kalman filter at a single point in time.
+    *
+    * @param x
+    *   The state vector [position; velocity].
+    * @param p
+    *   The state covariance matrix, representing the uncertainty of the estimate.
+    */
+  final case class KalmanState(x: DenseVector[Double], p: DenseMatrix[Double])
 
-  def ghkKalman(
-      values: List[Double],
-      alpha: Double,
-      beta: Double,
-      gamma: Double,
-      initialGuess: Double,
-      initialVelocity: Double,
-      initialAcceleration: Double,
-      time: Int
-  ): List[Double] = {
-    @tailrec
-    def calc(
-        measurements: List[Double],
-        prevEstimate: Double,
-        prevVelocity: Double,
-        prevAcceleration: Double,
-        predictions: List[Double]
-    ): List[Double] =
-      if (measurements.isEmpty) predictions
-      else {
-        val currentEstimate     = prevEstimate + alpha * (measurements.head - prevEstimate)
-        val currentVelocity     = prevVelocity + beta * ((measurements.head - prevEstimate) / time)
-        val currentAcceleration = prevAcceleration + gamma * ((measurements.head - prevEstimate) / (math.pow(time, 2) / 2))
-        val nextEstimate        = currentEstimate + time * currentVelocity + currentAcceleration * (math.pow(time, 2) / 2)
-        val nextVelocity        = currentVelocity + currentAcceleration * time
-        calc(measurements.tail, nextEstimate, nextVelocity, currentAcceleration, currentEstimate :: predictions)
+  /** A 1-D Kalman filter for tracking an object's position and velocity.
+    *
+    * @param measurements
+    *   List of position measurements, from oldest to earliest.
+    * @param dt
+    *   The time step between measurements (e.g., 1.0 second).
+    * @param processNoise
+    *   The uncertainty in the model's physics (how much we expect velocity to change unexpectedly).
+    * @param measurementNoise
+    *   The uncertainty of the sensor providing the measurements.
+    * @return
+    *   A list of filtered state estimates (position and velocity), from earliest to latest.
+    */
+  def kalmanFilter1D(
+      measurements: List[Double],
+      dt: Double = 1.0,
+      processNoise: Double = 1e-4,
+      measurementNoise: Double = 0.1
+  ): List[KalmanState] =
+    // The `return` keyword is used here for a "guard clause", which is a common
+    // and readable pattern for handling edge cases at the start of a function.
+    if (measurements.isEmpty) Nil
+    else {
+
+      val F = DenseMatrix((1.0, dt), (0.0, 1.0))
+      val H = DenseMatrix((1.0, 0.0))
+      val Q = DenseMatrix((math.pow(dt, 4) / 4, math.pow(dt, 3) / 2), (math.pow(dt, 3) / 2, math.pow(dt, 2))) * processNoise
+      val R = DenseMatrix(measurementNoise)
+      val I = DenseMatrix.eye[Double](2)
+
+      val it               = measurements.reverseIterator
+      val firstMeasurement = it.next()
+      val initialX         = DenseVector(firstMeasurement, 0.0)
+      val initialP         = DenseMatrix.eye[Double](2) * 500.0
+
+      var currentState              = KalmanState(initialX, initialP)
+      var result: List[KalmanState] = List(currentState)
+
+      while (it.hasNext) {
+        val z = it.next()
+
+        val x_predicted = F * currentState.x
+        val p_predicted = F * currentState.p * F.t + Q
+
+        // --- THE FIX IS HERE: Break the operation into two unambiguous steps ---
+        // 1. First, calculate the predicted measurement as a vector.
+        val predictedMeasurementVector = H * x_predicted
+        // 2. Then, extract the scalar value and perform simple subtraction.
+        val y = z - predictedMeasurementVector(0)
+
+        val S = H * p_predicted * H.t + R
+        val K = p_predicted * H.t * inv(S)
+
+        val x_new = x_predicted + (K.toDenseVector * y)
+        val p_new = (I - (K * H)) * p_predicted
+
+        currentState = KalmanState(x_new, p_new)
+        result = currentState :: result
       }
-    val initialEstimate = initialGuess + time * initialVelocity + initialAcceleration * math.pow(time, 2) / 2
-    calc(values.reverse, initialEstimate, initialVelocity + initialAcceleration * time, initialAcceleration, Nil)
-  }
+      result
+    }
 }

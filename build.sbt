@@ -59,7 +59,7 @@ val calculations = project
   .settings(
     name       := "currexx-calculations",
     moduleName := "currexx-calculations",
-    libraryDependencies ++= Dependencies.test,
+    libraryDependencies ++= Dependencies.calculations ++ Dependencies.test,
     Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
   )
 
