@@ -1,6 +1,6 @@
 package currexx.calculations
 
-import scala.collection.mutable.{Queue => MQueue}
+import scala.collection.mutable.Queue as MQueue
 
 object MomentumOscillators {
 
