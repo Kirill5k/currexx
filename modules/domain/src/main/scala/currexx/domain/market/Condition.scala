@@ -43,7 +43,7 @@ object Condition {
       else if (current < previous) Direction.Downward
       else Direction.Still
 
-    line match {
+    line match
       case latest :: prev1 :: prev2 :: _ =>
         val currentDirection  = getDirection(latest, prev1)
         val previousDirection = getDirection(prev1, prev2)
@@ -64,10 +64,7 @@ object Condition {
               previousTrendLength = Some(trendSegmentCount + 1)
             )
           }
-
-      // If the list has fewer than 3 elements, we cannot detect a change in trend.
       case _ => None
-    }
   }
 
   def thresholdCrossing(line: List[Double], min: Double, max: Double): Option[Condition] =
