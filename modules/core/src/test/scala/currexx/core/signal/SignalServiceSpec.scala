@@ -8,7 +8,7 @@ import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Settings, Signals, Users}
 import currexx.core.settings.TriggerFrequency
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
-import currexx.domain.market.{Condition, Direction, Indicator, MovingAverage, ValueSource, ValueTransformation as VT}
+import currexx.domain.market.{Condition, Direction, Indicator, ValueSource, ValueTransformation as VT}
 import currexx.domain.user.UserId
 import kirill5k.common.cats.test.IOWordSpec
 
@@ -85,7 +85,7 @@ class SignalServiceSpec extends IOWordSpec {
           val expectedSignal = Signal(
             Users.uid,
             Markets.gbpeur,
-            Condition.TrendDirectionChange(Direction.Still, Direction.Upward, Some(1)),
+            Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(13)),
             Markets.trendChangeDetection,
             timeSeriesData.prices.head.time
           )
@@ -112,7 +112,7 @@ class SignalServiceSpec extends IOWordSpec {
           val expectedSignal = Signal(
             Users.uid,
             Markets.gbpeur,
-            Condition.TrendDirectionChange(Direction.Still, Direction.Upward, Some(1)),
+            Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(13)),
             Markets.trendChangeDetection,
             timeSeriesData.prices.head.time
           )
@@ -146,13 +146,13 @@ class SignalServiceSpec extends IOWordSpec {
     }
 
     "detectTrendChange" should {
-      val indicator = Indicator.TrendChangeDetection(ValueSource.Close, VT.NMA(16, 8, 4.2d, MovingAverage.Weighted))
+      val indicator = Indicator.TrendChangeDetection(ValueSource.Close, VT.HMA(16))
 
       "create signal when trend direction changes" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val signal = SignalService.detectTrendChange(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.TrendChangeDetection])
 
-        val expectedCondition = Condition.TrendDirectionChange(Direction.Upward, Direction.Still, Some(1))
+        val expectedCondition = Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(13))
         signal mustBe Some(Signal(Users.uid, Markets.gbpeur, expectedCondition, indicator, timeSeriesData.prices.head.time))
       }
 
