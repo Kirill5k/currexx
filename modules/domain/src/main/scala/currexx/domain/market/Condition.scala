@@ -2,6 +2,7 @@ package currexx.domain.market
 
 import currexx.domain.types.EnumType
 import org.latestbit.circe.adt.codec.*
+import kirill5k.common.syntax.option.*
 
 object Direction extends EnumType[Direction](() => Direction.values)
 enum Direction:
@@ -29,44 +30,59 @@ object Condition {
     typeFieldName = "kind"
   )
 
-  /** Detects if the direction of a time-series line has changed on the most recent data point. If a change is detected, it returns the old
-    * direction, the new direction, and the length of the trend that just ended.
+  /** Detects a significant turn (peak or trough) in a time-series line. This method is more reliable than a simple slope change but has a
+    * lag of `lookback` periods.
     *
     * @param line
-    *   A list of values (e.g., smoothed prices) sorted from latest to earliest.
+    *   A list of values sorted from latest to earliest.
+    * @param lookback
+    *   The number of periods to look before and after the turn point for confirmation. A higher value means more reliability but more lag.
+    *   A common value is 2 or 3.
     * @return
-    *   An Option[Condition.TrendDirectionChange] if a change occurred on the latest tick, otherwise None.
+    *   An Option[Condition.TrendDirectionChange] if a significant turn was confirmed `lookback` periods ago, otherwise None.
     */
-  def trendDirectionChange(line: List[Double]): Option[Condition] = {
+  def trendDirectionChange(line: List[Double], lookback: Int = 1): Option[Condition] = {
     def getDirection(current: Double, previous: Double): Direction =
       if (current > previous) Direction.Upward
       else if (current < previous) Direction.Downward
       else Direction.Still
 
     def calculateTrendLength(history: List[Double], trendDirection: Direction): Int =
-      val historicalSegments = history.sliding(2)
+      val historicalSegments   = history.sliding(2)
       val historicalDirections = historicalSegments.collect { case curr :: prev :: _ => getDirection(curr, prev) }
-      val trendSegmentCount = historicalDirections.takeWhile(_ == trendDirection).size
+      val trendSegmentCount    = historicalDirections.takeWhile(_ == trendDirection).size
       trendSegmentCount + 1
 
-    line match
-      case latest :: prev1 :: prev2 :: _ =>
-        val currentDirection  = getDirection(latest, prev1)
-        val previousDirection = getDirection(prev1, prev2)
+    // The total window size needed to confirm a turn at the center.
+    val windowSize = 2 * lookback + 1
+    Option
+      .flatWhen(line.length >= windowSize) {
+        val window = line.take(windowSize)
+        // The point we are testing is the one in the middle of our window.
+        // Since the list is latest-to-earliest, this point is `lookback` periods in the past.
+        val candidateTurnPoint = window(lookback)
+        val beforeTurn         = window.take(lookback)
+        val afterTurn          = window.drop(lookback + 1)
 
-        // A change occurs if the directions are different.
-        // We often want to ignore changes to/from a 'Still' state, but for completeness,
-        // this implementation detects all changes. You could add `&& previousDirection != Direction.Still`
-        // to be more strict about what constitutes a "trend".
         Option
-          .when(currentDirection != previousDirection) {
+          .when(beforeTurn.forall(_ < candidateTurnPoint) && afterTurn.forall(_ < candidateTurnPoint))(
             Condition.TrendDirectionChange(
-              from = previousDirection,
-              to = currentDirection,
-              previousTrendLength = Some(calculateTrendLength(line.tail, previousDirection))
+              Direction.Upward,
+              Direction.Downward,
+              Some(calculateTrendLength(line.drop(lookback), Direction.Upward))
             )
-          }
-      case _ => None
+          )
+          .orElse(
+            Option
+              .when(beforeTurn.forall(_ > candidateTurnPoint) && afterTurn.forall(_ > candidateTurnPoint))(
+                Condition.TrendDirectionChange(
+                  Direction.Downward,
+                  Direction.Upward,
+                  Some(calculateTrendLength(line.drop(lookback), Direction.Downward))
+                )
+              )
+          )
+      }
   }
 
   def thresholdCrossing(line: List[Double], min: Double, max: Double): Option[Condition] =
