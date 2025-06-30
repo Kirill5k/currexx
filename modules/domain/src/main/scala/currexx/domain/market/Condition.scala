@@ -29,29 +29,45 @@ object Condition {
     typeFieldName = "kind"
   )
 
-  // TODO: Revalidate this
+  /** Detects if the direction of a time-series line has changed on the most recent data point. If a change is detected, it returns the old
+    * direction, the new direction, and the length of the trend that just ended.
+    *
+    * @param line
+    *   A list of values (e.g., smoothed prices) sorted from latest to earliest.
+    * @return
+    *   An Option[Condition.TrendDirectionChange] if a change occurred on the latest tick, otherwise None.
+    */
   def trendDirectionChange(line: List[Double]): Option[Condition] = {
-    val current  = line.toArray
-    val previous = current.tail
+    def getDirection(current: Double, previous: Double): Direction =
+      if (current > previous) Direction.Upward
+      else if (current < previous) Direction.Downward
+      else Direction.Still
 
-    val diff                        = previous.lazyZip(current).map((p, c) => p - 2 * c)
-    val isGrowing: Int => Boolean   = i => diff(i) > diff(i + 1) && diff(i + 1) > diff(i + 2)
-    val isDeclining: Int => Boolean = i => diff(i) < diff(i + 1) && diff(i + 1) < diff(i + 2)
+    line match {
+      case latest :: prev1 :: prev2 :: _ =>
+        val currentDirection  = getDirection(latest, prev1)
+        val previousDirection = getDirection(prev1, prev2)
 
-    val trend = LazyList
-      .range(0, line.size - 3)
-      .map { i =>
-        if (!isGrowing(i) && !isDeclining(i)) Direction.Still
-        else if (current(i) > previous(i)) Direction.Upward
-        else Direction.Downward
-      }
+        // A change occurs if the directions are different.
+        // We often want to ignore changes to/from a 'Still' state, but for completeness,
+        // this implementation detects all changes. You could add `&& previousDirection != Direction.Still`
+        // to be more strict about what constitutes a "trend".
+        Option
+          .when(currentDirection != previousDirection) {
+            val historicalSegments   = line.tail.sliding(2)
+            val historicalDirections = historicalSegments.collect { case curr :: prev :: _ => getDirection(curr, prev) }
+            val trendSegmentCount    = historicalDirections.takeWhile(_ == previousDirection).size
 
-    val currTrend = trend.head
-    val prevTrend = trend.drop(1).head
-    Option
-      .when(currTrend != prevTrend)(
-        Condition.TrendDirectionChange(prevTrend, currTrend, Some(trend.drop(1).takeWhile(_ == prevTrend).size))
-      )
+            Condition.TrendDirectionChange(
+              from = previousDirection,
+              to = currentDirection,
+              previousTrendLength = Some(trendSegmentCount + 1)
+            )
+          }
+
+      // If the list has fewer than 3 elements, we cannot detect a change in trend.
+      case _ => None
+    }
   }
 
   def thresholdCrossing(line: List[Double], min: Double, max: Double): Option[Condition] =
