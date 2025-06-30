@@ -43,6 +43,12 @@ object Condition {
       else if (current < previous) Direction.Downward
       else Direction.Still
 
+    def calculateTrendLength(history: List[Double], trendDirection: Direction): Int =
+      val historicalSegments = history.sliding(2)
+      val historicalDirections = historicalSegments.collect { case curr :: prev :: _ => getDirection(curr, prev) }
+      val trendSegmentCount = historicalDirections.takeWhile(_ == trendDirection).size
+      trendSegmentCount + 1
+
     line match
       case latest :: prev1 :: prev2 :: _ =>
         val currentDirection  = getDirection(latest, prev1)
@@ -54,14 +60,10 @@ object Condition {
         // to be more strict about what constitutes a "trend".
         Option
           .when(currentDirection != previousDirection) {
-            val historicalSegments   = line.tail.sliding(2)
-            val historicalDirections = historicalSegments.collect { case curr :: prev :: _ => getDirection(curr, prev) }
-            val trendSegmentCount    = historicalDirections.takeWhile(_ == previousDirection).size
-
             Condition.TrendDirectionChange(
               from = previousDirection,
               to = currentDirection,
-              previousTrendLength = Some(trendSegmentCount + 1)
+              previousTrendLength = Some(calculateTrendLength(line.tail, previousDirection))
             )
           }
       case _ => None
