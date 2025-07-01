@@ -30,6 +30,50 @@ object Condition {
     typeFieldName = "kind"
   )
 
+  /** Detects if a crossover occurred between two time-series lines on the most recent data point.
+    *
+    * This function provides a general-purpose utility for identifying crossover events. The interpretation of the crossover (e.g., as a
+    * buy/sell signal) is left to the caller.
+    *
+    * The direction of the cross is reported from the perspective of `line1`:
+    *   - `Upward` cross: `line1` has crossed from being below `line2` to being at or above `line2`.
+    *   - `Downward` cross: `line1` has crossed from being above `line2` to being at or below `line2`.
+    *
+    * Example Use Case: A classic moving average crossover signal could be implemented by the caller like this:
+    * {{{
+    *   val fastMA = ...
+    *   val slowMA = ...
+    *   linesCrossing(fastMA, slowMA) match {
+    *     case Some(Condition.LinesCrossing(Direction.Upward)) => // Golden Cross -> Potential BUY signal
+    *     case Some(Condition.LinesCrossing(Direction.Downward)) => // Death Cross -> Potential SELL signal
+    *     case _ => // No signal
+    *   }
+    * }}}
+    *
+    * @param line1
+    *   The first line (e.g., a fast moving average, or the price line). Data is sorted from latest to earliest.
+    * @param line2
+    *   The second line (e.g., a slow moving average, or a signal line). Data is sorted from latest to earliest.
+    * @return
+    *   `Some(Condition.LinesCrossing)` containing the direction of the cross if one occurred. `None` otherwise.
+    */
+  def linesCrossing(line1: List[Double], line2: List[Double]): Option[Condition] =
+    crossingDirection(line1, line2)
+      .map(Condition.LinesCrossing(_))
+
+  def barrierCrossing(line: List[Double], upperBarrier: List[Double], lowerBarrier: List[Double]): Option[Condition] =
+    crossingDirection(line, upperBarrier)
+      .map(Condition.UpperBandCrossing(_))
+      .orElse(crossingDirection(line, lowerBarrier).map(Condition.LowerBandCrossing(_)))
+
+  private def crossingDirection(line1: List[Double], line2: List[Double]): Option[Direction] =
+    (line1, line2) match
+      case (l1c :: l1p :: _, l2c :: l2p :: _) =>
+        Option
+          .when(l1c >= l2c && l1p < l2p)(Direction.Upward)                  // line1 crossed above line2
+          .orElse(Option.when(l1c <= l2c && l1p > l2p)(Direction.Downward)) // line1 crossed below line2
+      case _ => None
+
   /** Detects a significant turn (peak or trough) in a time-series line. This method is more reliable than a simple slope change but has a
     * lag of `lookback` periods.
     *
@@ -90,21 +134,4 @@ object Condition {
       case (c, p) if c > max && p <= max => Some(Condition.AboveThreshold(max, c))
       case (c, p) if c < min && p >= min => Some(Condition.BelowThreshold(min, c))
       case _                             => None
-
-  private def crossingDirection(line1: List[Double], line2: List[Double]): Option[Direction] =
-    (line1.head, line2.head, line1.drop(1).head, line2.drop(1).head) match
-      case (l1c, l2c, l1p, l2p) if l1c >= l2c && l1p < l2p => Some(Direction.Upward)
-      case (l1c, l2c, l1p, l2p) if l1c <= l2c && l1p > l2p => Some(Direction.Downward)
-      case _                                               => None
-
-  // line1=SLOW, line2=FAST
-  // CrossingUp=Sell, CrossingDown=Buy
-  // TODO: Revalidate this
-  def linesCrossing(line1: List[Double], line2: List[Double]): Option[Condition] =
-    crossingDirection(line1, line2).map(Condition.LinesCrossing(_))
-
-  def barrierCrossing(line: List[Double], upperBarrier: List[Double], lowerBarrier: List[Double]): Option[Condition] =
-    crossingDirection(line, upperBarrier)
-      .map(Condition.UpperBandCrossing(_))
-      .orElse(crossingDirection(line, lowerBarrier).map(Condition.LowerBandCrossing(_)))
 }
