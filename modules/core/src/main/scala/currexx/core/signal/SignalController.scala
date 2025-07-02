@@ -8,7 +8,8 @@ import cats.effect.Async
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, Interval}
+import currexx.domain.market.{CurrencyPair, Interval}
+import currexx.domain.signal.{Condition, Indicator}
 import kirill5k.common.cats.Clock
 import io.circe.Codec
 import org.http4s.HttpRoutes

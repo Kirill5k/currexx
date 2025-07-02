@@ -3,7 +3,8 @@ package currexx.core.common.http
 import currexx.clients.broker.BrokerParameters
 import currexx.core.market.MarketController.MarketStateView
 import currexx.core.monitor.MonitorController.{CreateMonitorRequest, MonitorView}
-import currexx.domain.market.{Condition, Currency, Direction, Indicator, TradeOrder}
+import currexx.domain.market.{Currency, TradeOrder}
+import currexx.domain.signal.{Condition, Direction, Indicator}
 import eu.timepit.refined.types.string.NonEmptyString
 import currexx.domain.validations.{EmailString, IdString}
 import currexx.domain.user.UserId

@@ -7,7 +7,8 @@ import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.signal.Signal
 import currexx.core.market.db.MarketStateRepository
 import currexx.core.trade.TradeOrderPlacement
-import currexx.domain.market.{Condition, CurrencyPair, TradeOrder}
+import currexx.domain.market.{CurrencyPair, TradeOrder}
+import currexx.domain.signal.Condition
 import currexx.domain.user.UserId
 
 trait MarketService[F[_]]:

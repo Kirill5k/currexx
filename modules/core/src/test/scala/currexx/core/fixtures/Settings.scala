@@ -6,7 +6,7 @@ import currexx.core.trade.TradeStrategy
 
 object Settings {
 
-  lazy val signal = SignalSettings(List(Markets.trendChangeDetection))
+  lazy val signal = SignalSettings(List(Signals.trendChangeDetection))
 
   lazy val trade = TradeSettings(
     TradeStrategy.Disabled,

@@ -1,7 +1,7 @@
-package currexx.domain.market
+package currexx.domain.signal
 
-import io.circe.syntax.*
 import io.circe.parser.*
+import io.circe.syntax.*
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 

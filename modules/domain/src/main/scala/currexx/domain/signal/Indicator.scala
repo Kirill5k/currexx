@@ -1,4 +1,4 @@
-package currexx.domain.market
+package currexx.domain.signal
 
 import cats.data.NonEmptyList
 import currexx.domain.types.EnumType
@@ -55,8 +55,6 @@ object IndicatorKind extends EnumType[IndicatorKind](() => IndicatorKind.values)
 enum IndicatorKind:
   case TrendChangeDetection, ThresholdCrossing, LinesCrossing, KeltnerChannel, Composite
 
-//TODO: Consider adding combined indicator (e.g. TrendChangeDetection with ThresholdCrossing)
-//A combination of indicators looking for different things (e.g., trend, momentum, volatility) creates a much more reliable signal.
 enum Indicator(val kind: IndicatorKind) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Composite(
       indicators: NonEmptyList[Indicator]

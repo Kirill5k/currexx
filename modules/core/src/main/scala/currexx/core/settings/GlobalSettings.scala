@@ -2,7 +2,8 @@ package currexx.core.settings
 
 import currexx.clients.broker.BrokerParameters
 import currexx.core.trade.TradeStrategy
-import currexx.domain.market.{CurrencyPair, Indicator, TradeOrder}
+import currexx.domain.market.{CurrencyPair, TradeOrder}
+import currexx.domain.signal.Indicator
 import currexx.domain.user.UserId
 import io.circe.Codec
 

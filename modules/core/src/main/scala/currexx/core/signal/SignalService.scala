@@ -10,11 +10,10 @@ import currexx.calculations.{Filters, MomentumOscillators, MovingAverages, Volat
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
-import currexx.domain.market.{
+import currexx.domain.market.{CurrencyPair, MarketTimeSeriesData}
+import currexx.domain.signal.{
   Condition,
-  CurrencyPair,
   Indicator,
-  MarketTimeSeriesData,
   MovingAverage,
   ValueSource as VS,
   ValueTransformation as VT

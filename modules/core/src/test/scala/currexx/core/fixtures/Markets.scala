@@ -4,25 +4,17 @@ import cats.data.NonEmptyList
 import currexx.core.market.{MarketProfile, MarketState, PositionState}
 import currexx.domain.market.Currency.{EUR, GBP, USD}
 import currexx.domain.market.{
-  Direction,
   CurrencyPair,
-  Indicator,
   Interval,
   MarketTimeSeriesData,
   PriceRange,
   TradeOrder,
-  ValueSource,
-  ValueTransformation
 }
+import currexx.domain.signal.Direction
 
 import java.time.{Instant, LocalDate, ZoneOffset}
 
 object Markets {
-  lazy val trendChangeDetection: Indicator =
-    Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(16))
-  lazy val thresholdCrossing: Indicator =
-    Indicator.ThresholdCrossing(ValueSource.Close, ValueTransformation.STOCH(14), 80d, 20d)
-
   lazy val gbpeur: CurrencyPair = CurrencyPair(GBP, EUR)
   lazy val gbpusd: CurrencyPair = CurrencyPair(GBP, USD)
 

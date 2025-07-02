@@ -1,11 +1,14 @@
 package currexx.core.market
 
-import currexx.domain.market.{Condition, CurrencyPair, Direction, TradeOrder}
+import currexx.domain.market.{CurrencyPair, TradeOrder}
+import currexx.domain.signal.{Condition, Direction}
 import currexx.domain.user.UserId
 import io.circe.Codec
 
 import java.time.Instant
 
+
+//TODO: REFINE: This is a simplified version of the market state.
 final case class MarketProfile(
     // Trend-related view
     trendDirection: Option[Direction] = None, // e.g., from TrendChangeDetection

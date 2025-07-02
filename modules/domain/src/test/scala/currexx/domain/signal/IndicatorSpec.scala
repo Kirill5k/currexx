@@ -1,4 +1,4 @@
-package currexx.domain.market
+package currexx.domain.signal
 
 import io.circe.parser.decode
 import io.circe.syntax.*

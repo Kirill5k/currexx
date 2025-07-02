@@ -1,9 +1,9 @@
-package currexx.domain.market
+package currexx.domain.signal
 
 import cats.data.NonEmptyList
 import currexx.domain.types.EnumType
-import org.latestbit.circe.adt.codec.*
 import kirill5k.common.syntax.option.*
+import org.latestbit.circe.adt.codec.*
 
 object Direction extends EnumType[Direction](() => Direction.values)
 enum Direction:

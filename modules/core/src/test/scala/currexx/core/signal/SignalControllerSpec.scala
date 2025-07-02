@@ -5,7 +5,8 @@ import kirill5k.common.http4s.test.HttpRoutesWordSpec
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Sessions, Signals, Users}
-import currexx.domain.market.*
+import currexx.domain.market.{Interval}
+import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation, Condition, Direction}
 import currexx.domain.user.UserId
 import kirill5k.common.cats.Clock
 import org.http4s.implicits.*
