@@ -1,5 +1,6 @@
 package currexx.domain.market
 
+import cats.data.NonEmptyList
 import currexx.domain.types.EnumType
 import io.circe.{Decoder, Encoder}
 import org.latestbit.circe.adt.codec.*
@@ -52,10 +53,14 @@ object ValueTransformation {
 
 object IndicatorKind extends EnumType[IndicatorKind](() => IndicatorKind.values)
 enum IndicatorKind:
-  case TrendChangeDetection, ThresholdCrossing, LinesCrossing, KeltnerChannel
+  case TrendChangeDetection, ThresholdCrossing, LinesCrossing, KeltnerChannel, Composite
 
 //TODO: Consider adding combined indicator (e.g. TrendChangeDetection with ThresholdCrossing)
+//A combination of indicators looking for different things (e.g., trend, momentum, volatility) creates a much more reliable signal.
 enum Indicator(val kind: IndicatorKind) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+  case Composite(
+      indicators: NonEmptyList[Indicator]
+  ) extends Indicator(IndicatorKind.Composite)
   case TrendChangeDetection(
       source: ValueSource,
       transformation: ValueTransformation
@@ -82,6 +87,7 @@ enum Indicator(val kind: IndicatorKind) derives JsonTaggedAdt.EncoderWithConfig,
 object Indicator:
   given JsonTaggedAdt.Config[Indicator] = JsonTaggedAdt.Config.Values[Indicator](
     mappings = Map(
+      IndicatorKind.Composite.print            -> JsonTaggedAdt.tagged[Indicator.Composite],
       IndicatorKind.TrendChangeDetection.print -> JsonTaggedAdt.tagged[Indicator.TrendChangeDetection],
       IndicatorKind.ThresholdCrossing.print    -> JsonTaggedAdt.tagged[Indicator.ThresholdCrossing],
       IndicatorKind.LinesCrossing.print        -> JsonTaggedAdt.tagged[Indicator.LinesCrossing],

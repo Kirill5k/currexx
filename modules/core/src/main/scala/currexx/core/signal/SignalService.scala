@@ -1,6 +1,7 @@
 package currexx.core.signal
 
 import cats.Monad
+import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
@@ -40,13 +41,8 @@ final private class LiveSignalService[F[_]](
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
     for
       settings <- settingsRepo.get(uid)
-      signals <- settings.indicators
-        .flatMap {
-          case tcd: Indicator.TrendChangeDetection => SignalService.detectTrendChange(uid, data, tcd)
-          case tc: Indicator.ThresholdCrossing     => SignalService.detectThresholdCrossing(uid, data, tc)
-          case ls: Indicator.LinesCrossing         => SignalService.detectLinesCrossing(uid, data, ls)
-          case kc: Indicator.KeltnerChannel        => SignalService.detectBarrierCrossing(uid, data, kc)
-        }
+      signals  <- settings.indicators
+        .flatMap(i => SignalService.detectSignal(uid, data, i))
         .traverse { signal =>
           settings.triggerFrequency match
             case TriggerFrequency.Continuously => F.pure(Some(signal))
@@ -62,6 +58,28 @@ final private class LiveSignalService[F[_]](
 }
 
 object SignalService {
+
+  def detectSignal(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator): Option[Signal] =
+    indicator match {
+      case tcd: Indicator.TrendChangeDetection => detectTrendChange(uid, data, tcd)
+      case tc: Indicator.ThresholdCrossing     => detectThresholdCrossing(uid, data, tc)
+      case lc: Indicator.LinesCrossing         => detectLinesCrossing(uid, data, lc)
+      case kc: Indicator.KeltnerChannel        => detectBarrierCrossing(uid, data, kc)
+      case c: Indicator.Composite              =>
+        val childSignalOptions = c.indicators.map(childInd => detectSignal(uid, data, childInd))
+        Option
+          .when(childSignalOptions.forall(_.isDefined)) {
+            val childSignals       = childSignalOptions.toList.flatten
+            val compositeCondition = Condition.Composite(NonEmptyList.fromListUnsafe(childSignals.map(_.condition)))
+            Signal(
+              userId = uid,
+              currencyPair = data.currencyPair,
+              condition = compositeCondition,
+              triggeredBy = c, // The parent indicator
+              time = data.prices.head.time
+            )
+          }
+    }
 
   extension (vs: VS)
     private def extract(data: MarketTimeSeriesData): List[Double] = {

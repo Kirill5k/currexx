@@ -1,5 +1,6 @@
 package currexx.domain.market
 
+import cats.data.NonEmptyList
 import currexx.domain.types.EnumType
 import org.latestbit.circe.adt.codec.*
 import kirill5k.common.syntax.option.*
@@ -9,6 +10,7 @@ enum Direction:
   case Upward, Downward, Still
 
 enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+  case Composite(conditions: NonEmptyList[Condition])
   case UpperBandCrossing(direction: Direction)
   case LowerBandCrossing(direction: Direction)
   case LinesCrossing(direction: Direction)
@@ -19,6 +21,7 @@ enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWit
 object Condition {
   given JsonTaggedAdt.Config[Condition] = JsonTaggedAdt.Config.Values[Condition](
     mappings = Map(
+      "composite"              -> JsonTaggedAdt.tagged[Condition.Composite],
       "upper-band-crossing"    -> JsonTaggedAdt.tagged[Condition.UpperBandCrossing],
       "lower-band-crossing"    -> JsonTaggedAdt.tagged[Condition.LowerBandCrossing],
       "lines-crossing"         -> JsonTaggedAdt.tagged[Condition.LinesCrossing],
