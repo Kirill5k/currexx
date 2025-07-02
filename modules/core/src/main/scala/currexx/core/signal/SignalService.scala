@@ -10,7 +10,6 @@ import currexx.domain.user.UserId
 import currexx.calculations.{Filters, MomentumOscillators, MovingAverages, Volatility}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
-import kirill5k.common.syntax.time.*
 import currexx.core.settings.TriggerFrequency
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.market.{
@@ -42,7 +41,7 @@ final private class LiveSignalService[F[_]](
     for
       settings <- settingsRepo.get(uid)
       signals  <- settings.indicators
-        .flatMap(i => SignalService.detectSignal(uid, data, i))
+        .flatMap(SignalService.detectSignal(uid, data, _))
         .traverse { signal =>
           settings.triggerFrequency match
             case TriggerFrequency.Continuously => F.pure(Some(signal))
@@ -69,12 +68,11 @@ object SignalService {
         val childSignalOptions = c.indicators.map(childInd => detectSignal(uid, data, childInd))
         Option
           .when(childSignalOptions.forall(_.isDefined)) {
-            val childSignals       = childSignalOptions.toList.flatten
-            val compositeCondition = Condition.Composite(NonEmptyList.fromListUnsafe(childSignals.map(_.condition)))
+            val childSignals = childSignalOptions.toList.flatten
             Signal(
               userId = uid,
               currencyPair = data.currencyPair,
-              condition = compositeCondition,
+              condition = Condition.Composite(NonEmptyList.fromListUnsafe(childSignals.map(_.condition))),
               triggeredBy = c, // The parent indicator
               time = data.prices.head.time
             )
@@ -83,8 +81,7 @@ object SignalService {
 
   extension (vs: VS)
     private def extract(data: MarketTimeSeriesData): List[Double] = {
-      val hour   = data.prices.head.time.hour
-      val prices = if (hour > 1 && hour < 12) data.prices.tail else data.prices.toList
+      val prices = data.prices.toList
       vs match
         case VS.Close => prices.map(_.close)
         case VS.Open  => prices.map(_.open)
