@@ -54,7 +54,7 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
           .withBody("""{"currencyPair":"GBP/EUR","triggeredBy": {"kind": "foo"}}""")
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val validIndicators = "keltner-channel, lines-crossing, threshold-crossing, trend-change-detection"
+        val validIndicators = "trend-change-detection, keltner-channel, lines-crossing, threshold-crossing, composite"
         val responseBody = s"""{"message":"Missing required field, Received unknown type: 'foo'. Exists only types: $validIndicators."}"""
         res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
@@ -72,7 +72,7 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
               |}""".stripMargin)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val validCondition = "above-threshold, lower-band-crossing, trend-direction-change, upper-band-crossing, below-threshold, lines-crossing"
+        val validCondition = "above-threshold, lower-band-crossing, composite, trend-direction-change, upper-band-crossing, below-threshold, lines-crossing"
         val responseBody = s"""{"message":"Received unknown type: 'foo'. Exists only types: $validCondition."}"""
         res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
