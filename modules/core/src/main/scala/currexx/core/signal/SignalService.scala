@@ -37,6 +37,7 @@ final private class LiveSignalService[F[_]](
   override def getAll(uid: UserId, sp: SearchParams): F[List[Signal]] = signalRepo.getAll(uid, sp)
   override def submit(signal: Signal): F[Unit] = saveAndDispatchAction(signal.userId, signal.currencyPair, List(signal))
 
+  //TODO: consider 1) getting rid of trigger frequency 2) changing settings.signals to settings.signal
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
     for
       settings <- settingsRepo.get(uid)
@@ -72,6 +73,7 @@ object SignalService {
             Signal(
               userId = uid,
               currencyPair = data.currencyPair,
+              interval = data.interval,
               condition = Condition.Composite(NonEmptyList.fromListUnsafe(childSignals.map(_.condition))),
               triggeredBy = c, // The parent indicator
               time = data.prices.head.time
@@ -116,7 +118,16 @@ object SignalService {
     val transformed = indicator.transformation.transform(source, data)
     Condition
       .thresholdCrossing(transformed, indicator.lowerBoundary, indicator.upperBoundary)
-      .map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))
+      .map { cond =>
+        Signal(
+          userId = uid,
+          currencyPair = data.currencyPair,
+          interval = data.interval,
+          condition = cond,
+          triggeredBy = indicator,
+          time = data.prices.head.time
+        )
+      }
   }
 
   def detectTrendChange(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.TrendChangeDetection): Option[Signal] = {
@@ -124,7 +135,16 @@ object SignalService {
     val transformed = indicator.transformation.transform(source, data)
     Condition
       .trendDirectionChange(transformed)
-      .map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))
+      .map { cond =>
+        Signal(
+          userId = uid,
+          currencyPair = data.currencyPair,
+          interval = data.interval,
+          condition = cond,
+          triggeredBy = indicator,
+          time = data.prices.head.time
+        )
+      }
   }
 
   def detectLinesCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.LinesCrossing): Option[Signal] = {
@@ -133,7 +153,16 @@ object SignalService {
     val line2  = indicator.line2Transformation.transform(source, data)
     Condition
       .linesCrossing(line1, line2)
-      .map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))
+      .map { cond =>
+        Signal(
+          userId = uid,
+          currencyPair = data.currencyPair,
+          interval = data.interval,
+          condition = cond,
+          triggeredBy = indicator,
+          time = data.prices.head.time
+        )
+      }
   }
 
   def detectBarrierCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.KeltnerChannel): Option[Signal] = {
@@ -146,7 +175,16 @@ object SignalService {
     Condition
       .barrierCrossing(line2, upperBand, lowerBand)
       .orElse(Condition.linesCrossing(line1, line2))
-      .map(cond => Signal(uid, data.currencyPair, cond, indicator, data.prices.head.time))
+      .map { cond =>
+        Signal(
+          userId = uid,
+          currencyPair = data.currencyPair,
+          interval = data.interval,
+          condition = cond,
+          triggeredBy = indicator,
+          time = data.prices.head.time
+        )
+      }
   }
 
   def make[F[_]: Concurrent](

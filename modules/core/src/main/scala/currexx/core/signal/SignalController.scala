@@ -8,7 +8,7 @@ import cats.effect.Async
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{Condition, CurrencyPair, Indicator}
+import currexx.domain.market.{Condition, CurrencyPair, Indicator, Interval}
 import kirill5k.common.cats.Clock
 import io.circe.Codec
 import org.http4s.HttpRoutes
@@ -31,7 +31,14 @@ final private class SignalController[F[_]](
       .serverLogic { session => req =>
         for
           time <- clock.now
-          signal = Signal(session.userId, req.currencyPair, req.condition, req.triggeredBy, time)
+          signal = Signal(
+            userId = session.userId,
+            interval = req.interval,
+            currencyPair = req.currencyPair,
+            condition = req.condition,
+            triggeredBy = req.triggeredBy,
+            time = time
+          )
           res <- service.submit(signal).voidResponse
         yield res
       }
@@ -57,12 +64,14 @@ final private class SignalController[F[_]](
 object SignalController extends TapirSchema with TapirJson {
 
   final case class SubmitSignalRequest(
+      interval: Interval,
       currencyPair: CurrencyPair,
       condition: Condition,
       triggeredBy: Indicator
   ) derives Codec.AsObject
 
   final case class SignalView(
+      interval: Interval,
       currencyPair: CurrencyPair,
       condition: Condition,
       triggeredBy: Indicator,
@@ -71,7 +80,13 @@ object SignalController extends TapirSchema with TapirJson {
 
   object SignalView:
     def from(signal: Signal): SignalView =
-      SignalView(signal.currencyPair, signal.condition, signal.triggeredBy, signal.time)
+      SignalView(
+        interval = signal.interval,
+        currencyPair = signal.currencyPair,
+        condition = signal.condition,
+        triggeredBy = signal.triggeredBy,
+        time = signal.time
+      )
 
   private val basePath = "signals"
 

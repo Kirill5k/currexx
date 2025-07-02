@@ -83,11 +83,12 @@ class SignalServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           val expectedSignal = Signal(
-            Users.uid,
-            Markets.gbpeur,
-            Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(13)),
-            Markets.trendChangeDetection,
-            timeSeriesData.prices.head.time
+            userId = Users.uid,
+            interval = Markets.timeSeriesData.interval,
+            currencyPair = Markets.gbpeur,
+            condition = Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(13)),
+            triggeredBy = Markets.trendChangeDetection,
+            time = timeSeriesData.prices.head.time
           )
           verify(settRepo).get(Users.uid)
           verify(signRepo).isFirstOfItsKindForThatDate(expectedSignal)
@@ -110,12 +111,14 @@ class SignalServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           val expectedSignal = Signal(
-            Users.uid,
-            Markets.gbpeur,
-            Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(13)),
-            Markets.trendChangeDetection,
-            timeSeriesData.prices.head.time
+            userId = Users.uid,
+            interval = Markets.timeSeriesData.interval,
+            currencyPair = Markets.gbpeur,
+            condition = Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(13)),
+            triggeredBy = Markets.trendChangeDetection,
+            time = timeSeriesData.prices.head.time
           )
+
           verify(settRepo).get(Users.uid)
           verify(signRepo).saveAll(List(expectedSignal))
           verifyNoMoreInteractions(signRepo)
@@ -152,8 +155,16 @@ class SignalServiceSpec extends IOWordSpec {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val signal = SignalService.detectTrendChange(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.TrendChangeDetection])
 
-        val expectedCondition = Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(13))
-        signal mustBe Some(Signal(Users.uid, Markets.gbpeur, expectedCondition, indicator, timeSeriesData.prices.head.time))
+        signal mustBe Some(
+          Signal(
+            userId = Users.uid,
+            interval = Markets.timeSeriesData.interval,
+            currencyPair = Markets.gbpeur,
+            condition = Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(13)),
+            triggeredBy = indicator,
+            time = timeSeriesData.prices.head.time
+          )
+        )
       }
 
       "not do anything when trend hasn't changed" in {
@@ -170,8 +181,16 @@ class SignalServiceSpec extends IOWordSpec {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val signal = SignalService.detectThresholdCrossing(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.ThresholdCrossing])
 
-        val expectedCondition = Condition.BelowThreshold(20d, BigDecimal(16.294773928361835))
-        signal mustBe Some(Signal(Users.uid, Markets.gbpeur, expectedCondition, indicator, timeSeriesData.prices.head.time))
+        signal mustBe Some(
+          Signal(
+            userId = Users.uid,
+            interval = Markets.timeSeriesData.interval,
+            currencyPair = Markets.gbpeur,
+            condition = Condition.BelowThreshold(20d, BigDecimal(16.294773928361835)),
+            triggeredBy = indicator,
+            time = timeSeriesData.prices.head.time
+          )
+        )
       }
 
       "not do anything when current value is within limits" in {
@@ -197,16 +216,17 @@ class SignalServiceSpec extends IOWordSpec {
 
         signal mustBe Some(
           Signal(
-            Users.uid,
-            Markets.gbpeur,
-            Condition.Composite(
+            userId = Users.uid,
+            currencyPair = Markets.gbpeur,
+            interval = Markets.timeSeriesData.interval,
+            condition = Condition.Composite(
               NonEmptyList.of(
                 Condition.BelowThreshold(20d, BigDecimal(16.294773928361835)),
                 Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(13))
               )
             ),
-            indicator,
-            timeSeriesData.prices.head.time
+            triggeredBy = indicator,
+            time = timeSeriesData.prices.head.time
           )
         )
       }

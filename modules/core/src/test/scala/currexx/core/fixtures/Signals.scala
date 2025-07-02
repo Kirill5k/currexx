@@ -1,7 +1,7 @@
 package currexx.core.fixtures
 
 import currexx.core.signal.*
-import currexx.domain.market.{Condition, Direction}
+import currexx.domain.market.{Condition, Direction, Interval}
 
 import java.time.Instant
 import java.time.temporal.ChronoField
@@ -10,18 +10,20 @@ object Signals {
   lazy val ts = Instant.now.`with`(ChronoField.MILLI_OF_SECOND, 0)
 
   lazy val trendDirectionChanged = Signal(
-    Users.uid,
-    Markets.gbpeur,
-    Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(1)),
-    Markets.trendChangeDetection,
-    ts
+    userId = Users.uid,
+    currencyPair = Markets.gbpeur,
+    interval = Interval.H1,
+    condition = Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(1)),
+    triggeredBy = Markets.trendChangeDetection,
+    time = ts
   )
 
   lazy val thresholdCrossing = Signal(
-    Users.uid,
-    Markets.gbpeur,
-    Condition.AboveThreshold(BigDecimal(80), 95),
-    Markets.thresholdCrossing,
-    ts
+    userId = Users.uid,
+    currencyPair = Markets.gbpeur,
+    interval = Interval.H1,
+    condition = Condition.AboveThreshold(BigDecimal(80), 95),
+    triggeredBy = Markets.thresholdCrossing,
+    time = ts
   )
 }

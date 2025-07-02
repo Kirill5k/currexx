@@ -28,22 +28,22 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
         val req = Request[IO](Method.POST, uri"/signals")
           .withAuthHeader()
           .withBody("""{
+              |"interval":"H1",
               |"currencyPair":"GBP/EUR",
               |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
               |"condition": {"kind":"trend-direction-change", "from":"downward", "to":"upward"}
               |}""".stripMargin)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val submittedSignal = Signal(
-          Users.uid,
-          Markets.gbpeur,
-          Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, None),
-          Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(16)),
-          now
-        )
-
         res mustHaveStatus (Status.NoContent, None)
-        verify(svc).submit(submittedSignal)
+        verify(svc).submit(Signal(
+          userId = Users.uid,
+          currencyPair = Markets.gbpeur,
+          interval = Interval.H1,
+          condition = Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, None),
+          triggeredBy = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(16)),
+          time = now
+        ))
       }
 
       "return error on unrecognized indicator" in {
@@ -51,7 +51,7 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
 
         val req = Request[IO](Method.POST, uri"/signals")
           .withAuthHeader()
-          .withBody("""{"currencyPair":"GBP/EUR","triggeredBy": {"kind": "foo"}}""")
+          .withBody("""{"interval":"H1","currencyPair":"GBP/EUR","triggeredBy": {"kind": "foo"}}""")
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val validIndicators = "trend-change-detection, keltner-channel, lines-crossing, threshold-crossing, composite"
@@ -66,6 +66,7 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
         val req = Request[IO](Method.POST, uri"/signals")
           .withAuthHeader()
           .withBody("""{
+              |"interval":"H1",
               |"currencyPair":"GBP/EUR",
               |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
               |"condition": {"kind":"foo","value":0.05}
@@ -84,6 +85,7 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
         val req = Request[IO](Method.POST, uri"/signals")
           .withAuthHeader()
           .withBody("""{
+              |"interval":"H1",
               |"currencyPair":"FOO/BAR",
               |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
               |"condition": {"kind":"trend-direction-change", "from":"downward", "to":"upward"}
@@ -102,6 +104,7 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
         val req = Request[IO](Method.POST, uri"/signals")
           .withAuthHeader()
           .withBody("""{
+              |"interval":"H1",
               |"currencyPair":"FOO-BAR",
               |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
               |"condition": {"kind":"trend-direction-change", "from":"downward", "to":"upward"}
@@ -122,6 +125,7 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody = s"""[{
+               |"interval":"H1",
                |"currencyPair":"GBPEUR",
                |"time": "${Signals.ts}",
                |"triggeredBy": {"kind":"trend-change-detection", "source": "close", "transformation": {"kind": "hma", "length": 16}},
