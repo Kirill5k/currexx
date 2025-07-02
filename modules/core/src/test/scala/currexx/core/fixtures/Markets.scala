@@ -1,12 +1,12 @@
 package currexx.core.fixtures
 
 import cats.data.NonEmptyList
-import currexx.core.market.{IndicatorState, MarketState, PositionState}
+import currexx.core.market.{MarketProfile, MarketState, PositionState}
 import currexx.domain.market.Currency.{EUR, GBP, USD}
 import currexx.domain.market.{
+  Direction,
   CurrencyPair,
   Indicator,
-  IndicatorKind,
   Interval,
   MarketTimeSeriesData,
   PriceRange,
@@ -32,20 +32,16 @@ object Markets {
 
   lazy val positionState: PositionState = PositionState(TradeOrder.Position.Buy, ts, priceRange.close)
 
-  lazy val indicatorState: IndicatorState =
-    IndicatorState(Signals.trendDirectionChanged.condition, Signals.trendDirectionChanged.time, trendChangeDetection)
-  lazy val indicatorStates: Map[IndicatorKind, List[IndicatorState]] = Map(trendChangeDetection.kind -> List(indicatorState))
+  lazy val profile: MarketProfile = MarketProfile(trendDirection = Some(Direction.Upward))
 
   lazy val state: MarketState = MarketState(
-    Users.uid,
-    gbpeur,
-    Some(positionState),
-    Map.empty,
-    Some(ts),
-    Some(ts)
+    userId = Users.uid,
+    currencyPair = gbpeur,
+    currentPosition = Some(positionState),
+    profile = profile,
+    lastUpdatedAt = ts,
+    createdAt = ts
   )
-
-  lazy val stateWithSignal: MarketState = state.copy(signals = Map(trendChangeDetection.kind -> List(indicatorState)))
 
   lazy val priceRanges: NonEmptyList[PriceRange] = NonEmptyList
     .of(

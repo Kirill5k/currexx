@@ -4,7 +4,7 @@ import cats.Monad
 import cats.effect.Async
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema}
-import currexx.domain.market.{CurrencyPair, IndicatorKind}
+import currexx.domain.market.CurrencyPair
 import io.circe.Codec
 import org.http4s.HttpRoutes
 import sttp.model.StatusCode
@@ -51,18 +51,18 @@ object MarketController extends TapirSchema with TapirJson with TapirCodecs {
 
   final case class MarketStateView(
       currentPosition: Option[PositionState],
-      signals: Map[IndicatorKind, List[IndicatorState]],
-      lastUpdatedAt: Option[Instant],
-      createdAt: Option[Instant]
+      profile: MarketProfile,
+      lastUpdatedAt: Instant,
+      createdAt: Instant
   ) derives Codec.AsObject
 
   object MarketStateView:
     def from(ms: MarketState): MarketStateView =
       MarketStateView(
-        ms.currentPosition,
-        ms.signals,
-        ms.lastUpdatedAt,
-        ms.createdAt
+        currentPosition = ms.currentPosition,
+        profile = ms.profile,
+        lastUpdatedAt = ms.lastUpdatedAt,
+        createdAt = ms.createdAt
       )
 
   private val basePath  = "market"

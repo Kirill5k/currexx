@@ -1,7 +1,7 @@
 package currexx.core.market.db
 
-import currexx.core.market.{IndicatorState, MarketState, PositionState}
-import currexx.domain.market.{CurrencyPair, IndicatorKind}
+import currexx.core.market.{MarketProfile, MarketState, PositionState}
+import currexx.domain.market.CurrencyPair
 import currexx.domain.user.UserId
 import io.circe.Codec
 import mongo4cats.bson.ObjectId
@@ -14,19 +14,34 @@ final case class MarketStateEntity(
     userId: ObjectId,
     currencyPair: CurrencyPair,
     currentPosition: Option[PositionState],
-    signals: Map[IndicatorKind, List[IndicatorState]],
-    lastUpdatedAt: Option[Instant],
-    createdAt: Option[Instant]
+    profile: MarketProfile,
+    lastUpdatedAt: Instant,
+    createdAt: Instant
 ) derives Codec.AsObject:
-  def toDomain: MarketState = MarketState(UserId(userId), currencyPair, currentPosition, signals, lastUpdatedAt, createdAt)
+  def toDomain: MarketState = MarketState(
+    userId = UserId(userId),
+    currencyPair = currencyPair,
+    currentPosition = currentPosition,
+    profile = profile,
+    lastUpdatedAt = lastUpdatedAt,
+    createdAt = createdAt
+  )
 
 object MarketStateEntity:
   def make(
       userId: UserId,
       currencyPair: CurrencyPair,
       currentPosition: Option[PositionState] = None,
-      signals: Map[IndicatorKind, List[IndicatorState]] = Map.empty,
-      lastUpdatedAt: Option[Instant] = None,
-      createdAt: Option[Instant] = Some(Instant.now())
+      profile: MarketProfile = MarketProfile(),
+      lastUpdatedAt: Instant = Instant.now(),
+      createdAt: Instant = Instant.now()
   ): MarketStateEntity =
-    MarketStateEntity(ObjectId(), userId.toObjectId, currencyPair, currentPosition, signals, lastUpdatedAt, createdAt)
+    MarketStateEntity(
+      _id = ObjectId(),
+      userId = userId.toObjectId,
+      currencyPair = currencyPair,
+      currentPosition = currentPosition,
+      profile = profile,
+      lastUpdatedAt = lastUpdatedAt,
+      createdAt = createdAt
+    )

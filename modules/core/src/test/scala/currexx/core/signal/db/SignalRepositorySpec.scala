@@ -73,28 +73,6 @@ class SignalRepositorySpec extends MongoSpec {
         result.map(_ mustBe Nil)
       }
     }
-
-    "isFirstOfItsKindForThatDate" should {
-      "return false if signal of such kind has been already submitted on the same date" in withEmbeddedMongoDb { db =>
-        val result = for
-          repo <- SignalRepository.make(db)
-          _    <- repo.saveAll(List(Signals.trendDirectionChanged))
-          res  <- repo.isFirstOfItsKindForThatDate(Signals.trendDirectionChanged)
-        yield res
-
-        result.map(_ mustBe false)
-      }
-
-      "return true if it is a first signal of such kind" in withEmbeddedMongoDb { db =>
-        val result = for
-          repo <- SignalRepository.make(db)
-          _    <- repo.saveAll(List(Signals.trendDirectionChanged))
-          res  <- repo.isFirstOfItsKindForThatDate(Signals.trendDirectionChanged.copy(currencyPair = Markets.gbpusd))
-        yield res
-
-        result.map(_ mustBe true)
-      }
-    }
   }
 
   def withEmbeddedMongoDb[A](test: MongoDatabase[IO] => IO[A]): Future[A] =

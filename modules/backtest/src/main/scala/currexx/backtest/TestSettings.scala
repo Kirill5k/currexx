@@ -2,7 +2,7 @@ package currexx.backtest
 
 import currexx.clients.broker.BrokerParameters
 import currexx.core.market.MarketState
-import currexx.core.settings.{SignalSettings, TradeSettings, TradingParameters, TriggerFrequency}
+import currexx.core.settings.{SignalSettings, TradeSettings, TradingParameters}
 import currexx.core.trade.TradeStrategy
 import currexx.domain.market.{CurrencyPair, Indicator}
 import currexx.domain.user.UserId
@@ -27,7 +27,7 @@ object TestSettings:
       userId = userId,
       currencyPair = currencyPair,
       marketState = MarketState(userId, currencyPair, None, Map.empty, None, None),
-      signal = SignalSettings(TriggerFrequency.OncePerDay, indicators),
+      signal = SignalSettings(indicators),
       trade = TradeSettings(strategy, BrokerParameters.Vindaloo("1"), TradingParameters(BigDecimal(0.1)))
     )
   }

@@ -3,7 +3,7 @@ package currexx.core.market
 import cats.effect.IO
 import kirill5k.common.http4s.test.HttpRoutesWordSpec
 import currexx.core.auth.Authenticator
-import currexx.core.fixtures.{Markets, Sessions, Signals, Users}
+import currexx.core.fixtures.{Markets, Sessions, Users}
 import currexx.domain.market.CurrencyPair
 import currexx.domain.user.UserId
 import org.http4s.implicits.*
@@ -62,7 +62,7 @@ class MarketControllerSpec extends HttpRoutesWordSpec {
     "GET /market/state" should {
       "return state of traded currencies" in {
         val svc = mock[MarketService[IO]]
-        when(svc.getState(any[UserId])).thenReturn(IO.pure(List(Markets.stateWithSignal)))
+        when(svc.getState(any[UserId])).thenReturn(IO.pure(List(Markets.state)))
 
         val req = Request[IO](Method.GET, uri"/market/state").withAuthHeader()
         val res = MarketController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
@@ -76,26 +76,13 @@ class MarketControllerSpec extends HttpRoutesWordSpec {
              |      "openedAt": "${Markets.ts}",
              |      "openPrice": 3
              |    },
-             |    "signals": {
-             |      "trend-change-detection": [
-             |        {
-             |          "triggeredBy": {
-             |            "kind": "trend-change-detection",
-             |            "source": "close",
-             |            "transformation": {
-             |              "kind": "hma",
-             |              "length": 16
-             |            }
-             |          },
-             |          "condition": {
-             |            "kind": "trend-direction-change",
-             |            "from": "downward",
-             |            "to": "upward",
-             |            "previousTrendLength": 1
-             |          },
-             |          "time": "${Signals.ts}"
-             |        }
-             |      ]
+             |    "profile" : {
+             |      "trendDirection" : "upward",
+             |      "trendStrength" : null,
+             |      "crossoverSignal" : null,
+             |      "isInOverboughtZone" : null,
+             |      "isInOversoldZone" : null,
+             |      "volatilityCondition" : null
              |    },
              |    "lastUpdatedAt": "${Markets.ts}",
              |    "createdAt": "${Markets.ts}"

@@ -4,12 +4,10 @@ import cats.Monad
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.common.action.{Action, ActionDispatcher}
-import kirill5k.common.syntax.time.*
-import currexx.core.common.effects.*
 import currexx.core.signal.Signal
 import currexx.core.market.db.MarketStateRepository
 import currexx.core.trade.TradeOrderPlacement
-import currexx.domain.market.{CurrencyPair, IndicatorKind, TradeOrder}
+import currexx.domain.market.{Condition, CurrencyPair, TradeOrder}
 import currexx.domain.user.UserId
 
 trait MarketService[F[_]]:
@@ -25,7 +23,7 @@ final private class LiveMarketService[F[_]](
 )(using
     F: Monad[F]
 ) extends MarketService[F] {
-  override def getState(uid: UserId): F[List[MarketState]] = stateRepo.getAll(uid)
+  override def getState(uid: UserId): F[List[MarketState]]                   = stateRepo.getAll(uid)
   override def clearState(uid: UserId, closePendingOrders: Boolean): F[Unit] =
     stateRepo.deleteAll(uid) >> F.whenA(closePendingOrders)(dispatcher.dispatch(Action.CloseAllOpenOrders(uid)))
 
@@ -40,27 +38,39 @@ final private class LiveMarketService[F[_]](
   }
 
   override def processSignals(uid: UserId, cp: CurrencyPair, signals: List[Signal]): F[Unit] =
-    stateRepo
-      .find(uid, cp)
-      .flatMap { state =>
-        val existingSignals = state.fold(Map.empty[IndicatorKind, List[IndicatorState]])(_.signals)
+    stateRepo.find(uid, cp).flatMap { maybeState =>
 
-        val updatedSignals = signals.foldLeft(existingSignals) { (current, signal) =>
-          val indicatorStates   = current.getOrElse(signal.triggeredBy.kind, Nil)
-          val newIndicatorState = IndicatorState(signal.condition, signal.time, signal.triggeredBy)
-          val updatedIndicatorStates =
-            if (indicatorStates.isEmpty) List(newIndicatorState)
-            else if (indicatorStates.head.time.hasSameDateAs(signal.time)) newIndicatorState :: indicatorStates.tail
-            else newIndicatorState :: indicatorStates.take(5)
-          current + (signal.triggeredBy.kind -> updatedIndicatorStates)
-        }
+      val currentProfile = maybeState.fold(MarketProfile())(_.profile)
+      val updatedProfile = signals.foldLeft(currentProfile) { (prof, sign) =>
+        updateProfileWithCondition(prof, sign.condition)
+      }
+      F.whenA(updatedProfile != currentProfile) {
+        stateRepo
+          .update(uid, cp, updatedProfile)
+          .flatMap(state => dispatcher.dispatch(Action.ProcessMarketStateUpdate(state, currentProfile)))
+      }
+    }
 
-        if (existingSignals == updatedSignals) F.pure(None)
-        else stateRepo.update(uid, cp, updatedSignals).map(Some(_))
-      }
-      .flatMapOption(F.unit) { state =>
-        dispatcher.dispatch(Action.ProcessMarketStateUpdate(state, signals.map(_.triggeredBy.kind)))
-      }
+  private def updateProfileWithCondition(profile: MarketProfile, condition: Condition): MarketProfile =
+    condition match {
+      case Condition.TrendDirectionChange(from, to, _) =>
+        profile.copy(trendDirection = Some(to))
+
+      case Condition.LinesCrossing(direction) =>
+        profile.copy(crossoverSignal = Some(direction))
+
+      case Condition.AboveThreshold(_, _) =>
+        profile.copy(isInOverboughtZone = Some(true), isInOversoldZone = Some(false))
+
+      case Condition.BelowThreshold(_, _) =>
+        profile.copy(isInOversoldZone = Some(true), isInOverboughtZone = Some(false))
+
+      case cond @ (_: Condition.UpperBandCrossing | _: Condition.LowerBandCrossing) =>
+        profile.copy(volatilityCondition = Some(cond))
+
+      case Condition.Composite(conditions) =>
+        conditions.foldLeft(profile)(updateProfileWithCondition) // Recursively apply inner conditions
+    }
 }
 
 object MarketService:

@@ -4,32 +4,35 @@ import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
 import currexx.core.fixtures.{Markets, Users}
-import currexx.core.market.MarketState
+import currexx.core.market.{MarketProfile, MarketState}
 import currexx.domain.errors.AppError
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
 
+import java.time.Instant
 import scala.concurrent.Future
 
 class MarketStateRepositorySpec extends MongoSpec {
   override protected val mongoPort: Int = 12354
 
+  val ts = Instant.now
+
   "A MarketStateRepository" when {
     "update signals" should {
-      "create new state with signals if it doesn't exist" in withEmbeddedMongoDb { db =>
+      "create new state if it doesn't exist" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- MarketStateRepository.make(db)
-          res  <- repo.update(Users.uid, Markets.gbpeur, Markets.indicatorStates)
+          res  <- repo.update(Users.uid, Markets.gbpeur, Markets.profile)
         yield res
 
-        result.map(_.withoutCreatedAt mustBe MarketState(Users.uid, Markets.gbpeur, None, Markets.indicatorStates, None, None))
+        result.map(_.withTime(ts) mustBe MarketState(Users.uid, Markets.gbpeur, None, Markets.profile, ts, ts))
       }
 
       "update existing state if it exists" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- MarketStateRepository.make(db)
-          _    <- repo.update(Users.uid, Markets.gbpeur, Map.empty)
-          _    <- repo.update(Users.uid, Markets.gbpeur, Markets.indicatorStates)
+          _    <- repo.update(Users.uid, Markets.gbpeur, None)
+          _    <- repo.update(Users.uid, Markets.gbpeur, Markets.profile)
           res  <- repo.getAll(Users.uid)
         yield res
 
@@ -41,7 +44,7 @@ class MarketStateRepositorySpec extends MongoSpec {
       "update position field in the state" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- MarketStateRepository.make(db)
-          _    <- repo.update(Users.uid, Markets.gbpeur, Markets.indicatorStates)
+          _    <- repo.update(Users.uid, Markets.gbpeur, Markets.profile)
           res  <- repo.update(Users.uid, Markets.gbpeur, Some(Markets.positionState))
         yield res
 
@@ -64,15 +67,15 @@ class MarketStateRepositorySpec extends MongoSpec {
       "return all market currency states" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- MarketStateRepository.make(db)
-          _    <- repo.update(Users.uid, Markets.gbpeur, Map.empty)
-          _    <- repo.update(Users.uid, Markets.gbpusd, Map.empty)
+          _    <- repo.update(Users.uid, Markets.gbpeur, None)
+          _    <- repo.update(Users.uid, Markets.gbpusd, None)
           res  <- repo.getAll(Users.uid)
         yield res
 
         result.map {
-          _.map(_.withoutCreatedAt) mustBe List(
-            MarketState(Users.uid, Markets.gbpeur, None, Map.empty, None, None),
-            MarketState(Users.uid, Markets.gbpusd, None, Map.empty, None, None)
+          _.map(_.withTime(ts)) mustBe List(
+            MarketState(Users.uid, Markets.gbpeur, None, MarketProfile(), ts, ts),
+            MarketState(Users.uid, Markets.gbpusd, None, MarketProfile(), ts, ts)
           )
         }
       }
@@ -82,8 +85,8 @@ class MarketStateRepositorySpec extends MongoSpec {
       "delete all market currency states" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- MarketStateRepository.make(db)
-          _    <- repo.update(Users.uid, Markets.gbpeur, Map.empty)
-          _    <- repo.update(Users.uid, Markets.gbpusd, Map.empty)
+          _    <- repo.update(Users.uid, Markets.gbpeur, None)
+          _    <- repo.update(Users.uid, Markets.gbpusd, None)
           _    <- repo.deleteAll(Users.uid)
           res  <- repo.getAll(Users.uid)
         yield res
@@ -96,7 +99,7 @@ class MarketStateRepositorySpec extends MongoSpec {
       "delete market currency state" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- MarketStateRepository.make(db)
-          _    <- repo.update(Users.uid, Markets.gbpeur, Map.empty)
+          _    <- repo.update(Users.uid, Markets.gbpeur, None)
           _    <- repo.delete(Users.uid, Markets.gbpeur)
           res  <- repo.find(Users.uid, Markets.gbpeur)
         yield res
@@ -115,7 +118,7 @@ class MarketStateRepositorySpec extends MongoSpec {
     }
   }
 
-  extension (s: MarketState) def withoutCreatedAt: MarketState = s.copy(createdAt = None)
+  extension (s: MarketState) def withTime(ts: Instant): MarketState = s.copy(createdAt = ts, lastUpdatedAt = ts)
 
   def withEmbeddedMongoDb[A](test: MongoDatabase[IO] => IO[A]): Future[A] =
     withRunningEmbeddedMongo {

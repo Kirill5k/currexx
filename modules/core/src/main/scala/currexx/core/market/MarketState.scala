@@ -1,15 +1,25 @@
 package currexx.core.market
 
-import currexx.domain.market.{Condition, CurrencyPair, Indicator, IndicatorKind, TradeOrder}
+import currexx.domain.market.{Condition, CurrencyPair, Direction, TradeOrder}
 import currexx.domain.user.UserId
 import io.circe.Codec
 
 import java.time.Instant
 
-final case class IndicatorState(
-    condition: Condition,
-    time: Instant,
-    triggeredBy: Indicator
+final case class MarketProfile(
+    // Trend-related view
+    trendDirection: Option[Direction] = None, // e.g., from TrendChangeDetection
+    trendStrength: Option[Double] = None,     // Could be length, or Kalman velocity
+
+    // Crossover-related view
+    crossoverSignal: Option[Direction] = None, // e.g., from LinesCrossing
+
+    // Oscillator-related view
+    isInOverboughtZone: Option[Boolean] = None, // e.g., from ThresholdCrossing > upper
+    isInOversoldZone: Option[Boolean] = None,   // e.g., from ThresholdCrossing < lower
+
+    // Volatility-related view
+    volatilityCondition: Option[Condition] = None // e.g., Keltner Channel band cross
 ) derives Codec.AsObject
 
 final case class PositionState(
@@ -22,8 +32,9 @@ final case class MarketState(
     userId: UserId,
     currencyPair: CurrencyPair,
     currentPosition: Option[PositionState],
-    signals: Map[IndicatorKind, List[IndicatorState]],
-    lastUpdatedAt: Option[Instant],
-    createdAt: Option[Instant]
-) derives Codec.AsObject:
+    profile: MarketProfile,
+    lastUpdatedAt: Instant,
+    createdAt: Instant
+) derives Codec.AsObject {
   def hasOpenPosition: Boolean = currentPosition.isDefined
+}

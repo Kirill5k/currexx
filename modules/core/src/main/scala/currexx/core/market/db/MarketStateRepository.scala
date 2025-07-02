@@ -5,11 +5,11 @@ import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import com.mongodb.client.model.ReturnDocument
-import currexx.domain.market.{CurrencyPair, IndicatorKind}
+import currexx.domain.market.CurrencyPair
 import currexx.domain.user.UserId
 import currexx.domain.errors.AppError
 import currexx.core.common.db.Repository
-import currexx.core.market.{IndicatorState, MarketState, PositionState}
+import currexx.core.market.{MarketProfile, MarketState, PositionState}
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.models.collection.FindOneAndUpdateOptions
 import mongo4cats.collection.MongoCollection
@@ -17,7 +17,7 @@ import mongo4cats.operations.{Filter, Update}
 import mongo4cats.database.MongoDatabase
 
 trait MarketStateRepository[F[_]] extends Repository[F]:
-  def update(uid: UserId, pair: CurrencyPair, signals: Map[IndicatorKind, List[IndicatorState]]): F[MarketState]
+  def update(uid: UserId, pair: CurrencyPair, profile: MarketProfile): F[MarketState]
   def update(uid: UserId, pair: CurrencyPair, position: Option[PositionState]): F[MarketState]
   def getAll(uid: UserId): F[List[MarketState]]
   def deleteAll(uid: UserId): F[Unit]
@@ -40,11 +40,11 @@ final private class LiveMarketStateRepository[F[_]](
       .deleteOne(userIdAndCurrencyPairEq(uid, cp))
       .flatMap(errorIfNotDeleted(AppError.NotTracked(List(cp))))
 
-  override def update(uid: UserId, cp: CurrencyPair, signals: Map[IndicatorKind, List[IndicatorState]]): F[MarketState] =
+  override def update(uid: UserId, cp: CurrencyPair, profile: MarketProfile): F[MarketState] =
     runUpdate(
       userIdAndCurrencyPairEq(uid, cp),
-      Update.set("signals", signals.map((k, v) => k.print -> v)),
-      MarketStateEntity.make(uid, cp, signals = signals)
+      Update.set("profile", profile),
+      MarketStateEntity.make(uid, cp, profile = profile)
     )
 
   override def update(uid: UserId, pair: CurrencyPair, position: Option[PositionState]): F[MarketState] =
@@ -82,5 +82,5 @@ final private class LiveMarketStateRepository[F[_]](
 object MarketStateRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[MarketStateRepository[F]] =
     db.getCollectionWithCodec[MarketStateEntity]("market-state")
-      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[IndicatorState].withAddedCodec[PositionState])
+      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[MarketProfile].withAddedCodec[PositionState])
       .map(coll => LiveMarketStateRepository[F](coll))

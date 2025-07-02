@@ -12,10 +12,10 @@ import currexx.clients.data.MarketDataClient
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.common.effects.*
-import currexx.core.market.MarketState
+import currexx.core.market.{MarketProfile, MarketState}
 import currexx.core.trade.TradeStrategyExecutor.Decision
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
-import currexx.domain.market.{CurrencyPair, IndicatorKind, Interval, TradeOrder}
+import currexx.domain.market.{CurrencyPair, Interval, TradeOrder}
 import currexx.domain.monitor.Limits
 import kirill5k.common.cats.Clock
 import currexx.domain.user.UserId
@@ -23,7 +23,7 @@ import fs2.Stream
 
 trait TradeService[F[_]]:
   def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]]
-  def processMarketStateUpdate(state: MarketState, triggers: List[IndicatorKind]): F[Unit]
+  def processMarketStateUpdate(state: MarketState, previousProfile: MarketProfile): F[Unit]
   def placeOrder(uid: UserId, order: TradeOrder, closePendingOrders: Boolean): F[Unit]
   def closeOpenOrders(uid: UserId): F[Unit]
   def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
@@ -91,12 +91,12 @@ final private class LiveTradeService[F[_]](
         .traverse(submitOrderPlacement)
     yield ()
 
-  override def processMarketStateUpdate(state: MarketState, triggers: List[IndicatorKind]): F[Unit] =
+  override def processMarketStateUpdate(state: MarketState, previousProfile: MarketProfile): F[Unit] =
     (settingsRepository.get(state.userId), marketDataClient.latestPrice(state.currencyPair), clock.now)
       .mapN { (settings, price, time) =>
         TradeStrategyExecutor
           .get(settings.strategy)
-          .analyze(state, triggers)
+          .analyze(state)
           .map {
             case Decision.Buy   => settings.trading.toOrder(TradeOrder.Position.Buy, state.currencyPair, price.close)
             case Decision.Sell  => settings.trading.toOrder(TradeOrder.Position.Sell, state.currencyPair, price.close)

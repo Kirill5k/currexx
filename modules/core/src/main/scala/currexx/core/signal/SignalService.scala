@@ -5,12 +5,10 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
-import cats.syntax.traverse.*
 import currexx.domain.user.UserId
 import currexx.calculations.{Filters, MomentumOscillators, MovingAverages, Volatility}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
-import currexx.core.settings.TriggerFrequency
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.market.{
   Condition,
@@ -37,18 +35,10 @@ final private class LiveSignalService[F[_]](
   override def getAll(uid: UserId, sp: SearchParams): F[List[Signal]] = signalRepo.getAll(uid, sp)
   override def submit(signal: Signal): F[Unit] = saveAndDispatchAction(signal.userId, signal.currencyPair, List(signal))
 
-  //TODO: consider 1) getting rid of trigger frequency 2) changing settings.signals to settings.signal
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
     for
       settings <- settingsRepo.get(uid)
-      signals  <- settings.indicators
-        .flatMap(SignalService.detectSignal(uid, data, _))
-        .traverse { signal =>
-          settings.triggerFrequency match
-            case TriggerFrequency.Continuously => F.pure(Some(signal))
-            case TriggerFrequency.OncePerDay   => signalRepo.isFirstOfItsKindForThatDate(signal).map(Option.when(_)(signal))
-        }
-        .map(_.flatten)
+      signals = settings.indicators.flatMap(SignalService.detectSignal(uid, data, _))
       _ <- F.whenA(signals.nonEmpty)(saveAndDispatchAction(uid, data.currencyPair, signals))
     yield ()
 

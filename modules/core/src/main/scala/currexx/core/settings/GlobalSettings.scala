@@ -3,16 +3,10 @@ package currexx.core.settings
 import currexx.clients.broker.BrokerParameters
 import currexx.core.trade.TradeStrategy
 import currexx.domain.market.{CurrencyPair, Indicator, TradeOrder}
-import currexx.domain.types.EnumType
 import currexx.domain.user.UserId
 import io.circe.Codec
 
-object TriggerFrequency extends EnumType[TriggerFrequency](() => TriggerFrequency.values)
-enum TriggerFrequency:
-  case Continuously, OncePerDay
-
 final case class SignalSettings(
-    triggerFrequency: TriggerFrequency,
     indicators: List[Indicator]
 ) derives Codec.AsObject
 

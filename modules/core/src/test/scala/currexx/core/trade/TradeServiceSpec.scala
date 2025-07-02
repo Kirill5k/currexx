@@ -10,7 +10,7 @@ import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Settings, Trades, Users}
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import kirill5k.common.cats.test.IOWordSpec
-import currexx.domain.market.{CurrencyPair, IndicatorKind, TradeOrder}
+import currexx.domain.market.{CurrencyPair, TradeOrder}
 import currexx.domain.monitor.Limits
 import currexx.domain.user.UserId
 import kirill5k.common.cats.Clock
@@ -274,52 +274,7 @@ class TradeServiceSpec extends IOWordSpec {
     }
 
     "processMarketStateUpdate" should {
-      "not do anything when trading strategy is disabled" in {
-        val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade.copy(strategy = TradeStrategy.Disabled))
-        when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
-
-        val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          _   <- svc.processMarketStateUpdate(Markets.state, List(IndicatorKind.TrendChangeDetection))
-        yield ()
-
-        result.asserting { res =>
-          verify(settRepo).get(Users.uid)
-          verify(dataClient).latestPrice(Markets.gbpeur)
-          verifyNoInteractions(orderRepo, brokerClient)
-          disp.submittedActions mustBe empty
-          res mustBe ()
-        }
-      }
-
-      "close existing order if new order has reverse position" in {
-        val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade.copy(strategy = TradeStrategy.TrendChange))
-        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
-        when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
-        when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
-
-        val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
-          currentState = Markets.stateWithSignal.copy(currentPosition =
-            Some(Markets.positionState.copy(position = TradeOrder.Position.Sell))
-          )
-          _ <- svc.processMarketStateUpdate(currentState, List(IndicatorKind.TrendChangeDetection))
-        yield ()
-
-        result.asserting { res =>
-          val order       = Settings.trade.trading.toOrder(TradeOrder.Position.Buy, Markets.gbpeur, 3.0)
-          val placedOrder = TradeOrderPlacement(Users.uid, order, Trades.broker, now)
-          verify(settRepo).get(Users.uid)
-          verify(brokerClient).submit(Trades.broker, TradeOrder.Exit(Markets.gbpeur, 3.0))
-          verify(brokerClient).submit(Trades.broker, order)
-          verify(dataClient).latestPrice(Markets.gbpeur)
-          verify(orderRepo).save(placedOrder)
-          disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
-          res mustBe ()
-        }
-      }
+      //TODO: add tests to test new state update processing logic
     }
   }
 

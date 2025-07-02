@@ -8,7 +8,6 @@ import eu.timepit.refined.types.string.NonEmptyString
 import currexx.domain.validations.{EmailString, IdString}
 import currexx.domain.user.UserId
 import currexx.core.monitor.MonitorId
-import currexx.core.settings.TriggerFrequency
 import currexx.core.trade.TradeStrategy
 import currexx.domain.monitor.Schedule
 import sttp.tapir.generic.auto.SchemaDerivation
@@ -33,7 +32,6 @@ transparent trait TapirSchema extends SchemaDerivation {
   given Schema[TradeOrder.Position]  = Schema.string
   given Schema[Indicator]            = Schema.string
   given Schema[Condition]            = Schema.string
-  given Schema[TriggerFrequency]     = Schema.string
   given Schema[TradeStrategy]        = Schema.string
   given Schema[BrokerParameters]     = Schema.string
   given Schema[MarketStateView]      = Schema.string

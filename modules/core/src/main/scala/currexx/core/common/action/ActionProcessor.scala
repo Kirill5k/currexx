@@ -50,8 +50,8 @@ final private class LiveActionProcessor[F[_]](
         logger.info(s"closing all opened orders for $uid") *> tradeService.closeOpenOrders(uid)
       case Action.CloseOpenOrders(uid, pair) =>
         logger.info(s"closing opened order for $uid/$pair currency pair") *> tradeService.closeOpenOrders(uid, pair)
-      case Action.ProcessMarketStateUpdate(state, indicators) =>
-        logger.info(s"processing market state update triggered by $indicators") *> tradeService.processMarketStateUpdate(state, indicators)
+      case Action.ProcessMarketStateUpdate(state, previousProfile) =>
+        logger.info(s"processing market state update for ${state.currencyPair}") *> tradeService.processMarketStateUpdate(state, previousProfile)
       case Action.ProcessTradeOrderPlacement(order) =>
         logger.info(s"processing trade order placement $order") *> marketService.processTradeOrderPlacement(order)
       case Action.SetupNewUser(uid) =>

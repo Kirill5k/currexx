@@ -6,18 +6,15 @@ import cats.syntax.flatMap.*
 import currexx.core.common.db.Repository
 import currexx.core.common.http.SearchParams
 import currexx.core.signal.Signal
-import kirill5k.common.syntax.time.*
 import currexx.domain.market.{CurrencyPair, Indicator}
 import currexx.domain.user.UserId
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
-import mongo4cats.operations.Filter
 import mongo4cats.models.database.CreateCollectionOptions
 import mongo4cats.database.MongoDatabase
 
 trait SignalRepository[F[_]] extends Repository[F]:
   def saveAll(signals: List[Signal]): F[Unit]
-  def isFirstOfItsKindForThatDate(signal: Signal): F[Boolean]
   def getAll(userId: UserId, sp: SearchParams): F[List[Signal]]
 
 final private class LiveSignalRepository[F[_]: Async](
@@ -26,16 +23,6 @@ final private class LiveSignalRepository[F[_]: Async](
 
   override def saveAll(signals: List[Signal]): F[Unit] =
     collection.insertMany(signals.map(SignalEntity.from)).void
-
-  override def isFirstOfItsKindForThatDate(signal: Signal): F[Boolean] =
-    collection
-      .count(
-        userIdAndCurrencyPairEq(signal.userId, signal.currencyPair) &&
-          Filter.eq(Field.TriggeredBy, signal.triggeredBy) &&
-          Filter.gte(Field.Time, signal.time.atStartOfDay) &&
-          Filter.lt(Field.Time, signal.time.atEndOfDay)
-      )
-      .map(_ == 0)
 
   override def getAll(uid: UserId, sp: SearchParams): F[List[Signal]] =
     collection
