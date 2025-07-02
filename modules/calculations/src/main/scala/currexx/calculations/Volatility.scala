@@ -1,21 +1,23 @@
 package currexx.calculations
 
-import scala.collection.mutable.Queue as MQueue
+import scala.collection.mutable.{ListBuffer, Queue as MQueue}
 
 object Volatility {
 
   /** Calculates the Average True Range (ATR).
     *
+    * It takes lists sorted from latest to earliest and returns a result in the same order.
+    *
     * @param closings
-    *   List of closing prices, from oldest to earliest.
+    *   List of closing prices, from latest to earliest.
     * @param highs
-    *   List of high prices, from oldest to earliest.
+    *   List of high prices, from latest to earliest.
     * @param lows
-    *   List of low prices, from oldest to earliest.
+    *   List of low prices, from latest to earliest.
     * @param length
     *   The smoothing period for the ATR.
     * @return
-    *   A list of ATR values in reverse chronological order (earliest to latest), same size as input.
+    *   A list of ATR values, sorted from latest to earliest, same size as input.
     */
   def averageTrueRange(
       closings: List[Double],
@@ -23,28 +25,28 @@ object Volatility {
       lows: List[Double],
       length: Int
   ): List[Double] =
-    if (closings.size < 2) {
-      List.fill(closings.size)(0.0)
-    } else {
-      val closeIt = closings.reverseIterator
-      val highIt  = highs.reverseIterator
-      val lowIt   = lows.reverseIterator
+    // ATR requires at least one price change, so 2 data points.
+    if (closings.size < 2) List.fill(closings.size)(0.0)
+    else {
 
-      var result  = List.empty[Double]
-      val trQueue = MQueue.empty[Double]
-      var prevAtr = 0.0
+      val resultBuffer = new ListBuffer[Double]
+      val trQueue      = MQueue.empty[Double]
+      var prevAtr      = 0.0
 
-      var prevClose = closeIt.next()
-      val firstHigh = highIt.next()
-      val firstLow  = lowIt.next()
-      trQueue.enqueue(firstHigh - firstLow)
-      result = 0.0 :: result
+      val data = closings.lazyZip(highs).lazyZip(lows).toList
+      val it   = data.reverseIterator
 
-      while (closeIt.hasNext && highIt.hasNext && lowIt.hasNext) {
-        val high  = highIt.next()
-        val low   = lowIt.next()
-        val close = closeIt.next()
+      val (firstClose, firstHigh, firstLow) = it.next()
 
+      val firstTr   = firstHigh - firstLow
+      var prevClose = firstClose
+      trQueue.enqueue(firstTr)
+      resultBuffer += 0.0 // Pad the result for the first point.
+
+      while (it.hasNext) {
+        val (close, high, low) = it.next()
+
+        // Calculate the current True Range using the *previous* close.
         val tr = math.max(high - low, math.max(math.abs(high - prevClose), math.abs(low - prevClose)))
         trQueue.enqueue(tr)
 
@@ -52,20 +54,25 @@ object Volatility {
           val _ = trQueue.dequeue()
         }
 
-        var currentAtr = 0.0
+        var currentAtr = 0.0 // Default to 0 during warm-up period
         if (trQueue.size == length) {
           currentAtr = if (prevAtr == 0.0) {
+            // First ATR calculation: a Simple Moving Average of the TRs.
             trQueue.sum / length
           } else {
+            // Subsequent ATRs: use Wilder's Smoothing.
             (prevAtr * (length - 1) + tr) / length
           }
           prevAtr = currentAtr
         }
 
-        result = currentAtr :: result
+        resultBuffer += currentAtr
+
+        // Update the previous close for the next iteration.
         prevClose = close
       }
 
-      result
+      // --- 3. Reverse Final Output ---
+      resultBuffer.toList.reverse
     }
 }

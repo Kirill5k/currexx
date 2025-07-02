@@ -43,10 +43,9 @@ object MovingAverages {
     *   A list of SMA values, sorted from latest to earliest, same size as input.
     */
   def simple(values: List[Double], n: Int): List[Double] = {
-    val chronologicalValues = values.reverse
     val window              = MQueue.empty[Double]
     val resultBuffer        = new ListBuffer[Double]
-    val it                  = chronologicalValues.iterator
+    val it                  = values.reverseIterator
 
     while (it.hasNext) {
       val price = it.next()
