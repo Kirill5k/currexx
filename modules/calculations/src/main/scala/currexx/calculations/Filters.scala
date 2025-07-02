@@ -4,11 +4,20 @@ import breeze.linalg.{DenseMatrix, DenseVector, inv}
 
 object Filters {
 
+  /** Provides a simplified interface to the full 1D Kalman filter.
+    *
+    * @param values
+    *   The list of prices/measurements, sorted from latest to earliest.
+    * @param gain
+    *   A value controlling the filter's responsiveness, mapped to process noise.
+    * @return
+    *   A list of smoothed prices, sorted from latest to earliest.
+    */
   def kalman(values: List[Double], gain: Double): List[Double] = {
     val filteredStates = kalmanFilter1D(
       measurements = values,
       processNoise = gain,
-      measurementNoise = 1.0
+      measurementNoise = 1.0 // Sensible default
     )
 
     filteredStates.map(_.x(0))
@@ -23,18 +32,19 @@ object Filters {
     */
   final case class KalmanState(x: DenseVector[Double], p: DenseMatrix[Double])
 
-  /** A 1-D Kalman filter for tracking an object's position and velocity.
+  /** A 1-D Kalman filter for tracking an object's position and velocity. It takes a list sorted from latest to earliest and returns a
+    * result in the same order.
     *
     * @param measurements
-    *   List of position measurements, from oldest to earliest.
+    *   List of position measurements, from latest to earliest.
     * @param dt
-    *   The time step between measurements (e.g., 1.0 second).
+    *   The time step between measurements (e.g., 1.0 period).
     * @param processNoise
-    *   The uncertainty in the model's physics (how much we expect velocity to change unexpectedly).
+    *   The uncertainty in the model's physics.
     * @param measurementNoise
     *   The uncertainty of the sensor providing the measurements.
     * @return
-    *   A list of filtered state estimates (position and velocity), from earliest to latest.
+    *   A list of filtered state estimates, from latest to earliest.
     */
   def kalmanFilter1D(
       measurements: List[Double],
@@ -42,18 +52,16 @@ object Filters {
       processNoise: Double = 1e-4,
       measurementNoise: Double = 0.1
   ): List[KalmanState] =
-    // The `return` keyword is used here for a "guard clause", which is a common
-    // and readable pattern for handling edge cases at the start of a function.
     if (measurements.isEmpty) Nil
     else {
-
       val F = DenseMatrix((1.0, dt), (0.0, 1.0))
       val H = DenseMatrix((1.0, 0.0))
       val Q = DenseMatrix((math.pow(dt, 4) / 4, math.pow(dt, 3) / 2), (math.pow(dt, 3) / 2, math.pow(dt, 2))) * processNoise
       val R = DenseMatrix(measurementNoise)
       val I = DenseMatrix.eye[Double](2)
 
-      val it               = measurements.reverseIterator
+      val it = measurements.reverseIterator
+
       val firstMeasurement = it.next()
       val initialX         = DenseVector(firstMeasurement, 0.0)
       val initialP         = DenseMatrix.eye[Double](2) * 500.0
@@ -64,24 +72,22 @@ object Filters {
       while (it.hasNext) {
         val z = it.next()
 
+        // Predict
         val x_predicted = F * currentState.x
         val p_predicted = F * currentState.p * F.t + Q
 
-        // --- THE FIX IS HERE: Break the operation into two unambiguous steps ---
-        // 1. First, calculate the predicted measurement as a vector.
+        // Update
         val predictedMeasurementVector = H * x_predicted
-        // 2. Then, extract the scalar value and perform simple subtraction.
-        val y = z - predictedMeasurementVector(0)
-
-        val S = H * p_predicted * H.t + R
-        val K = p_predicted * H.t * inv(S)
-
-        val x_new = x_predicted + (K.toDenseVector * y)
-        val p_new = (I - (K * H)) * p_predicted
+        val y                          = z - predictedMeasurementVector(0)
+        val S                          = H * p_predicted * H.t + R
+        val K                          = p_predicted * H.t * inv(S)
+        val x_new                      = x_predicted + (K.toDenseVector * y)
+        val p_new                      = (I - (K * H)) * p_predicted
 
         currentState = KalmanState(x_new, p_new)
         result = currentState :: result
       }
+
       result
     }
 }
