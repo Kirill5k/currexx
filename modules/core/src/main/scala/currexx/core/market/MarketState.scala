@@ -37,17 +37,10 @@ final case class VolatilityState(
 ) derives Codec.AsObject
 
 final case class MarketProfile(
-    /** The state of the primary, confirmed market trend. */
     trend: Option[TrendState] = None,
-
-    /** The state of the most recent crossover event. */
     crossover: Option[CrossoverState] = None,
-
-    /** The persistent state of the market's momentum. */
     momentum: Option[MomentumState] = None,
     lastMomentumValue: Option[Double] = None,
-
-    /** The state of the market's volatility regime. */
     volatility: Option[VolatilityState] = None,
     lastVolatilityValue: Option[Double] = None
 ) derives Codec.AsObject
@@ -65,6 +58,4 @@ final case class MarketState(
     profile: MarketProfile,
     lastUpdatedAt: Instant,
     createdAt: Instant
-) derives Codec.AsObject {
-  def hasOpenPosition: Boolean = currentPosition.isDefined
-}
+) derives Codec.AsObject
