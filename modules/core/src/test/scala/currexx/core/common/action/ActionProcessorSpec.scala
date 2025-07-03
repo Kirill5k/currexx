@@ -8,6 +8,7 @@ import currexx.core.signal.{Signal, SignalService}
 import currexx.core.trade.TradeService
 import currexx.core.settings.SettingsService
 import currexx.domain.market.CurrencyPair
+import currexx.domain.signal.Direction
 import currexx.domain.user.UserId
 import kirill5k.common.cats.test.IOWordSpec
 import org.typelevel.log4cats.Logger
@@ -25,15 +26,16 @@ class ActionProcessorSpec extends IOWordSpec {
 
       when(marksvc.processSignals(any[UserId], any[CurrencyPair], anyList[Signal])).thenReturn(IO.unit)
 
+      val signal = Signals.trend(Direction.Upward)
       val result = for
         dispatcher <- ActionDispatcher.make[IO]
         processor  <- ActionProcessor.make[IO](dispatcher, monsvc, sigsvc, marksvc, tradesvc, settvc)
-        _          <- dispatcher.dispatch(Action.ProcessSignals(Users.uid, Markets.gbpeur, List(Signals.trendDirectionChanged)))
+        _          <- dispatcher.dispatch(Action.ProcessSignals(Users.uid, Markets.gbpeur, List(signal)))
         res        <- processor.run.interruptAfter(2.second).compile.drain
       yield res
 
       result.asserting { r =>
-        verify(marksvc).processSignals(Users.uid, Markets.gbpeur, List(Signals.trendDirectionChanged))
+        verify(marksvc).processSignals(Users.uid, Markets.gbpeur, List(signal))
         r mustBe ()
       }
     }

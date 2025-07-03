@@ -5,6 +5,7 @@ import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Signals, Users}
+import currexx.domain.signal.Direction
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
 
@@ -20,11 +21,11 @@ class SignalRepositorySpec extends MongoSpec {
       "store signal in the repository" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- SignalRepository.make(db)
-          _    <- repo.saveAll(List(Signals.trendDirectionChanged))
+          _    <- repo.saveAll(List(Signals.trend(Direction.Upward)))
           res  <- repo.getAll(Users.uid, emptySearchParams)
         yield res
 
-        result.map(_ mustBe List(Signals.trendDirectionChanged))
+        result.map(_ mustBe List(Signals.trend(Direction.Upward)))
       }
     }
 
@@ -32,18 +33,22 @@ class SignalRepositorySpec extends MongoSpec {
       "return all signals sorted by time in descending order" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- SignalRepository.make(db)
-          _    <- repo.saveAll(List(Signals.trendDirectionChanged))
-          _    <- repo.saveAll(List(Signals.trendDirectionChanged.copy(time = Signals.ts.minusSeconds(10))))
-          res  <- repo.getAll(Users.uid, emptySearchParams)
+          _    <- repo.saveAll(
+            List(
+              Signals.trend(Direction.Upward),
+              Signals.trend(Direction.Upward, time = Signals.ts.minusSeconds(10))
+            )
+          )
+          res <- repo.getAll(Users.uid, emptySearchParams)
         yield res
 
-        result.map(_.head mustBe Signals.trendDirectionChanged)
+        result.map(_.head mustBe Signals.trend(Direction.Upward))
       }
 
       "not return anything when there are no signals for provided user-id" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- SignalRepository.make(db)
-          _    <- repo.saveAll(List(Signals.trendDirectionChanged))
+          _    <- repo.saveAll(List(Signals.trend(Direction.Upward)))
           res  <- repo.getAll(Users.uid2, emptySearchParams)
         yield res
 
@@ -53,8 +58,12 @@ class SignalRepositorySpec extends MongoSpec {
       "filter out signals by time" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- SignalRepository.make(db)
-          _    <- repo.saveAll(List(Signals.trendDirectionChanged))
-          _    <- repo.saveAll(List(Signals.trendDirectionChanged.copy(time = Signals.ts.minusSeconds(10))))
+          _    <- repo.saveAll(
+            List(
+              Signals.trend(Direction.Upward),
+              Signals.trend(Direction.Upward, time = Signals.ts.minusSeconds(10))
+            )
+          )
           sp = SearchParams(Some(Signals.ts.minusSeconds(100)), Some(Signals.ts.minusSeconds(50)), None)
           res <- repo.getAll(Users.uid, sp)
         yield res
@@ -65,7 +74,7 @@ class SignalRepositorySpec extends MongoSpec {
       "filter out signals by currencyPair" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- SignalRepository.make(db)
-          _    <- repo.saveAll(List(Signals.trendDirectionChanged))
+          _    <- repo.saveAll(List(Signals.trend(Direction.Upward)))
           sp = SearchParams(currencyPair = Some(Markets.gbpusd))
           res <- repo.getAll(Users.uid, sp)
         yield res

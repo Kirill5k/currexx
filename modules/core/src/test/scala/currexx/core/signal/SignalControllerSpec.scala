@@ -5,7 +5,7 @@ import kirill5k.common.http4s.test.HttpRoutesWordSpec
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Sessions, Signals, Users}
-import currexx.domain.market.{Interval}
+import currexx.domain.market.Interval
 import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation, Condition, Direction}
 import currexx.domain.user.UserId
 import kirill5k.common.cats.Clock
@@ -120,7 +120,7 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
     "GET /signals" should {
       "return all submitted signals" in {
         val svc = mock[SignalService[IO]]
-        when(svc.getAll(any[UserId], any[SearchParams])).thenReturnIO(List(Signals.trendDirectionChanged))
+        when(svc.getAll(any[UserId], any[SearchParams])).thenReturnIO(List(Signals.trend(Direction.Upward)))
 
         val req = Request[IO](Method.GET, uri"/signals?from=2020-01-01&to=2021-01-01T04:01:00Z&currencyPair=GBP/USD").withAuthHeader()
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))

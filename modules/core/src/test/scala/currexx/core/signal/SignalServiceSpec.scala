@@ -5,7 +5,7 @@ import cats.effect.IO
 import currexx.core.MockActionDispatcher
 import currexx.core.common.action.Action
 import currexx.core.common.http.SearchParams
-import currexx.core.fixtures.{Markets, Settings, Signals, Users}
+import currexx.core.fixtures.{Indicators, Markets, Settings, Signals, Users}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.signal.{Condition, Direction, Indicator, ValueSource, ValueTransformation as VT}
 import currexx.domain.user.UserId
@@ -19,14 +19,15 @@ class SignalServiceSpec extends IOWordSpec {
         val (signRepo, settRepo, disp) = mocks
         when(signRepo.saveAll(anyList[Signal])).thenReturnUnit
 
+        val signal = Signals.trend(Direction.Upward)
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
-          _   <- svc.submit(Signals.trendDirectionChanged)
+          _   <- svc.submit(signal)
         yield ()
 
         result.asserting { res =>
-          verify(signRepo).saveAll(List(Signals.trendDirectionChanged))
-          disp.submittedActions mustBe List(Action.ProcessSignals(Users.uid, Markets.gbpeur, List(Signals.trendDirectionChanged)))
+          verify(signRepo).saveAll(List(signal))
+          disp.submittedActions mustBe List(Action.ProcessSignals(Users.uid, Markets.gbpeur, List(signal)))
           res mustBe ()
         }
       }
@@ -34,8 +35,10 @@ class SignalServiceSpec extends IOWordSpec {
 
     "getAll" should {
       "return all signals from the signalRepository" in {
+        val signal                     = Signals.trend(Direction.Upward)
         val (signRepo, settRepo, disp) = mocks
-        when(signRepo.getAll(any[UserId], any[SearchParams])).thenReturnIO(List(Signals.trendDirectionChanged))
+        when(signRepo.getAll(any[UserId], any[SearchParams]))
+          .thenReturnIO(List(signal))
 
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
@@ -45,8 +48,8 @@ class SignalServiceSpec extends IOWordSpec {
         result.asserting { res =>
           verifyNoInteractions(settRepo)
           verify(signRepo).getAll(Users.uid, SearchParams(Some(Signals.ts), None, Some(Markets.gbpeur)))
-          disp.submittedActions mustBe empty
-          res mustBe List(Signals.trendDirectionChanged)
+          disp.submittedActions must be(empty)
+          res mustBe List(signal)
         }
       }
     }
@@ -64,7 +67,7 @@ class SignalServiceSpec extends IOWordSpec {
         result.asserting { res =>
           verify(settRepo).get(Users.uid)
           verifyNoInteractions(signRepo)
-          disp.submittedActions mustBe empty
+          disp.submittedActions must be(empty)
           res mustBe ()
         }
       }
@@ -86,7 +89,7 @@ class SignalServiceSpec extends IOWordSpec {
             interval = Markets.timeSeriesData.interval,
             currencyPair = Markets.gbpeur,
             condition = Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(13)),
-            triggeredBy = Signals.trendChangeDetection,
+            triggeredBy = Indicators.trendChangeDetection,
             time = timeSeriesData.prices.head.time
           )
 
@@ -111,7 +114,7 @@ class SignalServiceSpec extends IOWordSpec {
         result.asserting { res =>
           verify(settRepo).get(Users.uid)
           verifyNoInteractions(signRepo)
-          disp.submittedActions mustBe empty
+          disp.submittedActions must be(empty)
           res mustBe ()
         }
       }
