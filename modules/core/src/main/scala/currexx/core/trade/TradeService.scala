@@ -13,13 +13,16 @@ import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.common.effects.*
 import currexx.core.market.{MarketProfile, MarketState}
-import currexx.core.trade.TradeStrategyExecutor.Decision
+import currexx.core.settings.TradeSettings
+import currexx.core.trade.TradeAction
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.market.{CurrencyPair, Interval, TradeOrder}
 import currexx.domain.monitor.Limits
 import kirill5k.common.cats.Clock
 import currexx.domain.user.UserId
 import fs2.Stream
+
+import java.time.Instant
 
 trait TradeService[F[_]]:
   def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]]
@@ -71,9 +74,12 @@ final private class LiveTradeService[F[_]](
       .findLatestBy(uid, cp)
       .flatMapOption(F.unit) { top =>
         F.whenA(top.order.isEnter) {
-          (clock.now, marketDataClient.latestPrice(cp))
-            .mapN((time, price) => top.copy(time = time, order = TradeOrder.Exit(cp, price.close)))
-            .flatMap(submitOrderPlacement)
+          for
+            time  <- clock.now
+            price <- marketDataClient.latestPrice(cp)
+            order = top.copy(time = time, order = TradeOrder.Exit(cp, price.close))
+            _ <- submitOrderPlacement(order)
+          yield ()
         }
       }
 
@@ -82,7 +88,7 @@ final private class LiveTradeService[F[_]](
       settings    <- settingsRepository.get(uid)
       foundOrders <- brokerClient.find(settings.broker, cps)
       time        <- clock.now
-      _ <- foundOrders
+      _           <- foundOrders
         .collect {
           case o if limits.min.exists(o.profit < _) || limits.max.exists(o.profit > _) =>
             TradeOrder.Exit(o.currencyPair, o.currentPrice)
@@ -92,23 +98,60 @@ final private class LiveTradeService[F[_]](
     yield ()
 
   override def processMarketStateUpdate(state: MarketState, previousProfile: MarketProfile): F[Unit] =
-    (settingsRepository.get(state.userId), marketDataClient.latestPrice(state.currencyPair), clock.now)
-      .mapN { (settings, price, time) =>
-        TradeStrategyExecutor
-          .get(settings.strategy)
-          .analyze(state)
-          .map {
-            case Decision.Buy   => settings.trading.toOrder(TradeOrder.Position.Buy, state.currencyPair, price.close)
-            case Decision.Sell  => settings.trading.toOrder(TradeOrder.Position.Sell, state.currencyPair, price.close)
-            case Decision.Close => TradeOrder.Exit(state.currencyPair, price.close)
-          }
-          .map(order => TradeOrderPlacement(state.userId, order, settings.broker, time))
+    for
+      settings <- settingsRepository.get(state.userId)
+      closeAction = Rule.findTriggeredAction(settings.strategy.closeRules, state, previousProfile)
+      openAction  = Rule.findTriggeredAction(settings.strategy.openRules, state, previousProfile)
+      finalAction = (state.currentPosition, closeAction, openAction) match {
+        // --- Case 1: We are in a position AND a close rule was triggered. ---
+        // The close rule takes highest priority. We exit the position.
+        case (Some(_), Some(action), _) => Some(action) // `action` will be `ClosePosition`
+        // --- Case 2: We are in a position AND an *opposite* open rule was triggered. ---
+        // This is the "Stop and Reverse" (SAR) logic.
+        case (Some(pos), None, Some(TradeAction.OpenShort)) if pos.position == TradeOrder.Position.Buy =>
+          // We are long, but an OpenShort signal appeared. We need a new "FlipToShort" action.
+          Some(TradeAction.FlipToShort)
+        case (Some(pos), None, Some(TradeAction.OpenLong)) if pos.position == TradeOrder.Position.Sell =>
+          // We are short, but an OpenLong signal appeared.
+          Some(TradeAction.FlipToLong)
+        // --- Case 3: We are flat AND an open rule was triggered. ---
+        case (None, _, Some(action)) => Some(action) // `action` will be `OpenLong` or `OpenShort`
+        // --- Default Case: No action to be taken ---
+        case _ => None
       }
-      .flatMapOption(F.unit) { top =>
-        def to = TradeOrder.Exit(top.order.currencyPair, top.order.price)
-        F.whenA(state.hasOpenPosition && top.order.isEnter)(brokerClient.submit(top.broker, to)) >>
-          submitOrderPlacement(top)
-      }
+      _ <- F.whenA(finalAction.isDefined)(executeAction(finalAction.get, state, settings))
+    yield ()
+
+  private def executeAction(action: TradeAction, state: MarketState, settings: TradeSettings): F[Unit] = {
+    def submit(order: TradeOrder, time: Instant): F[Unit] =
+      submitOrderPlacement(TradeOrderPlacement(state.userId, order, settings.broker, time))
+    for
+      time  <- clock.now
+      price <- marketDataClient.latestPrice(state.currencyPair)
+      _     <- action match
+        case TradeAction.OpenLong =>
+          val order = settings.trading.toOrder(TradeOrder.Position.Buy, state.currencyPair, price.close)
+          submit(order, time)
+
+        case TradeAction.FlipToLong =>
+          val exitOrder = TradeOrder.Exit(state.currencyPair, price.close)
+          val openOrder = settings.trading.toOrder(TradeOrder.Position.Buy, state.currencyPair, price.close)
+          submit(exitOrder, time) >> submit(openOrder, time)
+
+        case TradeAction.OpenShort =>
+          val order = settings.trading.toOrder(TradeOrder.Position.Sell, state.currencyPair, price.close)
+          submit(order, time)
+
+        case TradeAction.FlipToShort =>
+          val exitOrder = TradeOrder.Exit(state.currencyPair, price.close)
+          val openOrder = settings.trading.toOrder(TradeOrder.Position.Sell, state.currencyPair, price.close)
+          submit(exitOrder, time) >> submit(openOrder, time)
+
+        case TradeAction.ClosePosition =>
+          val order = TradeOrder.Exit(state.currencyPair, price.close)
+          submit(order, time)
+    yield ()
+  }
 
   private def submitOrderPlacement(top: TradeOrderPlacement): F[Unit] =
     brokerClient.submit(top.broker, top.order) *>
