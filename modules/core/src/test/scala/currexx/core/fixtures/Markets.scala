@@ -1,15 +1,9 @@
 package currexx.core.fixtures
 
 import cats.data.NonEmptyList
-import currexx.core.market.{MarketProfile, MarketState, PositionState}
+import currexx.core.market.{MarketProfile, MarketState, PositionState, TrendState}
 import currexx.domain.market.Currency.{EUR, GBP, USD}
-import currexx.domain.market.{
-  CurrencyPair,
-  Interval,
-  MarketTimeSeriesData,
-  PriceRange,
-  TradeOrder,
-}
+import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange, TradeOrder}
 import currexx.domain.signal.Direction
 
 import java.time.{Instant, LocalDate, ZoneOffset}
@@ -24,7 +18,7 @@ object Markets {
 
   lazy val positionState: PositionState = PositionState(TradeOrder.Position.Buy, ts, priceRange.close)
 
-  lazy val profile: MarketProfile = MarketProfile(trendDirection = Some(Direction.Upward))
+  lazy val profile: MarketProfile = MarketProfile(trend = Some(TrendState(Direction.Upward, ts)))
 
   lazy val state: MarketState = MarketState(
     userId = Users.uid,

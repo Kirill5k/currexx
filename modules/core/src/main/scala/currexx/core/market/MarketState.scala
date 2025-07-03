@@ -1,28 +1,55 @@
 package currexx.core.market
 
 import currexx.domain.market.{CurrencyPair, TradeOrder}
-import currexx.domain.signal.{Condition, Direction}
+import currexx.domain.signal.Direction
 import currexx.domain.user.UserId
+import currexx.domain.types.EnumType
 import io.circe.Codec
 
 import java.time.Instant
 
+object MomentumZone extends EnumType[MomentumZone](() => MomentumZone.values)
+enum MomentumZone:
+  case Overbought, Oversold, Neutral
 
-//TODO: REFINE: This is a simplified version of the market state.
+object VolatilityRegime extends EnumType[VolatilityRegime](() => VolatilityRegime.values)
+enum VolatilityRegime:
+  case High, Low, Expanding, Contracting
+
+final case class TrendState(
+    direction: Direction,
+    confirmedAt: Instant
+) derives Codec.AsObject
+
+final case class CrossoverState(
+    direction: Direction,
+    confirmedAt: Instant
+) derives Codec.AsObject
+
+final case class MomentumState(
+    zone: MomentumZone,
+    confirmedAt: Instant
+) derives Codec.AsObject
+
+final case class VolatilityState(
+    regime: VolatilityRegime,
+    confirmedAt: Instant
+) derives Codec.AsObject
+
 final case class MarketProfile(
-    // Trend-related view
-    trendDirection: Option[Direction] = None, // e.g., from TrendChangeDetection
-    trendStrength: Option[Double] = None,     // Could be length, or Kalman velocity
+    /** The state of the primary, confirmed market trend. */
+    trend: Option[TrendState] = None,
 
-    // Crossover-related view
-    crossoverSignal: Option[Direction] = None, // e.g., from LinesCrossing
+    /** The state of the most recent crossover event. */
+    crossover: Option[CrossoverState] = None,
 
-    // Oscillator-related view
-    isInOverboughtZone: Option[Boolean] = None, // e.g., from ThresholdCrossing > upper
-    isInOversoldZone: Option[Boolean] = None,   // e.g., from ThresholdCrossing < lower
+    /** The persistent state of the market's momentum. */
+    momentum: Option[MomentumState] = None,
+    lastMomentumValue: Option[Double] = None,
 
-    // Volatility-related view
-    volatilityCondition: Option[Condition] = None // e.g., Keltner Channel band cross
+    /** The state of the market's volatility regime. */
+    volatility: Option[VolatilityState] = None,
+    lastVolatilityValue: Option[Double] = None
 ) derives Codec.AsObject
 
 final case class PositionState(

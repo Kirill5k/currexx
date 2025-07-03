@@ -42,9 +42,7 @@ final private class LiveMarketService[F[_]](
     stateRepo.find(uid, cp).flatMap { maybeState =>
 
       val currentProfile = maybeState.fold(MarketProfile())(_.profile)
-      val updatedProfile = signals.foldLeft(currentProfile) { (prof, sign) =>
-        updateProfileWithCondition(prof, sign.condition)
-      }
+      val updatedProfile = signals.foldLeft(currentProfile)(updateProfileWithCondition)
       F.whenA(updatedProfile != currentProfile) {
         stateRepo
           .update(uid, cp, updatedProfile)
@@ -52,25 +50,74 @@ final private class LiveMarketService[F[_]](
       }
     }
 
-  private def updateProfileWithCondition(profile: MarketProfile, condition: Condition): MarketProfile =
-    condition match {
-      case Condition.TrendDirectionChange(from, to, _) =>
-        profile.copy(trendDirection = Some(to))
+  private def updateProfileWithCondition(profile: MarketProfile, signal: Signal): MarketProfile =
+    signal.condition match {
+      // --- Trend Signal ---
+      case Condition.TrendDirectionChange(_, to, _) =>
+        // A trend change occurred. Create a new TrendState.
+        val newTrendState = TrendState(
+          direction = to,
+          confirmedAt = signal.time
+        )
+        profile.copy(trend = Some(newTrendState))
 
+      // --- Crossover Signal ---
       case Condition.LinesCrossing(direction) =>
-        profile.copy(crossoverSignal = Some(direction))
+        // A crossover occurred. Create a new CrossoverState.
+        val newCrossoverState = CrossoverState(
+          direction = direction,
+          confirmedAt = signal.time
+        )
+        profile.copy(crossover = Some(newCrossoverState))
 
-      case Condition.AboveThreshold(_, _) =>
-        profile.copy(isInOverboughtZone = Some(true), isInOversoldZone = Some(false))
+      // --- Momentum Signals (Threshold Crossing) ---
+      case Condition.AboveThreshold(_, value) =>
+        // The oscillator crossed the upper boundary.
+        // We are now in the Overbought zone.
+        val newMomentumState = MomentumState(
+          zone = MomentumZone.Overbought,
+          confirmedAt = signal.time
+        )
+        profile.copy(
+          momentum = Some(newMomentumState),
+          lastMomentumValue = Some(value.toDouble) // Update the latest raw value
+        )
 
-      case Condition.BelowThreshold(_, _) =>
-        profile.copy(isInOversoldZone = Some(true), isInOverboughtZone = Some(false))
+      case Condition.BelowThreshold(_, value) =>
+        // The oscillator crossed the lower boundary.
+        // We are now in the Oversold zone.
+        val newMomentumState = MomentumState(
+          zone = MomentumZone.Oversold,
+          confirmedAt = signal.time
+        )
+        profile.copy(
+          momentum = Some(newMomentumState),
+          lastMomentumValue = Some(value.toDouble) // Update the latest raw value
+        )
 
-      case cond @ (_: Condition.UpperBandCrossing | _: Condition.LowerBandCrossing) =>
-        profile.copy(volatilityCondition = Some(cond))
+      // --- Volatility Signals (e.g., from Keltner Channel) ---
+      // Here we just pass the condition through. A more advanced system might create a VolatilityState.
+      case _ @ (_: Condition.UpperBandCrossing | _: Condition.LowerBandCrossing) =>
+        // This part of the profile could be enhanced further, but for now, we just note the event.
+        // Let's assume the `VolatilityState` logic is not yet fully implemented.
+        // For now, we can just update the last known value from a related indicator if available.
+        // This part is highly dependent on how you define volatility signals.
+        // As a placeholder, we do nothing with the state, just the value if we had it.
+        profile // No change to the profile state, maybe just update a raw value if one was passed.
 
+      // --- Composite Signal ---
       case Condition.Composite(conditions) =>
-        conditions.foldLeft(profile)(updateProfileWithCondition) // Recursively apply inner conditions
+        // A composite signal is just a bundle of other signals.
+        // We recursively fold over its inner conditions to update the profile.
+        // This ensures that if a composite contains a TrendChange and a ThresholdCrossing,
+        // BOTH the `trend` and `momentum` fields of the profile get updated correctly.
+        conditions.foldLeft(profile) { (currentProfile, innerCondition) =>
+          // To properly update, the inner call also needs the signal context.
+          // This highlights a design choice: for simplicity here, we assume the composite's
+          // top-level signal context (like time) applies to all children.
+          val pseudoSignal = signal.copy(condition = innerCondition)
+          updateProfileWithCondition(currentProfile, pseudoSignal)
+        }
     }
 }
 
