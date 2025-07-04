@@ -8,10 +8,12 @@ import currexx.core.MockActionDispatcher
 import currexx.core.common.action.Action
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Settings, Trades, Users}
+import currexx.core.market.{MarketProfile, TrendState}
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import kirill5k.common.cats.test.IOWordSpec
 import currexx.domain.market.{CurrencyPair, TradeOrder}
 import currexx.domain.monitor.Limits
+import currexx.domain.signal.Direction
 import currexx.domain.user.UserId
 import kirill5k.common.cats.Clock
 
@@ -49,7 +51,7 @@ class TradeServiceSpec extends IOWordSpec {
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
-        val order = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, 1.3, 0.1)
+        val order  = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, 1.3, 0.1)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
           _   <- svc.placeOrder(Users.uid, order, false)
@@ -74,7 +76,7 @@ class TradeServiceSpec extends IOWordSpec {
         when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturnNone
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
-        val order = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, BigDecimal(1.3), BigDecimal(0.1))
+        val order  = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, BigDecimal(1.3), BigDecimal(0.1))
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
           _   <- svc.placeOrder(Users.uid, order, true)
@@ -183,7 +185,7 @@ class TradeServiceSpec extends IOWordSpec {
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
-        val cps = NonEmptyList.of(Markets.gbpeur)
+        val cps    = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
           _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(None, Some(10), None, None))
@@ -210,7 +212,7 @@ class TradeServiceSpec extends IOWordSpec {
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
-        val cps = NonEmptyList.of(Markets.gbpeur)
+        val cps    = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
           _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None))
@@ -235,7 +237,7 @@ class TradeServiceSpec extends IOWordSpec {
         when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]]))
           .thenReturnIO(List(Trades.openedOrder.copy(profit = 0)))
 
-        val cps = NonEmptyList.of(Markets.gbpeur)
+        val cps    = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
           _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None))
@@ -256,7 +258,7 @@ class TradeServiceSpec extends IOWordSpec {
         when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
         when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]])).thenReturnIO(Nil)
 
-        val cps = NonEmptyList.of(Markets.gbpeur)
+        val cps    = NonEmptyList.of(Markets.gbpeur)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
           _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None))
@@ -274,7 +276,130 @@ class TradeServiceSpec extends IOWordSpec {
     }
 
     "processMarketStateUpdate" should {
-      //TODO: add tests to test new state update processing logic
+      val state         = Markets.state
+      val marketProfile = MarketProfile(trend = Some(TrendState(Direction.Downward, Markets.ts)))
+
+      "not do anything when no rules are triggered" in {
+        val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
+        when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
+
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
+          _   <- svc.processMarketStateUpdate(state, marketProfile)
+        yield ()
+
+        result.asserting { res =>
+          verify(settRepo).get(state.userId)
+          verifyNoInteractions(orderRepo, brokerClient, dataClient)
+          disp.submittedActions mustBe empty
+          res mustBe ()
+        }
+      }
+
+      "open a new long position when not in trade and open-long rule is triggered" in {
+        val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
+        val openLongRule                                          = Rule(TradeAction.OpenLong, Rule.Condition.TrendIs(Direction.Upward))
+        val settings                                              = Settings.trade.copy(strategy = TradeStrategy(List(openLongRule), Nil))
+        when(settRepo.get(any[UserId])).thenReturnIO(settings)
+        when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
+        when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
+
+        val tradeState = state.copy(currentPosition = None)
+        val result     = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
+          _   <- svc.processMarketStateUpdate(tradeState, marketProfile)
+        yield ()
+
+        result.asserting { res =>
+          val order       = TradeOrder.Enter(TradeOrder.Position.Buy, state.currencyPair, Markets.priceRange.close, settings.trading.volume)
+          val placedOrder = TradeOrderPlacement(Users.uid, order, Trades.broker, now)
+
+          verify(settRepo).get(state.userId)
+          verify(dataClient).latestPrice(state.currencyPair)
+          verify(brokerClient).submit(settings.broker, order)
+          verify(orderRepo).save(placedOrder)
+          disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
+          res mustBe ()
+        }
+      }
+
+      "close a long position when in trade and close-long rule is triggered" in {
+        val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
+        val closeRule                                             = Rule(TradeAction.ClosePosition, Rule.Condition.PositionIsOpen)
+        val settings                                              = Settings.trade.copy(strategy = TradeStrategy(Nil, List(closeRule)))
+        when(settRepo.get(any[UserId])).thenReturnIO(settings)
+        when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
+        when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
+
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
+          _   <- svc.processMarketStateUpdate(state, marketProfile)
+        yield ()
+
+        result.asserting { res =>
+          val order       = TradeOrder.Exit(state.currencyPair, Markets.priceRange.close)
+          val placedOrder = TradeOrderPlacement(Users.uid, order, Trades.broker, now)
+
+          verify(settRepo).get(state.userId)
+          verify(dataClient).latestPrice(state.currencyPair)
+          verify(brokerClient).submit(settings.broker, order)
+          verify(orderRepo).save(placedOrder)
+          disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
+          res mustBe ()
+        }
+      }
+
+      "flip to short when in long position and open-short rule is triggered" in {
+        val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
+        val openShortRule                                         = Rule(TradeAction.OpenShort, Rule.Condition.TrendIs(Direction.Upward))
+        val settings = Settings.trade.copy(strategy = TradeStrategy(openRules = List(openShortRule), closeRules = Nil))
+        when(settRepo.get(any[UserId])).thenReturnIO(settings)
+        when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
+        when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
+
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
+          _   <- svc.processMarketStateUpdate(state, marketProfile)
+        yield ()
+
+        result.asserting { res =>
+          val exitOrder       = TradeOrder.Exit(state.currencyPair, Markets.priceRange.close)
+          val placedExitOrder = TradeOrderPlacement(Users.uid, exitOrder, Trades.broker, now)
+          val openOrder = TradeOrder.Enter(TradeOrder.Position.Sell, state.currencyPair, Markets.priceRange.close, settings.trading.volume)
+          val placedOpenOrder = TradeOrderPlacement(Users.uid, openOrder, Trades.broker, now)
+
+          verify(settRepo).get(state.userId)
+          verify(dataClient).latestPrice(state.currencyPair)
+          verify(brokerClient).submit(settings.broker, exitOrder)
+          verify(brokerClient).submit(settings.broker, openOrder)
+          verify(orderRepo).save(placedExitOrder)
+          verify(orderRepo).save(placedOpenOrder)
+          disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOpenOrder))
+          res mustBe ()
+        }
+      }
+
+      "do nothing when in long position and open-long rule is triggered" in {
+        val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
+        val openLongRule                                          = Rule(TradeAction.OpenLong, Rule.Condition.TrendIs(Direction.Upward))
+        val settings                                              = Settings.trade.copy(strategy = TradeStrategy(List(openLongRule), Nil))
+        when(settRepo.get(any[UserId])).thenReturnIO(settings)
+
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
+          _   <- svc.processMarketStateUpdate(state, marketProfile)
+        yield ()
+
+        result.asserting { res =>
+          verify(settRepo).get(state.userId)
+          verifyNoInteractions(orderRepo, brokerClient, dataClient)
+          disp.submittedActions mustBe empty
+          res mustBe ()
+        }
+      }
     }
   }
 
