@@ -68,4 +68,34 @@ object Signals {
       condition = Condition.Composite(NonEmptyList.fromListUnsafe(conditions)),
       triggeredBy = Indicator.Composite(NonEmptyList.fromListUnsafe(triggers))
     )
+
+  def aboveThreshold(
+      threshold: BigDecimal = BigDecimal(80),
+      value: BigDecimal = BigDecimal(85),
+      uid: UserId = Users.uid,
+      time: Instant = ts,
+      cp: CurrencyPair = Markets.gbpeur
+  ): Signal =
+    make(
+      uid = uid,
+      time = time,
+      cp = cp,
+      condition = Condition.AboveThreshold(threshold, value),
+      triggeredBy = Indicators.trendChangeDetection
+    )
+
+  def belowThreshold(
+      threshold: BigDecimal = BigDecimal(20),
+      value: BigDecimal = BigDecimal(15),
+      uid: UserId = Users.uid,
+      time: Instant = ts,
+      cp: CurrencyPair = Markets.gbpeur
+  ): Signal =
+    make(
+      uid = uid,
+      time = time,
+      cp = cp,
+      condition = Condition.BelowThreshold(threshold, value),
+      triggeredBy = Indicators.trendChangeDetection
+    )
 }
