@@ -53,45 +53,57 @@ object MarketProfile {
         // --- Trend Signal ---
         case Condition.TrendDirectionChange(_, to, _) =>
           // A trend change occurred. Create a new TrendState.
-          val newTrendState = TrendState(
-            direction = to,
-            confirmedAt = signal.time
-          )
-          profile.copy(trend = Some(newTrendState))
+          val currentTrendDirection = profile.trend.map(_.direction)
+          if (currentTrendDirection.isEmpty || !currentTrendDirection.contains(to)) {
+            val newTrendState = TrendState(
+              direction = to,
+              confirmedAt = signal.time
+            )
+            profile.copy(trend = Some(newTrendState))
+          } else profile
 
         // --- Crossover Signal ---
         case Condition.LinesCrossing(direction) =>
           // A crossover occurred. Create a new CrossoverState.
-          val newCrossoverState = CrossoverState(
-            direction = direction,
-            confirmedAt = signal.time
-          )
-          profile.copy(crossover = Some(newCrossoverState))
+          val currentCrossoverDirection = profile.crossover.map(_.direction)
+          if (currentCrossoverDirection.isEmpty || !currentCrossoverDirection.contains(direction)) {
+            val newCrossoverState = CrossoverState(
+              direction = direction,
+              confirmedAt = signal.time
+            )
+            profile.copy(crossover = Some(newCrossoverState))
+          } else profile
 
         // --- Momentum Signals (Threshold Crossing) ---
         case Condition.AboveThreshold(_, value) =>
           // The oscillator crossed the upper boundary.
           // We are now in the Overbought zone.
-          val newMomentumState = MomentumState(
-            zone = MomentumZone.Overbought,
-            confirmedAt = signal.time
-          )
-          profile.copy(
-            momentum = Some(newMomentumState),
-            lastMomentumValue = Some(value.toDouble) // Update the latest raw value
-          )
+          val currentMomentumZone = profile.momentum.map(_.zone)
+          if (currentMomentumZone.isEmpty || !currentMomentumZone.contains(MomentumZone.Overbought)) {
+            val newMomentumState = MomentumState(
+              zone = MomentumZone.Overbought,
+              confirmedAt = signal.time
+            )
+            profile.copy(
+              momentum = Some(newMomentumState),
+              lastMomentumValue = Some(value.toDouble) // Update the latest raw value
+            )
+          } else profile
 
         case Condition.BelowThreshold(_, value) =>
           // The oscillator crossed the lower boundary.
           // We are now in the Oversold zone.
-          val newMomentumState = MomentumState(
-            zone = MomentumZone.Oversold,
-            confirmedAt = signal.time
-          )
-          profile.copy(
-            momentum = Some(newMomentumState),
-            lastMomentumValue = Some(value.toDouble) // Update the latest raw value
-          )
+          val currentMomentumZone = profile.momentum.map(_.zone)
+          if (currentMomentumZone.isEmpty || !currentMomentumZone.contains(MomentumZone.Oversold)) {
+            val newMomentumState = MomentumState(
+              zone = MomentumZone.Oversold,
+              confirmedAt = signal.time
+            )
+            profile.copy(
+              momentum = Some(newMomentumState),
+              lastMomentumValue = Some(value.toDouble) // Update the latest raw value
+            )
+          } else profile
 
         // --- Volatility Signals (e.g., from Keltner Channel) ---
         // Here we just pass the condition through. A more advanced system might create a VolatilityState.

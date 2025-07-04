@@ -79,7 +79,7 @@ class MarketControllerSpec extends HttpRoutesWordSpec {
              |    "profile" : {
              |      "trend" : {
              |        "direction" : "upward",
-             |        "confirmedAt" : "2025-07-03T00:00:00Z"
+             |        "confirmedAt" : "${Markets.ts}"
              |      },
              |      "crossover" : null,
              |      "momentum" : null,

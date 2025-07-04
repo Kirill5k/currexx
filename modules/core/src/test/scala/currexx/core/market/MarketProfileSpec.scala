@@ -5,6 +5,8 @@ import currexx.domain.signal.Direction
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.time.Instant
+
 class MarketProfileSpec extends AnyWordSpec with Matchers {
 
   "A MarketProfile" when {
@@ -13,6 +15,13 @@ class MarketProfileSpec extends AnyWordSpec with Matchers {
         val signal  = Signals.trend(Direction.Upward)
         val profile = MarketProfile().update(signal)
         profile.trend mustBe Some(TrendState(Direction.Upward, signal.time))
+      }
+
+      "not update anything when trend is the same" in {
+        val signal = Signals.trend(Direction.Upward)
+        val profile = MarketProfile(trend = Some(TrendState(Direction.Upward, Instant.parse("2023-10-01T00:00:00Z"))))
+        val updatedProfile = profile.update(signal)
+        profile mustBe updatedProfile
       }
 
       "update crossover" in {
