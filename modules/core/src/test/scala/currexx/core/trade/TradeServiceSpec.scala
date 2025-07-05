@@ -312,7 +312,7 @@ class TradeServiceSpec extends IOWordSpec {
         yield ()
 
         result.asserting { res =>
-          val order       = TradeOrder.Enter(TradeOrder.Position.Buy, state.currencyPair, Markets.priceRange.close, settings.trading.volume)
+          val order       = settings.trading.toOrder(TradeOrder.Position.Buy, state.currencyPair, Markets.priceRange.close)
           val placedOrder = TradeOrderPlacement(Users.uid, order, Trades.broker, now)
 
           verify(settRepo).get(state.userId)
@@ -368,7 +368,7 @@ class TradeServiceSpec extends IOWordSpec {
         result.asserting { res =>
           val exitOrder       = TradeOrder.Exit(state.currencyPair, Markets.priceRange.close)
           val placedExitOrder = TradeOrderPlacement(Users.uid, exitOrder, Trades.broker, now)
-          val openOrder = TradeOrder.Enter(TradeOrder.Position.Sell, state.currencyPair, Markets.priceRange.close, settings.trading.volume)
+          val openOrder       = settings.trading.toOrder(TradeOrder.Position.Sell, state.currencyPair, Markets.priceRange.close)
           val placedOpenOrder = TradeOrderPlacement(Users.uid, openOrder, Trades.broker, now)
 
           verify(settRepo).get(state.userId)
