@@ -2,7 +2,7 @@ package currexx.core.market
 
 import currexx.core.signal.Signal
 import currexx.domain.market.{CurrencyPair, TradeOrder}
-import currexx.domain.signal.{Condition, Direction}
+import currexx.domain.signal.{Boundary, Condition, Direction}
 import currexx.domain.user.UserId
 import currexx.domain.types.EnumType
 import io.circe.Codec
@@ -41,9 +41,9 @@ final case class MarketProfile(
     trend: Option[TrendState] = None,
     crossover: Option[CrossoverState] = None,
     momentum: Option[MomentumState] = None,
-    lastMomentumValue: Option[Double] = None,
+    lastMomentumValue: Option[BigDecimal] = None,
     volatility: Option[VolatilityState] = None,
-    lastVolatilityValue: Option[Double] = None
+    lastVolatilityValue: Option[BigDecimal] = None
 ) derives Codec.AsObject
 
 object MarketProfile {
@@ -74,36 +74,30 @@ object MarketProfile {
             profile.copy(crossover = Some(newCrossoverState))
           } else profile
 
-        // --- Momentum Signals (Threshold Crossing) ---
-        case Condition.AboveThreshold(_, value) =>
-          // The oscillator crossed the upper boundary.
-          // We are now in the Overbought zone.
-          val currentMomentumZone = profile.momentum.map(_.zone)
-          if (currentMomentumZone.isEmpty || !currentMomentumZone.contains(MomentumZone.Overbought)) {
-            val newMomentumState = MomentumState(
-              zone = MomentumZone.Overbought,
-              confirmedAt = signal.time
-            )
-            profile.copy(
-              momentum = Some(newMomentumState),
-              lastMomentumValue = Some(value.toDouble) // Update the latest raw value
-            )
-          } else profile
+        case Condition.ThresholdCrossing(_, value, direction, boundary) =>
+          // Determine the new zone based on the signal's direction and boundary
+          val newZone = (direction, boundary) match {
+            case (Direction.Upward, Boundary.Upper)   => MomentumZone.Overbought
+            case (Direction.Downward, Boundary.Lower) => MomentumZone.Oversold
+            case (Direction.Downward, Boundary.Upper) => MomentumZone.Neutral
+            case (Direction.Upward, Boundary.Lower)   => MomentumZone.Neutral
+            case _                                    =>
+              // This case (e.g., Still direction) shouldn't happen, but we can handle it
+              // by just taking the current zone from the profile.
+              profile.momentum.map(_.zone).getOrElse(MomentumZone.Neutral)
+          }
 
-        case Condition.BelowThreshold(_, value) =>
-          // The oscillator crossed the lower boundary.
-          // We are now in the Oversold zone.
-          val currentMomentumZone = profile.momentum.map(_.zone)
-          if (currentMomentumZone.isEmpty || !currentMomentumZone.contains(MomentumZone.Oversold)) {
-            val newMomentumState = MomentumState(
-              zone = MomentumZone.Oversold,
-              confirmedAt = signal.time
-            )
-            profile.copy(
-              momentum = Some(newMomentumState),
-              lastMomentumValue = Some(value.toDouble) // Update the latest raw value
-            )
-          } else profile
+          // Check if the zone has actually changed from the previous state.
+          val currentZone = profile.momentum.map(_.zone)
+          if (!currentZone.contains(newZone)) {
+            // The zone has changed. Create a new MomentumState with the new zone
+            // and the current signal's timestamp as its `confirmedAt` time.
+            val newMomentumState = MomentumState(zone = newZone, confirmedAt = signal.time)
+            profile.copy(momentum = Some(newMomentumState), lastMomentumValue = Some(value))
+          } else {
+            // The zone is the same, but we should still update the latest raw value.
+            profile.copy(lastMomentumValue = Some(value))
+          }
 
         // --- Volatility Signals (e.g., from Keltner Channel) ---
         // Here we just pass the condition through. A more advanced system might create a VolatilityState.

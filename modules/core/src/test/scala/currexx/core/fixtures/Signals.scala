@@ -3,7 +3,7 @@ package currexx.core.fixtures
 import cats.data.NonEmptyList
 import currexx.core.signal.Signal
 import currexx.domain.market.{CurrencyPair, Interval}
-import currexx.domain.signal.{Condition, Direction, Indicator, ValueSource, ValueTransformation}
+import currexx.domain.signal.{Boundary, Condition, Direction, Indicator, ValueSource, ValueTransformation}
 import currexx.domain.user.UserId
 import kirill5k.common.syntax.time.*
 
@@ -80,7 +80,7 @@ object Signals {
       uid = uid,
       time = time,
       cp = cp,
-      condition = Condition.AboveThreshold(threshold, value),
+      condition = Condition.ThresholdCrossing(threshold, value, Direction.Upward, Boundary.Upper),
       triggeredBy = Indicators.trendChangeDetection
     )
 
@@ -95,7 +95,7 @@ object Signals {
       uid = uid,
       time = time,
       cp = cp,
-      condition = Condition.BelowThreshold(threshold, value),
+      condition = Condition.ThresholdCrossing(threshold, value, Direction.Downward, Boundary.Lower),
       triggeredBy = Indicators.trendChangeDetection
     )
 }

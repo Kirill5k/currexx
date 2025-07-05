@@ -9,13 +9,16 @@ object Direction extends EnumType[Direction](() => Direction.values)
 enum Direction:
   case Upward, Downward, Still
 
+object Boundary extends EnumType[Boundary](() => Boundary.values)
+enum Boundary:
+  case Upper, Lower
+
 enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Composite(conditions: NonEmptyList[Condition])
   case UpperBandCrossing(direction: Direction)
   case LowerBandCrossing(direction: Direction)
   case LinesCrossing(direction: Direction)
-  case AboveThreshold(threshold: BigDecimal, value: BigDecimal)
-  case BelowThreshold(threshold: BigDecimal, value: BigDecimal)
+  case ThresholdCrossing(threshold: BigDecimal, value: BigDecimal, direction: Direction, boundary: Boundary)
   case TrendDirectionChange(from: Direction, to: Direction, previousTrendLength: Option[Int] = None)
 
 object Condition {
@@ -25,8 +28,7 @@ object Condition {
       "upper-band-crossing"    -> JsonTaggedAdt.tagged[Condition.UpperBandCrossing],
       "lower-band-crossing"    -> JsonTaggedAdt.tagged[Condition.LowerBandCrossing],
       "lines-crossing"         -> JsonTaggedAdt.tagged[Condition.LinesCrossing],
-      "above-threshold"        -> JsonTaggedAdt.tagged[Condition.AboveThreshold],
-      "below-threshold"        -> JsonTaggedAdt.tagged[Condition.BelowThreshold],
+      "threshold-crossing"     -> JsonTaggedAdt.tagged[Condition.ThresholdCrossing],
       "trend-direction-change" -> JsonTaggedAdt.tagged[Condition.TrendDirectionChange]
     ),
     strict = true,
@@ -132,9 +134,28 @@ object Condition {
       }
   }
 
-  def thresholdCrossing(line: List[Double], min: Double, max: Double): Option[Condition] =
-    (line.head, line.drop(1).head) match
-      case (c, p) if c > max && p <= max => Some(Condition.AboveThreshold(max, c))
-      case (c, p) if c < min && p >= min => Some(Condition.BelowThreshold(min, c))
-      case _                             => None
+  def thresholdCrossing(line: List[Double], lowerBoundary: Double, upperBoundary: Double): Option[Condition] =
+    line match {
+      case current :: previous :: _ =>
+        // Check against the UPPER boundary first
+        if (current >= upperBoundary && previous < upperBoundary) {
+          // Crossed ABOVE the upper boundary
+          Some(Condition.ThresholdCrossing(upperBoundary, current, Direction.Upward, Boundary.Upper))
+        } else if (current < upperBoundary && previous >= upperBoundary) {
+          // Crossed back BELOW the upper boundary
+          Some(Condition.ThresholdCrossing(upperBoundary, current, Direction.Downward, Boundary.Upper))
+        }
+        // If no upper boundary cross, check against the LOWER boundary
+        else if (current <= lowerBoundary && previous > lowerBoundary) {
+          // Crossed BELOW the lower boundary
+          Some(Condition.ThresholdCrossing(lowerBoundary, current, Direction.Downward, Boundary.Lower))
+        } else if (current > lowerBoundary && previous <= lowerBoundary) {
+          // Crossed back ABOVE the lower boundary
+          Some(Condition.ThresholdCrossing(lowerBoundary, current, Direction.Upward, Boundary.Lower))
+        } else {
+          // No crossing occurred
+          None
+        }
+      case _ => None
+    }
 }

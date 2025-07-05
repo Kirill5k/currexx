@@ -7,7 +7,7 @@ import currexx.core.common.action.Action
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Indicators, Markets, Settings, Signals, Users}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
-import currexx.domain.signal.{Condition, Direction, Indicator, ValueSource, ValueTransformation as VT}
+import currexx.domain.signal.{Boundary, Condition, Direction, Indicator, ValueSource, ValueTransformation as VT}
 import currexx.domain.user.UserId
 import kirill5k.common.cats.test.IOWordSpec
 
@@ -158,7 +158,7 @@ class SignalServiceSpec extends IOWordSpec {
             userId = Users.uid,
             interval = Markets.timeSeriesData.interval,
             currencyPair = Markets.gbpeur,
-            condition = Condition.BelowThreshold(20d, BigDecimal(16.294773928361835)),
+            condition = Condition.ThresholdCrossing(20d, BigDecimal(16.294773928361835), Direction.Downward, Boundary.Lower),
             triggeredBy = indicator,
             time = timeSeriesData.prices.head.time
           )
@@ -193,7 +193,7 @@ class SignalServiceSpec extends IOWordSpec {
             interval = Markets.timeSeriesData.interval,
             condition = Condition.Composite(
               NonEmptyList.of(
-                Condition.BelowThreshold(20d, BigDecimal(16.294773928361835)),
+                Condition.ThresholdCrossing(20d, BigDecimal(16.294773928361835), Direction.Downward, Boundary.Lower),
                 Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(13))
               )
             ),
