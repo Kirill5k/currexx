@@ -5,6 +5,10 @@ import currexx.domain.types.EnumType
 import kirill5k.common.syntax.option.*
 import org.latestbit.circe.adt.codec.*
 
+object VolatilityRegime extends EnumType[VolatilityRegime](() => VolatilityRegime.values)
+enum VolatilityRegime:
+  case High, Low
+
 object Direction extends EnumType[Direction](() => Direction.values)
 enum Direction:
   case Upward, Downward, Still
@@ -20,6 +24,7 @@ enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWit
   case LinesCrossing(direction: Direction)
   case ThresholdCrossing(threshold: BigDecimal, value: BigDecimal, direction: Direction, boundary: Boundary)
   case TrendDirectionChange(from: Direction, to: Direction, previousTrendLength: Option[Int] = None)
+  case VolatilityRegimeChanged(from: Option[VolatilityRegime], to: VolatilityRegime)
 
 object Condition {
   given JsonTaggedAdt.Config[Condition] = JsonTaggedAdt.Config.Values[Condition](
@@ -148,4 +153,28 @@ object Condition {
         checkCrossing(upperBoundary, Boundary.Upper)
           .orElse(checkCrossing(lowerBoundary, Boundary.Lower))
       case _ => None
+
+  def volatilityRegimeChange(primaryLine: List[Double], smoothedLine: List[Double]): Option[Condition] =
+    // Safely pattern match to get the current and previous values from both lines.
+    (primaryLine, smoothedLine) match {
+      case (currentPrimary :: previousPrimary :: restPrimary, currentSmoothed :: previousSmoothed :: restSmoothed) =>
+
+        val currentRegime = if (currentPrimary > currentSmoothed) VolatilityRegime.High else VolatilityRegime.Low
+
+        // Now, determine the previous regime.
+        // We check if there is enough data to have a valid previous state.
+        // If `restPrimary` is empty, it means we only have 2 data points, so there is no "from".
+        val previousRegimeOpt = Option.when(restPrimary.nonEmpty && restSmoothed.nonEmpty) {
+          if (previousPrimary > previousSmoothed) VolatilityRegime.High else VolatilityRegime.Low
+        }
+        // A signal is generated if:
+        // 1. The regime has changed from the previous one.
+        // OR
+        // 2. There was no previous regime (it's the first ever calculation).
+        Option.when(!previousRegimeOpt.contains(currentRegime)) {
+          Condition.VolatilityRegimeChanged(from = previousRegimeOpt, to = currentRegime)
+        }
+      // Not enough data to even determine the current regime.
+      case _ => None
+    }
 }

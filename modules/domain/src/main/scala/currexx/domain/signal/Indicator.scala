@@ -53,7 +53,7 @@ object ValueTransformation {
 
 object IndicatorKind extends EnumType[IndicatorKind](() => IndicatorKind.values)
 enum IndicatorKind:
-  case TrendChangeDetection, ThresholdCrossing, LinesCrossing, KeltnerChannel, Composite
+  case VolatilityRegimeDetection, TrendChangeDetection, ThresholdCrossing, LinesCrossing, KeltnerChannel, Composite
 
 enum Indicator(val kind: IndicatorKind) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Composite(
@@ -81,15 +81,21 @@ enum Indicator(val kind: IndicatorKind) derives JsonTaggedAdt.EncoderWithConfig,
       atrLength: Int,
       atrMultiplier: Double
   ) extends Indicator(IndicatorKind.KeltnerChannel)
+  case VolatilityRegimeDetection(
+      atrLength: Int,
+      smoothingType: ValueTransformation,
+      smoothingLength: Int
+  ) extends Indicator(IndicatorKind.VolatilityRegimeDetection)
 
 object Indicator:
   given JsonTaggedAdt.Config[Indicator] = JsonTaggedAdt.Config.Values[Indicator](
     mappings = Map(
-      IndicatorKind.Composite.print            -> JsonTaggedAdt.tagged[Indicator.Composite],
-      IndicatorKind.TrendChangeDetection.print -> JsonTaggedAdt.tagged[Indicator.TrendChangeDetection],
-      IndicatorKind.ThresholdCrossing.print    -> JsonTaggedAdt.tagged[Indicator.ThresholdCrossing],
-      IndicatorKind.LinesCrossing.print        -> JsonTaggedAdt.tagged[Indicator.LinesCrossing],
-      IndicatorKind.KeltnerChannel.print       -> JsonTaggedAdt.tagged[Indicator.KeltnerChannel]
+      IndicatorKind.Composite.print                 -> JsonTaggedAdt.tagged[Indicator.Composite],
+      IndicatorKind.VolatilityRegimeDetection.print -> JsonTaggedAdt.tagged[Indicator.VolatilityRegimeDetection],
+      IndicatorKind.TrendChangeDetection.print      -> JsonTaggedAdt.tagged[Indicator.TrendChangeDetection],
+      IndicatorKind.ThresholdCrossing.print         -> JsonTaggedAdt.tagged[Indicator.ThresholdCrossing],
+      IndicatorKind.LinesCrossing.print             -> JsonTaggedAdt.tagged[Indicator.LinesCrossing],
+      IndicatorKind.KeltnerChannel.print            -> JsonTaggedAdt.tagged[Indicator.KeltnerChannel]
     ),
     strict = true,
     typeFieldName = "kind"

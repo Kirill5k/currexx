@@ -2,7 +2,7 @@ package currexx.core.market
 
 import currexx.core.signal.Signal
 import currexx.domain.market.{CurrencyPair, TradeOrder}
-import currexx.domain.signal.{Boundary, Condition, Direction}
+import currexx.domain.signal.{Boundary, Condition, Direction, VolatilityRegime}
 import currexx.domain.user.UserId
 import currexx.domain.types.EnumType
 import io.circe.Codec
@@ -12,10 +12,6 @@ import java.time.Instant
 object MomentumZone extends EnumType[MomentumZone](() => MomentumZone.values)
 enum MomentumZone:
   case Overbought, Oversold, Neutral
-
-object VolatilityRegime extends EnumType[VolatilityRegime](() => VolatilityRegime.values)
-enum VolatilityRegime:
-  case High, Low, Expanding, Contracting
 
 final case class TrendState(
     direction: Direction,
@@ -98,6 +94,19 @@ object MarketProfile {
             // The zone is the same, but we should still update the latest raw value.
             profile.copy(lastMomentumValue = Some(value))
           }
+
+        case Condition.VolatilityRegimeChanged(_, to) =>
+          val currentRegime = profile.volatility.map(_.regime)
+          if (!currentRegime.contains(to)) {
+            val newVolatilityState = VolatilityState(
+              regime = to,
+              confirmedAt = signal.time
+            )
+            // Note: This assumes another mechanism will update `lastVolatilityValue`.
+            // A good way is to have the VolatilityRegimeChanged signal also carry the raw ATR value.
+            // Let's assume for now the signal is simple.
+            profile.copy(volatility = Some(newVolatilityState))
+          } else profile
 
         // --- Volatility Signals (e.g., from Keltner Channel) ---
         // Here we just pass the condition through. A more advanced system might create a VolatilityState.

@@ -11,13 +11,7 @@ import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.market.{CurrencyPair, MarketTimeSeriesData}
-import currexx.domain.signal.{
-  Condition,
-  Indicator,
-  MovingAverage,
-  ValueSource as VS,
-  ValueTransformation as VT
-}
+import currexx.domain.signal.{Condition, Indicator, MovingAverage, ValueSource as VS, ValueTransformation as VT}
 
 trait SignalService[F[_]]:
   def submit(signal: Signal): F[Unit]
@@ -50,11 +44,12 @@ object SignalService {
 
   def detectSignal(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator): Option[Signal] =
     indicator match {
-      case tcd: Indicator.TrendChangeDetection => detectTrendChange(uid, data, tcd)
-      case tc: Indicator.ThresholdCrossing     => detectThresholdCrossing(uid, data, tc)
-      case lc: Indicator.LinesCrossing         => detectLinesCrossing(uid, data, lc)
-      case kc: Indicator.KeltnerChannel        => detectBarrierCrossing(uid, data, kc)
-      case c: Indicator.Composite              =>
+      case tcd: Indicator.TrendChangeDetection      => detectTrendChange(uid, data, tcd)
+      case tc: Indicator.ThresholdCrossing          => detectThresholdCrossing(uid, data, tc)
+      case lc: Indicator.LinesCrossing              => detectLinesCrossing(uid, data, lc)
+      case kc: Indicator.KeltnerChannel             => detectBarrierCrossing(uid, data, kc)
+      case vrd: Indicator.VolatilityRegimeDetection => detectVolatilityRegimeChange(uid, data, vrd)
+      case c: Indicator.Composite                   =>
         val childSignalOptions = c.indicators.map(childInd => detectSignal(uid, data, childInd))
         Option
           .when(childSignalOptions.forall(_.isDefined)) {
@@ -170,6 +165,27 @@ object SignalService {
           currencyPair = data.currencyPair,
           interval = data.interval,
           condition = cond,
+          triggeredBy = indicator,
+          time = data.prices.head.time
+        )
+      }
+  }
+
+  def detectVolatilityRegimeChange(
+      uid: UserId,
+      data: MarketTimeSeriesData,
+      indicator: Indicator.VolatilityRegimeDetection
+  ): Option[Signal] = {
+    val atrLine   = Volatility.averageTrueRange(data.closings, data.highs, data.lows, indicator.atrLength)
+    val atrMaLine = indicator.smoothingType.transform(atrLine, data)
+    Condition
+      .volatilityRegimeChange(atrLine, atrMaLine)
+      .map { condition => // If a condition was returned, wrap it in a Signal.
+        Signal(
+          userId = uid,
+          currencyPair = data.currencyPair,
+          interval = data.interval,
+          condition = condition,
           triggeredBy = indicator,
           time = data.prices.head.time
         )

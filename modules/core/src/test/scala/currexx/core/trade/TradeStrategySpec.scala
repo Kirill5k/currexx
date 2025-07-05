@@ -1,9 +1,9 @@
 package currexx.core.trade
 
 import currexx.core.fixtures.Markets.*
-import currexx.core.market.{MarketProfile, MarketState, MomentumState, MomentumZone, VolatilityRegime, CrossoverState, TrendState, VolatilityState}
+import currexx.core.market.{CrossoverState, MarketProfile, MarketState, MomentumState, MomentumZone, TrendState, VolatilityState}
 import currexx.core.trade.Rule.Condition
-import currexx.domain.signal.Direction
+import currexx.domain.signal.{Direction, VolatilityRegime}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 

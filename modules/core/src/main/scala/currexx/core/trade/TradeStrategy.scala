@@ -1,9 +1,9 @@
 package currexx.core.trade
 
-import currexx.core.market.{MarketProfile, MarketState, MomentumZone, VolatilityRegime}
+import currexx.core.market.{MarketProfile, MarketState, MomentumZone}
 import currexx.core.trade
 import currexx.domain.JsonCodecs
-import currexx.domain.signal.Direction
+import currexx.domain.signal.{Direction, VolatilityRegime}
 import currexx.domain.types.EnumType
 import io.circe.Codec
 import org.latestbit.circe.adt.codec.*
