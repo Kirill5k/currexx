@@ -19,14 +19,7 @@ class ConditionSpec extends AnyWordSpec with Matchers {
 
       "decode above-threshold condition from json" in {
         val condition: Condition = Condition.ThresholdCrossing(BigDecimal(10), BigDecimal(20), Direction.Upward, Boundary.Upper)
-        val json                 =
-          """{
-            |"threshold":10,
-            |"value":20,
-            |"kind":"above-threshold",
-            |"direction":"upward",
-            |"boundary":"upper"
-            |}""".stripMargin
+        val json                 = """{"threshold":10,"value":20,"direction":"upward","boundary":"upper","kind":"threshold-crossing"}"""
 
         condition.asJson.noSpaces mustBe json
         decode[Condition](json) mustBe Right(condition)
@@ -49,13 +42,13 @@ class ConditionSpec extends AnyWordSpec with Matchers {
       }
 
       "return BelowThreshold when current value is below min" in {
-        val line = List(0.5, 1.0, 1.0, 1.0, 1.0)
+        val line = List(0.5, 1.1, 1.0, 1.0, 1.0)
 
         Condition.thresholdCrossing(line, 1.0, 4.0) mustBe Some(Condition.ThresholdCrossing(1.0, 0.5, Direction.Downward, Boundary.Lower))
       }
 
       "return None when value is within limits" in {
-        val line = List(3.0, 5.0, 1.0, 1.0, 1.0)
+        val line = List(3.0, 3.5, 1.0, 1.0, 1.0)
 
         Condition.thresholdCrossing(line, 1.0, 4.0) mustBe None
       }

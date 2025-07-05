@@ -135,27 +135,17 @@ object Condition {
   }
 
   def thresholdCrossing(line: List[Double], lowerBoundary: Double, upperBoundary: Double): Option[Condition] =
-    line match {
+    line match
       case current :: previous :: _ =>
-        // Check against the UPPER boundary first
-        if (current >= upperBoundary && previous < upperBoundary) {
-          // Crossed ABOVE the upper boundary
-          Some(Condition.ThresholdCrossing(upperBoundary, current, Direction.Upward, Boundary.Upper))
-        } else if (current < upperBoundary && previous >= upperBoundary) {
-          // Crossed back BELOW the upper boundary
-          Some(Condition.ThresholdCrossing(upperBoundary, current, Direction.Downward, Boundary.Upper))
-        }
-        // If no upper boundary cross, check against the LOWER boundary
-        else if (current <= lowerBoundary && previous > lowerBoundary) {
-          // Crossed BELOW the lower boundary
-          Some(Condition.ThresholdCrossing(lowerBoundary, current, Direction.Downward, Boundary.Lower))
-        } else if (current > lowerBoundary && previous <= lowerBoundary) {
-          // Crossed back ABOVE the lower boundary
-          Some(Condition.ThresholdCrossing(lowerBoundary, current, Direction.Upward, Boundary.Lower))
-        } else {
-          // No crossing occurred
-          None
-        }
+        def checkCrossing(boundary: Double, boundaryType: Boundary): Option[Condition] =
+          (current, previous) match
+            case (c, p) if c >= boundary && p < boundary =>
+              Some(Condition.ThresholdCrossing(boundary, c, Direction.Upward, boundaryType))
+            case (c, p) if c < boundary && p >= boundary =>
+              Some(Condition.ThresholdCrossing(boundary, c, Direction.Downward, boundaryType))
+            case _ => None
+        // Check upper boundary first, then lower boundary
+        checkCrossing(upperBoundary, Boundary.Upper)
+          .orElse(checkCrossing(lowerBoundary, Boundary.Lower))
       case _ => None
-    }
 }
