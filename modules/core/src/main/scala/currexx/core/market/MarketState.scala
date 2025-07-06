@@ -95,7 +95,7 @@ object MarketProfile {
             profile.copy(lastMomentumValue = Some(value))
           }
 
-        case Condition.VolatilityRegimeChanged(_, to) =>
+        case Condition.VolatilityRegimeChange(_, to) =>
           val currentRegime = profile.volatility.map(_.regime)
           if (!currentRegime.contains(to)) {
             val newVolatilityState = VolatilityState(

@@ -24,17 +24,18 @@ enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWit
   case LinesCrossing(direction: Direction)
   case ThresholdCrossing(threshold: BigDecimal, value: BigDecimal, direction: Direction, boundary: Boundary)
   case TrendDirectionChange(from: Direction, to: Direction, previousTrendLength: Option[Int] = None)
-  case VolatilityRegimeChanged(from: Option[VolatilityRegime], to: VolatilityRegime)
+  case VolatilityRegimeChange(from: Option[VolatilityRegime], to: VolatilityRegime)
 
 object Condition {
   given JsonTaggedAdt.Config[Condition] = JsonTaggedAdt.Config.Values[Condition](
     mappings = Map(
-      "composite"              -> JsonTaggedAdt.tagged[Condition.Composite],
-      "upper-band-crossing"    -> JsonTaggedAdt.tagged[Condition.UpperBandCrossing],
-      "lower-band-crossing"    -> JsonTaggedAdt.tagged[Condition.LowerBandCrossing],
-      "lines-crossing"         -> JsonTaggedAdt.tagged[Condition.LinesCrossing],
-      "threshold-crossing"     -> JsonTaggedAdt.tagged[Condition.ThresholdCrossing],
-      "trend-direction-change" -> JsonTaggedAdt.tagged[Condition.TrendDirectionChange]
+      "composite"                -> JsonTaggedAdt.tagged[Condition.Composite],
+      "upper-band-crossing"      -> JsonTaggedAdt.tagged[Condition.UpperBandCrossing],
+      "lower-band-crossing"      -> JsonTaggedAdt.tagged[Condition.LowerBandCrossing],
+      "lines-crossing"           -> JsonTaggedAdt.tagged[Condition.LinesCrossing],
+      "threshold-crossing"       -> JsonTaggedAdt.tagged[Condition.ThresholdCrossing],
+      "volatility-regime-change" -> JsonTaggedAdt.tagged[Condition.VolatilityRegimeChange],
+      "trend-direction-change"   -> JsonTaggedAdt.tagged[Condition.TrendDirectionChange]
     ),
     strict = true,
     typeFieldName = "kind"
@@ -172,7 +173,7 @@ object Condition {
         // OR
         // 2. There was no previous regime (it's the first ever calculation).
         Option.when(!previousRegimeOpt.contains(currentRegime)) {
-          Condition.VolatilityRegimeChanged(from = previousRegimeOpt, to = currentRegime)
+          Condition.VolatilityRegimeChange(from = previousRegimeOpt, to = currentRegime)
         }
       // Not enough data to even determine the current regime.
       case _ => None
