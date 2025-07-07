@@ -5,10 +5,8 @@ import cats.effect.{IO, IOApp}
 import cats.syntax.traverse.*
 import currexx.algorithms.Parameters
 import currexx.algorithms.operators.{Elitism, Selector}
+import currexx.domain.signal.Indicator
 import currexx.backtest.optimizer.*
-import currexx.core.trade.TradeStrategy
-import currexx.domain.signal.ValueTransformation.*
-import currexx.domain.signal.{Indicator, ValueSource}
 
 import scala.util.Random
 
@@ -25,39 +23,10 @@ object Optimizer extends IOApp.Simple {
     shuffle = true
   )
 
-  val trendChangeDetection = Indicator.TrendChangeDetection(
-    source = ValueSource.Close,
-    transformation = sequenced(
-      JMA(21, 100, 3),
-//      ValueTransformation.RSX(3)
-    )
-  )
-
-  val linesCrossing = Indicator.LinesCrossing(
-    ValueSource.Close,
-    HMA(20),
-    HMA(10)
-  )
-
-  val thresholdCrossing = Indicator.ThresholdCrossing(
-    ValueSource.Close,
-    RSX(40),
-    70D,
-    20D
-  )
-
-  val keltnerChannel = Indicator.KeltnerChannel(
-    ValueSource.Close,
-    JMA(45,100,3),
-    JMA(9,100,2),
-    30,
-    1.5
-  )
-
   val testDataSets    = MarketDataProvider.majors
-  val strategy        = TradeStrategy.KeltnerChannel
-  val target          = keltnerChannel
-  val otherIndicators = Nil
+  val strategy        = TestStrategy.s1_rules
+  val target          = TestStrategy.s1_indicators.head
+  val otherIndicators = TestStrategy.s1_indicators.tail
 
   override def run: IO[Unit] = for
     _       <- IO.println(s"Starting optimization of $target")

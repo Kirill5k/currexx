@@ -39,7 +39,7 @@ enum Op[A, I]:
 object Op:
   extension [A, I](fa: Op[A, I]) def freeM: Free[Op[*, I], A] = Free.liftF(fa)
 
-  private class OpInterpreter[F[_], I](
+  class OpInterpreter[F[_], I](
       initialiser: Initialiser[F, I],
       crossover: Crossover[F, I],
       mutator: Mutator[F, I],

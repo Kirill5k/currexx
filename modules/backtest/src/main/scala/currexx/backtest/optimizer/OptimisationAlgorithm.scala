@@ -1,7 +1,6 @@
 package currexx.backtest.optimizer
 
 import cats.effect.Async
-import cats.syntax.functor.*
 import currexx.algorithms.operators.*
 import currexx.algorithms.*
 
