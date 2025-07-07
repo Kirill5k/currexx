@@ -6,7 +6,7 @@ import cats.syntax.traverse.*
 import cats.syntax.apply.*
 import cats.syntax.applicativeError.*
 import currexx.algorithms.operators.Crossover
-import currexx.domain.market.{Indicator, ValueTransformation as VT}
+import currexx.domain.signal.{Indicator, ValueTransformation as VT}
 import currexx.backtest.syntax.*
 
 import scala.util.Random
@@ -43,7 +43,7 @@ object IndicatorCrossover:
             Right(VT.JMA(crossInt(l1, l2, Some(5)), crossInt((ph1 + 100) / 5, (ph2 + 100) / 5) * 5 - 100, r.pickOne(pow1, pow2)))
           case (VT.NMA(l1, sl1, d1, ma1), VT.NMA(l2, sl2, d2, _)) =>
             Right(VT.NMA(crossInt(l1, l2), crossInt(sl1, sl2), crossDouble(d1, d2, 0.5), ma1))
-          case (VT.Sequenced(s1), VT.Sequenced(s2)) => s1.zip(s2).traverse(crossVt _).map(VT.Sequenced(_))
+          case (VT.Sequenced(s1), VT.Sequenced(s2)) => s1.zip(s2).traverse((v1, v2) => crossVt(v1, v2)).map(VT.Sequenced(_))
           case _                                    => Left(new IllegalArgumentException("both parents must be of the same type"))
 
         F.defer {

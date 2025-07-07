@@ -6,17 +6,17 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.market.db.MarketStateRepository
-import currexx.core.market.{IndicatorState, MarketService, MarketState, PositionState}
-import currexx.domain.market.{CurrencyPair, IndicatorKind}
+import currexx.core.market.{MarketProfile, MarketService, MarketState, PositionState}
+import currexx.domain.market.CurrencyPair
 import currexx.domain.user.UserId
 
 final private class TestMarketStateRepository[F[_]: Monad](
     private val state: Ref[F, MarketState]
 ) extends MarketStateRepository[F]:
-  override def delete(uid: UserId, cp: CurrencyPair): F[Unit] = Monad[F].unit
-  override def deleteAll(uid: UserId): F[Unit]                = Monad[F].unit
-  override def update(uid: UserId, pair: CurrencyPair, signals: Map[IndicatorKind, List[IndicatorState]]): F[MarketState] =
-    state.updateAndGet(_.copy(signals = signals))
+  override def delete(uid: UserId, cp: CurrencyPair): F[Unit]                                  = Monad[F].unit
+  override def deleteAll(uid: UserId): F[Unit]                                                 = Monad[F].unit
+  override def update(uid: UserId, pair: CurrencyPair, profile: MarketProfile): F[MarketState] =
+    state.updateAndGet(_.copy(profile = profile))
   override def update(uid: UserId, pair: CurrencyPair, position: Option[PositionState]): F[MarketState] =
     state.updateAndGet(_.copy(currentPosition = position))
   override def getAll(uid: UserId): F[List[MarketState]] =

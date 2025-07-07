@@ -19,5 +19,5 @@ final private class TestMonitorService[F[_]](using
   override def triggerMonitor(uid: UserId, id: MonitorId, manual: Boolean): F[Unit] = F.unit
 
 object TestMonitorService:
-  def make[F[_]: Async: Clock]: F[MonitorService[F]] =
+  def make[F[_]: {Async, Clock}]: F[MonitorService[F]] =
     Async[F].pure(TestMonitorService[F])

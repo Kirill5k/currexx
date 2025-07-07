@@ -26,7 +26,7 @@ final private class TestTradeOrderRepository[F[_]: Async](
   override def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]] = orders.get.map(_.headOption)
 
 object TestTradeService:
-  def make[F[_]: Async: Clock](
+  def make[F[_]: {Async, Clock}](
       initialSettings: TradeSettings,
       clients: TestClients[F],
       dispatcher: ActionDispatcher[F]

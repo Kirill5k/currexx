@@ -2,7 +2,7 @@ package currexx.backtest.optimizer
 
 import cats.effect.Sync
 import currexx.algorithms.operators.Mutator
-import currexx.domain.market.{Indicator, ValueTransformation as VT}
+import currexx.domain.signal.{Indicator, ValueTransformation as VT}
 import currexx.backtest.syntax.*
 
 import scala.util.Random
