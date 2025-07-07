@@ -31,6 +31,7 @@ object IndicatorCrossover:
           minValue.fold(result)(math.max(_, result))
         }
 
+        //TODO: Update
         def crossVt(so1: VT, so2: VT): Either[Throwable, VT] = (so1, so2) match
           case (VT.RSX(l1), VT.RSX(l2))       => Right(VT.RSX(crossInt(l1, l2, Some(5))))
           case (VT.STOCH(l1), VT.STOCH(l2))   => Right(VT.STOCH(crossInt(l1, l2, Some(5))))

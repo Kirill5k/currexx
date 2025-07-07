@@ -32,5 +32,9 @@ object IndicatorInitialiser:
             Indicator.LinesCrossing(vs, randomiseVt(vt1), randomiseVt(vt2))
           case Indicator.KeltnerChannel(vs, vt1, vt2, atrL, atrR) =>
             Indicator.KeltnerChannel(vs, randomiseVt(vt1), randomiseVt(vt2), atrL, atrR)
+            //TODO: update
+          case Indicator.Composite(_) => ???
+          case Indicator.VolatilityRegimeDetection(_, _, _) => ???
+          case Indicator.ValueTracking(_, _, _) => ???
       }
     }

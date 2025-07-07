@@ -20,6 +20,7 @@ object IndicatorEvaluator {
 
   val cp = CurrencyPair(EUR, GBP)
 
+  //TODO: Update
   given Show[Indicator] = (ind: Indicator) => {
     def showInd(i: Indicator): String = i match
       case Indicator.TrendChangeDetection(vs, transformation) =>

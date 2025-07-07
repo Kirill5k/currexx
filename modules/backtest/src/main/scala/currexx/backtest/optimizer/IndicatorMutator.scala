@@ -40,6 +40,7 @@ object IndicatorMutator:
           case VT.NMA(length, signalLength, lambda, maCalc) =>
             VT.NMA(mutateInt(length, 50), mutateInt(signalLength, 31), math.max(mutateDouble(lambda, 15d, 0.5d), 0.25), maCalc)
 
+        //TODO: Update
         F.delay {
           ind match
             case Indicator.TrendChangeDetection(vs, vt) =>
