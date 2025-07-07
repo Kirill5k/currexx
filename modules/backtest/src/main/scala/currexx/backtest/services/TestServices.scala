@@ -60,6 +60,6 @@ object TestServices:
       clock      <- TestClock.make[F]
       clients    <- TestClients.make[F]
       market     <- TestMarketService.make[F](settings.marketState, dispatcher)
-      trade      <- TestTradeService.make[F](settings.trade, clients, dispatcher)(Async[F], clock)
+      trade      <- TestTradeService.make[F](settings.trade, clients, dispatcher)(using Async[F], clock)
       signal     <- TestSignalService.make[F](settings.signal, dispatcher)
     yield TestServices[F](settings, signal, market, trade, clients, clock, dispatcher)

@@ -5,8 +5,9 @@ import currexx.backtest.services.TestServices
 import currexx.backtest.syntax.*
 import currexx.core.trade.TradeStrategy
 import currexx.domain.market.Currency.{EUR, GBP}
-import currexx.domain.market.ValueTransformation.*
-import currexx.domain.market.*
+import currexx.domain.market.CurrencyPair
+import currexx.domain.signal.ValueTransformation.*
+import currexx.domain.signal.{ValueSource, Indicator}
 import fs2.Stream
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger

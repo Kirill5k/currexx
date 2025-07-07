@@ -12,15 +12,16 @@ import currexx.backtest.syntax.*
 import currexx.backtest.{MarketDataProvider, OrderStatsCollector, TestSettings}
 import currexx.core.trade.TradeStrategy
 import currexx.domain.market.Currency.{EUR, GBP}
-import currexx.domain.market.{CurrencyPair, Indicator}
+import currexx.domain.market.CurrencyPair
+import currexx.domain.signal.Indicator
 import fs2.Stream
 
 object IndicatorEvaluator {
 
   val cp = CurrencyPair(EUR, GBP)
 
-  given Show[Indicator] = (ind: Indicator) =>
-    ind match
+  given Show[Indicator] = (ind: Indicator) => {
+    def showInd(i: Indicator): String = i match
       case Indicator.TrendChangeDetection(vs, transformation) =>
         s"${ind.kind}-${vs.print}-${transformation}"
       case Indicator.ThresholdCrossing(vs, transformation, upperBoundary, lowerBoundary) =>
@@ -29,6 +30,10 @@ object IndicatorEvaluator {
         s"${ind.kind}-${vs.print}-${slowTransformation}-${fastTransformation}"
       case Indicator.KeltnerChannel(vs, vs1, vs2, atrLength, atrMultiplier) =>
         s"${ind.kind}-${vs.print}-$vs1-$vs2-$atrLength-$atrMultiplier"
+      case Indicator.Composite(indicators) =>
+        s"${ind.kind}-${indicators.map(showInd).toList.mkString("-")}"
+    showInd(ind)
+  }
 
   def make[F[_]: Async](
       testFilePaths: List[String],
@@ -37,12 +42,12 @@ object IndicatorEvaluator {
   ): F[Evaluator[F, Indicator]] =
     for
       testDataSets <- testFilePaths.traverse(MarketDataProvider.read[F](_, cp).compile.toList)
-      eval <- Evaluator.cached[F, Indicator] { ind =>
+      eval         <- Evaluator.cached[F, Indicator] { ind =>
         testDataSets
           .traverse { testData =>
             for
               services <- TestServices.make[F](TestSettings.make(cp, ts, ind :: otherIndicators))
-              _ <- Stream
+              _        <- Stream
                 .emits(testData)
                 .through(services.processMarketData)
                 .compile

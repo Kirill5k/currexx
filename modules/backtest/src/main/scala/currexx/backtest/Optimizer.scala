@@ -7,8 +7,8 @@ import currexx.algorithms.Parameters
 import currexx.algorithms.operators.{Elitism, Selector}
 import currexx.backtest.optimizer.*
 import currexx.core.trade.TradeStrategy
-import currexx.domain.market.ValueTransformation.*
-import currexx.domain.market.{Indicator, ValueSource}
+import currexx.domain.signal.ValueTransformation.*
+import currexx.domain.signal.{Indicator, ValueSource}
 
 import scala.util.Random
 
