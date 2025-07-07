@@ -326,8 +326,8 @@ class TradeServiceSpec extends IOWordSpec {
 
       "close a long position when in trade and close-long rule is triggered" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
-        val closeRule                                             = Rule(TradeAction.ClosePosition, Rule.Condition.PositionIsOpen)
-        val settings                                              = Settings.trade.copy(strategy = TradeStrategy(Nil, List(closeRule)))
+        val closeRule = Rule(TradeAction.ClosePosition, Rule.Condition.PositionIs(TradeOrder.Position.Buy))
+        val settings  = Settings.trade.copy(strategy = TradeStrategy(Nil, List(closeRule)))
         when(settRepo.get(any[UserId])).thenReturnIO(settings)
         when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit

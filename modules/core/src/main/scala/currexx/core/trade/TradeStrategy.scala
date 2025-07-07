@@ -3,6 +3,7 @@ package currexx.core.trade
 import currexx.core.market.{MarketProfile, MarketState, MomentumZone}
 import currexx.core.trade
 import currexx.domain.JsonCodecs
+import currexx.domain.market.TradeOrder
 import currexx.domain.signal.{Direction, VolatilityRegime}
 import currexx.domain.types.EnumType
 import io.circe.Codec
@@ -53,9 +54,9 @@ object Rule extends JsonCodecs {
     case MomentumIsIn(zone: MomentumZone)          extends Condition("momentum-is-in")
     case MomentumIs(direction: Direction)          extends Condition("momentum-is")
     case VolatilityIs(regime: VolatilityRegime)    extends Condition("volatility-is")
-    case PositionIsOpen                            extends Condition("position-is-open")
-    case NoPosition                                extends Condition("no-position")
+    case PositionIs(position: TradeOrder.Position) extends Condition("position-is")
     case PositionOpenFor(duration: FiniteDuration) extends Condition("position-open-for")
+    case NoPosition                                extends Condition("no-position")
 
   object Condition:
     given JsonTaggedAdt.Config[Condition] = JsonTaggedAdt.Config.Values[Condition](
@@ -71,9 +72,9 @@ object Rule extends JsonCodecs {
         "momentum-is-in"     -> JsonTaggedAdt.tagged[Condition.MomentumIsIn],
         "momentum-is"        -> JsonTaggedAdt.tagged[Condition.MomentumIs],
         "volatility-is"      -> JsonTaggedAdt.tagged[Condition.VolatilityIs],
-        "position-is-open"   -> JsonTaggedAdt.tagged[Condition.PositionIsOpen.type],
+        "position-is"        -> JsonTaggedAdt.tagged[Condition.PositionIs],
+        "position-open-for"  -> JsonTaggedAdt.tagged[Condition.PositionOpenFor],
         "no-position"        -> JsonTaggedAdt.tagged[Condition.NoPosition.type],
-        "position-open-for"  -> JsonTaggedAdt.tagged[Condition.PositionOpenFor]
       ),
       strict = true,
       typeFieldName = "kind"
@@ -146,8 +147,8 @@ object Rule extends JsonCodecs {
       case Condition.VolatilityIs(regime) =>
         currentProfile.volatility.exists(_.regime == regime)
 
-      case Condition.PositionIsOpen =>
-        state.currentPosition.isDefined
+      case Condition.PositionIs(position) =>
+        state.currentPosition.exists(_.position == position)
 
       case Condition.NoPosition =>
         state.currentPosition.isEmpty

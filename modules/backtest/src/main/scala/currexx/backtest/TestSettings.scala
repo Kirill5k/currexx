@@ -24,7 +24,7 @@ object TestSettings:
       currencyPair: CurrencyPair,
       strategy: TradeStrategy,
       indicators: List[Indicator]
-  ): TestSettings = {
+  ): TestSettings =
     val userId = UserId(ObjectId.gen)
     val now    = Instant.now()
     TestSettings(
@@ -34,4 +34,3 @@ object TestSettings:
       signal = SignalSettings(indicators),
       trade = TradeSettings(strategy, BrokerParameters.Xtb("user1", "password", true), TradingParameters(BigDecimal(0.1)))
     )
-  }

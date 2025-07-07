@@ -3,6 +3,7 @@ package currexx.core.trade
 import currexx.core.fixtures.Markets.*
 import currexx.core.market.{CrossoverState, MarketProfile, MarketState, MomentumState, MomentumZone, TrendState, VolatilityState}
 import currexx.core.trade.Rule.Condition
+import currexx.domain.market.TradeOrder
 import currexx.domain.signal.{Direction, VolatilityRegime}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -58,7 +59,7 @@ class TradeStrategySpec extends AnyWordSpec with Matchers {
     "return the action of the first triggered rule" in {
       val rules = List(
         Rule(anotherTradeAction, Condition.TrendIs(Direction.Upward)),
-        Rule(tradeAction, Condition.PositionIsOpen)
+        Rule(tradeAction, Condition.PositionIs(TradeOrder.Position.Buy))
       )
       Rule.findTriggeredAction(rules, trendChangedState, previousProfile) mustBe Some(tradeAction)
     }
@@ -107,7 +108,7 @@ class TradeStrategySpec extends AnyWordSpec with Matchers {
     }
 
     "evaluate PositionIsOpen condition" in {
-      val rule = Rule(tradeAction, Condition.PositionIsOpen)
+      val rule = Rule(tradeAction, Condition.PositionIs(TradeOrder.Position.Buy))
       Rule.findTriggeredAction(List(rule), trendChangedState, previousProfile) mustBe Some(tradeAction)
     }
 
@@ -122,7 +123,7 @@ class TradeStrategySpec extends AnyWordSpec with Matchers {
     }
 
     "evaluate AllOf condition" in {
-      val rule = Rule(closePositionAction, Condition.AllOf(List(Condition.PositionIsOpen, Condition.TrendIs(Direction.Downward))))
+      val rule = Rule(closePositionAction, Condition.AllOf(List(Condition.PositionIs(TradeOrder.Position.Buy), Condition.TrendIs(Direction.Downward))))
       Rule.findTriggeredAction(List(rule), trendChangedState, previousProfile) mustBe Some(closePositionAction)
     }
 
