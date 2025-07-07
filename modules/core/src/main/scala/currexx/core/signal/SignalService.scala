@@ -44,6 +44,7 @@ object SignalService {
 
   def detectSignal(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator): Option[Signal] =
     indicator match {
+      case vt: Indicator.ValueTracking              => detectValue(uid, data, vt)
       case tcd: Indicator.TrendChangeDetection      => detectTrendChange(uid, data, tcd)
       case tc: Indicator.ThresholdCrossing          => detectThresholdCrossing(uid, data, tc)
       case lc: Indicator.LinesCrossing              => detectLinesCrossing(uid, data, lc)
@@ -190,6 +191,21 @@ object SignalService {
           time = data.prices.head.time
         )
       }
+  }
+
+  def detectValue(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.ValueTracking): Option[Signal] = {
+    val source      = indicator.source.extract(data)
+    val transformed = indicator.transformation.transform(source, data)
+    transformed.headOption.map { latestValue =>
+      Signal(
+        userId = uid,
+        currencyPair = data.currencyPair,
+        interval = data.interval,
+        condition = Condition.ValueUpdated(indicator.role, latestValue),
+        triggeredBy = indicator,
+        time = data.prices.head.time
+      )
+    }
   }
 
   def make[F[_]: Concurrent](

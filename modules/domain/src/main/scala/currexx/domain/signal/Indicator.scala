@@ -17,6 +17,10 @@ object ValueSource extends EnumType[ValueSource](() => ValueSource.values, EnumT
 enum ValueSource:
   case Close, Open, HL2, HLC3
 
+object ValueRole extends EnumType[ValueRole](() => ValueRole.values)
+enum ValueRole:
+  case Momentum, Volatility
+
 enum ValueTransformation(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Sequenced(sequence: List[ValueTransformation])                             extends ValueTransformation("sequenced")
   case Kalman(gain: Double)                                                       extends ValueTransformation("kalman")
@@ -53,7 +57,7 @@ object ValueTransformation {
 
 object IndicatorKind extends EnumType[IndicatorKind](() => IndicatorKind.values)
 enum IndicatorKind:
-  case VolatilityRegimeDetection, TrendChangeDetection, ThresholdCrossing, LinesCrossing, KeltnerChannel, Composite
+  case VolatilityRegimeDetection, TrendChangeDetection, ThresholdCrossing, LinesCrossing, KeltnerChannel, Composite, ValueTracking
 
 enum Indicator(val kind: IndicatorKind) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Composite(
@@ -86,6 +90,11 @@ enum Indicator(val kind: IndicatorKind) derives JsonTaggedAdt.EncoderWithConfig,
       smoothingType: ValueTransformation,
       smoothingLength: Int
   ) extends Indicator(IndicatorKind.VolatilityRegimeDetection)
+  case ValueTracking(
+      role: ValueRole,
+      source: ValueSource,
+      transformation: ValueTransformation
+  ) extends Indicator(IndicatorKind.ValueTracking)
 
 object Indicator:
   given JsonTaggedAdt.Config[Indicator] = JsonTaggedAdt.Config.Values[Indicator](
@@ -95,7 +104,8 @@ object Indicator:
       IndicatorKind.TrendChangeDetection.print      -> JsonTaggedAdt.tagged[Indicator.TrendChangeDetection],
       IndicatorKind.ThresholdCrossing.print         -> JsonTaggedAdt.tagged[Indicator.ThresholdCrossing],
       IndicatorKind.LinesCrossing.print             -> JsonTaggedAdt.tagged[Indicator.LinesCrossing],
-      IndicatorKind.KeltnerChannel.print            -> JsonTaggedAdt.tagged[Indicator.KeltnerChannel]
+      IndicatorKind.KeltnerChannel.print            -> JsonTaggedAdt.tagged[Indicator.KeltnerChannel],
+      IndicatorKind.ValueTracking.print             -> JsonTaggedAdt.tagged[Indicator.ValueTracking]
     ),
     strict = true,
     typeFieldName = "kind"

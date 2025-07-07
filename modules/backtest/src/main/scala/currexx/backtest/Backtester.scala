@@ -7,7 +7,7 @@ import currexx.core.trade.TradeStrategy
 import currexx.domain.market.Currency.{EUR, GBP}
 import currexx.domain.market.CurrencyPair
 import currexx.domain.signal.ValueTransformation.*
-import currexx.domain.signal.{ValueSource, Indicator}
+import currexx.domain.signal.{Indicator, ValueSource}
 import fs2.Stream
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -19,10 +19,10 @@ object Backtester extends IOApp.Simple {
     CurrencyPair(EUR, GBP),
     TradeStrategy.KeltnerChannel,
     List(
-      Indicator.LinesCrossing(ValueSource.Close,JMA(45,100,3),JMA(9,100,2)),
-      Indicator.TrendChangeDetection(ValueSource.Close, sequenced(NMA(5,17,9.5, MovingAverage.Hull))),
-      Indicator.ThresholdCrossing(ValueSource.Close, RSX(41),44.0,13.0),
-      Indicator.KeltnerChannel(ValueSource.Close, JMA(45,100,3),JMA(9,100,2), 30, 1.5)
+      Indicator.LinesCrossing(ValueSource.Close, JMA(45, 100, 3), JMA(9, 100, 2)),
+      Indicator.TrendChangeDetection(ValueSource.Close, sequenced(NMA(5, 17, 9.5, MovingAverage.Hull))),
+      Indicator.ThresholdCrossing(ValueSource.Close, RSX(41), 44.0, 13.0),
+      Indicator.KeltnerChannel(ValueSource.Close, JMA(45, 100, 3), JMA(9, 100, 2), 30, 1.5)
     )
   )
 
@@ -33,7 +33,7 @@ object Backtester extends IOApp.Simple {
         for
           _        <- logger.info(s"Processing $filePath")
           services <- TestServices.make[IO](settings)
-          _ <- MarketDataProvider
+          _        <- MarketDataProvider
             .read[IO](filePath, settings.currencyPair)
             .through(services.processMarketData)
             .compile
@@ -45,6 +45,8 @@ object Backtester extends IOApp.Simple {
       .compile
       .toList
       .flatMap { stats =>
-        logger.info(s"total profit: ${stats.map(_.totalProfit).sum}, median: ${stats.map(_.totalProfit).median}, median loss: ${stats.map(_.meanLoss).median}")
+        logger.info(
+          s"total profit: ${stats.map(_.totalProfit).sum}, median: ${stats.map(_.totalProfit).median}, median loss: ${stats.map(_.meanLoss).median}"
+        )
       }
 }

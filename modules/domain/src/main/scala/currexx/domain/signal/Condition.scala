@@ -25,6 +25,7 @@ enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWit
   case ThresholdCrossing(threshold: BigDecimal, value: BigDecimal, direction: Direction, boundary: Boundary)
   case TrendDirectionChange(from: Direction, to: Direction, previousTrendLength: Option[Int] = None)
   case VolatilityRegimeChange(from: Option[VolatilityRegime], to: VolatilityRegime)
+  case ValueUpdated(role: ValueRole, value: BigDecimal)
 
 object Condition {
   given JsonTaggedAdt.Config[Condition] = JsonTaggedAdt.Config.Values[Condition](
@@ -35,7 +36,8 @@ object Condition {
       "lines-crossing"           -> JsonTaggedAdt.tagged[Condition.LinesCrossing],
       "threshold-crossing"       -> JsonTaggedAdt.tagged[Condition.ThresholdCrossing],
       "volatility-regime-change" -> JsonTaggedAdt.tagged[Condition.VolatilityRegimeChange],
-      "trend-direction-change"   -> JsonTaggedAdt.tagged[Condition.TrendDirectionChange]
+      "trend-direction-change"   -> JsonTaggedAdt.tagged[Condition.TrendDirectionChange],
+      "value-updated"            -> JsonTaggedAdt.tagged[Condition.ValueUpdated]
     ),
     strict = true,
     typeFieldName = "kind"

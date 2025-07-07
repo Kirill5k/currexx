@@ -2,7 +2,7 @@ package currexx.core.market
 
 import currexx.core.signal.Signal
 import currexx.domain.market.{CurrencyPair, TradeOrder}
-import currexx.domain.signal.{Boundary, Condition, Direction, VolatilityRegime}
+import currexx.domain.signal.{Boundary, Condition, Direction, ValueRole, VolatilityRegime}
 import currexx.domain.user.UserId
 import currexx.domain.types.EnumType
 import io.circe.Codec
@@ -46,6 +46,10 @@ object MarketProfile {
   extension (profile: MarketProfile)
     def update(signal: Signal): MarketProfile =
       signal.condition match {
+        case Condition.ValueUpdated(role, value) =>
+          role match
+            case ValueRole.Momentum   => profile.copy(lastMomentumValue = Some(value))
+            case ValueRole.Volatility => profile.copy(lastVolatilityValue = Some(value))
         // --- Trend Signal ---
         case Condition.TrendDirectionChange(_, to, _) =>
           // A trend change occurred. Create a new TrendState.
