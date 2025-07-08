@@ -20,7 +20,6 @@ object IndicatorEvaluator {
 
   val cp = CurrencyPair(EUR, GBP)
 
-  //TODO: Update
   given Show[Indicator] = (ind: Indicator) => {
     def showInd(i: Indicator): String = i match
       case Indicator.TrendChangeDetection(vs, transformation) =>
@@ -33,6 +32,10 @@ object IndicatorEvaluator {
         s"${ind.kind}-${vs.print}-$vs1-$vs2-$atrLength-$atrMultiplier"
       case Indicator.Composite(indicators) =>
         s"${ind.kind}-${indicators.map(showInd).toList.mkString("-")}"
+      case Indicator.VolatilityRegimeDetection(atrLength, smoothingType, smoothingLength) =>
+        s"${ind.kind}-${atrLength}-${smoothingType}-$smoothingLength"
+      case Indicator.ValueTracking(vs, transformation, targetValue) =>
+        s"${ind.kind}-${vs.print}-${transformation}-$targetValue"
     showInd(ind)
   }
 

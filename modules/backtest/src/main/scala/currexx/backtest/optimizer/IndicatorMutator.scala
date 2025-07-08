@@ -10,7 +10,8 @@ import scala.util.Random
 object IndicatorMutator:
   def make[F[_]](using F: Sync[F]): F[Mutator[F, Indicator]] = F.pure {
     new Mutator[F, Indicator] {
-      private val bitFlitMutator                                                                      = Mutator.pureBitFlip
+      private val bitFlitMutator = Mutator.pureBitFlip
+
       override def mutate(ind: Indicator, mutationProbability: Double)(using r: Random): F[Indicator] = {
         def mutateInt(int: Int, maxValue: Int, minValue: Int = 1): Int = {
           val binArray = int.toBinaryArray(maxValue)
@@ -40,18 +41,23 @@ object IndicatorMutator:
           case VT.NMA(length, signalLength, lambda, maCalc) =>
             VT.NMA(mutateInt(length, 50), mutateInt(signalLength, 31), math.max(mutateDouble(lambda, 15d, 0.5d), 0.25), maCalc)
 
-        // TODO: Update
-        F.delay {
-          ind match
-            case Indicator.TrendChangeDetection(vs, vt) =>
-              Indicator.TrendChangeDetection(vs, mutateVt(vt))
-            case Indicator.ThresholdCrossing(vs, vt, ub, lb) =>
-              Indicator.ThresholdCrossing(vs, mutateVt(vt), mutateInt(ub.toInt, 100), mutateInt(lb.toInt, 100))
-            case Indicator.LinesCrossing(vs, vt1, vt2) =>
-              Indicator.LinesCrossing(vs, mutateVt(vt1), mutateVt(vt2))
-            case Indicator.KeltnerChannel(vs, vt1, vt2, atrL, atrR) =>
-              Indicator.KeltnerChannel(vs, mutateVt(vt1), mutateVt(vt2), atrL, atrR)
-        }
+        def mutateInd(indicator: Indicator): Indicator = indicator match
+          case Indicator.Composite(is) =>
+            Indicator.Composite(is.map(mutateInd))
+          case Indicator.TrendChangeDetection(vs, vt) =>
+            Indicator.TrendChangeDetection(vs, mutateVt(vt))
+          case Indicator.ThresholdCrossing(vs, vt, ub, lb) =>
+            Indicator.ThresholdCrossing(vs, mutateVt(vt), mutateInt(ub.toInt, 100), mutateInt(lb.toInt, 100))
+          case Indicator.LinesCrossing(vs, vt1, vt2) =>
+            Indicator.LinesCrossing(vs, mutateVt(vt1), mutateVt(vt2))
+          case Indicator.KeltnerChannel(vs, vt1, vt2, atrL, atrR) =>
+            Indicator.KeltnerChannel(vs, mutateVt(vt1), mutateVt(vt2), atrL, atrR)
+          case Indicator.VolatilityRegimeDetection(atr, st, sl) =>
+            Indicator.VolatilityRegimeDetection(mutateInt(atr, 50), mutateVt(st), mutateInt(sl, 50))
+          case Indicator.ValueTracking(vr, vs, vt) =>
+            Indicator.ValueTracking(vr, vs, mutateVt(vt))
+
+        F.delay(mutateInd(ind))
       }
     }
   }

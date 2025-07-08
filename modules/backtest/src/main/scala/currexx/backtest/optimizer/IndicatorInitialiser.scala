@@ -22,19 +22,21 @@ object IndicatorInitialiser:
         case _: VT.JMA              => VT.JMA(rand.nextInt(41) + 2, rand.nextInt(40) * 5 - 100, rand.nextInt(2) + 2)
         case nma: VT.NMA            => VT.NMA(rand.nextInt(48) + 2, rand.nextInt(28) + 2, (1 + rand.nextInt(80)) * 0.25d, nma.maCalc)
 
-      F.delay {
-        ind match
-          case Indicator.TrendChangeDetection(vs, vt) =>
-            Indicator.TrendChangeDetection(vs, randomiseVt(vt))
-          case Indicator.ThresholdCrossing(vs, vt, _, _) =>
-            Indicator.ThresholdCrossing(vs, randomiseVt(vt), rand.nextInt(49) + 50, rand.nextInt(49) + 1)
-          case Indicator.LinesCrossing(vs, vt1, vt2) =>
-            Indicator.LinesCrossing(vs, randomiseVt(vt1), randomiseVt(vt2))
-          case Indicator.KeltnerChannel(vs, vt1, vt2, atrL, atrR) =>
-            Indicator.KeltnerChannel(vs, randomiseVt(vt1), randomiseVt(vt2), atrL, atrR)
-            //TODO: update
-          case Indicator.Composite(_) => ???
-          case Indicator.VolatilityRegimeDetection(_, _, _) => ???
-          case Indicator.ValueTracking(_, _, _) => ???
-      }
+      def randomiseInd(indicator: Indicator): Indicator = indicator match
+        case Indicator.TrendChangeDetection(vs, vt) =>
+          Indicator.TrendChangeDetection(vs, randomiseVt(vt))
+        case Indicator.ThresholdCrossing(vs, vt, _, _) =>
+          Indicator.ThresholdCrossing(vs, randomiseVt(vt), rand.nextInt(49) + 50, rand.nextInt(49) + 1)
+        case Indicator.LinesCrossing(vs, vt1, vt2) =>
+          Indicator.LinesCrossing(vs, randomiseVt(vt1), randomiseVt(vt2))
+        case Indicator.KeltnerChannel(vs, vt1, vt2, atrL, atrR) =>
+          Indicator.KeltnerChannel(vs, randomiseVt(vt1), randomiseVt(vt2), atrL, atrR)
+        case Indicator.VolatilityRegimeDetection(_, vt, _) =>
+          Indicator.VolatilityRegimeDetection(rand.nextInt(49) + 1, randomiseVt(vt), rand.nextInt(49) + 1)
+        case Indicator.Composite(is) =>
+          Indicator.Composite(is.map(randomiseInd))
+        case Indicator.ValueTracking(vr, vs, vt) =>
+          Indicator.ValueTracking(vr, vs, randomiseVt(vt))
+
+      F.delay(randomiseInd(ind))
     }
