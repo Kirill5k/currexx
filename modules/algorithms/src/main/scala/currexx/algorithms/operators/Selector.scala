@@ -12,6 +12,7 @@ trait Selector[F[_], I]:
   def selectPairs(population: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): F[DistributedPopulation[I]]
 
 object Selector:
+
   /**
    * Pure roulette wheel selection implementation.
    *
@@ -69,7 +70,6 @@ object Selector:
       }
     }
 
-
   /**
    * Pure tournament selection implementation with selection WITHOUT replacement.
    *
@@ -91,11 +91,10 @@ object Selector:
   def pureTournament[I] = new Selector[Id, I] {
     override def selectPairs(population: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): Id[DistributedPopulation[I]] = {
       val selectedIndividuals = ListBuffer.empty[I]
-      // Use ArrayBuffer for efficient removal by swapping with last element
       val remainingPopulation = ArrayBuffer.from(population)
 
       while (selectedIndividuals.size < populationLimit && remainingPopulation.nonEmpty) {
-        val (selectedIndividual, indexToRemove) = selectOneWithIndex(remainingPopulation.toVector)
+        val (selectedIndividual, indexToRemove) = selectOneWithIndex(remainingPopulation)
         selectedIndividuals += selectedIndividual
 
         // Remove the selected individual efficiently using swap-remove
@@ -111,7 +110,7 @@ object Selector:
       selectedIndividuals.toVector.pairs
     }
 
-    private def selectOneWithIndex(population: EvaluatedPopulation[I])(using r: Random): (I, Int) = {
+    private def selectOneWithIndex(population: ArrayBuffer[(I, Fitness)])(using r: Random): (I, Int) = {
       if (population.length == 1) {
         (population.head._1, 0)
       } else {
