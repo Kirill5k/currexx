@@ -15,7 +15,7 @@ object Selector:
   def pureRouletteWheel[I] = new Selector[Id, I] {
     override def selectPairs(popByFitness: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): Id[DistributedPopulation[I]] = {
       val newPop = ListBuffer.empty[I]
-      val fitnessSum = popByFitness.map(_._2).reduce(_ + _)
+      val fitnessSum = popByFitness.map(_._2).sum
 
       while (newPop.size < populationLimit && popByFitness.nonEmpty) {
         if (fitnessSum.isZero) {

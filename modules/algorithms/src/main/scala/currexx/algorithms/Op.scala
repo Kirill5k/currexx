@@ -6,7 +6,7 @@ import cats.free.Free
 import currexx.algorithms.operators.*
 import fs2.Stream
 
-import scala.util.Random
+import scala.util.{Random, Try}
 
 opaque type Fitness = BigDecimal
 object Fitness:
@@ -21,6 +21,19 @@ object Fitness:
     def value: BigDecimal          = fitness
   given ordering: Ordering[Fitness] with
     def compare(f1: Fitness, f2: Fitness): Int = f1.compare(f2)
+
+  given numeric: Numeric[Fitness] with
+    def plus(x: Fitness, y: Fitness): Fitness     = x + y
+    def minus(x: Fitness, y: Fitness): Fitness    = x - y
+    def times(x: Fitness, y: Fitness): Fitness    = Fitness(x.value * y.value)
+    def negate(x: Fitness): Fitness               = Fitness(-x.value)
+    def fromInt(x: Int): Fitness                  = Fitness(BigDecimal(x))
+    def parseString(str: String): Option[Fitness] = Try(Fitness(BigDecimal(str))).toOption
+    def toInt(x: Fitness): Int                    = x.value.toInt
+    def toLong(x: Fitness): Long                  = x.value.toLong
+    def toFloat(x: Fitness): Float                = x.value.toFloat
+    def toDouble(x: Fitness): Double              = x.value.toDouble
+    def compare(x: Fitness, y: Fitness): Int      = x.value.compare(y.value)
 
 type Population[I]            = Vector[I]
 type EvaluatedPopulation[I]   = Vector[(I, Fitness)]
