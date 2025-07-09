@@ -16,9 +16,11 @@ object Fitness:
     def -(other: Fitness): Fitness = fitness - other
     def +(other: Fitness): Fitness = fitness + other
     def /(other: Fitness): Fitness = fitness / other
+    def >(other: Fitness): Boolean = fitness > other
+    def <(other: Fitness): Boolean = fitness < other
     def value: BigDecimal          = fitness
   given ordering: Ordering[Fitness] with
-    def compare(f1: Fitness, f2: Fitness) = f1.compare(f2)
+    def compare(f1: Fitness, f2: Fitness): Int = f1.compare(f2)
 
 type Population[I]            = Vector[I]
 type EvaluatedPopulation[I]   = Vector[(I, Fitness)]
@@ -47,7 +49,8 @@ object Op:
       selector: Selector[F, I],
       elitism: Elitism[F, I],
       updateFn: Option[(Int, Int) => F[Unit]]
-  )(using F: Async[F], rand: Random) extends ~>[Op[*, I], F] {
+  )(using F: Async[F], rand: Random)
+      extends ~>[Op[*, I], F] {
     def apply[A](fa: Op[A, I]): F[A] =
       fa match
         case Op.UpdateOnProgress(iteration, maxGen) =>
@@ -82,5 +85,5 @@ object Op:
       selector: Selector[F, I],
       elitism: Elitism[F, I],
       updateFn: Option[(Int, Int) => F[Unit]] = None
-  )(using F: Async[F], rand: Random): Op[*, I] ~> F = 
+  )(using F: Async[F], rand: Random): Op[*, I] ~> F =
     new OpInterpreter[F, I](initialiser, crossover, mutator, evaluator, selector, elitism, updateFn)
