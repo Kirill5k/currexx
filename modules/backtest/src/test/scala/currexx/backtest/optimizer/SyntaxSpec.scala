@@ -1,9 +1,10 @@
 package currexx.backtest.optimizer
 
 import currexx.backtest.syntax.*
-import kirill5k.common.cats.test.IOWordSpec
+import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.matchers.must.Matchers
 
-class SyntaxSpec extends IOWordSpec {
+class SyntaxSpec extends AnyWordSpec with Matchers {
 
   "Syntax" should {
     "provide extension method for converting binary array to int" in {

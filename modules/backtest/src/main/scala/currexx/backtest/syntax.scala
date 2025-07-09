@@ -9,7 +9,7 @@ object syntax {
       r.nextInt(2 + elements.size) match
         case 0 => element1
         case 1 => element2
-        case n => elements.toIndexedSeq(n-2)
+        case n => elements(n-2)  // Direct access instead of toIndexedSeq
 
   extension (bd: BigDecimal)
     def roundTo(scale: Int): BigDecimal = bd.setScale(scale, RoundingMode.HALF_UP)
@@ -24,9 +24,8 @@ object syntax {
         val size = list.size
         if (size % 2 == 1) sorted(size / 2)
         else {
-          val partial = sorted.drop((size - 1) / 2)
-          val (left, right) = (partial.head, partial.tail.head)
-          (left + right) / 2
+          val mid = size / 2
+          (sorted(mid - 1) + sorted(mid)) / 2
         }
       }
 
@@ -36,7 +35,7 @@ object syntax {
       var i   = 0
       while (i < array.length) {
         if (array(i) == 1)
-          res = res + math.pow(2, array.length - i - 1).toInt
+          res = res | (1 << (array.length - i - 1))
         i = i + 1
       }
       res
