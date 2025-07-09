@@ -5,7 +5,7 @@ import cats.effect.Sync
 import currexx.algorithms.{DistributedPopulation, EvaluatedPopulation, Fitness}
 import currexx.algorithms.collections.*
 
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.{ListBuffer, ArrayBuffer}
 import scala.util.Random
 
 trait Selector[F[_], I]:
@@ -71,41 +71,59 @@ object Selector:
 
 
   /**
-   * Pure tournament selection implementation.
+   * Pure tournament selection implementation with selection WITHOUT replacement.
    *
    * This method implements binary tournament selection where two random individuals compete
-   * in each tournament, and the one with higher fitness wins. This approach provides good
-   * selection pressure while maintaining diversity in the population.
+   * in each tournament, and the one with higher fitness wins. Unlike standard tournament selection,
+   * this implementation uses "selection without replacement" at the population level, meaning
+   * once an individual is selected, it cannot be selected again until all selections are complete.
    *
    * The algorithm:
-   * 1. For each selection, randomly pick two different individuals from the population
-   * 2. Compare their fitness values
-   * 3. Select the individual with higher fitness
-   * 4. Ensure no individual competes against itself (selection without replacement within tournament)
+   * 1. Create a mutable copy of the population for tracking remaining individuals
+   * 2. For each selection, randomly pick two different individuals from remaining population
+   * 3. Compare their fitness values and select the fitter individual
+   * 4. Remove the selected individual from the remaining population
+   * 5. Ensure no individual competes against itself within a tournament
    *
-   * Like roulette wheel selection, the same individual can be selected multiple times across
-   * different tournaments (selection with replacement at the population level).
+   * This approach ensures maximum diversity in selection but may reduce selection pressure
+   * compared to selection with replacement.
    */
   def pureTournament[I] = new Selector[Id, I] {
-    override def selectPairs(population: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): Id[DistributedPopulation[I]] =
-      List
-        .fill(populationLimit)(selectOne(population))
-        .toVector
-        .pairs
+    override def selectPairs(population: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): Id[DistributedPopulation[I]] = {
+      val selectedIndividuals = ListBuffer.empty[I]
+      // Use ArrayBuffer for efficient removal by swapping with last element
+      val remainingPopulation = ArrayBuffer.from(population)
 
-    private def selectOne(population: EvaluatedPopulation[I])(using r: Random): I = {
+      while (selectedIndividuals.size < populationLimit && remainingPopulation.nonEmpty) {
+        val (selectedIndividual, indexToRemove) = selectOneWithIndex(remainingPopulation.toVector)
+        selectedIndividuals += selectedIndividual
+
+        // Remove the selected individual efficiently using swap-remove
+        if (indexToRemove >= 0) {
+          // Swap with last element and remove last (O(1) operation)
+          if (indexToRemove < remainingPopulation.length - 1) {
+            remainingPopulation(indexToRemove) = remainingPopulation.last
+          }
+          val _ = remainingPopulation.remove(remainingPopulation.length - 1)
+        }
+      }
+
+      selectedIndividuals.toVector.pairs
+    }
+
+    private def selectOneWithIndex(population: EvaluatedPopulation[I])(using r: Random): (I, Int) = {
       if (population.length == 1) {
-        population.head._1
+        (population.head._1, 0)
       } else {
         val p1Index = r.nextInt(population.length)
         var p2Index = r.nextInt(population.length)
-        // Ensure we don't select the same individual twice
+        // Ensure we don't select the same individual twice within the tournament
         while (p2Index == p1Index) {
           p2Index = r.nextInt(population.length)
         }
         val p1 = population(p1Index)
         val p2 = population(p2Index)
-        if (p1._2 > p2._2) p1._1 else p2._1
+        if (p1._2 > p2._2) (p1._1, p1Index) else (p2._1, p2Index)
       }
     }
   }
