@@ -12,6 +12,23 @@ trait Selector[F[_], I]:
   def selectPairs(population: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): F[DistributedPopulation[I]]
 
 object Selector:
+  /**
+   * Pure roulette wheel selection implementation.
+   *
+   * This method implements fitness-proportionate selection where individuals with higher fitness
+   * have a higher probability of being selected. The selection process uses "selection with replacement",
+   * meaning the same individual can be selected multiple times, which is standard behavior for
+   * genetic algorithms.
+   *
+   * The algorithm:
+   * 1. Calculates the total fitness sum of all individuals
+   * 2. For each selection, generates a random number between 0 and fitness sum
+   * 3. Iterates through the population, accumulating fitness values until the random threshold is reached
+   * 4. Selects the individual at that position
+   *
+   * Special handling for zero fitness: If all fitness values are zero, selection becomes random
+   * to avoid division by zero and ensure the algorithm can still proceed.
+   */
   def pureRouletteWheel[I] = new Selector[Id, I] {
     override def selectPairs(popByFitness: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): Id[DistributedPopulation[I]] = {
       val newPop = ListBuffer.empty[I]
@@ -53,6 +70,22 @@ object Selector:
     }
 
 
+  /**
+   * Pure tournament selection implementation.
+   *
+   * This method implements binary tournament selection where two random individuals compete
+   * in each tournament, and the one with higher fitness wins. This approach provides good
+   * selection pressure while maintaining diversity in the population.
+   *
+   * The algorithm:
+   * 1. For each selection, randomly pick two different individuals from the population
+   * 2. Compare their fitness values
+   * 3. Select the individual with higher fitness
+   * 4. Ensure no individual competes against itself (selection without replacement within tournament)
+   *
+   * Like roulette wheel selection, the same individual can be selected multiple times across
+   * different tournaments (selection with replacement at the population level).
+   */
   def pureTournament[I] = new Selector[Id, I] {
     override def selectPairs(population: EvaluatedPopulation[I], populationLimit: Int)(using r: Random): Id[DistributedPopulation[I]] =
       List
