@@ -14,8 +14,8 @@ object Backtester extends IOApp.Simple {
 
   val settings = TestSettings.make(
     CurrencyPair(EUR, GBP),
-    TestStrategy.s1_rules,
-    TestStrategy.s1_indicators
+    TestStrategy.s3_rules,
+    TestStrategy.s3_indicators
   )
 
   override val run: IO[Unit] =
