@@ -8,6 +8,7 @@ import fs2.{Stream, text}
 import java.time.format.DateTimeFormatter
 import java.time.{LocalDate, ZoneOffset}
 
+//TODO: update data points + find 1h
 object MarketDataProvider:
   val majors = List(
     "aud-usd-1d-2years.csv",
