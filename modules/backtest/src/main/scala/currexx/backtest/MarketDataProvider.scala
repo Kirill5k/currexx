@@ -72,6 +72,7 @@ object MarketDataProvider:
       .through(text.utf8.decode)
       .through(text.lines)
       .drop(1)
+      .filter(l => l.split(",")(5).toDouble > 0)
       .map { line =>
         val vals = line.split(",")
         PriceRange(
