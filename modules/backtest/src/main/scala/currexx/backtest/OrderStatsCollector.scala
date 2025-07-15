@@ -2,7 +2,7 @@ package currexx.backtest
 
 import currexx.backtest.syntax.*
 import currexx.core.trade.TradeOrderPlacement
-import currexx.domain.market.TradeOrder
+import currexx.domain.market.TradeOrder as TO
 
 import java.time.Instant
 import scala.collection.immutable.ListMap
@@ -17,11 +17,11 @@ final case class OrderStats(
     biggestLoss: BigDecimal = BigDecimal(0),
     profitByMonth: Map[String, BigDecimal] = ListMap.empty
 ):
-  def medianProfitByMonth: BigDecimal = profitByMonth.values.toList.median.roundTo(5)
-  def meanProfitByMonth: BigDecimal   = profitByMonth.values.toList.mean.roundTo(5)
-  def meanLoss: BigDecimal            = losses.mean.roundTo(5)
-  def incBuy: OrderStats              = copy(total = total + 1, buys = buys + 1)
-  def incSell: OrderStats             = copy(total = total + 1, sells = sells + 1)
+  def medianProfitByMonth: BigDecimal          = profitByMonth.values.toList.median.roundTo(5)
+  def meanProfitByMonth: BigDecimal            = profitByMonth.values.toList.mean.roundTo(5)
+  def meanLoss: BigDecimal                     = losses.mean.roundTo(5)
+  def incBuy: OrderStats                       = copy(total = total + 1, buys = buys + 1)
+  def incSell: OrderStats                      = copy(total = total + 1, sells = sells + 1)
   def close(profit: BigDecimal, time: Instant) =
     copy(
       losses = if (profit < BigDecimal(0)) profit :: losses else losses,
@@ -50,28 +50,39 @@ final case class OrderStats(
 object OrderStatsCollector:
   def collect(orders: List[TradeOrderPlacement]): OrderStats =
     orders
-      .foldLeft[(OrderStats, Option[TradeOrderPlacement])]((OrderStats(), None)) { case ((stats, prevOrder), currentOrder) =>
-        (prevOrder.map(_.order), currentOrder.order) match
-          case (None, TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _))  => (stats.incBuy, Some(currentOrder))
-          case (None, TradeOrder.Enter(TradeOrder.Position.Sell, _, _, _)) => (stats.incSell, Some(currentOrder))
-          case (None, TradeOrder.Exit(_, _))                               => (stats, None)
+      .foldLeft[(OrderStats, Option[TradeOrderPlacement])]((OrderStats(), None)) { case ((stats, openPosition), currentOrder) =>
+        (openPosition.map(_.order), currentOrder.order) match {
+          // No open position - only Enter orders are valid
+          case (None, TO.Enter(TO.Position.Buy, _, _, _))  => (stats.incBuy, Some(currentOrder))
+          case (None, TO.Enter(TO.Position.Sell, _, _, _)) => (stats.incSell, Some(currentOrder))
+          case (None, TO.Exit(_, _))                       => (stats, None) // Invalid: exit without enter
 
-          case (Some(TradeOrder.Exit(_, _)), TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _))  => (stats.incBuy, Some(currentOrder))
-          case (Some(TradeOrder.Exit(_, _)), TradeOrder.Enter(TradeOrder.Position.Sell, _, _, _)) => (stats.incSell, Some(currentOrder))
-          case (Some(TradeOrder.Exit(_, _)), TradeOrder.Exit(_, _))                               => (stats, None)
+          // Previous order was Exit - only Enter orders are valid
+          case (Some(TO.Exit(_, _)), TO.Enter(TO.Position.Buy, _, _, _))  => (stats.incBuy, Some(currentOrder))
+          case (Some(TO.Exit(_, _)), TO.Enter(TO.Position.Sell, _, _, _)) => (stats.incSell, Some(currentOrder))
+          case (Some(TO.Exit(_, _)), TO.Exit(_, _))                       => (stats, None) // Invalid: exit after exit
 
-          case (Some(TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _)), TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _)) =>
-            (stats, prevOrder)
-          case (Some(TradeOrder.Enter(TradeOrder.Position.Buy, _, bp, _)), TradeOrder.Enter(TradeOrder.Position.Sell, _, sp, _)) =>
-            (stats.incSell.close(sp - bp, currentOrder.time), Some(currentOrder))
-          case (Some(TradeOrder.Enter(TradeOrder.Position.Buy, _, bp, _)), TradeOrder.Exit(_, ep)) =>
-            (stats.close(ep - bp, currentOrder.time), None)
+          // Open Buy position
+          case (Some(TO.Enter(TO.Position.Buy, _, _, _)), TO.Enter(TO.Position.Buy, _, _, _)) =>
+            // Replace previous buy with new buy (no trade completion)
+            (stats, Some(currentOrder))
+          case (Some(TO.Enter(TO.Position.Buy, _, buyPrice, _)), TO.Enter(TO.Position.Sell, _, sellPrice, _)) =>
+            // Close buy position and open sell position
+            (stats.incSell.close(sellPrice - buyPrice, currentOrder.time), Some(currentOrder))
+          case (Some(TO.Enter(TO.Position.Buy, _, buyPrice, _)), TO.Exit(_, exitPrice)) =>
+            // Close buy position
+            (stats.close(exitPrice - buyPrice, currentOrder.time), None)
 
-          case (Some(TradeOrder.Enter(TradeOrder.Position.Sell, _, _, _)), TradeOrder.Enter(TradeOrder.Position.Sell, _, _, _)) =>
-            (stats, prevOrder)
-          case (Some(TradeOrder.Enter(TradeOrder.Position.Sell, _, sp, _)), TradeOrder.Enter(TradeOrder.Position.Buy, _, bp, _)) =>
-            (stats.incBuy.close(sp - bp, currentOrder.time), Some(currentOrder))
-          case (Some(TradeOrder.Enter(TradeOrder.Position.Sell, _, sp, _)), TradeOrder.Exit(_, ep)) =>
-            (stats.close(sp - ep, currentOrder.time), None)
+          // Open Sell position
+          case (Some(TO.Enter(TO.Position.Sell, _, _, _)), TO.Enter(TO.Position.Sell, _, _, _)) =>
+            // Replace previous sell with new sell (no trade completion)
+            (stats, Some(currentOrder))
+          case (Some(TO.Enter(TO.Position.Sell, _, sellPrice, _)), TO.Enter(TO.Position.Buy, _, buyPrice, _)) =>
+            // Close sell position and open buy position
+            (stats.incBuy.close(sellPrice - buyPrice, currentOrder.time), Some(currentOrder))
+          case (Some(TO.Enter(TO.Position.Sell, _, sellPrice, _)), TO.Exit(_, exitPrice)) =>
+            // Close sell position
+            (stats.close(sellPrice - exitPrice, currentOrder.time), None)
+        }
       }
       ._1
