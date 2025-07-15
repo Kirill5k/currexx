@@ -9,6 +9,9 @@ import currexx.core.fixtures.{Markets, Signals, Trades, Users}
 import currexx.domain.market.{CurrencyPair, TradeOrder}
 import currexx.domain.signal.Direction
 import kirill5k.common.cats.test.IOWordSpec
+import kirill5k.common.syntax.time.*
+
+import scala.concurrent.duration.*
 
 class MarketServiceSpec extends IOWordSpec {
 
@@ -142,6 +145,50 @@ class MarketServiceSpec extends IOWordSpec {
           verifyNoMoreInteractions(stateRepo)
           disp.submittedActions mustBe empty
           res mustBe()
+        }
+      }
+    }
+
+    "updateTimeState" should {
+      "fastforward confirmedAt when the gap between latest and 2nd to latest candle is greater than interval" in {
+        val (stateRepo, disp) = mocks
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnIO(Some(Markets.state))
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[MarketProfile])).thenReturnIO(Markets.state)
+
+        val dataWithGap = Markets.timeSeriesData.copy(
+          prices = Markets.priceRanges.head.copy(time = Markets.ts.plus(1.day)) :: Markets.priceRanges
+        )
+
+        val result = for
+          svc   <- MarketService.make[IO](stateRepo, disp)
+          state <- svc.updateTimeState(Users.uid, dataWithGap)
+        yield state
+
+        result.asserting { res =>
+          verify(stateRepo).find(Users.uid, Markets.gbpeur)
+          verify(stateRepo).update(
+            Users.uid,
+            Markets.gbpeur,
+            MarketProfile(trend = Some(TrendState(Direction.Upward, Markets.ts.plus(1.day))))
+          )
+          disp.submittedActions mustBe empty
+          res mustBe ()
+        }
+      }
+
+      "should not do anything when there is no signifacant gap between candles" in {
+        val (stateRepo, disp) = mocks
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnIO(Some(Markets.state))
+
+        val result = for
+          svc   <- MarketService.make[IO](stateRepo, disp)
+          state <- svc.updateTimeState(Users.uid, Markets.timeSeriesData)
+        yield state
+
+        result.asserting { res =>
+          verifyNoInteractions(stateRepo)
+          disp.submittedActions mustBe empty
+          res mustBe ()
         }
       }
     }
