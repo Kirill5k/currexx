@@ -36,6 +36,7 @@ final class TestServices[F[_]] private (
       for
         _ <- clients.data.setData(data)
         _ <- clock.setTime(data.prices.head.time)
+        _ <- marketService.updateTimeState(settings.userId, data)
         _ <- signalService.processMarketData(settings.userId, data)
         _ <- collectPendingActions { case Action.ProcessSignals(uid, cp, signals) =>
           marketService.processSignals(uid, cp, signals)

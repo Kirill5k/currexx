@@ -176,7 +176,7 @@ class MarketServiceSpec extends IOWordSpec {
         }
       }
 
-      "should not do anything when there is no signifacant gap between candles" in {
+      "should not do anything when there is no significant gap between candles" in {
         val (stateRepo, disp) = mocks
         when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnIO(Some(Markets.state))
 

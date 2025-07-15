@@ -6,7 +6,7 @@ import fs2.io.file.{Files, Path}
 import fs2.{Stream, text}
 
 import java.time.format.DateTimeFormatter
-import java.time.{LocalDate, ZoneOffset}
+import java.time.ZonedDateTime
 
 object MarketDataProvider:
   val majors = List(
@@ -59,13 +59,13 @@ object MarketDataProvider:
     "eur-aud-1d.csv",
   )
   
-  private val timePattern = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+  private val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss.SSSXXX")
   
   def read[F[_]: Async](
       filePath: String,
-      currencyPair: CurrencyPair,
-      interval: Interval = Interval.D1
-  ): Stream[F, MarketTimeSeriesData] =
+      currencyPair: CurrencyPair
+  ): Stream[F, MarketTimeSeriesData] = {
+    val interval = if (filePath.contains("1h")) Interval.H1 else Interval.D1
     Files
       .forAsync[F]
       .readAll(Path(getClass.getClassLoader.getResource(filePath).getPath))
@@ -81,9 +81,10 @@ object MarketDataProvider:
           vals(3).toDouble,
           vals(4).toDouble,
           vals(5).toDouble,
-          LocalDate.parse(vals(0).subSequence(0, 10), timePattern).atStartOfDay().atOffset(ZoneOffset.UTC).toInstant
+          ZonedDateTime.parse(vals(0).replace(" GMT-0000", "Z").replace(" GMT+0100", "+01:00"), formatter).toInstant
         )
       }
       .sliding(100)
       .map(_.toNel.map(prices => MarketTimeSeriesData(currencyPair, interval, prices.reverse)))
       .unNone
+  }
