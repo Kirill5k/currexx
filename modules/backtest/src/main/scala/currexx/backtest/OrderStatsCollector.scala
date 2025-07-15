@@ -50,7 +50,7 @@ final case class OrderStats(
 object OrderStatsCollector:
   def collect(orders: List[TradeOrderPlacement]): OrderStats =
     orders
-      .foldRight[(OrderStats, Option[TradeOrderPlacement])]((OrderStats(), None)) { case (currentOrder, (stats, prevOrder)) =>
+      .foldLeft[(OrderStats, Option[TradeOrderPlacement])]((OrderStats(), None)) { case ((stats, prevOrder), currentOrder) =>
         (prevOrder.map(_.order), currentOrder.order) match
           case (None, TradeOrder.Enter(TradeOrder.Position.Buy, _, _, _))  => (stats.incBuy, Some(currentOrder))
           case (None, TradeOrder.Enter(TradeOrder.Position.Sell, _, _, _)) => (stats.incSell, Some(currentOrder))

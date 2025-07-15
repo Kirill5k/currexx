@@ -20,7 +20,7 @@ object Backtester extends IOApp.Simple {
 
   override val run: IO[Unit] =
     Stream
-      .emits(MarketDataProvider.majors)
+      .emits(MarketDataProvider.majors1h)
       .evalMap { filePath =>
         for
           _        <- logger.info(s"Processing $filePath")
