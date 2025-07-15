@@ -7,8 +7,9 @@ import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.signal.Signal
 import currexx.core.market.db.MarketStateRepository
 import currexx.core.trade.TradeOrderPlacement
-import currexx.domain.market.{CurrencyPair, TradeOrder}
+import currexx.domain.market.{CurrencyPair, MarketTimeSeriesData, TradeOrder}
 import currexx.domain.user.UserId
+import kirill5k.common.syntax.time.*
 
 trait MarketService[F[_]]:
   def getState(uid: UserId): F[List[MarketState]]
@@ -16,6 +17,7 @@ trait MarketService[F[_]]:
   def clearState(uid: UserId, cp: CurrencyPair, closePendingOrders: Boolean): F[Unit]
   def processSignals(uid: UserId, cp: CurrencyPair, signals: List[Signal]): F[Unit]
   def processTradeOrderPlacement(top: TradeOrderPlacement): F[Unit]
+  def updateTimeState(uid: UserId, data: MarketTimeSeriesData): F[Unit]
 
 final private class LiveMarketService[F[_]](
     private val stateRepo: MarketStateRepository[F],
@@ -47,6 +49,26 @@ final private class LiveMarketService[F[_]](
           .flatMap(state => dispatcher.dispatch(Action.ProcessMarketStateUpdate(state, currentProfile)))
       }
     }
+
+  override def updateTimeState(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
+    data.prices.toList match
+      case latestCandle :: previousCandle :: _ =>
+        val cp = data.currencyPair
+        val timeGap = previousCandle.time.durationBetween(latestCandle.time)
+        F.whenA(timeGap > (data.interval.toDuration * 2)) {
+          stateRepo.find(uid, cp).flatMap {
+            case Some(previousState) =>
+              val shiftedProfile = previousState.profile.copy(
+                trend = previousState.profile.trend.map(s => s.copy(confirmedAt = s.confirmedAt.plus(timeGap))),
+                momentum = previousState.profile.momentum.map(s => s.copy(confirmedAt = s.confirmedAt.plus(timeGap))),
+                volatility = previousState.profile.volatility.map(s => s.copy(confirmedAt = s.confirmedAt.plus(timeGap))),
+                crossover = None // Invalidate crossover events across a major gap
+              )
+              stateRepo.update(uid, cp, shiftedProfile).void
+            case None => F.unit
+          }
+        }
+      case _ => F.unit
 }
 
 object MarketService:
