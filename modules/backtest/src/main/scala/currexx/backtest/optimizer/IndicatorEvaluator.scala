@@ -45,12 +45,12 @@ object IndicatorEvaluator {
       otherIndicators: List[Indicator] = Nil
   ): F[Evaluator[F, Indicator]] =
     for
-      testDataSets <- testFilePaths.traverse(MarketDataProvider.read[F](_, cp).compile.toList)
+      testDataSets <- testFilePaths.traverse(MarketDataProvider.read[F](_).compile.toList)
       eval         <- Evaluator.cached[F, Indicator] { ind =>
         testDataSets
           .traverse { testData =>
             for
-              services <- TestServices.make[F](TestSettings.make(cp, ts, ind :: otherIndicators))
+              services <- TestServices.make[F](TestSettings.make(testData.head.currencyPair, ts, ind :: otherIndicators))
               _        <- Stream
                 .emits(testData)
                 .through(services.processMarketData)

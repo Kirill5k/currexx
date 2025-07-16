@@ -61,11 +61,9 @@ object MarketDataProvider:
   
   private val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss.SSSXXX")
   
-  def read[F[_]: Async](
-      filePath: String,
-      currencyPair: CurrencyPair
-  ): Stream[F, MarketTimeSeriesData] = {
+  def read[F[_]: Async](filePath: String): Stream[F, MarketTimeSeriesData] = {
     val interval = if (filePath.contains("1h")) Interval.H1 else Interval.D1
+    val cp = CurrencyPair.from(filePath.slice(0, 7).replaceAll("-", "").toUpperCase()).toOption.get
     Files
       .forAsync[F]
       .readAll(Path(getClass.getClassLoader.getResource(filePath).getPath))
@@ -85,6 +83,6 @@ object MarketDataProvider:
         )
       }
       .sliding(100)
-      .map(_.toNel.map(prices => MarketTimeSeriesData(currencyPair, interval, prices.reverse)))
+      .map(_.toNel.map(prices => MarketTimeSeriesData(cp, interval, prices.reverse)))
       .unNone
   }

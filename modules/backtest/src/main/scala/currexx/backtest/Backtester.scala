@@ -26,7 +26,7 @@ object Backtester extends IOApp.Simple {
           _        <- logger.info(s"Processing $filePath")
           services <- TestServices.make[IO](settings)
           _        <- MarketDataProvider
-            .read[IO](filePath, settings.currencyPair)
+            .read[IO](filePath)
             .through(services.processMarketData)
             .compile
             .drain

@@ -111,7 +111,7 @@ object TestStrategy {
   val s3_indicators = List(
     Indicator.TrendChangeDetection(
       source = ValueSource.HLC3,
-      transformation = ValueTransformation.JMA(length = 29, phase = 100, power = 3)
+      transformation = ValueTransformation.JMA(length = 29, phase = 60, power = 3)
     ),
     Indicator.ThresholdCrossing(
       source = ValueSource.Close,
