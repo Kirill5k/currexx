@@ -13,20 +13,38 @@ import scala.util.Random
 object IndicatorCrossover:
   def make[F[_]](using F: Sync[F]): F[Crossover[F, Indicator]] = F.pure {
     new Crossover[F, Indicator] {
-      private val threeWaySplitCrossover = Crossover.pureThreeWaySplit[Int]
-
       override def cross(par1: Indicator, par2: Indicator)(using r: Random): F[Indicator] = {
 
         def crossDouble(d1: Double, d2: Double, stepSize: Double): Double = {
-          val i1     = d1 * 100
-          val i2     = d2 * 100
-          val result = crossInt(i1.toInt, i2.toInt).toDouble / 100
-          result - (result % stepSize)
+          // Use a more direct approach for double crossover
+          // Instead of converting to int, use weighted random selection or interpolation
+          val alpha = r.nextDouble() // Random weight between 0 and 1
+          val interpolated = d1 * alpha + d2 * (1.0 - alpha)
+
+          // Properly snap to step size grid by rounding to nearest step
+          val steps = math.round(interpolated / stepSize)
+          val result = steps * stepSize
+
+          // Ensure the result is within the bounds of the original values
+          val minVal = math.min(d1, d2)
+          val maxVal = math.max(d1, d2)
+          math.max(minVal, math.min(maxVal, result))
         }
 
         def crossInt(i1: Int, i2: Int, minValue: Option[Int] = None): Int = {
-          val max    = math.max(i1, i2)
-          val result = threeWaySplitCrossover.cross(i1.toBinaryArray(max), i2.toBinaryArray(max)).toInt
+          // Proper genetic crossover for integers
+          // Use uniform crossover or arithmetic crossover with bounds
+          val result = r.nextInt(4) match {
+            case 0 => i1 // Take from parent 1 (25%)
+            case 1 => i2 // Take from parent 2 (25%)
+            case 2 => // Arithmetic crossover with random weight (25%)
+              val alpha = r.nextDouble()
+              math.round(i1 * alpha + i2 * (1.0 - alpha)).toInt
+            case 3 => // Random value within the range of both parents (25%)
+              val minVal = math.min(i1, i2)
+              val maxVal = math.max(i1, i2)
+              if (minVal == maxVal) minVal else minVal + r.nextInt(maxVal - minVal + 1)
+          }
           minValue.fold(result)(math.max(_, result))
         }
 
@@ -39,15 +57,24 @@ object IndicatorCrossover:
           case (VT.EMA(l1), VT.EMA(l2))                       => Right(VT.EMA(crossInt(l1, l2, Some(5))))
           case (VT.Kalman(g1), VT.Kalman(g2))                 => Right(VT.Kalman(crossDouble(g1, g2, 0.05)))
           case (VT.JMA(l1, ph1, pow1), VT.JMA(l2, ph2, pow2)) =>
-            Right(VT.JMA(crossInt(l1, l2, Some(5)), crossInt((ph1 + 100) / 5, (ph2 + 100) / 5) * 5 - 100, r.pickOne(pow1, pow2)))
+            // Improve JMA phase handling - phase should be in [-100, 100] range
+            val crossedPhase = crossInt(ph1, ph2, Some(-100))
+            val clampedPhase = math.max(-100, math.min(100, crossedPhase))
+            Right(VT.JMA(crossInt(l1, l2, Some(5)), clampedPhase, r.pickOne(pow1, pow2)))
           case (VT.NMA(l1, sl1, d1, ma1), VT.NMA(l2, sl2, d2, _)) =>
             Right(VT.NMA(crossInt(l1, l2), crossInt(sl1, sl2), crossDouble(d1, d2, 0.5), ma1))
-          case (VT.Sequenced(s1), VT.Sequenced(s2)) => s1.zip(s2).traverse((v1, v2) => crossVt(v1, v2)).map(VT.Sequenced(_))
+          case (VT.Sequenced(s1), VT.Sequenced(s2)) => 
+            // Ensure sequences have same length before crossing
+            if (s1.length != s2.length) {
+              Left(new IllegalArgumentException(s"Sequenced transformations must have same length: ${s1.length} vs ${s2.length}"))
+            } else {
+              s1.zip(s2).traverse((v1, v2) => crossVt(v1, v2)).map(VT.Sequenced(_))
+            }
           case _                                    => Left(new IllegalArgumentException("both parents must be of the same type"))
 
         def crossInd(ind1: Indicator, ind2: Indicator): Either[Throwable, Indicator] = (ind1, ind2) match
           case (Indicator.VolatilityRegimeDetection(atr1, vt1, sl1), Indicator.VolatilityRegimeDetection(atr2, vt2, sl2)) =>
-            crossVt(vt1, vt2).map(vt => Indicator.VolatilityRegimeDetection(crossInt(atr1, atr2), vt, crossInt(sl1, sl2)))
+            crossVt(vt1, vt2).map(vt => Indicator.VolatilityRegimeDetection(crossInt(atr1, atr2, Some(1)), vt, crossInt(sl1, sl2, Some(1))))
           case (Indicator.ValueTracking(vr1, vs1, vt1), Indicator.ValueTracking(vr2, vs2, vt2)) =>
             if (vr1 == vr2 && vs1 == vs2) {
               crossVt(vt1, vt2).map(vt => Indicator.ValueTracking(vr1, vs1, vt))
@@ -55,7 +82,12 @@ object IndicatorCrossover:
               Left(new IllegalArgumentException("both ValueTracking indicators must have the same value range and value source"))
             }
           case (Indicator.Composite(is1), Indicator.Composite(is2)) =>
-            is1.zip(is2).traverse((i1, i2) => crossInd(i1, i2)).map(Indicator.Composite(_))
+            // Ensure composite indicators have same length before crossing
+            if (is1.length != is2.length) {
+              Left(new IllegalArgumentException(s"Composite indicators must have same length: ${is1.length} vs ${is2.length}"))
+            } else {
+              is1.zip(is2).traverse((i1, i2) => crossInd(i1, i2)).map(Indicator.Composite(_))
+            }
           case (Indicator.LinesCrossing(s, st1, ft1), Indicator.LinesCrossing(_, st2, ft2)) =>
             (crossVt(st1, st2), crossVt(ft1, ft2)).mapN((st, ft) => Indicator.LinesCrossing(s, st, ft))
           case (Indicator.TrendChangeDetection(s, t1), Indicator.TrendChangeDetection(_, t2)) =>
@@ -63,9 +95,11 @@ object IndicatorCrossover:
           case (Indicator.ThresholdCrossing(s, t1, ub1, lb1), Indicator.ThresholdCrossing(_, t2, ub2, lb2)) =>
             crossVt(t1, t2)
               .map { t =>
-                val ub = math.min(crossInt(ub1.toInt, ub2.toInt), 100)
-                val lb = math.min(crossInt(lb1.toInt, lb2.toInt), 100)
-                Indicator.ThresholdCrossing(s, t, ub, lb)
+                // Ensure proper threshold bounds: lb <= ub and both in [0, 100]
+                val crossedUb = math.max(0, math.min(100, crossInt(ub1.toInt, ub2.toInt)))
+                val crossedLb = math.max(0, math.min(100, crossInt(lb1.toInt, lb2.toInt)))
+                val (finalLb, finalUb) = if (crossedLb > crossedUb) (crossedUb, crossedLb) else (crossedLb, crossedUb)
+                Indicator.ThresholdCrossing(s, t, finalUb, finalLb)
               }
           case (Indicator.KeltnerChannel(vs, st1, ft1, al, ar), Indicator.KeltnerChannel(_, st2, ft2, _, _)) =>
             (crossVt(st1, st2), crossVt(ft1, ft2)).mapN((st, ft) => Indicator.KeltnerChannel(vs, st, ft, al, ar))

@@ -20,7 +20,7 @@ class IndicatorCrossoverSpec extends IOWordSpec {
       yield result
 
       result.asserting { ind =>
-        ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(8))
+        ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(13))
       }
     }
 
@@ -42,8 +42,8 @@ class IndicatorCrossoverSpec extends IOWordSpec {
 
       result.asserting { ind =>
         ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.sequenced(
-          ValueTransformation.HMA(32),
-          ValueTransformation.Kalman(0.5),
+          ValueTransformation.HMA(38),
+          ValueTransformation.Kalman(0.65),
         ))
       }
     }
