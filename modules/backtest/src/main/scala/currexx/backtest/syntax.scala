@@ -28,35 +28,4 @@ object syntax {
           (sorted(mid - 1) + sorted(mid)) / 2
         }
       }
-
-  extension (array: Array[Int])
-    def toInt: Int = {
-      var res = 0
-      var i   = 0
-      while (i < array.length) {
-        if (array(i) == 1)
-          res = res | (1 << (array.length - i - 1))
-        i = i + 1
-      }
-      res
-    }
-
-  extension (num: Int)
-    def toBinaryArray(maxValue: Int): Array[Int] = {
-      val bitLength = math.max(Integer.SIZE - Integer.numberOfLeadingZeros(maxValue), 1)
-      val array = Array.fill(bitLength)(0)
-      
-      if (num == 0) array
-      else {
-        var i = 0
-        var j = num
-        while (i < array.length) {
-          if (j % 2 == 1)
-            array(array.length - i - 1) = 1
-          j = j / 2
-          i = i + 1
-        }
-        array
-      }
-    }
 }

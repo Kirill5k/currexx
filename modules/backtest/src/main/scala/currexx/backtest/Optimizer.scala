@@ -17,8 +17,8 @@ object Optimizer extends IOApp.Simple {
   val gaParameters = Parameters.GA(
     populationSize = 250,
     maxGen = 250,
-    crossoverProbability = 0.8,
-    mutationProbability = 0.1,
+    crossoverProbability = 0.7,
+    mutationProbability = 0.2,
     elitismRatio = 0.025,
     shuffle = true
   )

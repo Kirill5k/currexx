@@ -21,7 +21,7 @@ class IndicatorMutatorSpec extends IOWordSpec {
         yield res
 
         result.asserting { ind =>
-          ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.Kalman(0.4))
+          ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.Kalman(0.45))
         }
       }
     }
@@ -37,7 +37,7 @@ class IndicatorMutatorSpec extends IOWordSpec {
         yield res
 
         result.asserting { ind =>
-          ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(9))
+          ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(5))
         }
       }
 
@@ -76,8 +76,8 @@ class IndicatorMutatorSpec extends IOWordSpec {
           ind mustBe Indicator.TrendChangeDetection(
             ValueSource.Close,
             ValueTransformation.sequenced(
-              ValueTransformation.HMA(9),
-              ValueTransformation.Kalman(0.15)
+              ValueTransformation.HMA(5),
+              ValueTransformation.Kalman(0.13)
             )
           )
         }
