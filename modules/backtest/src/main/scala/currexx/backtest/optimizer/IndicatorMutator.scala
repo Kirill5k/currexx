@@ -18,7 +18,6 @@ object IndicatorMutator {
             val stdDev   = (maxValue - minValue) * 0.1 // 10% of range as standard deviation
             val mutation = (r.nextGaussian() * stdDev).round.toInt
             val result   = value + mutation
-            // Clamp the result to be within the valid min/max range.
             math.max(minValue, math.min(result, maxValue))
           } else {
             value
@@ -32,15 +31,10 @@ object IndicatorMutator {
             val mutated       = value + mutation
             val roundedToStep = math.round(mutated / stepSize) * stepSize
             val finalValue    = math.max(minValue, math.min(roundedToStep, maxValue))
-            // Round to 4 decimal places for consistency
             math.round(finalValue * 10000.0) / 10000.0
           } else {
             value
           }
-
-        // A helper for mutating moving average types if you ever need it.
-        def mutateMa(ma: MovingAverage): MovingAverage =
-          ma // For now, we don't mutate the type of MA, just its parameters.
 
         def mutateVt(vt: VT): VT = vt match {
           case VT.Sequenced(sequence)       => VT.Sequenced(sequence.map(mutateVt))
@@ -62,12 +56,11 @@ object IndicatorMutator {
               mutateInt(length, 5, 50),
               mutateInt(signalLength, 5, 50),
               mutateDouble(lambda, 0.5, 4.0, 0.25),
-              mutateMa(maCalc)
+              maCalc
             )
         }
 
         def mutateInd(indicator: Indicator): Indicator = indicator match {
-          // For composite indicators, recursively mutate each child.
           case Indicator.Composite(is) =>
             Indicator.Composite(is.map(mutateInd))
           case Indicator.TrendChangeDetection(vs, vt) =>
@@ -94,7 +87,6 @@ object IndicatorMutator {
             )
           case Indicator.ValueTracking(vr, vs, vt) =>
             Indicator.ValueTracking(vr, vs, mutateVt(vt))
-          // Add cases for any new indicators like BollingerBands here.
         }
 
         F.delay(mutateInd(ind))
