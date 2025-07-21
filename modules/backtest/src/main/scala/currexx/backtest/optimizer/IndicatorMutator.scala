@@ -2,7 +2,7 @@ package currexx.backtest.optimizer
 
 import cats.effect.Sync
 import currexx.algorithms.operators.Mutator
-import currexx.domain.signal.{Indicator, MovingAverage, ValueTransformation as VT}
+import currexx.domain.signal.{Indicator, ValueTransformation as VT}
 
 import scala.util.Random
 
@@ -13,7 +13,7 @@ object IndicatorMutator {
       override def mutate(ind: Indicator, mutationProbability: Double)(using r: Random): F[Indicator] = {
 
         /** Mutates an integer parameter using a Gaussian distribution. */
-        def mutateInt(value: Int, minValue: Int, maxValue: Int): Int =
+        def mutInt(value: Int, minValue: Int, maxValue: Int): Int =
           if (r.nextDouble() < mutationProbability) {
             val stdDev   = (maxValue - minValue) * 0.1 // 10% of range as standard deviation
             val mutation = (r.nextGaussian() * stdDev).round.toInt
@@ -24,7 +24,7 @@ object IndicatorMutator {
           }
 
         /** Mutates a double parameter using a Gaussian distribution, with rounding to a step size. */
-        def mutateDouble(value: Double, minValue: Double, maxValue: Double, stepSize: Double): Double =
+        def mutDouble(value: Double, minValue: Double, maxValue: Double, stepSize: Double): Double =
           if (r.nextDouble() < mutationProbability) {
             val stdDev        = (maxValue - minValue) * 0.1 // 10% of range
             val mutation      = r.nextGaussian() * stdDev
@@ -36,60 +36,47 @@ object IndicatorMutator {
             value
           }
 
-        def mutateVt(vt: VT): VT = vt match {
-          case VT.Sequenced(sequence)       => VT.Sequenced(sequence.map(mutateVt))
-          case VT.Kalman(gain)              => VT.Kalman(mutateDouble(gain, 0.01, 0.5, 0.01))
-          case VT.STOCH(length)             => VT.STOCH(mutateInt(length, 5, 50))
-          case VT.RSX(length)               => VT.RSX(mutateInt(length, 5, 50))
-          case VT.WMA(length)               => VT.WMA(mutateInt(length, 5, 100))
-          case VT.SMA(length)               => VT.SMA(mutateInt(length, 5, 100))
-          case VT.EMA(length)               => VT.EMA(mutateInt(length, 5, 100))
-          case VT.HMA(length)               => VT.HMA(mutateInt(length, 5, 100))
+        def mutVt(vt: VT): VT = vt match
+          case VT.Sequenced(sequence) =>
+            VT.Sequenced(sequence.map(mutVt))
+          case VT.Kalman(gain) =>
+            VT.Kalman(mutDouble(gain, 0.01, 0.5, 0.01))
+          case VT.STOCH(length) =>
+            VT.STOCH(mutInt(length, 5, 50))
+          case VT.RSX(length) =>
+            VT.RSX(mutInt(length, 5, 50))
+          case VT.WMA(length) =>
+            VT.WMA(mutInt(length, 5, 100))
+          case VT.SMA(length) =>
+            VT.SMA(mutInt(length, 5, 100))
+          case VT.EMA(length) =>
+            VT.EMA(mutInt(length, 5, 100))
+          case VT.HMA(length) =>
+            VT.HMA(mutInt(length, 5, 100))
           case VT.JMA(length, phase, power) =>
-            VT.JMA(
-              mutateInt(length, 5, 50),
-              mutateInt(phase, -100, 100), // JMA phase can be negative
-              mutateInt(power, 1, 10)
-            )
+            VT.JMA(mutInt(length, 5, 50), mutInt(phase, -100, 100), mutInt(power, 1, 10)) // JMA phase can be negative
           case VT.NMA(length, signalLength, lambda, maCalc) =>
-            VT.NMA(
-              mutateInt(length, 5, 50),
-              mutateInt(signalLength, 5, 50),
-              mutateDouble(lambda, 0.5, 4.0, 0.25),
-              maCalc
-            )
-        }
+            VT.NMA(mutInt(length, 5, 50), mutInt(signalLength, 5, 50), mutDouble(lambda, 0.5, 4.0, 0.25), maCalc)
 
-        def mutateInd(indicator: Indicator): Indicator = indicator match {
+        def mutInd(indicator: Indicator): Indicator = indicator match
           case Indicator.Composite(is) =>
-            Indicator.Composite(is.map(mutateInd))
+            Indicator.Composite(is.map(mutInd))
           case Indicator.TrendChangeDetection(vs, vt) =>
-            Indicator.TrendChangeDetection(vs, mutateVt(vt))
+            Indicator.TrendChangeDetection(vs, mutVt(vt))
           case Indicator.ThresholdCrossing(vs, vt, ub, lb) =>
-            val mutatedUb = mutateDouble(ub, 50.0, 95.0, 1.0)
-            val mutatedLb = mutateDouble(lb, 5.0, mutatedUb, 1.0)
-            Indicator.ThresholdCrossing(vs, mutateVt(vt), mutatedUb, mutatedLb)
+            val mutatedUb = mutDouble(ub, 50.0, 95.0, 1.0)
+            val mutatedLb = mutDouble(lb, 5.0, mutatedUb, 1.0)
+            Indicator.ThresholdCrossing(vs, mutVt(vt), mutatedUb, mutatedLb)
           case Indicator.LinesCrossing(vs, vt1, vt2) =>
-            Indicator.LinesCrossing(vs, mutateVt(vt1), mutateVt(vt2))
+            Indicator.LinesCrossing(vs, mutVt(vt1), mutVt(vt2))
           case Indicator.KeltnerChannel(vs, vt1, vt2, atrL, atrM) =>
-            Indicator.KeltnerChannel(
-              vs,
-              mutateVt(vt1),
-              mutateVt(vt2),
-              mutateInt(atrL, 5, 50),
-              mutateDouble(atrM, 0.5, 5.0, 0.1) // Using a finer step for the multiplier
-            )
+            Indicator.KeltnerChannel(vs, mutVt(vt1), mutVt(vt2), mutInt(atrL, 5, 50), mutDouble(atrM, 0.5, 5.0, 0.1))
           case Indicator.VolatilityRegimeDetection(atrL, smoothing, smoothingL) =>
-            Indicator.VolatilityRegimeDetection(
-              mutateInt(atrL, 5, 50),
-              mutateVt(smoothing),
-              mutateInt(smoothingL, 5, 50)
-            )
+            Indicator.VolatilityRegimeDetection(mutInt(atrL, 5, 50), mutVt(smoothing), mutInt(smoothingL, 5, 50))
           case Indicator.ValueTracking(vr, vs, vt) =>
-            Indicator.ValueTracking(vr, vs, mutateVt(vt))
-        }
+            Indicator.ValueTracking(vr, vs, mutVt(vt))
 
-        F.delay(mutateInd(ind))
+        F.delay(mutInd(ind))
       }
     }
   }
