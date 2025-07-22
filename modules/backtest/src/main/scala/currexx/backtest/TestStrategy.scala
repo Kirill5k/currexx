@@ -21,9 +21,8 @@ object TestStrategy {
       upperBoundary = 70.0,
       lowerBoundary = 30.0
     ),
-    // NEW: Explicitly track the RSX value on every bar
     Indicator.ValueTracking(
-      role = ValueRole.Momentum, // Use the type-safe enum
+      role = ValueRole.Momentum,
       source = ValueSource.Close,
       transformation = ValueTransformation.RSX(length = 14)
     )
