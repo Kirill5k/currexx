@@ -24,6 +24,7 @@ enum ValueRole:
 enum ValueTransformation(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Sequenced(sequence: List[ValueTransformation])                             extends ValueTransformation("sequenced")
   case Kalman(gain: Double)                                                       extends ValueTransformation("kalman")
+  case KalmanVelocity(gain: Double)                                               extends ValueTransformation("kalman-velocity")
   case RSX(length: Int)                                                           extends ValueTransformation("rsx")
   case WMA(length: Int)                                                           extends ValueTransformation("wma")
   case SMA(length: Int)                                                           extends ValueTransformation("sma")
@@ -39,16 +40,17 @@ object ValueTransformation {
 
   given JsonTaggedAdt.Config[ValueTransformation] = JsonTaggedAdt.Config.Values[ValueTransformation](
     mappings = Map(
-      "sequenced" -> JsonTaggedAdt.tagged[ValueTransformation.Sequenced],
-      "kalman"    -> JsonTaggedAdt.tagged[ValueTransformation.Kalman],
-      "rsx"       -> JsonTaggedAdt.tagged[ValueTransformation.RSX],
-      "stoch"     -> JsonTaggedAdt.tagged[ValueTransformation.STOCH],
-      "ema"       -> JsonTaggedAdt.tagged[ValueTransformation.EMA],
-      "hma"       -> JsonTaggedAdt.tagged[ValueTransformation.HMA],
-      "nma"       -> JsonTaggedAdt.tagged[ValueTransformation.NMA],
-      "sma"       -> JsonTaggedAdt.tagged[ValueTransformation.SMA],
-      "wma"       -> JsonTaggedAdt.tagged[ValueTransformation.WMA],
-      "jma"       -> JsonTaggedAdt.tagged[ValueTransformation.JMA]
+      "sequenced"       -> JsonTaggedAdt.tagged[ValueTransformation.Sequenced],
+      "kalman"          -> JsonTaggedAdt.tagged[ValueTransformation.Kalman],
+      "kalman-velocity" -> JsonTaggedAdt.tagged[ValueTransformation.KalmanVelocity],
+      "rsx"             -> JsonTaggedAdt.tagged[ValueTransformation.RSX],
+      "stoch"           -> JsonTaggedAdt.tagged[ValueTransformation.STOCH],
+      "ema"             -> JsonTaggedAdt.tagged[ValueTransformation.EMA],
+      "hma"             -> JsonTaggedAdt.tagged[ValueTransformation.HMA],
+      "nma"             -> JsonTaggedAdt.tagged[ValueTransformation.NMA],
+      "sma"             -> JsonTaggedAdt.tagged[ValueTransformation.SMA],
+      "wma"             -> JsonTaggedAdt.tagged[ValueTransformation.WMA],
+      "jma"             -> JsonTaggedAdt.tagged[ValueTransformation.JMA]
     ),
     strict = true,
     typeFieldName = "kind"

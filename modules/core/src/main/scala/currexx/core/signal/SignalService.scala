@@ -81,6 +81,7 @@ object SignalService {
       vt match
         case VT.Sequenced(transformations)            => transformations.foldLeft(data)((d, t) => t.transform(d, ref))
         case VT.Kalman(gain)                          => Filters.kalman(data, gain)
+        case VT.KalmanVelocity(gain)                  => Filters.kalmanVelocity(data, gain)
         case VT.RSX(length)                           => MomentumOscillators.jurikRelativeStrengthIndex(data, length)
         case VT.STOCH(length)                         => MomentumOscillators.stochastic(data, ref.highs, ref.lows, length)
         case VT.WMA(length)                           => MovingAverages.weighted(data, length)
