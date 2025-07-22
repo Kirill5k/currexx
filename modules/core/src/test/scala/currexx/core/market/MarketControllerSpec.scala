@@ -74,7 +74,7 @@ class MarketControllerSpec extends HttpRoutesWordSpec {
              |    "currentPosition": {
              |      "position": "buy",
              |      "openedAt": "${Markets.ts}",
-             |      "openPrice": 3
+             |      "openPrice": 3.0
              |    },
              |    "profile" : {
              |      "trend" : {
@@ -85,7 +85,8 @@ class MarketControllerSpec extends HttpRoutesWordSpec {
              |      "momentum" : null,
              |      "lastMomentumValue" : null,
              |      "volatility" : null,
-             |      "lastVolatilityValue" : null
+             |      "lastVolatilityValue" : null,
+             |      "lastVelocityValue": null
              |    },
              |    "lastUpdatedAt": "${Markets.ts}",
              |    "createdAt": "${Markets.ts}"
