@@ -1,6 +1,7 @@
 package currexx.backtest.services
 
-import cats.effect.{Async, Ref}
+import cats.Functor
+import cats.effect.{Ref, Temporal}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.common.action.ActionDispatcher
@@ -19,7 +20,7 @@ final private class TestTradeSettingsRepository[F[_]](
 ) extends TradeSettingsRepository[F]:
   override def get(uid: UserId): F[TradeSettings] = settings.get
 
-final private class TestTradeOrderRepository[F[_]: Async](
+final private class TestTradeOrderRepository[F[_]: Functor](
     private val orders: Ref[F, ListBuffer[TradeOrderPlacement]]
 ) extends TradeOrderRepository[F]:
   override def getAllTradedCurrencies(uid: UserId): F[List[CurrencyPair]]          = orders.get.map(_.headOption.map(_.order.currencyPair).toList)
@@ -28,7 +29,7 @@ final private class TestTradeOrderRepository[F[_]: Async](
   override def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]] = orders.get.map(_.headOption)
 
 object TestTradeService:
-  def make[F[_]: {Async, Clock}](
+  def make[F[_]: {Temporal, Clock}](
       initialSettings: TradeSettings,
       clients: TestClients[F],
       dispatcher: ActionDispatcher[F]

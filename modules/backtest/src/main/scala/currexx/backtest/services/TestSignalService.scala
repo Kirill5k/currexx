@@ -1,7 +1,7 @@
 package currexx.backtest.services
 
 import cats.Monad
-import cats.effect.{Async, Ref}
+import cats.effect.{Ref, Temporal}
 import cats.syntax.flatMap.*
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.SearchParams
@@ -20,5 +20,5 @@ final private class TestSignalSettingsRepository[F[_]](
   override def get(uid: UserId): F[SignalSettings] = settings.get
 
 object TestSignalService:
-  def make[F[_]: Async](initialSettings: SignalSettings, dispatcher: ActionDispatcher[F]): F[SignalService[F]] =
+  def make[F[_]: Temporal](initialSettings: SignalSettings, dispatcher: ActionDispatcher[F]): F[SignalService[F]] =
     Ref.of(initialSettings).flatMap(s => SignalService.make(TestSignalRepository[F], TestSignalSettingsRepository[F](s), dispatcher))

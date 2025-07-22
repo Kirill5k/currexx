@@ -1,7 +1,7 @@
 package currexx.backtest.services
 
 import cats.Monad
-import cats.effect.{Async, Ref}
+import cats.effect.{Concurrent, Ref}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.common.action.ActionDispatcher
@@ -26,5 +26,5 @@ final private class TestMarketStateRepository[F[_]: Monad](
     state.get.map(Some(_))
 
 object TestMarketService:
-  def make[F[_]: Async](initialState: MarketState, dispatcher: ActionDispatcher[F]): F[MarketService[F]] =
+  def make[F[_]: Concurrent](initialState: MarketState, dispatcher: ActionDispatcher[F]): F[MarketService[F]] =
     Ref.of(initialState).flatMap(s => MarketService.make(TestMarketStateRepository(s), dispatcher))

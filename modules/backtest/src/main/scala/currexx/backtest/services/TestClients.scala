@@ -10,7 +10,7 @@ import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, Open
 
 final class TestBrokerClient[F[_]](using F: Monad[F]) extends BrokerClient[F]:
   override def find(parameters: BrokerParameters, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]] = F.pure(Nil)
-  override def submit(parameters: BrokerParameters, order: TradeOrder): F[Unit]                = F.unit
+  override def submit(parameters: BrokerParameters, order: TradeOrder): F[Unit]                               = F.unit
 
 final class TestMarketDataClient[F[_]](
     private val priceRef: Ref[F, Option[MarketTimeSeriesData]]

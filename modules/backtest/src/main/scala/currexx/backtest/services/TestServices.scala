@@ -1,6 +1,6 @@
 package currexx.backtest.services
 
-import cats.effect.Async
+import cats.effect.Temporal
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
@@ -22,7 +22,7 @@ final class TestServices[F[_]] private (
     private val clock: TestClock[F],
     private val dispatcher: ActionDispatcher[F]
 )(using
-    F: Async[F]
+    F: Temporal[F]
 ) {
 
   private def collectPendingActions(pf: PartialFunction[Action, F[Unit]]): F[Unit] =
@@ -55,12 +55,12 @@ final class TestServices[F[_]] private (
 }
 
 object TestServices:
-  def make[F[_]: Async](settings: TestSettings): F[TestServices[F]] =
+  def make[F[_]: Temporal](settings: TestSettings): F[TestServices[F]] =
     for
       dispatcher <- ActionDispatcher.make[F]
       clock      <- TestClock.make[F]
       clients    <- TestClients.make[F]
       market     <- TestMarketService.make[F](settings.marketState, dispatcher)
-      trade      <- TestTradeService.make[F](settings.trade, clients, dispatcher)(using Async[F], clock)
+      trade      <- TestTradeService.make[F](settings.trade, clients, dispatcher)(using Temporal[F], clock)
       signal     <- TestSignalService.make[F](settings.signal, dispatcher)
     yield TestServices[F](settings, signal, market, trade, clients, clock, dispatcher)
