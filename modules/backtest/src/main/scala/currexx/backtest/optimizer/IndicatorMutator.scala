@@ -41,10 +41,14 @@ object IndicatorMutator {
             VT.Sequenced(sequence.map(mutVt))
           case VT.Kalman(gain) =>
             VT.Kalman(mutDouble(gain, 0.01, 0.5, 0.01))
+          case VT.KalmanVelocity(gain) =>
+            VT.KalmanVelocity(mutDouble(gain, 0.01, 0.5, 0.01))
           case VT.STOCH(length) =>
             VT.STOCH(mutInt(length, 5, 50))
           case VT.RSX(length) =>
             VT.RSX(mutInt(length, 5, 50))
+          case VT.JRSX(length) =>
+            VT.JRSX(mutInt(length, 5, 50))
           case VT.WMA(length) =>
             VT.WMA(mutInt(length, 5, 100))
           case VT.SMA(length) =>

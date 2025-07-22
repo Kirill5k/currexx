@@ -24,9 +24,9 @@ object Optimizer extends IOApp.Simple {
   )
 
   val testDataSets    = MarketDataProvider.majors
-  val strategy        = TestStrategy.s4_rules
-  val target          = TestStrategy.s4_indicators.head
-  val otherIndicators = TestStrategy.s4_indicators.tail
+  val strategy        = TestStrategy.s3_rules
+  val target          = TestStrategy.s3_indicators.head
+  val otherIndicators = TestStrategy.s3_indicators.tail
 
   override def run: IO[Unit] = for
     _       <- IO.println(s"Starting optimization of $target")

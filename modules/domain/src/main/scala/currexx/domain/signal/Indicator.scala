@@ -26,6 +26,7 @@ enum ValueTransformation(val kind: String) derives JsonTaggedAdt.EncoderWithConf
   case Kalman(gain: Double)                                                       extends ValueTransformation("kalman")
   case KalmanVelocity(gain: Double)                                               extends ValueTransformation("kalman-velocity")
   case RSX(length: Int)                                                           extends ValueTransformation("rsx")
+  case JRSX(length: Int)                                                          extends ValueTransformation("jrsx")
   case WMA(length: Int)                                                           extends ValueTransformation("wma")
   case SMA(length: Int)                                                           extends ValueTransformation("sma")
   case EMA(length: Int)                                                           extends ValueTransformation("ema")
@@ -44,6 +45,7 @@ object ValueTransformation {
       "kalman"          -> JsonTaggedAdt.tagged[ValueTransformation.Kalman],
       "kalman-velocity" -> JsonTaggedAdt.tagged[ValueTransformation.KalmanVelocity],
       "rsx"             -> JsonTaggedAdt.tagged[ValueTransformation.RSX],
+      "jrsx"            -> JsonTaggedAdt.tagged[ValueTransformation.JRSX],
       "stoch"           -> JsonTaggedAdt.tagged[ValueTransformation.STOCH],
       "ema"             -> JsonTaggedAdt.tagged[ValueTransformation.EMA],
       "hma"             -> JsonTaggedAdt.tagged[ValueTransformation.HMA],
