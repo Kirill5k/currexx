@@ -43,42 +43,55 @@ final case class Rule(
 object Rule extends JsonCodecs {
 
   enum Condition(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
-    case AllOf(conditions: List[Condition])        extends Condition("all-of")
-    case AnyOf(conditions: List[Condition])        extends Condition("any-of")
-    case Not(condition: Condition)                 extends Condition("not")
-    case TrendChangedTo(direction: Direction)      extends Condition("trend-changed-to")
-    case TrendIs(direction: Direction)             extends Condition("trend-is")
-    case TrendActiveFor(duration: FiniteDuration)  extends Condition("trend-active-for")
-    case CrossoverOccurred(direction: Direction)   extends Condition("crossover-occurred")
-    case MomentumEntered(zone: MomentumZone)       extends Condition("momentum-entered")
-    case MomentumIsIn(zone: MomentumZone)          extends Condition("momentum-is-in")
-    case MomentumIs(direction: Direction)          extends Condition("momentum-is")
-    case VolatilityIs(regime: VolatilityRegime)    extends Condition("volatility-is")
-    case PositionIs(position: TradeOrder.Position) extends Condition("position-is")
-    case PositionOpenFor(duration: FiniteDuration) extends Condition("position-open-for")
-    case NoPosition                                extends Condition("no-position")
+    case AllOf(conditions: List[Condition])                        extends Condition("all-of")
+    case AnyOf(conditions: List[Condition])                        extends Condition("any-of")
+    case Not(condition: Condition)                                 extends Condition("not")
+    case TrendChangedTo(direction: Direction)                      extends Condition("trend-changed-to")
+    case TrendIs(direction: Direction)                             extends Condition("trend-is")
+    case TrendActiveFor(duration: FiniteDuration)                  extends Condition("trend-active-for")
+    case CrossoverOccurred(direction: Direction)                   extends Condition("crossover-occurred")
+    case MomentumEntered(zone: MomentumZone)                       extends Condition("momentum-entered")
+    case MomentumIsIn(zone: MomentumZone)                          extends Condition("momentum-is-in")
+    case MomentumIs(direction: Direction)                          extends Condition("momentum-is")
+    case VolatilityIs(regime: VolatilityRegime)                    extends Condition("volatility-is")
+    case VelocityIs(direction: Direction)                          extends Condition("velocity-is")
+    case VelocityCrossedLevel(level: Double, direction: Direction) extends Condition("velocity-crossed-level")
+    case PositionIs(position: TradeOrder.Position)                 extends Condition("position-is")
+    case PositionOpenFor(duration: FiniteDuration)                 extends Condition("position-open-for")
+    case NoPosition                                                extends Condition("no-position")
 
   object Condition:
     given JsonTaggedAdt.Config[Condition] = JsonTaggedAdt.Config.Values[Condition](
       mappings = Map(
-        "all-of"             -> JsonTaggedAdt.tagged[Condition.AllOf],
-        "any-of"             -> JsonTaggedAdt.tagged[Condition.AnyOf],
-        "not"                -> JsonTaggedAdt.tagged[Condition.Not],
-        "trend-changed-to"   -> JsonTaggedAdt.tagged[Condition.TrendChangedTo],
-        "trend-is"           -> JsonTaggedAdt.tagged[Condition.TrendIs],
-        "trend-active-for"   -> JsonTaggedAdt.tagged[Condition.TrendActiveFor],
-        "crossover-occurred" -> JsonTaggedAdt.tagged[Condition.CrossoverOccurred],
-        "momentum-entered"   -> JsonTaggedAdt.tagged[Condition.MomentumEntered],
-        "momentum-is-in"     -> JsonTaggedAdt.tagged[Condition.MomentumIsIn],
-        "momentum-is"        -> JsonTaggedAdt.tagged[Condition.MomentumIs],
-        "volatility-is"      -> JsonTaggedAdt.tagged[Condition.VolatilityIs],
-        "position-is"        -> JsonTaggedAdt.tagged[Condition.PositionIs],
-        "position-open-for"  -> JsonTaggedAdt.tagged[Condition.PositionOpenFor],
-        "no-position"        -> JsonTaggedAdt.tagged[Condition.NoPosition.type],
+        "all-of"                 -> JsonTaggedAdt.tagged[Condition.AllOf],
+        "any-of"                 -> JsonTaggedAdt.tagged[Condition.AnyOf],
+        "not"                    -> JsonTaggedAdt.tagged[Condition.Not],
+        "trend-changed-to"       -> JsonTaggedAdt.tagged[Condition.TrendChangedTo],
+        "trend-is"               -> JsonTaggedAdt.tagged[Condition.TrendIs],
+        "trend-active-for"       -> JsonTaggedAdt.tagged[Condition.TrendActiveFor],
+        "crossover-occurred"     -> JsonTaggedAdt.tagged[Condition.CrossoverOccurred],
+        "momentum-entered"       -> JsonTaggedAdt.tagged[Condition.MomentumEntered],
+        "momentum-is-in"         -> JsonTaggedAdt.tagged[Condition.MomentumIsIn],
+        "momentum-is"            -> JsonTaggedAdt.tagged[Condition.MomentumIs],
+        "volatility-is"          -> JsonTaggedAdt.tagged[Condition.VolatilityIs],
+        "velocity-is"            -> JsonTaggedAdt.tagged[Condition.VelocityIs],
+        "velocity-crossed-level" -> JsonTaggedAdt.tagged[Condition.VelocityCrossedLevel],
+        "position-is"            -> JsonTaggedAdt.tagged[Condition.PositionIs],
+        "position-open-for"      -> JsonTaggedAdt.tagged[Condition.PositionOpenFor],
+        "no-position"            -> JsonTaggedAdt.tagged[Condition.NoPosition.type]
       ),
       strict = true,
       typeFieldName = "kind"
     )
+
+    val trendIsUpward: Condition   = Condition.TrendIs(Direction.Upward)
+    val trendIsDownward: Condition = Condition.TrendIs(Direction.Downward)
+    val positionIsBuy: Condition   = Condition.PositionIs(TradeOrder.Position.Buy)
+    val positionIsSell: Condition  = Condition.PositionIs(TradeOrder.Position.Sell)
+
+    def not(condition: Condition): Condition     = Condition.Not(condition)
+    def allOf(conditions: Condition*): Condition = Condition.AllOf(conditions.toList)
+    def anyOf(conditions: Condition*): Condition = Condition.AnyOf(conditions.toList)
 
   def findTriggeredAction(
       rules: List[Rule],
@@ -157,6 +170,27 @@ object Rule extends JsonCodecs {
         state.currentPosition.exists { pos =>
           val positionAge = pos.openedAt.durationBetween(state.lastUpdatedAt)
           positionAge.toNanos >= duration.toNanos
+        }
+      case Condition.VelocityIs(direction) =>
+        currentProfile.lastVelocityValue match {
+          case Some(v) =>
+            direction match {
+              case Direction.Upward   => v > 0.0
+              case Direction.Downward => v < 0.0
+              case Direction.Still    => v == 0.0
+            }
+          case None => false // Cannot determine if velocity is not present.
+        }
+      case Condition.VelocityCrossedLevel(level, direction) =>
+        // This requires both the current and previous velocity values.
+        (currentProfile.lastVelocityValue, previousProfile.lastVelocityValue) match {
+          case (Some(currentValue), Some(previousValue)) =>
+            direction match {
+              case Direction.Upward   => currentValue >= level && previousValue < level
+              case Direction.Downward => currentValue <= level && previousValue > level
+              case Direction.Still    => false
+            }
+          case _ => false // Cannot determine a cross without two consecutive points.
         }
     }
   }

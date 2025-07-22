@@ -39,7 +39,8 @@ final case class MarketProfile(
     momentum: Option[MomentumState] = None,
     lastMomentumValue: Option[BigDecimal] = None,
     volatility: Option[VolatilityState] = None,
-    lastVolatilityValue: Option[BigDecimal] = None
+    lastVolatilityValue: Option[BigDecimal] = None,
+    lastVelocityValue: Option[BigDecimal] = None
 ) derives Codec.AsObject
 
 object MarketProfile {
@@ -50,6 +51,7 @@ object MarketProfile {
           role match
             case ValueRole.Momentum   => profile.copy(lastMomentumValue = Some(value))
             case ValueRole.Volatility => profile.copy(lastVolatilityValue = Some(value))
+            case ValueRole.Velocity   => profile.copy(lastVelocityValue = Some(value))
         // --- Trend Signal ---
         case Condition.TrendDirectionChange(_, to, _) =>
           // A trend change occurred. Create a new TrendState.
