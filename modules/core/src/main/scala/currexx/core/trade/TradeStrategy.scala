@@ -84,10 +84,18 @@ object Rule extends JsonCodecs {
       typeFieldName = "kind"
     )
 
-    val trendIsUpward: Condition   = Condition.TrendIs(Direction.Upward)
-    val trendIsDownward: Condition = Condition.TrendIs(Direction.Downward)
-    val positionIsBuy: Condition   = Condition.PositionIs(TradeOrder.Position.Buy)
-    val positionIsSell: Condition  = Condition.PositionIs(TradeOrder.Position.Sell)
+    val trendIsUpward: Condition             = Condition.TrendIs(Direction.Upward)
+    val trendIsDownward: Condition           = Condition.TrendIs(Direction.Downward)
+    val positionIsBuy: Condition             = Condition.PositionIs(TradeOrder.Position.Buy)
+    val positionIsSell: Condition            = Condition.PositionIs(TradeOrder.Position.Sell)
+    val downwardCrossover: Condition         = Condition.CrossoverOccurred(Direction.Downward)
+    val upwardCrossover: Condition           = Condition.CrossoverOccurred(Direction.Upward)
+    val volatilityIsHigh: Condition          = Condition.VolatilityIs(VolatilityRegime.High)
+    val volatilityIsLow: Condition           = Condition.VolatilityIs(VolatilityRegime.Low)
+    val momentumEnteredOverbought: Condition = Condition.MomentumEntered(MomentumZone.Overbought)
+    val momentumEnteredOversold: Condition   = Condition.MomentumEntered(MomentumZone.Oversold)
+    val momentumIsInOverbought: Condition    = Condition.MomentumIsIn(MomentumZone.Overbought)
+    val momentumIsInOversold: Condition      = Condition.MomentumIsIn(MomentumZone.Oversold)
 
     def not(condition: Condition): Condition     = Condition.Not(condition)
     def allOf(conditions: Condition*): Condition = Condition.AllOf(conditions.toList)

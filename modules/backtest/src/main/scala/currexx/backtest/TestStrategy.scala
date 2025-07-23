@@ -2,8 +2,7 @@ package currexx.backtest
 
 import currexx.core.market.MomentumZone
 import currexx.core.trade.{Rule, TradeAction, TradeStrategy}
-import currexx.domain.market.TradeOrder
-import currexx.domain.signal.{Direction, Indicator, ValueRole, ValueSource, ValueTransformation, VolatilityRegime}
+import currexx.domain.signal.{Direction, Indicator, ValueRole, ValueSource, ValueTransformation}
 
 import scala.concurrent.duration.*
 
@@ -33,24 +32,20 @@ object TestStrategy {
     openRules = List(
       Rule(
         action = TradeAction.OpenLong,
-        conditions = Rule.Condition.AllOf(
-          List(
-            Rule.Condition.NoPosition,
-            Rule.Condition.TrendIs(Direction.Upward),
-            Rule.Condition.TrendActiveFor(4.hours),
-            Rule.Condition.Not(Rule.Condition.MomentumIsIn(MomentumZone.Overbought))
-          )
+        conditions = Rule.Condition.allOf(
+          Rule.Condition.NoPosition,
+          Rule.Condition.trendIsUpward,
+          Rule.Condition.TrendActiveFor(4.hours),
+          Rule.Condition.Not(Rule.Condition.momentumIsInOverbought)
         )
       )
     ),
     closeRules = List(
       Rule(
         action = TradeAction.ClosePosition,
-        conditions = Rule.Condition.AnyOf(
-          List(
-            Rule.Condition.TrendChangedTo(Direction.Downward),
-            Rule.Condition.MomentumEntered(MomentumZone.Overbought)
-          )
+        conditions = Rule.Condition.anyOf(
+          Rule.Condition.TrendChangedTo(Direction.Downward),
+          Rule.Condition.momentumEnteredOverbought
         )
       )
     )
@@ -86,23 +81,19 @@ object TestStrategy {
     openRules = List(
       Rule(
         action = TradeAction.OpenLong,
-        conditions = Rule.Condition.AllOf(
-          List(
-            Rule.Condition.NoPosition,
-            Rule.Condition.CrossoverOccurred(Direction.Upward),
-            Rule.Condition.Not(Rule.Condition.MomentumIsIn(MomentumZone.Overbought))
-          )
+        conditions = Rule.Condition.allOf(
+          Rule.Condition.NoPosition,
+          Rule.Condition.upwardCrossover,
+          Rule.Condition.not(Rule.Condition.momentumIsInOverbought)
         )
       )
     ),
     closeRules = List(
       Rule(
         action = TradeAction.ClosePosition,
-        conditions = Rule.Condition.AnyOf(
-          List(
-            Rule.Condition.TrendChangedTo(Direction.Downward),
-            Rule.Condition.MomentumEntered(MomentumZone.Overbought)
-          )
+        conditions = Rule.Condition.anyOf(
+          Rule.Condition.TrendChangedTo(Direction.Downward),
+          Rule.Condition.momentumEnteredOverbought
         )
       )
     )
@@ -132,31 +123,31 @@ object TestStrategy {
       // Rule for LONG positions
       Rule(
         action = TradeAction.OpenLong,
-        conditions = Rule.Condition.AllOf(List(
+        conditions = Rule.Condition.allOf(
           Rule.Condition.NoPosition,
-          Rule.Condition.TrendIs(Direction.Upward),
+          Rule.Condition.trendIsUpward,
           Rule.Condition.TrendActiveFor(12.hours),
           // The original logic was good, and now it's robust because we have ValueTracking.
-          Rule.Condition.AnyOf(List(
+          Rule.Condition.anyOf(
             Rule.Condition.MomentumEntered(MomentumZone.Neutral),
             Rule.Condition.MomentumIs(Direction.Upward)
-          )),
-          Rule.Condition.Not(Rule.Condition.MomentumIsIn(MomentumZone.Overbought))
-        ))
+          ),
+          Rule.Condition.Not(Rule.Condition.momentumIsInOverbought)
+        )
       ),
       // Symmetrical rule for SHORT positions
       Rule(
         action = TradeAction.OpenShort,
-        conditions = Rule.Condition.AllOf(List(
+        conditions = Rule.Condition.allOf(
           Rule.Condition.NoPosition,
-          Rule.Condition.TrendIs(Direction.Downward),
+          Rule.Condition.trendIsDownward,
           Rule.Condition.TrendActiveFor(12.hours),
-          Rule.Condition.AnyOf(List(
+          Rule.Condition.anyOf(
             Rule.Condition.MomentumEntered(MomentumZone.Neutral),
             Rule.Condition.MomentumIs(Direction.Downward)
-          )),
-          Rule.Condition.Not(Rule.Condition.MomentumIsIn(MomentumZone.Oversold))
-        ))
+          ),
+          Rule.Condition.Not(Rule.Condition.momentumIsInOversold)
+        )
       )
     ),
     // SIMPLIFIED close rules that don't depend on knowing the position direction.
@@ -164,16 +155,16 @@ object TestStrategy {
     closeRules = List(
       Rule(
         action = TradeAction.ClosePosition,
-        conditions = Rule.Condition.AnyOf(List(
+        conditions = Rule.Condition.anyOf(
           // Exit if momentum enters an extreme zone opposite to the presumed trade.
           // E.g., if we are long, this triggers when we become overbought.
           // If we are short, this triggers when we become oversold.
-          Rule.Condition.MomentumEntered(MomentumZone.Overbought),
-          Rule.Condition.MomentumEntered(MomentumZone.Oversold),
+          Rule.Condition.momentumEnteredOverbought,
+          Rule.Condition.momentumEnteredOversold,
           // Exit if the primary trend flips against us. This acts as a master stop-loss.
           Rule.Condition.TrendChangedTo(Direction.Downward),
           Rule.Condition.TrendChangedTo(Direction.Upward)
-        ))
+        )
       )
     )
   )
@@ -194,7 +185,7 @@ object TestStrategy {
       source = ValueSource.Close,
       transformation = ValueTransformation.RSX(length = 14),
       upperBoundary = 80.0, // Defines the Overbought zone
-      lowerBoundary = 20.0 // Defines the Oversold zone
+      lowerBoundary = 20.0  // Defines the Oversold zone
     ),
 
     // The volatility filter indicator.
@@ -206,64 +197,138 @@ object TestStrategy {
   )
 
   // --- The Full TradeStrategy Definition for Filtered JMA Crossover ---
-  val s4_rules = TradeStrategy(
+  val s4_rules =   TradeStrategy(
+    // openRules are now the primary drivers for both entries and reversals.
     openRules = List(
-      // --- Rule for Opening a LONG Position ---
+      // Rule for being LONG
       Rule(
         action = TradeAction.OpenLong,
-        conditions = Rule.Condition.AllOf(List(
-          // Prerequisite Checks:
-          Rule.Condition.NoPosition,
-          Rule.Condition.VolatilityIs(VolatilityRegime.Low), // FILTER 1: Only trade in low volatility
-          Rule.Condition.Not(Rule.Condition.MomentumIsIn(MomentumZone.Overbought)), // FILTER 2: Don't buy if overbought
+        conditions = Rule.Condition.allOf(
+          // Entry Trigger: A "Golden Cross" of the JMAs.
+          Rule.Condition.upwardCrossover,
 
-          // The Entry Trigger:
-          // A "Golden Cross" of the JMAs (fast line crosses above slow line)
-          Rule.Condition.CrossoverOccurred(Direction.Upward)
-        ))
+          // FILTERS: These apply to both initial entries and reversals.
+          Rule.Condition.volatilityIsLow,
+          Rule.Condition.Not(Rule.Condition.momentumIsInOverbought)
+        )
       ),
 
-      // --- Rule for Opening a SHORT Position ---
+      // Rule for being SHORT
       Rule(
         action = TradeAction.OpenShort,
-        conditions = Rule.Condition.AllOf(List(
-          // Prerequisite Checks:
-          Rule.Condition.NoPosition,
-          Rule.Condition.VolatilityIs(VolatilityRegime.Low), // FILTER 1
-          Rule.Condition.Not(Rule.Condition.MomentumIsIn(MomentumZone.Oversold)), // FILTER 2
+        conditions = Rule.Condition.allOf(
+          // Entry Trigger: A "Death Cross" of the JMAs.
+          Rule.Condition.downwardCrossover,
 
-          // The Entry Trigger:
-          // A "Death Cross" of the JMAs (fast line crosses below slow line)
-          Rule.Condition.CrossoverOccurred(Direction.Downward)
-        ))
+          // FILTERS:
+          Rule.Condition.volatilityIsLow,
+          Rule.Condition.Not(Rule.Condition.momentumIsInOversold)
+        )
       )
     ),
 
+    // closeRules are now for non-reversing exits to a FLAT state.
+    // The crossover logic has been REMOVED from here.
     closeRules = List(
-      // A single, comprehensive rule for closing any open position.
       Rule(
         action = TradeAction.ClosePosition,
-        conditions = Rule.Condition.AnyOf(List(
-          // --- STOP-LOSS Condition: A reverse crossover occurs ---
-          Rule.Condition.AllOf(List(
-            Rule.Condition.PositionIs(TradeOrder.Position.Buy), // If we are long...
-            Rule.Condition.CrossoverOccurred(Direction.Downward) // ...exit on a death cross.
-          )),
-          Rule.Condition.AllOf(List(
-            Rule.Condition.PositionIs(TradeOrder.Position.Sell), // If we are short...
-            Rule.Condition.CrossoverOccurred(Direction.Upward) // ...exit on a golden cross.
-          )),
+        conditions = Rule.Condition.anyOf(
+          // Emergency Exit 1: Volatility explodes. Get out and wait for calm.
+          Rule.Condition.volatilityIsHigh,
 
-          // --- TAKE-PROFIT Condition: Momentum becomes exhausted ---
-          Rule.Condition.AllOf(List(
-            Rule.Condition.PositionIs(TradeOrder.Position.Buy), // If we are long...
-            Rule.Condition.MomentumEntered(MomentumZone.Overbought) // ...exit when momentum is overbought.
-          )),
-          Rule.Condition.AllOf(List(
-            Rule.Condition.PositionIs(TradeOrder.Position.Sell), // If we are short...
-            Rule.Condition.MomentumEntered(MomentumZone.Oversold) // ...exit when momentum is oversold.
-          ))
-        ))
+          // Emergency Exit 2 (Take Profit): Momentum becomes completely exhausted.
+          Rule.Condition.allOf(
+            Rule.Condition.positionIsBuy,
+            Rule.Condition.momentumEnteredOverbought
+          ),
+          Rule.Condition.allOf(
+            Rule.Condition.positionIsSell,
+            Rule.Condition.momentumEnteredOversold
+          )
+        )
+      )
+    )
+  )
+
+  val s5_indicators = List(
+    // 1. The TREND filter: A slow Kalman filter on the price.
+    // This will populate the `MarketProfile.trend` state.
+    Indicator.TrendChangeDetection(
+      source = ValueSource.HLC3,
+      transformation = ValueTransformation.Kalman(gain = 0.05) // Slow and smooth
+    ),
+
+    // 2. The VELOCITY tracker: A faster Kalman filter that tracks velocity.
+    // This will populate `MarketProfile.lastTrendVelocity`.
+    Indicator.ValueTracking(
+      role = ValueRole.Velocity, // Requires adding this new role
+      source = ValueSource.HLC3,
+      transformation = ValueTransformation.KalmanVelocity(gain = 0.2) // Faster and more responsive
+    ),
+
+    // 3. The EXIT filter: A momentum oscillator for take-profit signals.
+    Indicator.ThresholdCrossing(
+      source = ValueSource.Close,
+      transformation = ValueTransformation.RSX(length = 14),
+      upperBoundary = 85.0,
+      lowerBoundary = 15.0
+    )
+  )
+
+  val s5_rules = TradeStrategy(
+    openRules = List(
+      Rule(
+        action = TradeAction.OpenLong,
+        conditions = Rule.Condition.allOf(
+          // Prerequisites:
+          Rule.Condition.NoPosition,
+          Rule.Condition.trendIsUpward, // The slow Kalman filter must confirm an uptrend.
+
+          // The Entry Trigger:
+          // Velocity must cross ABOVE a positive threshold. This confirms a
+          // real breakout in momentum, not just noise around the zero line.
+          Rule.Condition.VelocityCrossedLevel(level = 0.05, direction = Direction.Upward)
+        )
+      ),
+      Rule(
+        action = TradeAction.OpenShort,
+        conditions = Rule.Condition.allOf(
+          // Prerequisites:
+          Rule.Condition.NoPosition,
+          Rule.Condition.trendIsDownward,
+
+          // The Entry Trigger:
+          // Velocity must cross BELOW a negative threshold.
+          Rule.Condition.VelocityCrossedLevel(level = -0.05, direction = Direction.Downward)
+        )
+      )
+    ),
+    closeRules = List(
+      Rule(
+        action = TradeAction.ClosePosition,
+        conditions = Rule.Condition.anyOf(
+          // --- ADAPTIVE STOP-LOSS: The momentum has died ---
+          // For a long position, we exit if velocity is no longer positive.
+          Rule.Condition.allOf(
+            Rule.Condition.positionIsBuy,
+            Rule.Condition.VelocityCrossedLevel(level = -0.02, direction = Direction.Downward)
+          ),
+          // For a short position, we exit if velocity is no longer negative.
+          Rule.Condition.allOf(
+            Rule.Condition.positionIsSell,
+            Rule.Condition.VelocityCrossedLevel(level = 0.02, direction = Direction.Upward)
+          ),
+
+          // --- TAKE-PROFIT: Momentum is exhausted ---
+          Rule.Condition.allOf(
+            Rule.Condition.positionIsBuy,
+            Rule.Condition.momentumEnteredOverbought
+          ),
+          Rule.Condition.allOf(
+            Rule.Condition.positionIsSell,
+            Rule.Condition.momentumEnteredOversold
+          )
+        )
       )
     )
   )
