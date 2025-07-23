@@ -13,7 +13,6 @@ import java.time.Instant
 
 final case class TestSettings(
     userId: UserId,
-    currencyPair: CurrencyPair,
     marketState: MarketState,
     signal: SignalSettings,
     trade: TradeSettings
@@ -29,7 +28,6 @@ object TestSettings:
     val now    = Instant.now()
     TestSettings(
       userId = userId,
-      currencyPair = currencyPair,
       marketState = MarketState(userId, currencyPair, None, MarketProfile(), now, now),
       signal = SignalSettings(indicators),
       trade = TradeSettings(strategy, BrokerParameters.Xtb("user1", "password", true), TradingParameters(BigDecimal(0.1)))

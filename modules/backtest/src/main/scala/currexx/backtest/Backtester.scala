@@ -3,8 +3,6 @@ package currexx.backtest
 import cats.effect.{IO, IOApp}
 import currexx.backtest.services.TestServices
 import currexx.backtest.syntax.*
-import currexx.domain.market.Currency.{EUR, GBP}
-import currexx.domain.market.CurrencyPair
 import fs2.Stream
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -12,18 +10,17 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 object Backtester extends IOApp.Simple {
   inline given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
-  val settings = TestSettings.make(
-    CurrencyPair(EUR, GBP),
-    TestStrategy.s3_rules,
-    TestStrategy.s3_indicators
-  )
-
   override val run: IO[Unit] =
     Stream
       .emits(MarketDataProvider.majors1h)
       .evalMap { filePath =>
         for
-          _        <- logger.info(s"Processing $filePath")
+          _ <- logger.info(s"Processing $filePath")
+          settings = TestSettings.make(
+            MarketDataProvider.cpFromFilePath(filePath),
+            TestStrategy.s5_rules,
+            TestStrategy.s5_indicators
+          )
           services <- TestServices.make[IO](settings)
           _        <- MarketDataProvider
             .read[IO](filePath)

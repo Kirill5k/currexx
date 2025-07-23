@@ -26,7 +26,7 @@ object MarketDataProvider:
     "usd-cad-1h-1year.csv",
     "usd-chf-1h-1year.csv"
   )
-  
+
   val completeDataset = List(
     "aud-cad-1d.csv",
     "aud-jpy-1d.csv",
@@ -53,17 +53,21 @@ object MarketDataProvider:
     "nzd-chf-1d.csv",
     "usd-dkk-1d.csv"
   )
-  
+
   val audDataset = List(
     "aud-cad-1d.csv",
-    "eur-aud-1d.csv",
+    "eur-aud-1d.csv"
   )
-  
+
   private val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss.SSSXXX")
-  
+
+  def cpFromFilePath(filePath: String): CurrencyPair =
+    val cpStr = filePath.slice(0, 7).replaceAll("-", "").toUpperCase()
+    CurrencyPair.from(cpStr).toOption.getOrElse(throw new IllegalArgumentException(s"Invalid currency pair in file path: $filePath"))
+
   def read[F[_]: Async](filePath: String): Stream[F, MarketTimeSeriesData] = {
     val interval = if (filePath.contains("1h")) Interval.H1 else Interval.D1
-    val cp = CurrencyPair.from(filePath.slice(0, 7).replaceAll("-", "").toUpperCase()).toOption.get
+    val cp       = cpFromFilePath(filePath)
     Files
       .forAsync[F]
       .readAll(Path(getClass.getClassLoader.getResource(filePath).getPath))
