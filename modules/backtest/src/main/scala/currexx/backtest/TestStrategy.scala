@@ -250,12 +250,14 @@ object TestStrategy {
     )
   )
 
+  // 0.3 / 0.4 - total profit: 0.32679
+  // 0.01 / 0.2 - total profit: 0.37519,
   val s5_indicators = List(
     // 1. The TREND filter: A slow Kalman filter on the price.
     // This will populate the `MarketProfile.trend` state.
     Indicator.TrendChangeDetection(
       source = ValueSource.HLC3,
-      transformation = ValueTransformation.Kalman(gain = 0.05, measurementNoise = 1.0) // Slow and smooth
+      transformation = ValueTransformation.Kalman(gain = 0.01, measurementNoise = 0.2) // Slow and smooth
     ),
 
     // 2. The VELOCITY tracker: A faster Kalman filter that tracks velocity.
@@ -263,7 +265,7 @@ object TestStrategy {
     Indicator.ValueTracking(
       role = ValueRole.Velocity, // Requires adding this new role
       source = ValueSource.HLC3,
-      transformation = ValueTransformation.KalmanVelocity(gain = 0.2, measurementNoise = 0.05) // Faster and more responsive
+      transformation = ValueTransformation.KalmanVelocity(gain = 0.4, measurementNoise = 0.05) // Faster and more responsive
     ),
 
     // 3. The EXIT filter: A momentum oscillator for take-profit signals.
@@ -287,7 +289,7 @@ object TestStrategy {
           // The Entry Trigger:
           // Velocity must cross ABOVE a positive threshold. This confirms a
           // real breakout in momentum, not just noise around the zero line.
-          Rule.Condition.VelocityCrossedLevel(level = 0.05, direction = Direction.Upward)
+          Rule.Condition.VelocityCrossedLevel(level = 0.0005, direction = Direction.Upward)
         )
       ),
       Rule(
@@ -299,7 +301,7 @@ object TestStrategy {
 
           // The Entry Trigger:
           // Velocity must cross BELOW a negative threshold.
-          Rule.Condition.VelocityCrossedLevel(level = -0.05, direction = Direction.Downward)
+          Rule.Condition.VelocityCrossedLevel(level = -0.0005, direction = Direction.Downward)
         )
       )
     ),
