@@ -31,11 +31,11 @@ class IndicatorCrossoverSpec extends IOWordSpec {
         cross <- IndicatorCrossover.make[IO]
         ind1 = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.sequenced(
           ValueTransformation.HMA(40),
-          ValueTransformation.Kalman(0.7),
+          ValueTransformation.Kalman(0.7, 1.0),
         ))
         ind2 = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.sequenced(
           ValueTransformation.HMA(37),
-          ValueTransformation.Kalman(0.6),
+          ValueTransformation.Kalman(0.6, 1.0),
         ))
         result <- cross.cross(ind1, ind2)
       yield result
@@ -43,7 +43,7 @@ class IndicatorCrossoverSpec extends IOWordSpec {
       result.asserting { ind =>
         ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.sequenced(
           ValueTransformation.HMA(38),
-          ValueTransformation.Kalman(0.65),
+          ValueTransformation.Kalman(0.65, 1.0),
         ))
       }
     }
@@ -55,14 +55,14 @@ class IndicatorCrossoverSpec extends IOWordSpec {
         cross <- IndicatorCrossover.make[IO]
         ind1 = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.sequenced(
           ValueTransformation.HMA(40),
-          ValueTransformation.Kalman(0.7),
+          ValueTransformation.Kalman(0.7, 1.0),
         ))
         ind2 = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(37))
         result <- cross.cross(ind1, ind2)
       yield result
 
       result.attempt.asserting { res =>
-        res.left.map(_.getMessage) mustBe Left("failed to cross TrendChangeDetection(Close,Sequenced(List(HMA(40), Kalman(0.7)))) and TrendChangeDetection(Close,HMA(37)) together: both parents must be of the same type")
+        res.left.map(_.getMessage) mustBe Left("failed to cross TrendChangeDetection(Close,Sequenced(List(HMA(40), Kalman(0.7,1.0)))) and TrendChangeDetection(Close,HMA(37)) together: both parents must be of the same type")
       }
     }
   }

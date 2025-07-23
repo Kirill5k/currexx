@@ -16,12 +16,12 @@ class IndicatorMutatorSpec extends IOWordSpec {
 
         val result = for
           mutator <- IndicatorMutator.make[IO]
-          ind = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.Kalman(0.5))
+          ind = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.Kalman(0.5, 1.0))
           res <- mutator.mutate(ind, 1.0d)
         yield res
 
         result.asserting { ind =>
-          ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.Kalman(0.45))
+          ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.Kalman(0.45, 1.0))
         }
       }
     }
@@ -66,7 +66,7 @@ class IndicatorMutatorSpec extends IOWordSpec {
             ValueSource.Close,
             ValueTransformation.sequenced(
               ValueTransformation.HMA(14),
-              ValueTransformation.Kalman(0.1)
+              ValueTransformation.Kalman(0.1, 1.0)
             )
           )
           res <- mutator.mutate(ind, 1.0d)
@@ -77,7 +77,7 @@ class IndicatorMutatorSpec extends IOWordSpec {
             ValueSource.Close,
             ValueTransformation.sequenced(
               ValueTransformation.HMA(5),
-              ValueTransformation.Kalman(0.13)
+              ValueTransformation.Kalman(0.13, 1.0)
             )
           )
         }
