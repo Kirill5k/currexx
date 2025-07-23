@@ -39,10 +39,10 @@ object IndicatorMutator {
         def mutVt(vt: VT): VT = vt match
           case VT.Sequenced(sequence) =>
             VT.Sequenced(sequence.map(mutVt))
-          case VT.Kalman(gain) =>
-            VT.Kalman(mutDouble(gain, 0.01, 0.5, 0.01))
-          case VT.KalmanVelocity(gain) =>
-            VT.KalmanVelocity(mutDouble(gain, 0.01, 0.5, 0.01))
+          case VT.Kalman(gain, measurementNoise) =>
+            VT.Kalman(mutDouble(gain, 0.01, 0.5, 0.01), mutDouble(measurementNoise, 0.01, 1.0, 0.01))
+          case VT.KalmanVelocity(gain, measurementNoise) =>
+            VT.KalmanVelocity(mutDouble(gain, 0.01, 0.5, 0.01), mutDouble(measurementNoise, 0.01, 1.0, 0.01))
           case VT.STOCH(length) =>
             VT.STOCH(mutInt(length, 5, 50))
           case VT.RSX(length) =>

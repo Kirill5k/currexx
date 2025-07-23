@@ -12,8 +12,8 @@ object IndicatorInitialiser:
 
       def randomiseVt(transformation: VT): VT = transformation match
         case VT.Sequenced(sequence) => VT.Sequenced(sequence.map(randomiseVt))
-        case _: VT.Kalman           => VT.Kalman(rand.nextInt(19) * 0.05d + 0.05d)
-        case _: VT.KalmanVelocity   => VT.KalmanVelocity(rand.nextInt(19) * 0.05d + 0.05d)
+        case _: VT.Kalman           => VT.Kalman(rand.nextInt(19) * 0.05d + 0.05d, (rand.nextInt(50) + 50) / 100)
+        case _: VT.KalmanVelocity   => VT.KalmanVelocity(rand.nextInt(19) * 0.05d + 0.05d, rand.nextInt(10) / 100)
         case _: VT.STOCH            => VT.STOCH(rand.nextInt(41) + 2)
         case _: VT.RSX              => VT.RSX(rand.nextInt(41) + 2)
         case _: VT.JRSX             => VT.JRSX(rand.nextInt(41) + 2)

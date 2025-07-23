@@ -23,8 +23,8 @@ enum ValueRole:
 
 enum ValueTransformation(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Sequenced(sequence: List[ValueTransformation])                             extends ValueTransformation("sequenced")
-  case Kalman(gain: Double)                                                       extends ValueTransformation("kalman")
-  case KalmanVelocity(gain: Double)                                               extends ValueTransformation("kalman-velocity")
+  case Kalman(gain: Double, measurementNoise: Double)                             extends ValueTransformation("kalman")
+  case KalmanVelocity(gain: Double, measurementNoise: Double)                     extends ValueTransformation("kalman-velocity")
   case RSX(length: Int)                                                           extends ValueTransformation("rsx")
   case JRSX(length: Int)                                                          extends ValueTransformation("jrsx")
   case WMA(length: Int)                                                           extends ValueTransformation("wma")

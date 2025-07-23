@@ -12,7 +12,7 @@ object TestStrategy {
     // Trend detection - no changes needed here.
     Indicator.TrendChangeDetection(
       source = ValueSource.HLC3,
-      transformation = ValueTransformation.Kalman(gain = 0.05)
+      transformation = ValueTransformation.Kalman(gain = 0.05, measurementNoise = 1.0)
     ),
     // Momentum events (entering Overbought/Oversold)
     Indicator.ThresholdCrossing(
@@ -73,7 +73,7 @@ object TestStrategy {
     // The trend indicator for the exit is also fine.
     Indicator.TrendChangeDetection(
       source = ValueSource.HLC3,
-      transformation = ValueTransformation.Kalman(gain = 0.08)
+      transformation = ValueTransformation.Kalman(gain = 0.08, measurementNoise = 1.0)
     )
   )
 
@@ -255,7 +255,7 @@ object TestStrategy {
     // This will populate the `MarketProfile.trend` state.
     Indicator.TrendChangeDetection(
       source = ValueSource.HLC3,
-      transformation = ValueTransformation.Kalman(gain = 0.05) // Slow and smooth
+      transformation = ValueTransformation.Kalman(gain = 0.05, measurementNoise = 1.0) // Slow and smooth
     ),
 
     // 2. The VELOCITY tracker: A faster Kalman filter that tracks velocity.
@@ -263,7 +263,7 @@ object TestStrategy {
     Indicator.ValueTracking(
       role = ValueRole.Velocity, // Requires adding this new role
       source = ValueSource.HLC3,
-      transformation = ValueTransformation.KalmanVelocity(gain = 0.2) // Faster and more responsive
+      transformation = ValueTransformation.KalmanVelocity(gain = 0.2, measurementNoise = 0.05) // Faster and more responsive
     ),
 
     // 3. The EXIT filter: A momentum oscillator for take-profit signals.

@@ -49,15 +49,17 @@ object IndicatorCrossover:
         }
 
         def crossVt(so1: VT, so2: VT): Either[Throwable, VT] = (so1, so2) match
-          case (VT.RSX(l1), VT.RSX(l2))                       => Right(VT.RSX(crossInt(l1, l2, Some(5))))
-          case (VT.JRSX(l1), VT.JRSX(l2))                     => Right(VT.JRSX(crossInt(l1, l2, Some(5))))
-          case (VT.STOCH(l1), VT.STOCH(l2))                   => Right(VT.STOCH(crossInt(l1, l2, Some(5))))
-          case (VT.HMA(l1), VT.HMA(l2))                       => Right(VT.HMA(crossInt(l1, l2, Some(5))))
-          case (VT.SMA(l1), VT.SMA(l2))                       => Right(VT.SMA(crossInt(l1, l2, Some(5))))
-          case (VT.WMA(l1), VT.WMA(l2))                       => Right(VT.WMA(crossInt(l1, l2, Some(5))))
-          case (VT.EMA(l1), VT.EMA(l2))                       => Right(VT.EMA(crossInt(l1, l2, Some(5))))
-          case (VT.Kalman(g1), VT.Kalman(g2))                 => Right(VT.Kalman(crossDouble(g1, g2, 0.05)))
-          case (VT.KalmanVelocity(g1), VT.KalmanVelocity(g2)) => Right(VT.KalmanVelocity(crossDouble(g1, g2, 0.05)))
+          case (VT.RSX(l1), VT.RSX(l2))                 => Right(VT.RSX(crossInt(l1, l2, Some(5))))
+          case (VT.JRSX(l1), VT.JRSX(l2))               => Right(VT.JRSX(crossInt(l1, l2, Some(5))))
+          case (VT.STOCH(l1), VT.STOCH(l2))             => Right(VT.STOCH(crossInt(l1, l2, Some(5))))
+          case (VT.HMA(l1), VT.HMA(l2))                 => Right(VT.HMA(crossInt(l1, l2, Some(5))))
+          case (VT.SMA(l1), VT.SMA(l2))                 => Right(VT.SMA(crossInt(l1, l2, Some(5))))
+          case (VT.WMA(l1), VT.WMA(l2))                 => Right(VT.WMA(crossInt(l1, l2, Some(5))))
+          case (VT.EMA(l1), VT.EMA(l2))                 => Right(VT.EMA(crossInt(l1, l2, Some(5))))
+          case (VT.Kalman(g1, mn1), VT.Kalman(g2, mn2)) =>
+            Right(VT.Kalman(crossDouble(g1, g2, 0.05), crossDouble(mn1, mn2, 0.01)))
+          case (VT.KalmanVelocity(g1, mn1), VT.KalmanVelocity(g2, mn2)) =>
+            Right(VT.KalmanVelocity(crossDouble(g1, g2, 0.05), crossDouble(mn1, mn2, 0.01)))
           case (VT.JMA(l1, ph1, pow1), VT.JMA(l2, ph2, pow2)) =>
             // Improve JMA phase handling - phase should be in [-100, 100] range
             val crossedPhase = crossInt(ph1, ph2, Some(-100))

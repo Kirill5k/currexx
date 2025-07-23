@@ -40,7 +40,7 @@ class IndicatorSpec extends AnyWordSpec with Matchers {
       val indicator = Indicator.TrendChangeDetection(
         source = ValueSource.Close,
         transformation = ValueTransformation.sequenced(
-          ValueTransformation.Kalman(0.25),
+          ValueTransformation.Kalman(0.25, 0.05),
           ValueTransformation.HMA(6)
         )
       )
@@ -48,7 +48,7 @@ class IndicatorSpec extends AnyWordSpec with Matchers {
       val json =
         """{
           |"source":"close",
-          |"transformation":{"sequence":[{"gain":0.25,"kind":"kalman"},{"length":6,"kind":"hma"}],"kind":"sequenced"},
+          |"transformation":{"sequence":[{"gain":0.25,"measurementNoise":0.05,"kind":"kalman"},{"length":6,"kind":"hma"}],"kind":"sequenced"},
           |"kind":"trend-change-detection"
           |}""".stripMargin.replaceAll("\n", "")
 

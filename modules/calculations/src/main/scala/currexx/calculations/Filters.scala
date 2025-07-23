@@ -13,11 +13,11 @@ object Filters {
     * @return
     *   A list of smoothed prices, sorted from latest to earliest.
     */
-  def kalman(values: List[Double], gain: Double): List[Double] = {
+  def kalman(values: List[Double], gain: Double, measurementNoise: Double = 1.0): List[Double] = {
     val filteredStates = kalmanFilter1D(
       measurements = values,
       processNoise = gain,
-      measurementNoise = 1.0 // Sensible default
+      measurementNoise = measurementNoise
     )
 
     filteredStates.map(_.x(0))
@@ -33,11 +33,11 @@ object Filters {
    * @param gain   A value controlling the filter's responsiveness, mapped to process noise.
    * @return A list of calculated velocities, sorted from latest to earliest.
    */
-  def kalmanVelocity(values: List[Double], gain: Double): List[Double] = {
+  def kalmanVelocity(values: List[Double], gain: Double, measurementNoise: Double = 1.0): List[Double] = {
     val filteredStates = kalmanFilter1D(
       measurements = values,
       processNoise = gain,
-      measurementNoise = 1.0 // Sensible default
+      measurementNoise = measurementNoise
     )
     // Extract the velocity component, which is at index 1 of the state vector.
     filteredStates.map(_.x(1))
