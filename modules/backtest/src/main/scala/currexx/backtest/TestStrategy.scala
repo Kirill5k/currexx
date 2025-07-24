@@ -197,7 +197,7 @@ object TestStrategy {
   )
 
   // --- The Full TradeStrategy Definition for Filtered JMA Crossover ---
-  val s4_rules =   TradeStrategy(
+  val s4_rules = TradeStrategy(
     // openRules are now the primary drivers for both entries and reversals.
     openRules = List(
       // Rule for being LONG
@@ -250,14 +250,12 @@ object TestStrategy {
     )
   )
 
-  // 0.3 / 0.4 - total profit: 0.32679
-  // 0.01 / 0.2 - total profit: 0.37519,
   val s5_indicators = List(
     // 1. The TREND filter: A slow Kalman filter on the price.
     // This will populate the `MarketProfile.trend` state.
     Indicator.TrendChangeDetection(
       source = ValueSource.HLC3,
-      transformation = ValueTransformation.Kalman(gain = 0.01, measurementNoise = 0.2) // Slow and smooth
+      transformation = ValueTransformation.Kalman(gain = 0.3, measurementNoise = 0.4) // Slow and smooth
     ),
 
     // 2. The VELOCITY tracker: A faster Kalman filter that tracks velocity.
@@ -274,6 +272,11 @@ object TestStrategy {
       transformation = ValueTransformation.RSX(length = 14),
       upperBoundary = 85.0,
       lowerBoundary = 15.0
+    ),
+    Indicator.VolatilityRegimeDetection(
+      atrLength = 14,
+      smoothingType = ValueTransformation.SMA(length = 20),
+      smoothingLength = 20
     )
   )
 
@@ -284,12 +287,14 @@ object TestStrategy {
         conditions = Rule.Condition.allOf(
           // Prerequisites:
           Rule.Condition.NoPosition,
-          Rule.Condition.trendIsUpward, // The slow Kalman filter must confirm an uptrend.
+          Rule.Condition.trendIsUpward,
+          Rule.Condition.TrendActiveFor(4.hours), // CONFIRMATION: The trend must be established for at least 4 hours.
+          Rule.Condition.volatilityIsLow, // FILTER: Only enter during low-volatility periods.
 
           // The Entry Trigger:
-          // Velocity must cross ABOVE a positive threshold. This confirms a
-          // real breakout in momentum, not just noise around the zero line.
-          Rule.Condition.VelocityCrossedLevel(level = 0.0005, direction = Direction.Upward)
+          // Velocity must surge above a symmetrical positive threshold.
+          // This confirms a real breakout in momentum.
+          Rule.Condition.VelocityCrossedLevel(level = 0.0003, direction = Direction.Upward)
         )
       ),
       Rule(
@@ -298,10 +303,12 @@ object TestStrategy {
           // Prerequisites:
           Rule.Condition.NoPosition,
           Rule.Condition.trendIsDownward,
+          Rule.Condition.TrendActiveFor(4.hours), // CONFIRMATION
+          Rule.Condition.volatilityIsLow, // FILTER
 
           // The Entry Trigger:
-          // Velocity must cross BELOW a negative threshold.
-          Rule.Condition.VelocityCrossedLevel(level = -0.0005, direction = Direction.Downward)
+          // Velocity must break below a symmetrical negative threshold.
+          Rule.Condition.VelocityCrossedLevel(level = -0.0003, direction = Direction.Downward)
         )
       )
     ),
@@ -313,12 +320,12 @@ object TestStrategy {
           // For a long position, we exit if velocity is no longer positive.
           Rule.Condition.allOf(
             Rule.Condition.positionIsBuy,
-            Rule.Condition.VelocityCrossedLevel(level = -0.02, direction = Direction.Downward)
+            Rule.Condition.VelocityCrossedLevel(level = -0.0001, direction = Direction.Downward)
           ),
           // For a short position, we exit if velocity is no longer negative.
           Rule.Condition.allOf(
             Rule.Condition.positionIsSell,
-            Rule.Condition.VelocityCrossedLevel(level = 0.02, direction = Direction.Upward)
+            Rule.Condition.VelocityCrossedLevel(level = 0.0001, direction = Direction.Upward)
           ),
 
           // --- TAKE-PROFIT: Momentum is exhausted ---
