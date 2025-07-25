@@ -7,99 +7,8 @@ import currexx.domain.signal.{Direction, Indicator, ValueRole, ValueSource, Valu
 import scala.concurrent.duration.*
 
 object TestStrategy {
-
+  
   val s1_indicators = List(
-    // Trend detection - no changes needed here.
-    Indicator.TrendChangeDetection(
-      source = ValueSource.HLC3,
-      transformation = ValueTransformation.Kalman(gain = 0.05, measurementNoise = 1.0)
-    ),
-    // Momentum events (entering Overbought/Oversold)
-    Indicator.ThresholdCrossing(
-      source = ValueSource.Close,
-      transformation = ValueTransformation.RSX(length = 14),
-      upperBoundary = 70.0,
-      lowerBoundary = 30.0
-    ),
-    Indicator.ValueTracking(
-      role = ValueRole.Momentum,
-      source = ValueSource.Close,
-      transformation = ValueTransformation.RSX(length = 14)
-    )
-  )
-
-  val s1_rules = TradeStrategy(
-    openRules = List(
-      Rule(
-        action = TradeAction.OpenLong,
-        conditions = Rule.Condition.allOf(
-          Rule.Condition.NoPosition,
-          Rule.Condition.trendIsUpward,
-          Rule.Condition.TrendActiveFor(4.hours),
-          Rule.Condition.Not(Rule.Condition.momentumIsInOverbought)
-        )
-      )
-    ),
-    closeRules = List(
-      Rule(
-        action = TradeAction.ClosePosition,
-        conditions = Rule.Condition.anyOf(
-          Rule.Condition.TrendChangedTo(Direction.Downward),
-          Rule.Condition.momentumEnteredOverbought
-        )
-      )
-    )
-  )
-
-  val s2_indicators = List(
-    Indicator.LinesCrossing(
-      source = ValueSource.Close,
-      // For a "Golden Cross" buy signal, line1 should be the FAST MA
-      line1Transformation = ValueTransformation.EMA(length = 21), // FAST
-      line2Transformation = ValueTransformation.EMA(length = 55)  // SLOW
-    ),
-    Indicator.ThresholdCrossing(
-      source = ValueSource.Close,
-      transformation = ValueTransformation.RSX(length = 14),
-      upperBoundary = 75.0,
-      lowerBoundary = 25.0
-    ),
-    // Explicitly track the momentum value
-    Indicator.ValueTracking(
-      role = ValueRole.Momentum,
-      source = ValueSource.Close,
-      transformation = ValueTransformation.RSX(length = 14)
-    ),
-    // The trend indicator for the exit is also fine.
-    Indicator.TrendChangeDetection(
-      source = ValueSource.HLC3,
-      transformation = ValueTransformation.Kalman(gain = 0.08, measurementNoise = 1.0)
-    )
-  )
-
-  val s2_rules = TradeStrategy(
-    openRules = List(
-      Rule(
-        action = TradeAction.OpenLong,
-        conditions = Rule.Condition.allOf(
-          Rule.Condition.NoPosition,
-          Rule.Condition.upwardCrossover,
-          Rule.Condition.not(Rule.Condition.momentumIsInOverbought)
-        )
-      )
-    ),
-    closeRules = List(
-      Rule(
-        action = TradeAction.ClosePosition,
-        conditions = Rule.Condition.anyOf(
-          Rule.Condition.TrendChangedTo(Direction.Downward),
-          Rule.Condition.momentumEnteredOverbought
-        )
-      )
-    )
-  )
-
-  val s3_indicators = List(
     Indicator.TrendChangeDetection(
       source = ValueSource.HLC3,
       transformation = ValueTransformation.JMA(length = 29, phase = 60, power = 3)
@@ -118,7 +27,7 @@ object TestStrategy {
     )
   )
 
-  val s3_rules = TradeStrategy(
+  val s1_rules = TradeStrategy(
     openRules = List(
       // Rule for LONG positions
       Rule(
@@ -170,7 +79,7 @@ object TestStrategy {
   )
 
   // --- The Set of Indicators for the Filtered JMA Crossover Strategy ---
-  val s4_indicators = List(
+  val s2_indicators = List(
     // The primary crossover indicator using two different JMAs.
     Indicator.LinesCrossing(
       source = ValueSource.HLC3, // Use a smooth price source for the JMAs
@@ -197,7 +106,7 @@ object TestStrategy {
   )
 
   // --- The Full TradeStrategy Definition for Filtered JMA Crossover ---
-  val s4_rules = TradeStrategy(
+  val s2_rules = TradeStrategy(
     // openRules are now the primary drivers for both entries and reversals.
     openRules = List(
       // Rule for being LONG
@@ -250,7 +159,7 @@ object TestStrategy {
     )
   )
 
-  val s5_indicators = List(
+  val s3_indicators = List(
     // 1. The TREND filter: A slow Kalman filter on the price.
     // This will populate the `MarketProfile.trend` state.
     Indicator.TrendChangeDetection(
@@ -280,7 +189,7 @@ object TestStrategy {
     )
   )
 
-  val s5_rules = TradeStrategy(
+  val s3_rules = TradeStrategy(
     openRules = List(
       Rule(
         action = TradeAction.OpenLong,
