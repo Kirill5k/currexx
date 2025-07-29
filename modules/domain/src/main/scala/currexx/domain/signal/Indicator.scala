@@ -59,57 +59,53 @@ object ValueTransformation {
   )
 }
 
-object IndicatorKind extends EnumType[IndicatorKind](() => IndicatorKind.values)
-enum IndicatorKind:
-  case VolatilityRegimeDetection, TrendChangeDetection, ThresholdCrossing, LinesCrossing, KeltnerChannel, Composite, ValueTracking
-
-enum Indicator(val kind: IndicatorKind) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+enum Indicator(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Composite(
       indicators: NonEmptyList[Indicator]
-  ) extends Indicator(IndicatorKind.Composite)
+  ) extends Indicator("composite")
   case TrendChangeDetection(
       source: ValueSource,
       transformation: ValueTransformation
-  ) extends Indicator(IndicatorKind.TrendChangeDetection)
+  ) extends Indicator("trend-change-detection")
   case ThresholdCrossing(
       source: ValueSource,
       transformation: ValueTransformation,
       upperBoundary: Double,
       lowerBoundary: Double
-  ) extends Indicator(IndicatorKind.ThresholdCrossing)
+  ) extends Indicator("threshold-crossing")
   case LinesCrossing(
       source: ValueSource,
       line1Transformation: ValueTransformation, // SLOW
       line2Transformation: ValueTransformation  // FAST
-  ) extends Indicator(IndicatorKind.LinesCrossing)
+  ) extends Indicator("lines-crossing")
   case KeltnerChannel(
       source: ValueSource,
       line1Transformation: ValueTransformation, // SLOW
       line2Transformation: ValueTransformation, // FAST
       atrLength: Int,
       atrMultiplier: Double
-  ) extends Indicator(IndicatorKind.KeltnerChannel)
+  ) extends Indicator("keltner-channel")
   case VolatilityRegimeDetection(
       atrLength: Int,
       smoothingType: ValueTransformation,
       smoothingLength: Int
-  ) extends Indicator(IndicatorKind.VolatilityRegimeDetection)
+  ) extends Indicator("volatility-regime-detection")
   case ValueTracking(
       role: ValueRole,
       source: ValueSource,
       transformation: ValueTransformation
-  ) extends Indicator(IndicatorKind.ValueTracking)
+  ) extends Indicator("value-tracking")
 
 object Indicator:
   given JsonTaggedAdt.Config[Indicator] = JsonTaggedAdt.Config.Values[Indicator](
     mappings = Map(
-      IndicatorKind.Composite.print                 -> JsonTaggedAdt.tagged[Indicator.Composite],
-      IndicatorKind.VolatilityRegimeDetection.print -> JsonTaggedAdt.tagged[Indicator.VolatilityRegimeDetection],
-      IndicatorKind.TrendChangeDetection.print      -> JsonTaggedAdt.tagged[Indicator.TrendChangeDetection],
-      IndicatorKind.ThresholdCrossing.print         -> JsonTaggedAdt.tagged[Indicator.ThresholdCrossing],
-      IndicatorKind.LinesCrossing.print             -> JsonTaggedAdt.tagged[Indicator.LinesCrossing],
-      IndicatorKind.KeltnerChannel.print            -> JsonTaggedAdt.tagged[Indicator.KeltnerChannel],
-      IndicatorKind.ValueTracking.print             -> JsonTaggedAdt.tagged[Indicator.ValueTracking]
+      "composite"                   -> JsonTaggedAdt.tagged[Indicator.Composite],
+      "volatility-regime-detection" -> JsonTaggedAdt.tagged[Indicator.VolatilityRegimeDetection],
+      "trend-change-detection"       -> JsonTaggedAdt.tagged[Indicator.TrendChangeDetection],
+      "threshold-crossing"          -> JsonTaggedAdt.tagged[Indicator.ThresholdCrossing],
+      "lines-crossing"              -> JsonTaggedAdt.tagged[Indicator.LinesCrossing],
+      "keltner-channel"             -> JsonTaggedAdt.tagged[Indicator.KeltnerChannel],
+      "value-tracking"              -> JsonTaggedAdt.tagged[Indicator.ValueTracking]
     ),
     strict = true,
     typeFieldName = "kind"
