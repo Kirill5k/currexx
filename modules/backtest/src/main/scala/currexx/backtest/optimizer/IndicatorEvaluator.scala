@@ -1,10 +1,11 @@
 package currexx.backtest.optimizer
 
-import cats.Show
+import cats.{Parallel, Show}
 import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
+import cats.syntax.parallel.*
 import currexx.algorithms.Fitness
 import currexx.algorithms.operators.Evaluator
 import currexx.backtest.services.TestServices
@@ -39,7 +40,7 @@ object IndicatorEvaluator {
     showInd(ind)
   }
 
-  def make[F[_]: Async](
+  def make[F[_]: {Async, Parallel}](
       testFilePaths: List[String],
       ts: TradeStrategy,
       otherIndicators: List[Indicator] = Nil
@@ -48,7 +49,7 @@ object IndicatorEvaluator {
       testDataSets <- testFilePaths.traverse(MarketDataProvider.read[F](_).compile.toList)
       eval         <- Evaluator.cached[F, Indicator] { ind =>
         testDataSets
-          .traverse { testData =>
+          .parTraverse { testData =>
             for
               services <- TestServices.make[F](TestSettings.make(testData.head.currencyPair, ts, ind :: otherIndicators))
               _        <- Stream

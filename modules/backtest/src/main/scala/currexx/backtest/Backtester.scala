@@ -13,13 +13,13 @@ object Backtester extends IOApp.Simple {
   override val run: IO[Unit] =
     Stream
       .emits(MarketDataProvider.majors1h)
-      .evalMap { filePath =>
+      .parEvalMap(16) { filePath =>
         for
           _ <- logger.info(s"Processing $filePath")
           settings = TestSettings.make(
             MarketDataProvider.cpFromFilePath(filePath),
-            TestStrategy.s3_rules,
-            TestStrategy.s3_indicators
+            TestStrategy.s1_rules,
+            TestStrategy.s1_indicators
           )
           services <- TestServices.make[IO](settings)
           _        <- MarketDataProvider
