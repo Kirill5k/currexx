@@ -60,6 +60,7 @@ object ValueTransformation {
 }
 
 enum Indicator(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+  //TODO: add logic parameter
   case Composite(
       indicators: NonEmptyList[Indicator]
   ) extends Indicator("composite")
