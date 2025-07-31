@@ -2,7 +2,6 @@ package currexx.domain.signal
 
 import cats.data.NonEmptyList
 import currexx.domain.types.EnumType
-import kirill5k.common.syntax.option.*
 import org.latestbit.circe.adt.codec.*
 
 object VolatilityRegime extends EnumType[VolatilityRegime](() => VolatilityRegime.values)
@@ -81,11 +80,9 @@ object Condition {
 
   private def crossingDirection(line1: List[Double], line2: List[Double]): Option[Direction] =
     (line1, line2) match
-      case (l1c :: l1p :: _, l2c :: l2p :: _) =>
-        Option
-          .when(l1c >= l2c && l1p < l2p)(Direction.Upward)                  // line1 crossed above line2
-          .orElse(Option.when(l1c <= l2c && l1p > l2p)(Direction.Downward)) // line1 crossed below line2
-      case _ => None
+      case (l1c :: l1p :: _, l2c :: l2p :: _) if l1c >= l2c && l1p < l2p => Some(Direction.Upward)
+      case (l1c :: l1p :: _, l2c :: l2p :: _) if l1c <= l2c && l1p > l2p => Some(Direction.Downward)
+      case _                                                             => None
 
   /** Detects a significant turn (peak or trough) in a time-series line. This method is more reliable than a simple slope change but has a
     * lag of `lookback` periods.
@@ -112,34 +109,32 @@ object Condition {
 
     // The total window size needed to confirm a turn at the center.
     val windowSize = 2 * lookback + 1
-    Option
-      .flatWhen(line.length >= windowSize) {
-        val window = line.take(windowSize)
-        // The point we are testing is the one in the middle of our window.
-        // Since the list is latest-to-earliest, this point is `lookback` periods in the past.
-        val candidateTurnPoint = window(lookback)
-        val beforeTurn         = window.take(lookback)
-        val afterTurn          = window.drop(lookback + 1)
+    if (line.length >= windowSize) {
+      val window = line.take(windowSize)
+      // The point we are testing is the one in the middle of our window.
+      // Since the list is latest-to-earliest, this point is `lookback` periods in the past.
+      val candidateTurnPoint = window(lookback)
+      val beforeTurn = window.take(lookback)
+      val afterTurn = window.drop(lookback + 1)
 
-        Option
-          .when(beforeTurn.forall(_ < candidateTurnPoint) && afterTurn.forall(_ < candidateTurnPoint))(
-            Condition.TrendDirectionChange(
-              Direction.Upward,
-              Direction.Downward,
-              Some(calculateTrendLength(line.drop(lookback), Direction.Upward))
-            )
+      if (beforeTurn.forall(_ < candidateTurnPoint) && afterTurn.forall(_ < candidateTurnPoint)) {
+        Some(
+          Condition.TrendDirectionChange(
+            Direction.Upward,
+            Direction.Downward,
+            Some(calculateTrendLength(line.drop(lookback), Direction.Upward))
           )
-          .orElse(
-            Option
-              .when(beforeTurn.forall(_ > candidateTurnPoint) && afterTurn.forall(_ > candidateTurnPoint))(
-                Condition.TrendDirectionChange(
-                  Direction.Downward,
-                  Direction.Upward,
-                  Some(calculateTrendLength(line.drop(lookback), Direction.Downward))
-                )
-              )
+        )
+      } else if (beforeTurn.forall(_ > candidateTurnPoint) && afterTurn.forall(_ > candidateTurnPoint)) {
+        Some(
+          Condition.TrendDirectionChange(
+            Direction.Downward,
+            Direction.Upward,
+            Some(calculateTrendLength(line.drop(lookback), Direction.Downward))
           )
-      }
+        )
+      } else None
+    } else None
   }
 
   def thresholdCrossing(line: List[Double], lowerBoundary: Double, upperBoundary: Double): Option[Condition] =
