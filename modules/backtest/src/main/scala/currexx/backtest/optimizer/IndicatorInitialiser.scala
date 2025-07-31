@@ -35,8 +35,8 @@ object IndicatorInitialiser:
           Indicator.KeltnerChannel(vs, randomiseVt(vt1), randomiseVt(vt2), atrL, atrR)
         case Indicator.VolatilityRegimeDetection(_, vt, _) =>
           Indicator.VolatilityRegimeDetection(rand.nextInt(49) + 1, randomiseVt(vt), rand.nextInt(49) + 1)
-        case Indicator.Composite(is) =>
-          Indicator.Composite(is.map(randomiseInd))
+        case Indicator.Composite(is, combinator) =>
+          Indicator.Composite(is.map(randomiseInd), combinator)
         case Indicator.ValueTracking(vr, vs, vt) =>
           Indicator.ValueTracking(vr, vs, randomiseVt(vt))
 

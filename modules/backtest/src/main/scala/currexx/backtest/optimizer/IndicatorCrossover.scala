@@ -85,12 +85,12 @@ object IndicatorCrossover:
             } else {
               Left(new IllegalArgumentException("both ValueTracking indicators must have the same value range and value source"))
             }
-          case (Indicator.Composite(is1), Indicator.Composite(is2)) =>
+          case (Indicator.Composite(is1, comb), Indicator.Composite(is2, _)) =>
             // Ensure composite indicators have same length before crossing
             if (is1.length != is2.length) {
               Left(new IllegalArgumentException(s"Composite indicators must have same length: ${is1.length} vs ${is2.length}"))
             } else {
-              is1.zip(is2).traverse((i1, i2) => crossInd(i1, i2)).map(Indicator.Composite(_))
+              is1.zip(is2).traverse((i1, i2) => crossInd(i1, i2)).map(inds => Indicator.Composite(inds, comb))
             }
           case (Indicator.LinesCrossing(s, st1, ft1), Indicator.LinesCrossing(_, st2, ft2)) =>
             (crossVt(st1, st2), crossVt(ft1, ft2)).mapN((st, ft) => Indicator.LinesCrossing(s, st, ft))

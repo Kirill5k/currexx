@@ -63,8 +63,8 @@ object IndicatorMutator {
             VT.NMA(mutInt(length, 5, 50), mutInt(signalLength, 5, 50), mutDouble(lambda, 0.5, 4.0, 0.25), maCalc)
 
         def mutInd(indicator: Indicator): Indicator = indicator match
-          case Indicator.Composite(is) =>
-            Indicator.Composite(is.map(mutInd))
+          case Indicator.Composite(is, comb) =>
+            Indicator.Composite(is.map(mutInd), comb)
           case Indicator.TrendChangeDetection(vs, vt) =>
             Indicator.TrendChangeDetection(vs, mutVt(vt))
           case Indicator.ThresholdCrossing(vs, vt, ub, lb) =>

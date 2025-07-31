@@ -27,8 +27,8 @@ object IndicatorEvaluator {
         s"${ind.kind}-${vs.print}-${slowTransformation}-${fastTransformation}"
       case Indicator.KeltnerChannel(vs, vs1, vs2, atrLength, atrMultiplier) =>
         s"${ind.kind}-${vs.print}-$vs1-$vs2-$atrLength-$atrMultiplier"
-      case Indicator.Composite(indicators) =>
-        s"${ind.kind}-${indicators.map(showInd).toList.mkString("-")}"
+      case Indicator.Composite(indicators, combinator) =>
+        s"${ind.kind}-$combinator-${indicators.map(showInd).toList.mkString("-")}"
       case Indicator.VolatilityRegimeDetection(atrLength, smoothingType, smoothingLength) =>
         s"${ind.kind}-${atrLength}-${smoothingType}-$smoothingLength"
       case Indicator.ValueTracking(vs, transformation, targetValue) =>
