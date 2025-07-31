@@ -75,8 +75,8 @@ object Condition {
 
   def barrierCrossing(line: List[Double], upperBarrier: List[Double], lowerBarrier: List[Double]): Option[Condition] =
     crossingDirection(line, upperBarrier)
-      .map(Condition.UpperBandCrossing(_))
-      .orElse(crossingDirection(line, lowerBarrier).map(Condition.LowerBandCrossing(_)))
+      .orElse(crossingDirection(line, lowerBarrier))
+      .map(Condition.LowerBandCrossing(_))
 
   private def crossingDirection(line1: List[Double], line2: List[Double]): Option[Direction] =
     (line1, line2) match
@@ -140,16 +140,17 @@ object Condition {
   def thresholdCrossing(line: List[Double], lowerBoundary: Double, upperBoundary: Double): Option[Condition] =
     line match
       case current :: previous :: _ =>
-        def checkCrossing(boundary: Double, boundaryType: Boundary): Option[Condition] =
-          (current, previous) match
-            case (c, p) if c >= boundary && p < boundary =>
-              Some(Condition.ThresholdCrossing(boundary, c, Direction.Upward, boundaryType))
-            case (c, p) if c < boundary && p >= boundary =>
-              Some(Condition.ThresholdCrossing(boundary, c, Direction.Downward, boundaryType))
-            case _ => None
-        // Check upper boundary first, then lower boundary
-        checkCrossing(upperBoundary, Boundary.Upper)
-          .orElse(checkCrossing(lowerBoundary, Boundary.Lower))
+        (current, previous) match {
+          case (c, p) if c >= upperBoundary && p < upperBoundary =>
+            Some(Condition.ThresholdCrossing(upperBoundary, c, Direction.Upward, Boundary.Upper))
+          case (c, p) if c < upperBoundary && p >= upperBoundary =>
+            Some(Condition.ThresholdCrossing(upperBoundary, c, Direction.Downward, Boundary.Upper))
+          case (c, p) if c <= lowerBoundary && p > lowerBoundary =>
+            Some(Condition.ThresholdCrossing(lowerBoundary, c, Direction.Downward, Boundary.Lower))
+          case (c, p) if c > lowerBoundary && p <= lowerBoundary =>
+            Some(Condition.ThresholdCrossing(lowerBoundary, c, Direction.Upward, Boundary.Lower))
+          case _ => None
+        }
       case _ => None
 
   def volatilityRegimeChange(primaryLine: List[Double], smoothedLine: List[Double]): Option[Condition] =
