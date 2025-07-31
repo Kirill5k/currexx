@@ -200,13 +200,41 @@ class SignalServiceSpec extends IOWordSpec {
           )
         )
       }
-      
+
       "not return anything when only one indicator generated signal" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
 
         val signal = SignalService.detectSignal(Users.uid, timeSeriesData, indicator)
 
         signal mustBe None
+      }
+    }
+
+    "detectComposite with Any combinator" should {
+      val indicator = Indicator.compositeAnyOf(
+        Indicator.ThresholdCrossing(ValueSource.Close, VT.STOCH(14), 80d, 20d),
+        Indicator.TrendChangeDetection(ValueSource.Close, VT.HMA(16))
+      )
+
+      "return composite condition when any of indicators generate signals" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(1))
+
+        val signal = SignalService.detectSignal(Users.uid, timeSeriesData, indicator)
+
+        signal mustBe Some(
+          Signal(
+            userId = Users.uid,
+            currencyPair = Markets.gbpeur,
+            interval = Markets.timeSeriesData.interval,
+            condition = Condition.Composite(
+              NonEmptyList.of(
+                Condition.ThresholdCrossing(20d, BigDecimal(32.868467410452254), Direction.Upward, Boundary.Lower)
+              )
+            ),
+            triggeredBy = indicator,
+            time = timeSeriesData.prices.head.time
+          )
+        )
       }
     }
   }
