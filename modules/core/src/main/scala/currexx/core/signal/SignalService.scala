@@ -11,7 +11,7 @@ import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.market.{CurrencyPair, MarketTimeSeriesData}
-import currexx.domain.signal.{Condition, Indicator, MovingAverage, ValueSource as VS, ValueTransformation as VT}
+import currexx.domain.signal.{CombinationLogic, Condition, Indicator, MovingAverage, ValueSource as VS, ValueTransformation as VT}
 
 trait SignalService[F[_]]:
   def submit(signal: Signal): F[Unit]
@@ -43,28 +43,14 @@ final private class LiveSignalService[F[_]](
 object SignalService {
 
   def detectSignal(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator): Option[Signal] =
-    indicator match {
+    indicator match
       case vt: Indicator.ValueTracking              => detectValue(uid, data, vt)
       case tcd: Indicator.TrendChangeDetection      => detectTrendChange(uid, data, tcd)
       case tc: Indicator.ThresholdCrossing          => detectThresholdCrossing(uid, data, tc)
       case lc: Indicator.LinesCrossing              => detectLinesCrossing(uid, data, lc)
       case kc: Indicator.KeltnerChannel             => detectBarrierCrossing(uid, data, kc)
       case vrd: Indicator.VolatilityRegimeDetection => detectVolatilityRegimeChange(uid, data, vrd)
-      case c: Indicator.Composite                   =>
-        val childSignalOptions = c.indicators.map(childInd => detectSignal(uid, data, childInd))
-        Option
-          .when(childSignalOptions.forall(_.isDefined)) {
-            val childSignals = childSignalOptions.toList.flatten
-            Signal(
-              userId = uid,
-              currencyPair = data.currencyPair,
-              interval = data.interval,
-              condition = Condition.Composite(NonEmptyList.fromListUnsafe(childSignals.map(_.condition))),
-              triggeredBy = c, // The parent indicator
-              time = data.prices.head.time
-            )
-          }
-    }
+      case c: Indicator.Composite                   => detectComposite(uid, data, c)
 
   extension (vs: VS)
     private def extract(data: MarketTimeSeriesData): List[Double] = {
@@ -209,6 +195,23 @@ object SignalService {
       )
     }
   }
+
+  def detectComposite(uid: UserId, data: MarketTimeSeriesData, composite: Indicator.Composite): Option[Signal] =
+    val childSignals = composite.indicators.toList.flatMap(child => detectSignal(uid, data, child))
+    val isConditionMet = composite.combinator match
+      case CombinationLogic.All => childSignals.size == composite.indicators.size
+      case CombinationLogic.Any => childSignals.nonEmpty
+    Option
+      .when(isConditionMet) {
+        Signal(
+          userId = uid,
+          currencyPair = data.currencyPair,
+          interval = data.interval,
+          condition = Condition.Composite(NonEmptyList.fromListUnsafe(childSignals.map(_.condition))),
+          triggeredBy = composite,
+          time = data.prices.head.time
+        )
+      }
 
   def make[F[_]: Concurrent](
       signalRepo: SignalRepository[F],

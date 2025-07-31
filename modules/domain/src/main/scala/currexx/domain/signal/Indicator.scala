@@ -9,10 +9,6 @@ object MovingAverage extends EnumType[MovingAverage](() => MovingAverage.values)
 enum MovingAverage:
   case Weighted, Exponential, Simple, Hull
 
-object CompositeMovingAverage extends EnumType[CompositeMovingAverage](() => CompositeMovingAverage.values)
-enum CompositeMovingAverage:
-  case Triple, Nyquist, Jurik
-
 object ValueSource extends EnumType[ValueSource](() => ValueSource.values, EnumType.printLowerCase(_))
 enum ValueSource:
   case Close, Open, HL2, HLC3
@@ -59,10 +55,14 @@ object ValueTransformation {
   )
 }
 
+object CombinationLogic extends EnumType[CombinationLogic](() => CombinationLogic.values)
+enum CombinationLogic:
+  case All, Any
+
 enum Indicator(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
-  //TODO: add logic parameter
   case Composite(
-      indicators: NonEmptyList[Indicator]
+      indicators: NonEmptyList[Indicator],
+      combinator: CombinationLogic
   ) extends Indicator("composite")
   case TrendChangeDetection(
       source: ValueSource,
@@ -111,3 +111,9 @@ object Indicator:
     strict = true,
     typeFieldName = "kind"
   )
+  
+  def compositeAllOf(indicator: Indicator, indicators: Indicator*): Indicator =
+    Indicator.Composite(NonEmptyList.of(indicator, indicators*), CombinationLogic.All)
+    
+  def compositeAnyOf(indicator: Indicator, indicators: Indicator*): Indicator =
+    Indicator.Composite(NonEmptyList.of(indicator, indicators*), CombinationLogic.Any)

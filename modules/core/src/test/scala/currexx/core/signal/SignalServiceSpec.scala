@@ -173,12 +173,10 @@ class SignalServiceSpec extends IOWordSpec {
       }
     }
 
-    "detectSignal" should {
-      val indicator = Indicator.Composite(
-        NonEmptyList.of(
-          Indicator.ThresholdCrossing(ValueSource.Close, VT.STOCH(14), 80d, 20d),
-          Indicator.TrendChangeDetection(ValueSource.Close, VT.HMA(16))
-        )
+    "detectComposite with All combinator" should {
+      val indicator = Indicator.compositeAllOf(
+        Indicator.ThresholdCrossing(ValueSource.Close, VT.STOCH(14), 80d, 20d),
+        Indicator.TrendChangeDetection(ValueSource.Close, VT.HMA(16))
       )
 
       "return composite condition when all indicators generate signals" in {
@@ -202,6 +200,7 @@ class SignalServiceSpec extends IOWordSpec {
           )
         )
       }
+      
       "not return anything when only one indicator generated signal" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
 

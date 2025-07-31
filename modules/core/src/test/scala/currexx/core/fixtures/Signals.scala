@@ -3,7 +3,7 @@ package currexx.core.fixtures
 import cats.data.NonEmptyList
 import currexx.core.signal.Signal
 import currexx.domain.market.{CurrencyPair, Interval}
-import currexx.domain.signal.{Boundary, Condition, Direction, Indicator, ValueSource, ValueTransformation}
+import currexx.domain.signal.{Boundary, CombinationLogic, Condition, Direction, Indicator, ValueSource, ValueTransformation}
 import currexx.domain.user.UserId
 import kirill5k.common.syntax.time.*
 
@@ -66,7 +66,7 @@ object Signals {
       time = time,
       cp = cp,
       condition = Condition.Composite(NonEmptyList.fromListUnsafe(conditions)),
-      triggeredBy = Indicator.Composite(NonEmptyList.fromListUnsafe(triggers))
+      triggeredBy = Indicator.Composite(NonEmptyList.fromListUnsafe(triggers), CombinationLogic.All)
     )
 
   def aboveThreshold(
