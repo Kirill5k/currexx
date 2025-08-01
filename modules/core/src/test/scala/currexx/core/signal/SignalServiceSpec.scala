@@ -125,7 +125,8 @@ class SignalServiceSpec extends IOWordSpec {
 
       "create signal when trend direction changes" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
-        val signal = SignalService.detectTrendChange(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.TrendChangeDetection])
+        val tcdInd = indicator.asInstanceOf[Indicator.TrendChangeDetection]
+        val signal = SignalService.detectTrendChange(Users.uid, timeSeriesData, tcdInd, ValueTransformer.cached)
 
         signal mustBe Some(
           Signal(
@@ -141,7 +142,8 @@ class SignalServiceSpec extends IOWordSpec {
 
       "not do anything when trend hasn't changed" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
-        val signal = SignalService.detectTrendChange(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.TrendChangeDetection])
+        val tcdInd = indicator.asInstanceOf[Indicator.TrendChangeDetection]
+        val signal = SignalService.detectTrendChange(Users.uid, timeSeriesData, tcdInd, ValueTransformer.cached)
 
         signal mustBe None
       }
@@ -151,7 +153,8 @@ class SignalServiceSpec extends IOWordSpec {
       val indicator = Indicator.ThresholdCrossing(ValueSource.Close, VT.STOCH(14), 80d, 20d)
       "create signal when current value is below threshold" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
-        val signal = SignalService.detectThresholdCrossing(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.ThresholdCrossing])
+        val tcInd = indicator.asInstanceOf[Indicator.ThresholdCrossing]
+        val signal = SignalService.detectThresholdCrossing(Users.uid, timeSeriesData, tcInd, ValueTransformer.cached)
 
         signal mustBe Some(
           Signal(
@@ -167,7 +170,8 @@ class SignalServiceSpec extends IOWordSpec {
 
       "not do anything when current value is within limits" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(10))
-        val signal = SignalService.detectThresholdCrossing(Users.uid, timeSeriesData, indicator.asInstanceOf[Indicator.ThresholdCrossing])
+        val tcInd = indicator.asInstanceOf[Indicator.ThresholdCrossing]
+        val signal = SignalService.detectThresholdCrossing(Users.uid, timeSeriesData, tcInd, ValueTransformer.cached)
 
         signal mustBe None
       }
@@ -177,12 +181,12 @@ class SignalServiceSpec extends IOWordSpec {
       val indicator = Indicator.compositeAllOf(
         Indicator.ThresholdCrossing(ValueSource.Close, VT.STOCH(14), 80d, 20d),
         Indicator.TrendChangeDetection(ValueSource.Close, VT.HMA(16))
-      )
+      ).asInstanceOf[Indicator.Composite]
 
       "return composite condition when all indicators generate signals" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
 
-        val signal = SignalService.detectSignal(Users.uid, timeSeriesData, indicator)
+        val signal = SignalService.detectComposite(Users.uid, timeSeriesData, indicator, ValueTransformer.cached)
 
         signal mustBe Some(
           Signal(
@@ -204,7 +208,7 @@ class SignalServiceSpec extends IOWordSpec {
       "not return anything when only one indicator generated signal" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
 
-        val signal = SignalService.detectSignal(Users.uid, timeSeriesData, indicator)
+        val signal = SignalService.detectComposite(Users.uid, timeSeriesData, indicator, ValueTransformer.cached)
 
         signal mustBe None
       }
@@ -214,12 +218,12 @@ class SignalServiceSpec extends IOWordSpec {
       val indicator = Indicator.compositeAnyOf(
         Indicator.ThresholdCrossing(ValueSource.Close, VT.STOCH(14), 80d, 20d),
         Indicator.TrendChangeDetection(ValueSource.Close, VT.HMA(16))
-      )
+      ).asInstanceOf[Indicator.Composite]
 
       "return composite condition when any of indicators generate signals" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(1))
 
-        val signal = SignalService.detectSignal(Users.uid, timeSeriesData, indicator)
+        val signal = SignalService.detectComposite(Users.uid, timeSeriesData, indicator, ValueTransformer.cached)
 
         signal mustBe Some(
           Signal(

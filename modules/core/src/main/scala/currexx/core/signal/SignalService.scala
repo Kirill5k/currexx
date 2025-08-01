@@ -6,17 +6,16 @@ import cats.effect.Concurrent
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.domain.user.UserId
-import currexx.calculations.{Filters, MomentumOscillators, MovingAverages, Volatility}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.market.{CurrencyPair, MarketTimeSeriesData}
-import currexx.domain.signal.{CombinationLogic, Condition, Indicator, MovingAverage, ValueSource as VS, ValueTransformation as VT}
+import currexx.domain.signal.{CombinationLogic, Condition, Indicator}
 
 trait SignalService[F[_]]:
   def submit(signal: Signal): F[Unit]
   def getAll(uid: UserId, sp: SearchParams): F[List[Signal]]
-  def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit]
+  def processMarketData(uid: UserId, data: MarketTimeSeriesData, transformer: ValueTransformer = ValueTransformer.pure): F[Unit]
 
 final private class LiveSignalService[F[_]](
     private val signalRepo: SignalRepository[F],
@@ -28,10 +27,10 @@ final private class LiveSignalService[F[_]](
   override def getAll(uid: UserId, sp: SearchParams): F[List[Signal]] = signalRepo.getAll(uid, sp)
   override def submit(signal: Signal): F[Unit] = saveAndDispatchAction(signal.userId, signal.currencyPair, List(signal))
 
-  override def processMarketData(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
+  override def processMarketData(uid: UserId, data: MarketTimeSeriesData, transformer: ValueTransformer): F[Unit] =
     for
       settings <- settingsRepo.get(uid)
-      signals = settings.indicators.flatMap(SignalService.detectSignal(uid, data, _))
+      signals = settings.indicators.flatMap(SignalService.detectSignal(uid, data, transformer))
       _ <- F.whenA(signals.nonEmpty)(saveAndDispatchAction(uid, data.currencyPair, signals))
     yield ()
 
@@ -42,53 +41,24 @@ final private class LiveSignalService[F[_]](
 
 object SignalService {
 
-  def detectSignal(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator): Option[Signal] =
+  def detectSignal(uid: UserId, data: MarketTimeSeriesData, transformer: ValueTransformer)(indicator: Indicator): Option[Signal] =
     indicator match
-      case vt: Indicator.ValueTracking              => detectValue(uid, data, vt)
-      case tcd: Indicator.TrendChangeDetection      => detectTrendChange(uid, data, tcd)
-      case tc: Indicator.ThresholdCrossing          => detectThresholdCrossing(uid, data, tc)
-      case lc: Indicator.LinesCrossing              => detectLinesCrossing(uid, data, lc)
-      case kc: Indicator.KeltnerChannel             => detectBarrierCrossing(uid, data, kc)
-      case vrd: Indicator.VolatilityRegimeDetection => detectVolatilityRegimeChange(uid, data, vrd)
-      case c: Indicator.Composite                   => detectComposite(uid, data, c)
+      case vt: Indicator.ValueTracking              => detectValue(uid, data, vt, transformer)
+      case tcd: Indicator.TrendChangeDetection      => detectTrendChange(uid, data, tcd, transformer)
+      case tc: Indicator.ThresholdCrossing          => detectThresholdCrossing(uid, data, tc, transformer)
+      case lc: Indicator.LinesCrossing              => detectLinesCrossing(uid, data, lc, transformer)
+      case kc: Indicator.KeltnerChannel             => detectBarrierCrossing(uid, data, kc, transformer)
+      case vrd: Indicator.VolatilityRegimeDetection => detectVolatilityRegimeChange(uid, data, vrd, transformer)
+      case c: Indicator.Composite                   => detectComposite(uid, data, c, transformer)
 
-  extension (vs: VS)
-    private def extract(data: MarketTimeSeriesData): List[Double] = {
-      val prices = data.prices.toList
-      vs match
-        case VS.Close => prices.map(_.close)
-        case VS.Open  => prices.map(_.open)
-        case VS.HL2   => prices.map(p => (p.high + p.low) / 2)
-        case VS.HLC3  => prices.map(p => (p.high + p.low + p.close) / 3)
-    }
-
-  extension (vt: VT)
-    private def transform(data: List[Double], ref: MarketTimeSeriesData): List[Double] =
-      vt match
-        case VT.Sequenced(transformations)             => transformations.foldLeft(data)((d, t) => t.transform(d, ref))
-        case VT.Kalman(gain, measurementNoise)         => Filters.kalman(data, gain, measurementNoise)
-        case VT.KalmanVelocity(gain, measurementNoise) => Filters.kalmanVelocity(data, gain, measurementNoise)
-        case VT.RSX(length)                            => MomentumOscillators.relativeStrengthIndex(data, length)
-        case VT.JRSX(length)                           => MomentumOscillators.jurikRelativeStrengthIndex(data, length)
-        case VT.STOCH(length)                          => MomentumOscillators.stochastic(data, ref.highs, ref.lows, length)
-        case VT.WMA(length)                            => MovingAverages.weighted(data, length)
-        case VT.SMA(length)                            => MovingAverages.simple(data, length)
-        case VT.EMA(length)                            => MovingAverages.exponential(data, length)
-        case VT.HMA(length)                            => MovingAverages.hull(data, length)
-        case VT.JMA(length, phase, power)              => MovingAverages.jurikSimplified(data, length, phase, power)
-        case VT.NMA(length, signalLength, lambda, ma)  => MovingAverages.nyquist(data, length, signalLength, lambda, ma.calculation)
-
-  extension (ma: MovingAverage)
-    private def calculation: (List[Double], Int) => List[Double] =
-      ma match
-        case MovingAverage.Exponential => (values, length) => MovingAverages.exponential(values, length)
-        case MovingAverage.Simple      => MovingAverages.simple
-        case MovingAverage.Weighted    => MovingAverages.weighted
-        case MovingAverage.Hull        => MovingAverages.hull
-
-  def detectThresholdCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.ThresholdCrossing): Option[Signal] = {
-    val source      = indicator.source.extract(data)
-    val transformed = indicator.transformation.transform(source, data)
+  def detectThresholdCrossing(
+      uid: UserId,
+      data: MarketTimeSeriesData,
+      indicator: Indicator.ThresholdCrossing,
+      transformer: ValueTransformer
+  ): Option[Signal] = {
+    val source      = transformer.extractFrom(data, indicator.source)
+    val transformed = transformer.transformTo(source, data, indicator.transformation)
     Condition
       .thresholdCrossing(transformed, indicator.lowerBoundary, indicator.upperBoundary)
       .map { cond =>
@@ -103,9 +73,14 @@ object SignalService {
       }
   }
 
-  def detectTrendChange(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.TrendChangeDetection): Option[Signal] = {
-    val source      = indicator.source.extract(data)
-    val transformed = indicator.transformation.transform(source, data)
+  def detectTrendChange(
+      uid: UserId,
+      data: MarketTimeSeriesData,
+      indicator: Indicator.TrendChangeDetection,
+      transformer: ValueTransformer
+  ): Option[Signal] = {
+    val source      = transformer.extractFrom(data, indicator.source)
+    val transformed = transformer.transformTo(source, data, indicator.transformation)
     Condition
       .trendDirectionChange(transformed)
       .map { cond =>
@@ -120,10 +95,15 @@ object SignalService {
       }
   }
 
-  def detectLinesCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.LinesCrossing): Option[Signal] = {
-    val source = indicator.source.extract(data)
-    val line1  = indicator.line1Transformation.transform(source, data)
-    val line2  = indicator.line2Transformation.transform(source, data)
+  def detectLinesCrossing(
+      uid: UserId,
+      data: MarketTimeSeriesData,
+      indicator: Indicator.LinesCrossing,
+      transformer: ValueTransformer
+  ): Option[Signal] = {
+    val source = transformer.extractFrom(data, indicator.source)
+    val line1  = transformer.transformTo(source, data, indicator.line1Transformation)
+    val line2  = transformer.transformTo(source, data, indicator.line2Transformation)
     Condition
       .linesCrossing(line1, line2)
       .map { cond =>
@@ -138,11 +118,16 @@ object SignalService {
       }
   }
 
-  def detectBarrierCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.KeltnerChannel): Option[Signal] = {
-    val source    = indicator.source.extract(data)
-    val line1     = indicator.line1Transformation.transform(source, data)
-    val line2     = indicator.line2Transformation.transform(source, data)
-    val atr       = Volatility.averageTrueRange(source, data.highs, data.lows, indicator.atrLength)
+  def detectBarrierCrossing(
+      uid: UserId,
+      data: MarketTimeSeriesData,
+      indicator: Indicator.KeltnerChannel,
+      transformer: ValueTransformer
+  ): Option[Signal] = {
+    val source    = transformer.extractFrom(data, indicator.source)
+    val line1     = transformer.transformTo(source, data, indicator.line1Transformation)
+    val line2     = transformer.transformTo(source, data, indicator.line2Transformation)
+    val atr       = transformer.averageTrueRange(source, data, indicator.atrLength)
     val upperBand = line1.lazyZip(atr).map((l1, a) => l1 + (a * indicator.atrMultiplier))
     val lowerBand = line1.lazyZip(atr).map((l1, a) => l1 - (a * indicator.atrMultiplier))
     Condition
@@ -163,10 +148,11 @@ object SignalService {
   def detectVolatilityRegimeChange(
       uid: UserId,
       data: MarketTimeSeriesData,
-      indicator: Indicator.VolatilityRegimeDetection
+      indicator: Indicator.VolatilityRegimeDetection,
+      transformer: ValueTransformer
   ): Option[Signal] = {
-    val atrLine   = Volatility.averageTrueRange(data.closings, data.highs, data.lows, indicator.atrLength)
-    val atrMaLine = indicator.smoothingType.transform(atrLine, data)
+    val atrLine   = transformer.averageTrueRange(data.closings, data, indicator.atrLength)
+    val atrMaLine = transformer.transformTo(atrLine, data, indicator.smoothingType)
     Condition
       .volatilityRegimeChange(atrLine, atrMaLine)
       .map { condition => // If a condition was returned, wrap it in a Signal.
@@ -181,9 +167,14 @@ object SignalService {
       }
   }
 
-  def detectValue(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.ValueTracking): Option[Signal] = {
-    val source      = indicator.source.extract(data)
-    val transformed = indicator.transformation.transform(source, data)
+  def detectValue(
+      uid: UserId,
+      data: MarketTimeSeriesData,
+      indicator: Indicator.ValueTracking,
+      transformer: ValueTransformer
+  ): Option[Signal] = {
+    val source      = transformer.extractFrom(data, indicator.source)
+    val transformed = transformer.transformTo(source, data, indicator.transformation)
     transformed.headOption.map { latestValue =>
       Signal(
         userId = uid,
@@ -196,8 +187,13 @@ object SignalService {
     }
   }
 
-  def detectComposite(uid: UserId, data: MarketTimeSeriesData, composite: Indicator.Composite): Option[Signal] =
-    val childSignals = composite.indicators.toList.flatMap(child => detectSignal(uid, data, child))
+  def detectComposite(
+      uid: UserId,
+      data: MarketTimeSeriesData,
+      composite: Indicator.Composite,
+      transformer: ValueTransformer
+  ): Option[Signal] =
+    val childSignals   = composite.indicators.toList.flatMap(detectSignal(uid, data, transformer))
     val isConditionMet = composite.combinator match
       case CombinationLogic.All => childSignals.size == composite.indicators.size
       case CombinationLogic.Any => childSignals.nonEmpty

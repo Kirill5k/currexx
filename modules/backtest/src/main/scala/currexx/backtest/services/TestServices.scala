@@ -8,7 +8,7 @@ import currexx.backtest.TestSettings
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.market.MarketService
-import currexx.core.signal.SignalService
+import currexx.core.signal.{SignalService, ValueTransformer}
 import currexx.core.trade.{TradeOrderPlacement, TradeService}
 import currexx.domain.market.MarketTimeSeriesData
 import fs2.Pipe
@@ -31,13 +31,13 @@ final class TestServices[F[_]] private (
       _       <- actions.collect(pf).sequence
     yield ()
 
-  def processMarketData: Pipe[F, MarketTimeSeriesData, Unit] =
+  def processMarketData(transformer: ValueTransformer): Pipe[F, MarketTimeSeriesData, Unit] =
     _.evalMap { data =>
       for
         _ <- clients.data.setData(data)
         _ <- clock.setTime(data.prices.head.time)
         _ <- marketService.updateTimeState(settings.userId, data)
-        _ <- signalService.processMarketData(settings.userId, data)
+        _ <- signalService.processMarketData(settings.userId, data, transformer)
         _ <- collectPendingActions { case Action.ProcessSignals(uid, cp, signals) =>
           marketService.processSignals(uid, cp, signals)
         }

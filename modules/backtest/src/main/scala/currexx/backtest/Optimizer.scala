@@ -7,6 +7,7 @@ import currexx.algorithms.Parameters
 import currexx.algorithms.operators.{Elitism, Selector}
 import currexx.domain.signal.Indicator
 import currexx.backtest.optimizer.*
+import currexx.core.signal.ValueTransformer
 
 import scala.util.Random
 
@@ -24,9 +25,9 @@ object Optimizer extends IOApp.Simple {
   )
 
   val testDataSets    = MarketDataProvider.majors
-  val strategy        = TestStrategy.s3_rules
-  val target          = TestStrategy.s3_indicators.head
-  val otherIndicators = TestStrategy.s3_indicators.tail
+  val strategy        = TestStrategy.s1_rules
+  val target          = TestStrategy.s1_indicators.head
+  val otherIndicators = TestStrategy.s1_indicators.tail
 
   override def run: IO[Unit] = for
     _       <- IO.println(s"Starting optimization of $target")
@@ -34,7 +35,7 @@ object Optimizer extends IOApp.Simple {
     init    <- IndicatorInitialiser.make[IO]
     cross   <- IndicatorCrossover.make[IO]
     mut     <- IndicatorMutator.make[IO]
-    eval    <- IndicatorEvaluator.make[IO](testDataSets, strategy, otherIndicators)
+    eval    <- IndicatorEvaluator.make[IO](testDataSets, strategy, otherIndicators, ValueTransformer.cached)
     sel     <- Selector.tournament[IO, Indicator]
     elit    <- Elitism.simple[IO, Indicator]
     updateFn = (currentGen: Int, maxGen: Int) => IO.whenA(currentGen % 10 == 0)(IO.println(s"$currentGen out of $maxGen"))
