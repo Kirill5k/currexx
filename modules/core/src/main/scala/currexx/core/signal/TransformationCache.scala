@@ -4,8 +4,7 @@ import currexx.calculations.{Filters, MomentumOscillators, MovingAverages, Volat
 import currexx.domain.market.MarketTimeSeriesData
 import currexx.domain.signal.{MovingAverage, ValueSource as VS, ValueTransformation as VT}
 
-import java.util.concurrent.ConcurrentHashMap
-import scala.jdk.CollectionConverters.*
+import scala.collection.concurrent.TrieMap
 
 trait ValueTransformer:
   def extractFrom(data: MarketTimeSeriesData, vs: VS): List[Double]
@@ -86,5 +85,4 @@ object ValueTransformer:
     new PureValueTransformer()
     
   def cached: ValueTransformer =
-    val concurrentMap = new ConcurrentHashMap[String, List[Double]]()
-    CachedValueTransformer(concurrentMap.asScala)
+    CachedValueTransformer(TrieMap.empty)
