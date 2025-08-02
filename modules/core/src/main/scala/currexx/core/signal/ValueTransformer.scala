@@ -64,20 +64,20 @@ final private class CachedValueTransformer(
   private def extractKey(data: MarketTimeSeriesData, vs: VS): String =
     s"${data.currencyPair}-${data.interval}-${data.prices.head.time}-$vs"
 
-  private def transformKey(values: List[Double], data: MarketTimeSeriesData, vt: VT): String =
-    s"${data.currencyPair}-${data.interval}-${data.prices.head.time}-$vt-${values.head}"
-
-  private def averageTrueRangeKey(values: List[Double], data: MarketTimeSeriesData, length: Int): String =
-    s"${data.currencyPair}-${data.interval}-${data.prices.head.time}-atr-$length-${values.head}"
+//  private def transformKey(values: List[Double], data: MarketTimeSeriesData, vt: VT): String =
+//    s"${data.currencyPair}-${data.interval}-${data.prices.head.time}-$vt-${values.head}"
+//
+//  private def averageTrueRangeKey(values: List[Double], data: MarketTimeSeriesData, length: Int): String =
+//    s"${data.currencyPair}-${data.interval}-${data.prices.head.time}-atr-$length-${values.head}"
 
   override def extractFrom(data: MarketTimeSeriesData, vs: VS): List[Double] =
     cache.getOrElseUpdate(extractKey(data, vs), transformer.extractFrom(data, vs))
 
   override def transformTo(values: List[Double], data: MarketTimeSeriesData, vt: VT): List[Double] =
-    cache.getOrElseUpdate(transformKey(values, data, vt), transformer.transformTo(values, data, vt))
+    transformer.transformTo(values, data, vt)
 
   override def averageTrueRange(values: List[Double], data: MarketTimeSeriesData, length: Int): List[Double] =
-    cache.getOrElseUpdate(averageTrueRangeKey(values, data, length), transformer.averageTrueRange(values, data, length))
+    transformer.averageTrueRange(values, data, length)
 }
 
 object ValueTransformer:

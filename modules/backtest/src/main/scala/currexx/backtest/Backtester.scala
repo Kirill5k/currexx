@@ -3,7 +3,6 @@ package currexx.backtest
 import cats.effect.{IO, IOApp}
 import currexx.backtest.services.TestServices
 import currexx.backtest.syntax.*
-import currexx.core.signal.ValueTransformer
 import fs2.Stream
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -25,7 +24,7 @@ object Backtester extends IOApp.Simple {
           services <- TestServices.make[IO](settings)
           _        <- MarketDataProvider
             .read[IO](filePath)
-            .through(services.processMarketData(ValueTransformer.pure))
+            .through(services.processMarketData)
             .compile
             .drain
           orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
