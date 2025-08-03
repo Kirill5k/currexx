@@ -11,6 +11,7 @@ import currexx.algorithms.operators.Evaluator
 import currexx.backtest.services.TestServices
 import currexx.backtest.syntax.*
 import currexx.backtest.{MarketDataProvider, OrderStatsCollector, TestSettings}
+import currexx.core.signal.SignalDetector
 import currexx.core.trade.TradeStrategy
 import currexx.domain.signal.Indicator
 import fs2.Stream
@@ -39,7 +40,8 @@ object IndicatorEvaluator {
   def make[F[_]: {Async, Parallel}](
       testFilePaths: List[String],
       ts: TradeStrategy,
-      otherIndicators: List[Indicator] = Nil
+      otherIndicators: List[Indicator] = Nil,
+      signalDetector: SignalDetector = SignalDetector.pure
   ): F[Evaluator[F, Indicator]] =
     for
       testDataSets <- testFilePaths.traverse(MarketDataProvider.read[F](_).compile.toList)
@@ -50,7 +52,7 @@ object IndicatorEvaluator {
               services <- TestServices.make[F](TestSettings.make(testData.head.currencyPair, ts, ind :: otherIndicators))
               _        <- Stream
                 .emits(testData)
-                .through(services.processMarketData)
+                .through(services.processMarketData(signalDetector))
                 .compile
                 .drain
               orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)

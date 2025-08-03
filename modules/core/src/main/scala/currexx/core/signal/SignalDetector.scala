@@ -140,5 +140,43 @@ final private class PureSignalDetector extends SignalDetector {
       }
 }
 
+final private class CachedSignalDetector(
+    private val cache: collection.mutable.Map[String, Option[Signal]]
+) extends SignalDetector {
+  private val detector = new PureSignalDetector()
+
+  private def cacheKey(data: MarketTimeSeriesData, indicator: Indicator): String =
+    s"${data.currencyPair}-${data.interval}-${data.prices.head.time}-$indicator"
+
+  override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal] =
+    cache.getOrElseUpdate(cacheKey(data, indicator), detector.detect(uid, data)(indicator))
+
+  def detectThresholdCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.ThresholdCrossing): Option[Signal] =
+    detector.detectThresholdCrossing(uid, data, indicator)
+
+  def detectTrendChange(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.TrendChangeDetection): Option[Signal] =
+    detector.detectTrendChange(uid, data, indicator)
+
+  def detectLinesCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.LinesCrossing): Option[Signal] =
+    detector.detectLinesCrossing(uid, data, indicator)
+
+  def detectBarrierCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.KeltnerChannel): Option[Signal] =
+    detector.detectBarrierCrossing(uid, data, indicator)
+
+  def detectVolatilityRegimeChange(
+      uid: UserId,
+      data: MarketTimeSeriesData,
+      indicator: Indicator.VolatilityRegimeDetection
+  ): Option[Signal] =
+    detector.detectVolatilityRegimeChange(uid, data, indicator)
+
+  def detectValue(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.ValueTracking): Option[Signal] =
+    detector.detectValue(uid, data, indicator)
+
+  def detectComposite(uid: UserId, data: MarketTimeSeriesData, composite: Indicator.Composite): Option[Signal] =
+    detector.detectComposite(uid, data, composite)
+}
+
 object SignalDetector:
-  def pure: SignalDetector = new PureSignalDetector()
+  def pure: SignalDetector   = new PureSignalDetector()
+  def cached: SignalDetector = new CachedSignalDetector(collection.mutable.Map.empty)
