@@ -178,5 +178,5 @@ final private class CachedSignalDetector(
 }
 
 object SignalDetector:
-  def pure: SignalDetector   = new PureSignalDetector()
-  def cached: SignalDetector = new CachedSignalDetector(collection.mutable.Map.empty)
+  def pure: SignalDetector   = PureSignalDetector()
+  def cached: SignalDetector = CachedSignalDetector(collection.concurrent.TrieMap.empty)
