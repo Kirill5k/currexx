@@ -20,7 +20,7 @@ object Backtester extends IOApp.Simple {
           settings = TestSettings.make(
             MarketDataProvider.cpFromFilePath(filePath),
             TestStrategy.s1_rules,
-            TestStrategy.s1_indicators
+            List(TestStrategy.s1_indicator)
           )
           services <- TestServices.make[IO](settings)
           _        <- MarketDataProvider

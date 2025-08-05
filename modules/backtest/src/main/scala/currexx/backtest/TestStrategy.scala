@@ -7,8 +7,8 @@ import currexx.domain.signal.{Direction, Indicator, ValueRole, ValueSource, Valu
 import scala.concurrent.duration.*
 
 object TestStrategy {
-  
-  val s1_indicators = List(
+
+  val s1_indicator = Indicator.compositeAnyOf(
     Indicator.TrendChangeDetection(
       source = ValueSource.HLC3,
       transformation = ValueTransformation.JMA(length = 29, phase = 60, power = 3)
@@ -79,7 +79,7 @@ object TestStrategy {
   )
 
   // --- The Set of Indicators for the Filtered JMA Crossover Strategy ---
-  val s2_indicators = List(
+  val s2_indicator = Indicator.compositeAnyOf(
     // The primary crossover indicator using two different JMAs.
     Indicator.LinesCrossing(
       source = ValueSource.HLC3, // Use a smooth price source for the JMAs
@@ -159,7 +159,7 @@ object TestStrategy {
     )
   )
 
-  val s3_indicators = List(
+  val s3_indicator = Indicator.compositeAnyOf(
     // 1. The TREND filter: A slow Kalman filter on the price.
     // This will populate the `MarketProfile.trend` state.
     Indicator.TrendChangeDetection(
@@ -198,7 +198,7 @@ object TestStrategy {
           Rule.Condition.NoPosition,
           Rule.Condition.trendIsUpward,
           Rule.Condition.TrendActiveFor(4.hours), // CONFIRMATION: The trend must be established for at least 4 hours.
-          Rule.Condition.volatilityIsLow, // FILTER: Only enter during low-volatility periods.
+          Rule.Condition.volatilityIsLow,         // FILTER: Only enter during low-volatility periods.
 
           // The Entry Trigger:
           // Velocity must surge above a symmetrical positive threshold.
@@ -213,7 +213,7 @@ object TestStrategy {
           Rule.Condition.NoPosition,
           Rule.Condition.trendIsDownward,
           Rule.Condition.TrendActiveFor(4.hours), // CONFIRMATION
-          Rule.Condition.volatilityIsLow, // FILTER
+          Rule.Condition.volatilityIsLow,         // FILTER
 
           // The Entry Trigger:
           // Velocity must break below a symmetrical negative threshold.
