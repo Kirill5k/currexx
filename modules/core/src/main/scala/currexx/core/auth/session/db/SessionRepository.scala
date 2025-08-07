@@ -42,6 +42,6 @@ final private class LiveSessionRepository[F[_]: Async](
 
 object SessionRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[SessionRepository[F]] =
-    db.getCollectionWithCodec[SessionEntity]("sessions")
+    db.getCollectionWithCodec[SessionEntity](Repository.Collection.Sessions)
       .map(_.withAddedCodec[SessionStatus])
       .map(LiveSessionRepository[F](_))

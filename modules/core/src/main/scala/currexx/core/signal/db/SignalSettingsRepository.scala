@@ -29,4 +29,4 @@ final private class LiveSignalSettingsRepository[F[_]](
 
 object SignalSettingsRepository:
   def make[F[_]: Async](db: MongoDatabase[F]): F[SignalSettingsRepository[F]] =
-    db.getCollectionWithCodec[Document]("settings").map(LiveSignalSettingsRepository[F](_))
+    db.getCollectionWithCodec[Document](Repository.Collection.Settings).map(LiveSignalSettingsRepository[F](_))

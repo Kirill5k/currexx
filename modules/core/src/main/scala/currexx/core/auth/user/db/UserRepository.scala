@@ -56,4 +56,4 @@ final private class LiveUserRepository[F[_]](
 
 object UserRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[UserRepository[F]] =
-    db.getCollectionWithCodec[UserEntity]("users").map(LiveUserRepository[F](_))
+    db.getCollectionWithCodec[UserEntity](Repository.Collection.Users).map(LiveUserRepository[F](_))

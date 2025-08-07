@@ -52,6 +52,6 @@ final private class LiveSettingsRepository[F[_]](
 
 object SettingsRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[SettingsRepository[F]] =
-    db.getCollectionWithCodec[GlobalSettingsEntity]("settings")
+    db.getCollectionWithCodec[GlobalSettingsEntity](Repository.Collection.Settings)
       .map(_.withAddedCodec[SignalSettings].withAddedCodec[TradeSettings])
       .map(LiveSettingsRepository[F](_))

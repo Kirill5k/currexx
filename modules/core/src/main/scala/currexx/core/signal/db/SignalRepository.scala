@@ -34,7 +34,7 @@ final private class LiveSignalRepository[F[_]: Async](
 }
 
 object SignalRepository extends MongoJsonCodecs:
-  private val collectionName    = "signals"
+  private val collectionName    = Repository.Collection.Signals
   private val collectionOptions = CreateCollectionOptions(capped = true, sizeInBytes = 268435456L)
 
   def make[F[_]](db: MongoDatabase[F])(using F: Async[F]): F[SignalRepository[F]] =

@@ -3,6 +3,7 @@ package currexx.core.auth.user.db
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
+import currexx.core.common.db.Repository
 import currexx.domain.user.{PasswordHash, User, UserEmail, UserId}
 import currexx.domain.errors.AppError.{AccountAlreadyExists, EntityDoesNotExist}
 import currexx.core.fixtures.Users
@@ -138,7 +139,7 @@ class UserRepositorySpec extends MongoSpec {
         .use { client =>
           for
             db   <- client.getDatabase("currexx")
-            accs <- db.getCollection("users")
+            accs <- db.getCollection(Repository.Collection.Users)
             _    <- accs.insertOne(accDoc(Users.uid, Users.details.email, password = Users.hash, registrationDate = Users.regDate))
             res  <- test(db)
           yield res

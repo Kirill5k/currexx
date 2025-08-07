@@ -53,3 +53,16 @@ trait Repository[F[_]] {
   extension [A](foa: F[Option[A]]) def mapOption[B](fab: A => B)(using F: Functor[F]): F[Option[B]]   = foa.map(_.map(fab))
   extension [A](fia: F[Iterable[A]]) def mapIterable[B](fab: A => B)(using F: Functor[F]): F[List[B]] = fia.map(_.toList.map(fab))
 }
+
+object Repository {
+  object Collection {
+    val Sessions      = "sessions"
+    val Users         = "users"
+    val LogEvents     = "log-events"
+    val MarketState   = "market-state"
+    val Monitors      = "monitors"
+    val Settings      = "settings"
+    val Signals       = "signals"
+    val TradeOrders   = "trade-orders"
+  }
+}

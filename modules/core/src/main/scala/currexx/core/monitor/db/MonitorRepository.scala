@@ -109,6 +109,6 @@ final private class LiveMonitorRepository[F[_]](
 
 object MonitorRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[MonitorRepository[F]] =
-    db.getCollectionWithCodec[MonitorEntity]("monitors")
+    db.getCollectionWithCodec[MonitorEntity](Repository.Collection.Monitors)
       .map(_.withAddedCodec[CurrencyPair].withAddedCodec[Interval].withAddedCodec[Schedule].withAddedCodec[Limits])
       .map(coll => LiveMonitorRepository[F](coll))

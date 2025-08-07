@@ -50,7 +50,7 @@ final private class LiveTradeOrderRepository[F[_]: Async](
       .mapOption(_.toDomain)
 
 object TradeOrderRepository extends MongoJsonCodecs:
-  private val collectionName    = "trade-orders"
+  private val collectionName    = Repository.Collection.TradeOrders
   private val collectionOptions = CreateCollectionOptions(capped = true, sizeInBytes = 268435456L)
 
   def make[F[_]](db: MongoDatabase[F])(using F: Async[F]): F[TradeOrderRepository[F]] =

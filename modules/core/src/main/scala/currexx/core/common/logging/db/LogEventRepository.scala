@@ -26,7 +26,7 @@ final private class LiveLogEventRepository[F[_]](
     collection.find.all.map(_.toList.map(_.toDomain))
 
 object LogEventRepository extends MongoJsonCodecs:
-  private val collectionName    = "log-events"
+  private val collectionName    = Repository.Collection.LogEvents
   private val collectionOptions = CreateCollectionOptions(capped = true, sizeInBytes = 268435456L)
 
   def make[F[_]](db: MongoDatabase[F])(using F: Async[F]): F[LogEventRepository[F]] =
