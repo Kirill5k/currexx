@@ -23,3 +23,4 @@ enum Action:
   case CloseOpenOrders(uid: UserId, currencyPair: CurrencyPair)
   case CloseAllOpenOrders(uid: UserId)
   case SetupNewUser(uid: UserId)
+  case Retried(action: Action, attempt: Int)
