@@ -4,6 +4,8 @@ import cats.effect.Sync
 import currexx.clients.ClientsConfig
 import pureconfig.{ConfigReader, ConfigSource}
 
+import scala.concurrent.duration.FiniteDuration
+
 object config {
   final case class JwtConfig(
       alg: String,
@@ -16,7 +18,10 @@ object config {
   ) derives ConfigReader
 
   final case class MongoConfig(
-      connectionUri: String
+      connectionUri: String,
+      connectTimeout: FiniteDuration,
+      readTimeout: FiniteDuration,
+      serverSelectionTimeout: FiniteDuration
   ) derives ConfigReader
 
   final case class ServerConfig(

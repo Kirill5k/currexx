@@ -25,17 +25,19 @@ object Resources:
       .builder()
       .applyConnectionString(ConnectionString(config.connectionUri))
       .applyToSocketSettings { builder =>
-        val _ = builder.connectTimeout(3, TimeUnit.MINUTES).readTimeout(3, TimeUnit.MINUTES)
+        val _ = builder
+          .connectTimeout(config.connectTimeout.toMillis, TimeUnit.MILLISECONDS)
+          .readTimeout(config.readTimeout.toMillis, TimeUnit.MILLISECONDS)
       }
       .applyToClusterSettings { builder =>
-        val _ = builder.serverSelectionTimeout(3, TimeUnit.MINUTES)
+        val _ = builder.serverSelectionTimeout(config.serverSelectionTimeout.toMillis, TimeUnit.MILLISECONDS)
       }
       .build()
     MongoClient.create[F](settings).evalMap(_.getDatabase("currexx"))
 
-  private def fs2Backend[F[_] : Async](timeout: FiniteDuration): Resource[F, WebSocketStreamBackend[F, Fs2Streams[F]]] =
+  private def fs2Backend[F[_]: Async](timeout: FiniteDuration): Resource[F, WebSocketStreamBackend[F, Fs2Streams[F]]] =
     Fs2Backend.resource[F](options = BackendOptions(timeout, None))
-  
+
   def make[F[_]: Async](config: AppConfig): Resource[F, Resources[F]] =
     (
       mongoDb[F](config.mongo),
