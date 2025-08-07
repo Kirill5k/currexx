@@ -26,22 +26,3 @@ final case class MarketStateEntity(
     lastUpdatedAt = lastUpdatedAt,
     createdAt = createdAt
   )
-
-object MarketStateEntity:
-  def make(
-      userId: UserId,
-      currencyPair: CurrencyPair,
-      currentPosition: Option[PositionState] = None,
-      profile: MarketProfile = MarketProfile(),
-      lastUpdatedAt: Instant = Instant.now(),
-      createdAt: Instant = Instant.now()
-  ): MarketStateEntity =
-    MarketStateEntity(
-      _id = ObjectId(),
-      userId = userId.toObjectId,
-      currencyPair = currencyPair,
-      currentPosition = currentPosition,
-      profile = profile,
-      lastUpdatedAt = lastUpdatedAt,
-      createdAt = createdAt
-    )

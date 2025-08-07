@@ -1,7 +1,6 @@
 package currexx.core.market.db
 
 import cats.effect.Async
-import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import com.mongodb.client.model.ReturnDocument
@@ -13,7 +12,7 @@ import currexx.core.market.{MarketProfile, MarketState, PositionState}
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.models.collection.FindOneAndUpdateOptions
 import mongo4cats.collection.MongoCollection
-import mongo4cats.operations.{Filter, Update}
+import mongo4cats.operations.Update
 import mongo4cats.database.MongoDatabase
 
 trait MarketStateRepository[F[_]] extends Repository[F]:
@@ -30,7 +29,7 @@ final private class LiveMarketStateRepository[F[_]](
     F: Async[F]
 ) extends MarketStateRepository[F] {
 
-  private val updateOptions = FindOneAndUpdateOptions(returnDocument = ReturnDocument.AFTER)
+  private val updateOptions = FindOneAndUpdateOptions(returnDocument = ReturnDocument.AFTER, upsert = true)
 
   override def deleteAll(uid: UserId): F[Unit] =
     collection.deleteMany(userIdEq(uid)).void
@@ -41,30 +40,35 @@ final private class LiveMarketStateRepository[F[_]](
       .flatMap(errorIfNotDeleted(AppError.NotTracked(List(cp))))
 
   override def update(uid: UserId, cp: CurrencyPair, profile: MarketProfile): F[MarketState] =
-    runUpdate(
-      userIdAndCurrencyPairEq(uid, cp),
-      Update.set("profile", profile),
-      MarketStateEntity.make(uid, cp, profile = profile)
-    )
+    collection
+      .findOneAndUpdate(
+        userIdAndCurrencyPairEq(uid, cp),
+        Update
+          .set("profile", profile)
+          .currentDate(Field.LastUpdatedAt)
+          .setOnInsert("userId", uid.toObjectId)
+          .setOnInsert("currencyPair", cp)
+          .setOnInsert("createdAt", java.time.Instant.now()),
+        updateOptions
+      )
+      .flatMap(opt => F.fromOption(opt, AppError.Internal("could not upsert market state")))
+      .map(_.toDomain)
 
   override def update(uid: UserId, pair: CurrencyPair, position: Option[PositionState]): F[MarketState] =
-    runUpdate(
-      userIdAndCurrencyPairEq(uid, pair),
-      Update.set("currentPosition", position),
-      MarketStateEntity.make(uid, pair, currentPosition = position)
-    )
-
-  private def runUpdate(
-      filter: Filter,
-      update: Update,
-      default: => MarketStateEntity
-  ): F[MarketState] =
     collection
-      .findOneAndUpdate(filter, update.currentDate(Field.LastUpdatedAt), updateOptions)
-      .flatMap {
-        case Some(state) => state.toDomain.pure[F]
-        case None        => collection.insertOne(default).as(default.toDomain)
-      }
+      .findOneAndUpdate(
+        userIdAndCurrencyPairEq(uid, pair),
+        Update
+          .set("currentPosition", position)
+          .currentDate(Field.LastUpdatedAt)
+          .setOnInsert("userId", uid.toObjectId)
+          .setOnInsert("currencyPair", pair)
+          .setOnInsert("createdAt", java.time.Instant.now())
+          .setOnInsert("profile", MarketProfile()),
+        updateOptions
+      )
+      .flatMap(opt => F.fromOption(opt, AppError.Internal("could not upsert market state")))
+      .map(_.toDomain)
 
   override def getAll(uid: UserId): F[List[MarketState]] =
     collection

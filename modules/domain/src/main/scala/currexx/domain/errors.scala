@@ -93,5 +93,7 @@ object errors {
 
     case object InvalidDateRange extends Unprocessable:
       override val message: String = "Date 'from' must be before date 'to'"
+
+    final case class Internal(message: String) extends AppError
   }
 }
