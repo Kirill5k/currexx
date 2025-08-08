@@ -4,8 +4,6 @@ import cats.Monad
 import cats.effect.Concurrent
 import cats.effect.std.Queue
 import cats.syntax.functor.*
-import cats.syntax.flatMap.*
-import cats.syntax.traverse.*
 import fs2.Stream
 
 trait ActionDispatcher[F[_]]:
@@ -18,7 +16,7 @@ final private class LiveActionDispatcher[F[_]: Monad](
 ) extends ActionDispatcher[F] {
 
   override def pendingActions: F[List[Action]] =
-    submittedActions.size.flatMap(n => List.fill(n)(submittedActions.take).sequence)
+    submittedActions.tryTakeN(None)
 
   override def dispatch(action: Action): F[Unit] =
     submittedActions.offer(action)
