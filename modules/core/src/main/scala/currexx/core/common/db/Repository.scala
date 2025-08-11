@@ -11,25 +11,8 @@ import mongo4cats.operations.Filter
 
 trait Repository[F[_]] {
 
-  protected object Field {
-    val Id                = "_id"
-    val Name              = "name"
-    val Time              = "time"
-    val UId               = "userId"
-    val Email             = "email"
-    val Kind              = "kind"
-    val LastQueriedAt     = "lastQueriedAt"
-    val LastUpdatedAt     = "lastUpdatedAt"
-    val Status            = "status"
-    val LastAccessedAt    = "lastAccessedAt"
-    val Active            = "active"
-    val CurrencyPair      = "currencyPair"
-    val CurrencyPairs     = "currencyPairs"
-    val OrderCurrencyPair = "order.currencyPair"
-    val Indicators        = "indicators"
-    val TriggeredBy       = "triggeredBy"
-  }
-
+  import Repository.*
+  
   private def idEqFilter(name: String, id: String): Filter = Filter.eq(name, ObjectId(id))
   protected def idEq(id: String): Filter                   = idEqFilter(Field.Id, id)
   protected def userIdEq(uid: UserId): Filter              = idEqFilter(Field.UId, uid.value)
@@ -37,11 +20,11 @@ trait Repository[F[_]] {
   protected def userIdAndCurrencyPairEq(uid: UserId, pair: CurrencyPair): Filter =
     userIdEq(uid) && Filter.eq(Field.CurrencyPair, pair)
 
-  protected def searchBy(uid: UserId, sp: SearchParams): Filter =
+  protected def searchBy(uid: UserId, sp: SearchParams, cpField: String): Filter =
     List(
       sp.from.map(f => Filter.gte(Field.Time, f)),
       sp.to.map(t => Filter.lt(Field.Time, t)),
-      sp.currencyPair.map(cp => Filter.regex(Field.CurrencyPair, s"${cp.base.code}\\/?${cp.quote.code}"))
+      sp.currencyPair.map(cp => Filter.regex(cpField, s"${cp.base.code}\\/?${cp.quote.code}"))
     ).flatten.foldLeft(userIdEq(uid))(_ && _)
 
   protected def errorIfNotDeleted(error: Throwable)(res: DeleteResult)(using F: MonadError[F, Throwable]): F[Unit] =
@@ -55,6 +38,25 @@ trait Repository[F[_]] {
 }
 
 object Repository {
+  object Field {
+    val Id = "_id"
+    val Name = "name"
+    val Time = "time"
+    val UId = "userId"
+    val Email = "email"
+    val Kind = "kind"
+    val LastQueriedAt = "lastQueriedAt"
+    val LastUpdatedAt = "lastUpdatedAt"
+    val Status = "status"
+    val LastAccessedAt = "lastAccessedAt"
+    val Active = "active"
+    val CurrencyPair = "currencyPair"
+    val CurrencyPairs = "currencyPairs"
+    val OrderCurrencyPair = "order.currencyPair"
+    val Indicators = "indicators"
+    val TriggeredBy = "triggeredBy"
+  }
+  
   object Collection {
     val Sessions      = "sessions"
     val Users         = "users"

@@ -7,10 +7,12 @@ import cats.syntax.applicativeError.*
 import currexx.domain.user.*
 import currexx.domain.errors.AppError.{AccountAlreadyExists, EntityDoesNotExist}
 import currexx.core.common.db.Repository
+import currexx.core.common.db.Repository.Field
 import mongo4cats.circe.MongoJsonCodecs
-import mongo4cats.operations.{Filter, Update}
+import mongo4cats.operations.{Filter, Index, Update}
 import mongo4cats.collection.MongoCollection
 import mongo4cats.database.MongoDatabase
+import mongo4cats.models.collection.IndexOptions
 
 trait UserRepository[F[_]] extends Repository[F]:
   def find(uid: UserId): F[User]
@@ -55,5 +57,9 @@ final private class LiveUserRepository[F[_]](
 }
 
 object UserRepository extends MongoJsonCodecs:
+  val indexByEmail = Index.ascending(Field.Email)
+  
   def make[F[_]: Async](db: MongoDatabase[F]): F[UserRepository[F]] =
-    db.getCollectionWithCodec[UserEntity](Repository.Collection.Users).map(LiveUserRepository[F](_))
+    db.getCollectionWithCodec[UserEntity](Repository.Collection.Users)
+      .flatTap(_.createIndex(indexByEmail, IndexOptions().unique(true)))
+      .map(LiveUserRepository[F](_))

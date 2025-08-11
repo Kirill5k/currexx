@@ -2,12 +2,14 @@ package currexx.core.auth.session.db
 
 import cats.effect.Async
 import cats.syntax.functor.*
+import cats.syntax.flatMap.*
 import currexx.core.common.db.Repository
+import currexx.core.common.db.Repository.Field
 import currexx.domain.session.{CreateSession, Session, SessionId, SessionStatus}
 import currexx.domain.user.UserId
 import mongo4cats.database.MongoDatabase
 import mongo4cats.circe.MongoJsonCodecs
-import mongo4cats.operations.Update
+import mongo4cats.operations.{Index, Update}
 import mongo4cats.collection.MongoCollection
 
 trait SessionRepository[F[_]] extends Repository[F]:
@@ -43,5 +45,6 @@ final private class LiveSessionRepository[F[_]: Async](
 object SessionRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[SessionRepository[F]] =
     db.getCollectionWithCodec[SessionEntity](Repository.Collection.Sessions)
+      .flatTap(_.createIndex(Index.ascending(Field.UId)))
       .map(_.withAddedCodec[SessionStatus])
       .map(LiveSessionRepository[F](_))

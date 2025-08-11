@@ -4,6 +4,7 @@ import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.common.db.Repository
+import currexx.core.common.db.Repository.Field
 import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval}
@@ -12,7 +13,7 @@ import currexx.domain.user.UserId
 import fs2.Stream
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
-import mongo4cats.operations.{Filter, Update}
+import mongo4cats.operations.{Filter, Index, Update}
 import mongo4cats.database.MongoDatabase
 
 import scala.concurrent.duration.FiniteDuration
@@ -107,8 +108,14 @@ final private class LiveMonitorRepository[F[_]](
     userIdEq(uid) && Filter.eq(Field.Kind, kind) && Filter.in(Field.CurrencyPairs, cps)
 }
 
-object MonitorRepository extends MongoJsonCodecs:
-  def make[F[_]: Async](db: MongoDatabase[F]): F[MonitorRepository[F]] =
+object MonitorRepository extends MongoJsonCodecs {
+  val indexByUid =  Index.ascending(Field.UId)
+  val indexByCps = Index.ascending(Field.UId).combinedWith(Index.ascending(Field.Kind)).combinedWith(Index.ascending(Field.CurrencyPairs))
+  
+  def make[F[_] : Async](db: MongoDatabase[F]): F[MonitorRepository[F]] =
     db.getCollectionWithCodec[MonitorEntity](Repository.Collection.Monitors)
+      .flatTap(_.createIndex(indexByUid))
+      .flatTap(_.createIndex(indexByCps))
       .map(_.withAddedCodec[CurrencyPair].withAddedCodec[Interval].withAddedCodec[Schedule].withAddedCodec[Limits])
       .map(coll => LiveMonitorRepository[F](coll))
+}

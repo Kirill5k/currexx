@@ -10,9 +10,9 @@ import currexx.domain.errors.AppError
 import currexx.core.common.db.Repository
 import currexx.core.market.{MarketProfile, MarketState, PositionState}
 import mongo4cats.circe.MongoJsonCodecs
-import mongo4cats.models.collection.FindOneAndUpdateOptions
+import mongo4cats.models.collection.{FindOneAndUpdateOptions, IndexOptions}
 import mongo4cats.collection.MongoCollection
-import mongo4cats.operations.Update
+import mongo4cats.operations.{Index, Update}
 import mongo4cats.database.MongoDatabase
 
 trait MarketStateRepository[F[_]] extends Repository[F]:
@@ -45,7 +45,7 @@ final private class LiveMarketStateRepository[F[_]](
         userIdAndCurrencyPairEq(uid, cp),
         Update
           .set("profile", profile)
-          .currentDate(Field.LastUpdatedAt)
+          .currentDate(Repository.Field.LastUpdatedAt)
           .setOnInsert("userId", uid.toObjectId)
           .setOnInsert("currencyPair", cp)
           .setOnInsert("createdAt", java.time.Instant.now()),
@@ -60,7 +60,7 @@ final private class LiveMarketStateRepository[F[_]](
         userIdAndCurrencyPairEq(uid, pair),
         Update
           .set("currentPosition", position)
-          .currentDate(Field.LastUpdatedAt)
+          .currentDate(Repository.Field.LastUpdatedAt)
           .setOnInsert("userId", uid.toObjectId)
           .setOnInsert("currencyPair", pair)
           .setOnInsert("createdAt", java.time.Instant.now())
@@ -83,8 +83,14 @@ final private class LiveMarketStateRepository[F[_]](
       .mapOption(_.toDomain)
 }
 
-object MarketStateRepository extends MongoJsonCodecs:
+object MarketStateRepository extends MongoJsonCodecs {
+  val indexByUidAndCp = Index.ascending(Repository.Field.UId).combinedWith(Index.ascending(Repository.Field.CurrencyPair))
+  val indexByUid      = Index.ascending(Repository.Field.UId)
+
   def make[F[_]: Async](db: MongoDatabase[F]): F[MarketStateRepository[F]] =
     db.getCollectionWithCodec[MarketStateEntity](Repository.Collection.MarketState)
+      .flatTap(_.createIndex(indexByUidAndCp, IndexOptions().unique(true)))
+      .flatTap(_.createIndex(indexByUid))
       .map(_.withAddedCodec[CurrencyPair].withAddedCodec[MarketProfile].withAddedCodec[PositionState])
       .map(coll => LiveMarketStateRepository[F](coll))
+}

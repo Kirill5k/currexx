@@ -4,13 +4,15 @@ import cats.effect.Async
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import currexx.core.common.db.Repository
+import currexx.core.common.db.Repository.Field
 import currexx.core.settings.{GlobalSettings, SignalSettings, TradeSettings}
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
-import mongo4cats.operations.Update
 import mongo4cats.database.MongoDatabase
+import mongo4cats.operations.{Index, Update}
+import mongo4cats.models.collection.IndexOptions
 
 trait SettingsRepository[F[_]]:
   def get(uid: UserId): F[GlobalSettings]
@@ -53,5 +55,6 @@ final private class LiveSettingsRepository[F[_]](
 object SettingsRepository extends MongoJsonCodecs:
   def make[F[_]: Async](db: MongoDatabase[F]): F[SettingsRepository[F]] =
     db.getCollectionWithCodec[GlobalSettingsEntity](Repository.Collection.Settings)
+      .flatTap(_.createIndex(Index.ascending(Field.UId), IndexOptions().unique(true)))
       .map(_.withAddedCodec[SignalSettings].withAddedCodec[TradeSettings])
       .map(LiveSettingsRepository[F](_))
