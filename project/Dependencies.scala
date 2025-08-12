@@ -90,6 +90,7 @@ object Dependencies {
     Libraries.commonScala.cats,
     Libraries.commonScala.syntax
   ) ++
+    Libraries.tapir.all ++
     Libraries.logging.all ++
     Libraries.circe.all ++
     Libraries.refined.all
@@ -110,8 +111,7 @@ object Dependencies {
     Libraries.pureconfig.core,
     Libraries.jwt,
     Libraries.bcrypt.cross(CrossVersion.for3Use2_13)
-  ) ++
-    Libraries.tapir.all
+  )
 
   val test = Seq(
     Libraries.commonScala.testHttp4s % Test,

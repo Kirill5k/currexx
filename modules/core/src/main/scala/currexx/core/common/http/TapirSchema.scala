@@ -1,10 +1,10 @@
 package currexx.core.common.http
 
+import cats.data.NonEmptySet
 import currexx.clients.broker.BrokerParameters
-import currexx.core.market.MarketController.MarketStateView
 import currexx.core.monitor.MonitorController.{CreateMonitorRequest, MonitorView}
 import currexx.domain.market.Currency
-import currexx.domain.signal.{Condition, Direction, Indicator}
+import currexx.domain.signal.{Condition, Indicator}
 import eu.timepit.refined.types.string.NonEmptyString
 import currexx.domain.validations.{EmailString, IdString}
 import currexx.domain.user.UserId
@@ -31,11 +31,9 @@ transparent trait TapirSchema extends SchemaDerivation {
     .map[Currency](s => Currency.from(s).toOption)(_.code)
     .description("3-letter currency code (e.g., EUR, USD)")
 
-  given Schema[Direction]           = Schema.string.validate(enumValidator(Direction.values))
-  given Schema[TradeOrder.Position] = Schema.string.validate(enumValidator(TradeOrder.Position.values))
-
-  // Schemas for complex types like MonitorView, CreateMonitorRequest, Indicator, Condition, etc.,
-  // are now automatically derived by SchemaDerivation, removing the need for incorrect placeholders.
+  // TODO: add schema for NonEmptySet and NonEmptyList, Interval, JCron (From Schedule.Cron)
+  
+  // THESE SCHEMAS WILL NOT BE DERIVED AUTOMATICALLY:
   given Schema[Indicator]            = Schema.string
   given Schema[Condition]            = Schema.string
   given Schema[MonitorView]          = Schema.string
@@ -44,8 +42,4 @@ transparent trait TapirSchema extends SchemaDerivation {
   given Schema[TradeOrder]           = Schema.string
   given Schema[TradeStrategy]        = Schema.string
   given Schema[BrokerParameters]     = Schema.string
-  given Schema[MarketStateView]      = Schema.string
-
-  private def enumValidator[E](values: Array[E]): Validator[E] =
-    Validator.enumeration[E](values.toList, e => Some(e.toString))
 }

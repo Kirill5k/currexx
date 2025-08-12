@@ -2,6 +2,7 @@ package currexx.domain
 
 import mongo4cats.bson.ObjectId
 import io.circe.{Decoder, Encoder, KeyDecoder, KeyEncoder}
+import sttp.tapir.{Schema, Validator}
 
 import scala.reflect.ClassTag
 
@@ -12,6 +13,7 @@ object types {
     def printLowerCase[E](e: E): String = e.toString.toLowerCase
 
   transparent trait EnumType[E: ClassTag](private val enums: () => Array[E], private val unwrap: E => String = EnumType.printKebabCase(_)):
+    given Schema[E]     = Schema.string.validate(Validator.enumeration(enums().toList, e => Some(unwrap(e))))
     given Encoder[E]    = Encoder[String].contramap(unwrap(_))
     given Decoder[E]    = Decoder[String].emap(from)
     given KeyEncoder[E] = (e: E) => unwrap(e)
