@@ -7,7 +7,7 @@ ThisBuild / version                             := scala.sys.process.Process("gi
 ThisBuild / organization                        := "io.github.kirill5k"
 ThisBuild / githubWorkflowPublishTargetBranches := Nil
 ThisBuild / githubWorkflowJavaVersions          := Seq(JavaSpec.temurin("24"))
-ThisBuild / scalacOptions ++= Seq("-Wunused:all")
+ThisBuild / scalacOptions ++= Seq("-Wunused:all", "-Xmax-inlines:256")
 ThisBuild / Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
 
 val noPublish = Seq(
@@ -92,7 +92,7 @@ val backtest = project
     name       := "currexx-backtest",
     moduleName := "currexx-backtest",
     libraryDependencies ++= Dependencies.test,
-    Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
+    Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement,
   )
 
 val root = project
