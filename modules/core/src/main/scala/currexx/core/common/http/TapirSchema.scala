@@ -2,7 +2,6 @@ package currexx.core.common.http
 
 import cats.data.{NonEmptyList, NonEmptySet}
 import currexx.clients.broker.BrokerParameters
-import currexx.core.monitor.MonitorController.{CreateMonitorRequest, MonitorView}
 import currexx.domain.market.{Currency, Interval, TradeOrder}
 import currexx.domain.signal.{Condition, Indicator}
 import eu.timepit.refined.types.string.NonEmptyString
@@ -11,6 +10,7 @@ import currexx.domain.user.UserId
 import currexx.core.monitor.MonitorId
 import currexx.core.trade.TradeStrategy
 import com.cronutils.model.Cron as JCron
+import currexx.domain.monitor.Schedule
 import sttp.tapir.generic.auto.SchemaDerivation
 import sttp.tapir.{Schema, Validator}
 
@@ -44,8 +44,7 @@ transparent trait TapirSchema extends SchemaDerivation {
   // THESE SCHEMAS WILL NOT BE DERIVED AUTOMATICALLY:
   given Schema[Indicator]            = Schema.string
   given Schema[Condition]            = Schema.string
-  given Schema[MonitorView]          = Schema.string
-  given Schema[CreateMonitorRequest] = Schema.string
+  given Schema[Schedule]             = Schema.string
   given Schema[Interval]             = Schema.string
   given Schema[TradeOrder]           = Schema.string
   given Schema[TradeStrategy]        = Schema.string
