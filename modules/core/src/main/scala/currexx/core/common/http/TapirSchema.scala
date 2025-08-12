@@ -12,28 +12,23 @@ import currexx.core.monitor.MonitorId
 import currexx.core.trade.TradeStrategy
 import currexx.domain.monitor.Schedule
 import sttp.tapir.generic.auto.SchemaDerivation
-import sttp.tapir.Schema
+import sttp.tapir.{Schema, Validator}
 
 import scala.concurrent.duration.FiniteDuration
 
 transparent trait TapirSchema extends SchemaDerivation {
-  // TODO: fix schemas
-  given Schema[UserId]               = Schema.string
-  given Schema[MonitorId]            = Schema.string
-  given Schema[IdString]             = Schema.string
-  given Schema[NonEmptyString]       = Schema.string
-  given Schema[EmailString]          = Schema.string
-  given Schema[Currency]             = Schema.string
-  given Schema[MonitorView]          = Schema.string
-  given Schema[CreateMonitorRequest] = Schema.string
-  given Schema[FiniteDuration]       = Schema.string
-  given Schema[Direction]            = Schema.string
-  given Schema[Schedule]             = Schema.string
-  given Schema[TradeOrder]           = Schema.string
-  given Schema[TradeOrder.Position]  = Schema.string
-  given Schema[Indicator]            = Schema.string
-  given Schema[Condition]            = Schema.string
-  given Schema[TradeStrategy]        = Schema.string
-  given Schema[BrokerParameters]     = Schema.string
-  given Schema[MarketStateView]      = Schema.string
+  given Schema[UserId] = Schema.string.description("User ID")
+  given Schema[MonitorId] = Schema.string.description("Monitor ID")
+  given Schema[IdString] = Schema.string.description("Generic ID")
+  given Schema[NonEmptyString] = Schema.string.description("Non-empty string")
+  given Schema[EmailString] = Schema.string.description("Email address").format("email")
+  given Schema[Currency] = Schema.string.description("Currency code (e.g., EUR, USD)").pattern("^[A-Z]{3}$")
+
+  given Schema[FiniteDuration] = Schema.string.description("Duration in ISO-8601 format, e.g., 'PT15M' for 15 minutes")
+
+  given smDirection: Schema[Direction] = Schema.string.validate(Validator.enumeration(Direction.values.toList, d => Some(d.toString)))
+  given smPosition: Schema[TradeOrder.Position] = Schema.string.validate(Validator.enumeration(TradeOrder.Position.values.toList, p => Some(p.toString)))
+
+  // Schemas for complex types like MonitorView, CreateMonitorRequest, Indicator, Condition, etc.,
+  // are now automatically derived by SchemaDerivation, removing the need for incorrect placeholders.
 }
