@@ -17,19 +17,19 @@ object ValueRole extends EnumType[ValueRole](() => ValueRole.values)
 enum ValueRole:
   case Momentum, Volatility, Velocity
 
-enum ValueTransformation(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
-  case Sequenced(sequence: List[ValueTransformation])                             extends ValueTransformation("sequenced")
-  case Kalman(gain: Double, measurementNoise: Double)                             extends ValueTransformation("kalman")
-  case KalmanVelocity(gain: Double, measurementNoise: Double)                     extends ValueTransformation("kalman-velocity")
-  case RSX(length: Int)                                                           extends ValueTransformation("rsx")
-  case JRSX(length: Int)                                                          extends ValueTransformation("jrsx")
-  case WMA(length: Int)                                                           extends ValueTransformation("wma")
-  case SMA(length: Int)                                                           extends ValueTransformation("sma")
-  case EMA(length: Int)                                                           extends ValueTransformation("ema")
-  case HMA(length: Int)                                                           extends ValueTransformation("hma")
-  case NMA(length: Int, signalLength: Int, lambda: Double, maCalc: MovingAverage) extends ValueTransformation("nma")
-  case JMA(length: Int, phase: Int, power: Int)                                   extends ValueTransformation("jma")
-  case STOCH(length: Int)                                                         extends ValueTransformation("stoch")
+enum ValueTransformation derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+  case Sequenced(sequence: List[ValueTransformation])                             extends ValueTransformation
+  case Kalman(gain: Double, measurementNoise: Double)                             extends ValueTransformation
+  case KalmanVelocity(gain: Double, measurementNoise: Double)                     extends ValueTransformation
+  case RSX(length: Int)                                                           extends ValueTransformation
+  case JRSX(length: Int)                                                          extends ValueTransformation
+  case WMA(length: Int)                                                           extends ValueTransformation
+  case SMA(length: Int)                                                           extends ValueTransformation
+  case EMA(length: Int)                                                           extends ValueTransformation
+  case HMA(length: Int)                                                           extends ValueTransformation
+  case NMA(length: Int, signalLength: Int, lambda: Double, maCalc: MovingAverage) extends ValueTransformation
+  case JMA(length: Int, phase: Int, power: Int)                                   extends ValueTransformation
+  case STOCH(length: Int)                                                         extends ValueTransformation
 
 object ValueTransformation {
   def sequenced(vt: ValueTransformation, vtSequence: ValueTransformation*): ValueTransformation =
@@ -59,43 +59,43 @@ object CombinationLogic extends EnumType[CombinationLogic](() => CombinationLogi
 enum CombinationLogic:
   case All, Any
 
-enum Indicator(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+enum Indicator derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Composite(
       indicators: NonEmptyList[Indicator],
       combinator: CombinationLogic
-  ) extends Indicator("composite")
+  ) extends Indicator
   case TrendChangeDetection(
       source: ValueSource,
       transformation: ValueTransformation
-  ) extends Indicator("trend-change-detection")
+  ) extends Indicator
   case ThresholdCrossing(
       source: ValueSource,
       transformation: ValueTransformation,
       upperBoundary: Double,
       lowerBoundary: Double
-  ) extends Indicator("threshold-crossing")
+  ) extends Indicator
   case LinesCrossing(
       source: ValueSource,
       line1Transformation: ValueTransformation, // SLOW
       line2Transformation: ValueTransformation  // FAST
-  ) extends Indicator("lines-crossing")
+  ) extends Indicator
   case KeltnerChannel(
       source: ValueSource,
       line1Transformation: ValueTransformation, // SLOW
       line2Transformation: ValueTransformation, // FAST
       atrLength: Int,
       atrMultiplier: Double
-  ) extends Indicator("keltner-channel")
+  ) extends Indicator
   case VolatilityRegimeDetection(
       atrLength: Int,
       smoothingType: ValueTransformation,
       smoothingLength: Int
-  ) extends Indicator("volatility-regime-detection")
+  ) extends Indicator
   case ValueTracking(
       role: ValueRole,
       source: ValueSource,
       transformation: ValueTransformation
-  ) extends Indicator("value-tracking")
+  ) extends Indicator
 
 object Indicator:
   given JsonTaggedAdt.Config[Indicator] = JsonTaggedAdt.Config.Values[Indicator](

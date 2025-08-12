@@ -42,23 +42,23 @@ final case class Rule(
 
 object Rule extends JsonCodecs {
 
-  enum Condition(val kind: String) derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
-    case AllOf(conditions: List[Condition])                        extends Condition("all-of")
-    case AnyOf(conditions: List[Condition])                        extends Condition("any-of")
-    case Not(condition: Condition)                                 extends Condition("not")
-    case TrendChangedTo(direction: Direction)                      extends Condition("trend-changed-to")
-    case TrendIs(direction: Direction)                             extends Condition("trend-is")
-    case TrendActiveFor(duration: FiniteDuration)                  extends Condition("trend-active-for")
-    case CrossoverOccurred(direction: Direction)                   extends Condition("crossover-occurred")
-    case MomentumEntered(zone: MomentumZone)                       extends Condition("momentum-entered")
-    case MomentumIsIn(zone: MomentumZone)                          extends Condition("momentum-is-in")
-    case MomentumIs(direction: Direction)                          extends Condition("momentum-is")
-    case VolatilityIs(regime: VolatilityRegime)                    extends Condition("volatility-is")
-    case VelocityIs(direction: Direction)                          extends Condition("velocity-is")
-    case VelocityCrossedLevel(level: Double, direction: Direction) extends Condition("velocity-crossed-level")
-    case PositionIs(position: TradeOrder.Position)                 extends Condition("position-is")
-    case PositionOpenFor(duration: FiniteDuration)                 extends Condition("position-open-for")
-    case NoPosition                                                extends Condition("no-position")
+  enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+    case AllOf(conditions: List[Condition])                        extends Condition
+    case AnyOf(conditions: List[Condition])                        extends Condition
+    case Not(condition: Condition)                                 extends Condition
+    case TrendChangedTo(direction: Direction)                      extends Condition
+    case TrendIs(direction: Direction)                             extends Condition
+    case TrendActiveFor(duration: FiniteDuration)                  extends Condition
+    case CrossoverOccurred(direction: Direction)                   extends Condition
+    case MomentumEntered(zone: MomentumZone)                       extends Condition
+    case MomentumIsIn(zone: MomentumZone)                          extends Condition
+    case MomentumIs(direction: Direction)                          extends Condition
+    case VolatilityIs(regime: VolatilityRegime)                    extends Condition
+    case VelocityIs(direction: Direction)                          extends Condition
+    case VelocityCrossedLevel(level: Double, direction: Direction) extends Condition
+    case PositionIs(position: TradeOrder.Position)                 extends Condition
+    case PositionOpenFor(duration: FiniteDuration)                 extends Condition
+    case NoPosition                                                extends Condition
 
   object Condition:
     given JsonTaggedAdt.Config[Condition] = JsonTaggedAdt.Config.Values[Condition](
