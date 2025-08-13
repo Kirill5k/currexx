@@ -8,7 +8,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import currexx.domain.validations.{EmailString, IdString}
 import currexx.domain.user.UserId
 import currexx.core.monitor.MonitorId
-import currexx.core.trade.TradeStrategy
+import currexx.core.trade.Rule.Condition as RuleCondition
 import com.cronutils.model.Cron as JCron
 import currexx.domain.monitor.Schedule
 import sttp.tapir.generic.Configuration
@@ -44,14 +44,13 @@ transparent trait TapirSchema extends SchemaDerivation {
     .map[Currency](s => Currency.from(s).toOption)(_.code)
     .description("3-letter currency code (e.g., EUR, USD)")
 
+  given Schema[Interval] = Schema.string.validate(Validator.enumeration(Interval.values.toList, i => Some(i.toString)))
+
   given Schema[TradeOrder]          = Schema.derived
   given Schema[BrokerParameters]    = Schema.derived
-  given Schema[ValueTransformation] = Schema.derived
-  given Schema[Indicator]           = Schema.derived
   given Schema[Schedule]            = Schema.derived
-
-  // THESE SCHEMAS WILL NOT BE DERIVED AUTOMATICALLY:
-  given Schema[Condition]     = Schema.string
-  given Schema[Interval]      = Schema.string
-  given Schema[TradeStrategy] = Schema.string
+  given Schema[RuleCondition]       = Schema.derived
+  given Schema[ValueTransformation] = Schema.derived
+  given Schema[Condition]           = Schema.string
+  given Schema[Indicator]           = Schema.string
 }
