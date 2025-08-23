@@ -25,7 +25,7 @@ object Mutator:
   def bitFlip[F[_]](using F: Sync[F]): F[Mutator[F, Array[Int]]] =
     F.pure {
       new Mutator[F, Array[Int]] {
-        val mutator: Mutator[Id, Array[Int]] = pureBitFlip
+        val mutator: Mutator[Id, Array[Int]]                                                              = pureBitFlip
         override def mutate(ind: Array[Int], mutationProbability: Double)(using r: Random): F[Array[Int]] =
           F.delay(mutator.mutate(ind, mutationProbability))
       }

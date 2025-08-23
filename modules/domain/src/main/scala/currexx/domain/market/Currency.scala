@@ -18,8 +18,7 @@ object Currency {
     s"Unknown currency code $code; Available currencies are: ${defaultSet.mkString(", ")}"
   )
 
-  extension (currency: Currency)
-    def code: String = currency
+  extension (currency: Currency) def code: String = currency
 
   inline given Decoder[Currency] = Decoder.decodeString.emap[Currency](Currency.from)
   inline given Encoder[Currency] = Encoder.encodeString.contramap(_.code)

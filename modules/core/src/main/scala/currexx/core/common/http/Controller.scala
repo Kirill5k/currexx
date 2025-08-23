@@ -39,7 +39,7 @@ trait Controller[F[_]] extends TapirJson with TapirSchema {
   def routes(using authenticator: Authenticator[F]): HttpRoutes[F]
 
   extension [A](fa: F[A])(using F: MonadThrow[F])
-    def voidResponse: F[Either[(StatusCode, ErrorResponse), Unit]] = mapResponse(_ => ())
+    def voidResponse: F[Either[(StatusCode, ErrorResponse), Unit]]             = mapResponse(_ => ())
     def mapResponse[B](fab: A => B): F[Either[(StatusCode, ErrorResponse), B]] =
       fa
         .map(fab(_).asRight[(StatusCode, ErrorResponse)])
@@ -85,7 +85,7 @@ object Controller extends TapirSchema with TapirJson with TapirCodecs {
             case _                            => None
         } else {
           ctx.failure match
-            case DecodeResult.Error(_, e) => errorEndpointOut(e)
+            case DecodeResult.Error(_, e)     => errorEndpointOut(e)
             case DecodeResult.InvalidValue(e) =>
               val msgs = e.collect { case ValidationError(_, _, _, Some(msg)) => msg }
               errorEndpointOut(AppError.FailedValidation(msgs.mkString(", ")))

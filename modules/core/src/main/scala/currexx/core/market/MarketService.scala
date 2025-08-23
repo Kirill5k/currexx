@@ -53,7 +53,7 @@ final private class LiveMarketService[F[_]](
   override def updateTimeState(uid: UserId, data: MarketTimeSeriesData): F[Unit] =
     data.prices.toList match
       case latestCandle :: previousCandle :: _ =>
-        val cp = data.currencyPair
+        val cp      = data.currencyPair
         val timeGap = previousCandle.time.durationBetween(latestCandle.time)
         F.whenA(timeGap > (data.interval.toDuration * 2)) {
           stateRepo.find(uid, cp).flatMap {

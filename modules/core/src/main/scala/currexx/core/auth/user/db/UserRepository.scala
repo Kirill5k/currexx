@@ -58,7 +58,7 @@ final private class LiveUserRepository[F[_]](
 
 object UserRepository extends MongoJsonCodecs:
   val indexByEmail = Index.ascending(Field.Email)
-  
+
   def make[F[_]: Async](db: MongoDatabase[F]): F[UserRepository[F]] =
     db.getCollectionWithCodec[UserEntity](Repository.Collection.Users)
       .flatTap(_.createIndex(indexByEmail, IndexOptions().unique(true)))

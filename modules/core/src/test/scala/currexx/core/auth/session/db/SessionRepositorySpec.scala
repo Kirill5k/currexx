@@ -17,7 +17,7 @@ class SessionRepositorySpec extends MongoSpec {
   override protected val mongoPort: Int = 12347
 
   "A SessionRepository" should {
-    "create new sessions" in {
+    "create new sessions" in
       withEmbeddedMongoDb { db =>
         val result = for
           repo <- SessionRepository.make(db)
@@ -37,9 +37,8 @@ class SessionRepositorySpec extends MongoSpec {
           ).some
         }
       }
-    }
 
-    "return empty option when session does not exist" in {
+    "return empty option when session does not exist" in
       withEmbeddedMongoDb { db =>
         val result = for
           repo <- SessionRepository.make(db)
@@ -48,9 +47,8 @@ class SessionRepositorySpec extends MongoSpec {
 
         result.map(_ mustBe None)
       }
-    }
 
-    "unauth session" in {
+    "unauth session" in
       withEmbeddedMongoDb { db =>
         val result = for
           repo <- SessionRepository.make(db)
@@ -65,9 +63,8 @@ class SessionRepositorySpec extends MongoSpec {
           sess.status mustBe SessionStatus.LoggedOut
         }
       }
-    }
 
-    "invalidate all sessions" in {
+    "invalidate all sessions" in
       withEmbeddedMongoDb { db =>
         val result = for
           repo <- SessionRepository.make(db)
@@ -86,9 +83,8 @@ class SessionRepositorySpec extends MongoSpec {
           case _ => fail("unexpected match")
         }
       }
-    }
 
-    "update session lastAccessedAt field on find" in {
+    "update session lastAccessedAt field on find" in
       withEmbeddedMongoDb { db =>
         val result = for
           repo <- SessionRepository.make(db)
@@ -101,7 +97,6 @@ class SessionRepositorySpec extends MongoSpec {
           sess.flatMap(_.lastAccessedAt) must not be empty
         }
       }
-    }
   }
 
   def withEmbeddedMongoDb[A](test: MongoDatabase[IO] => IO[A]): Future[A] =

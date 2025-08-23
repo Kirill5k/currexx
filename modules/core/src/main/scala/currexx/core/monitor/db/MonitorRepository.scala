@@ -109,10 +109,10 @@ final private class LiveMonitorRepository[F[_]](
 }
 
 object MonitorRepository extends MongoJsonCodecs {
-  val indexByUid =  Index.ascending(Field.UId)
+  val indexByUid = Index.ascending(Field.UId)
   val indexByCps = Index.ascending(Field.UId).combinedWith(Index.ascending(Field.Kind)).combinedWith(Index.ascending(Field.CurrencyPairs))
-  
-  def make[F[_] : Async](db: MongoDatabase[F]): F[MonitorRepository[F]] =
+
+  def make[F[_]: Async](db: MongoDatabase[F]): F[MonitorRepository[F]] =
     db.getCollectionWithCodec[MonitorEntity](Repository.Collection.Monitors)
       .flatTap(_.createIndex(indexByUid))
       .flatTap(_.createIndex(indexByCps))

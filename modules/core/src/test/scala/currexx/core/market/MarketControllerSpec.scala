@@ -7,7 +7,7 @@ import currexx.core.fixtures.{Markets, Sessions, Users}
 import currexx.domain.market.CurrencyPair
 import currexx.domain.user.UserId
 import org.http4s.implicits.*
-import org.http4s.{Method, Status, Uri, Request}
+import org.http4s.{Method, Request, Status, Uri}
 
 class MarketControllerSpec extends HttpRoutesWordSpec {
 

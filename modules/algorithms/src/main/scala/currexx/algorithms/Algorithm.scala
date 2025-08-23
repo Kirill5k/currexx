@@ -25,7 +25,7 @@ object Algorithm {
   case object GA extends Algorithm[Alg.GA, Parameters.GA] {
     override def optimise[I](target: I, params: Parameters.GA): Free[Op[*, I], EvaluatedPopulation[I]] =
       for
-        pop <- Op.InitPopulation(target, params.populationSize, params.shuffle).freeM
+        pop      <- Op.InitPopulation(target, params.populationSize, params.shuffle).freeM
         finalPop <- iterate(pop, params.maxGen) { (currentPop, i) =>
           for
             _           <- Op.UpdateOnProgress(i, params.maxGen).freeM

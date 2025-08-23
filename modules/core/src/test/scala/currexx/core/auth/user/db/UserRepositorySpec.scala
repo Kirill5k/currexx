@@ -20,7 +20,7 @@ class UserRepositorySpec extends MongoSpec {
   "An UserRepository" when {
 
     "find" should {
-      "find account by id" in {
+      "find account by id" in
         withEmbeddedMongoDb { client =>
           val result = for
             repo <- UserRepository.make(client)
@@ -31,9 +31,8 @@ class UserRepositorySpec extends MongoSpec {
             acc mustBe User(Users.uid, Users.details.email, Users.details.name, Users.hash, Users.regDate)
           }
         }
-      }
 
-      "return error account does not exist" in {
+      "return error account does not exist" in
         withEmbeddedMongoDb { client =>
           val result = for
             repo <- UserRepository.make(client)
@@ -42,11 +41,10 @@ class UserRepositorySpec extends MongoSpec {
 
           result.attempt.map(_ mustBe Left(EntityDoesNotExist("User", Users.uid2.value)))
         }
-      }
     }
 
     "findBy" should {
-      "find account by email" in {
+      "find account by email" in
         withEmbeddedMongoDb { client =>
           val result = for
             repo <- UserRepository.make(client)
@@ -57,9 +55,8 @@ class UserRepositorySpec extends MongoSpec {
             acc mustBe Some(User(Users.uid, Users.details.email, Users.details.name, Users.hash, Users.regDate))
           }
         }
-      }
 
-      "return empty option when account does not exist" in {
+      "return empty option when account does not exist" in
         withEmbeddedMongoDb { client =>
           val result = for
             repo <- UserRepository.make(client)
@@ -68,11 +65,10 @@ class UserRepositorySpec extends MongoSpec {
 
           result.map(_ mustBe None)
         }
-      }
     }
 
     "updatePassword" should {
-      "update account password" in {
+      "update account password" in
         withEmbeddedMongoDb { client =>
           val newpwd = PasswordHash("new-password")
           val result = for
@@ -85,11 +81,10 @@ class UserRepositorySpec extends MongoSpec {
             acc.password mustBe newpwd
           }
         }
-      }
 
-      "return error when account does not exist" in {
+      "return error when account does not exist" in
         withEmbeddedMongoDb { client =>
-          val id = UserId(ObjectId().toHexString)
+          val id     = UserId(ObjectId().toHexString)
           val result = for
             repo <- UserRepository.make(client)
             acc  <- repo.updatePassword(id)(Users.hash)
@@ -97,11 +92,10 @@ class UserRepositorySpec extends MongoSpec {
 
           result.attempt.map(_ mustBe Left(EntityDoesNotExist("User", id.value)))
         }
-      }
     }
 
     "create" should {
-      "create new account" in {
+      "create new account" in
         withEmbeddedMongoDb { client =>
           val email = UserEmail("acc2@et.com")
 
@@ -117,9 +111,8 @@ class UserRepositorySpec extends MongoSpec {
             case _ => fail("unmatched case")
           }
         }
-      }
 
-      "return error when account already exists" in {
+      "return error when account already exists" in
         withEmbeddedMongoDb { client =>
           val result = for
             repo <- UserRepository.make(client)
@@ -128,7 +121,6 @@ class UserRepositorySpec extends MongoSpec {
 
           result.attempt.map(_ mustBe Left(AccountAlreadyExists(Users.details.email)))
         }
-      }
     }
   }
 

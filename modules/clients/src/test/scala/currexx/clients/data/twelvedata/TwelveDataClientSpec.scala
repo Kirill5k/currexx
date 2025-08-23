@@ -33,7 +33,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
             ResponseStub.adjust(readJson("twelvedata/eur-usd-daily-prices.response.json"))
           case _ => throw new RuntimeException()
         }
-      
+
       val result = for
         client <- TwelveDataClient.make[IO](config, testingBackend, 100.millis)
         res    <- client.timeSeriesData(pair, Interval.D1)
@@ -50,13 +50,12 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
     }
 
     "retry after some delay in case of api limit error" in {
-      val testingBackend = fs2BackendStub
-        .whenAnyRequest
+      val testingBackend = fs2BackendStub.whenAnyRequest
         .thenRespondCyclic(
           ResponseStub.adjust(readJson("twelvedata/limit-error.json")),
           ResponseStub.adjust(readJson("twelvedata/eur-usd-daily-prices.response.json"))
         )
-      
+
       val result = for
         client <- TwelveDataClient.make[IO](config, testingBackend, 100.millis)
         res    <- client.timeSeriesData(pair, Interval.D1)

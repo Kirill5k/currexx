@@ -13,7 +13,7 @@ import scala.concurrent.duration.*
 class HealthControllerSpec extends HttpRoutesWordSpec {
 
   val ipAddress = "127.0.0.1"
-  val ts = Instant.parse("2020-01-01T00:00:00Z")
+  val ts        = Instant.parse("2020-01-01T00:00:00Z")
 
   given clock: Clock[IO] = Clock.mock[IO](ts)
 

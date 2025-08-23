@@ -102,7 +102,7 @@ object Indicator:
     mappings = Map(
       "composite"                   -> JsonTaggedAdt.tagged[Indicator.Composite],
       "volatility-regime-detection" -> JsonTaggedAdt.tagged[Indicator.VolatilityRegimeDetection],
-      "trend-change-detection"       -> JsonTaggedAdt.tagged[Indicator.TrendChangeDetection],
+      "trend-change-detection"      -> JsonTaggedAdt.tagged[Indicator.TrendChangeDetection],
       "threshold-crossing"          -> JsonTaggedAdt.tagged[Indicator.ThresholdCrossing],
       "lines-crossing"              -> JsonTaggedAdt.tagged[Indicator.LinesCrossing],
       "keltner-channel"             -> JsonTaggedAdt.tagged[Indicator.KeltnerChannel],
@@ -111,9 +111,9 @@ object Indicator:
     strict = true,
     typeFieldName = "kind"
   )
-  
+
   def compositeAllOf(indicator: Indicator, indicators: Indicator*): Indicator =
     Indicator.Composite(NonEmptyList.of(indicator, indicators*), CombinationLogic.All)
-    
+
   def compositeAnyOf(indicator: Indicator, indicators: Indicator*): Indicator =
     Indicator.Composite(NonEmptyList.of(indicator, indicators*), CombinationLogic.Any)

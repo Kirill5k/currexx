@@ -19,8 +19,8 @@ object FileReader {
   def pricesFromResources(path: String): NonEmptyList[PriceRange] = {
     val json = FileReader.parseFromResources[JsonObject](path)
     for
-      prices    <- json("Time Series FX (Daily)").toRight(new RuntimeException("missing prices"))
-      priceList <- prices.as[ListMap[String, JsonObject]]
+      prices     <- json("Time Series FX (Daily)").toRight(new RuntimeException("missing prices"))
+      priceList  <- prices.as[ListMap[String, JsonObject]]
       priceRange <- priceList.toList.traverse { (date, ohlc) =>
         for
           open  <- ohlc("1. open").flatMap(_.asString).map(_.toDouble).toRight(new RuntimeException("missing open"))

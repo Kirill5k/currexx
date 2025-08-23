@@ -38,9 +38,9 @@ class SelectorSpec extends IOWordSpec {
         (7, Fitness(35.0)), // 1
         (6, Fitness(20.0)), // 2
         (4, Fitness(10.0)), // 5
-        (8, Fitness(7.0)), // 3
-        (3, Fitness(5.0)), // 4
-        (1, Fitness(4.0)), // 6
+        (8, Fitness(7.0)),  // 3
+        (3, Fitness(5.0)),  // 4
+        (1, Fitness(4.0)),  // 6
         (2, Fitness(2.0)),
         (5, Fitness(1.0)),
         (10, Fitness(-1.0)),

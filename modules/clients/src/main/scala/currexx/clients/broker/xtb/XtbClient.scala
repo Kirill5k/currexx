@@ -30,7 +30,7 @@ private[clients] trait XtbClient[F[_]] extends Fs2HttpClient[F]:
 
 final private class LiveXtbClient[F[_]](
     override protected val backend: WebSocketStreamBackend[F, Fs2Streams[F]],
-    private val config: XtbConfig,
+    private val config: XtbConfig
 )(using
     F: Async[F],
     logger: Logger[F]
@@ -42,7 +42,7 @@ final private class LiveXtbClient[F[_]](
   override def getCurrentOrders(params: BrokerParameters.Xtb, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]] =
     for
       state <- initEmptyState
-      _ <- basicRequest
+      _     <- basicRequest
         .get(uri"${config.baseUri}/${if (params.demo) "demo" else "real"}")
         .response(asWebSocketStream(Fs2Streams[F])(orderRetrievalProcess(state, params, cps)))
         .send(backend)
@@ -103,7 +103,7 @@ final private class LiveXtbClient[F[_]](
                   .filter(_.symbol == order.currencyPair)
                   .map(td => XtbRequest.closeTransaction(sid, order.currencyPair, td).asText)
               }
-          case XtbResponse.OrderPlacement(_) => Stream.emit(WebSocketFrame.close)
+          case XtbResponse.OrderPlacement(_)          => Stream.emit(WebSocketFrame.close)
           case XtbResponse.Error("SE199", errorDescr) =>
             Stream.logError(s"$name-client/server-${params.userId}: failed to close transaction for $order - $errorDescr") ++
               obtainSessionId(state)
@@ -222,6 +222,6 @@ object XtbClient:
 
   def make[F[_]: {Async, Logger}](
       config: XtbConfig,
-      backend: WebSocketStreamBackend[F, Fs2Streams[F]],
+      backend: WebSocketStreamBackend[F, Fs2Streams[F]]
   ): F[XtbClient[F]] =
     Monad[F].pure(LiveXtbClient(backend, config))

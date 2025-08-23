@@ -14,7 +14,7 @@ class AppConfigSpec extends IOWordSpec {
 
   "An AppConfig" should {
 
-    "load itself from application.conf" in {
+    "load itself from application.conf" in
       AppConfig.load[IO].asserting { config =>
         config.server.host mustBe "0.0.0.0"
         config.mongo.connectionUri mustBe "mongodb+srv://user:password@mongo/currexx"
@@ -22,6 +22,5 @@ class AppConfigSpec extends IOWordSpec {
         config.clients.twelveData.apiKey mustBe "td-key"
         config.clients.xtb.baseUri mustBe "wss://ws.xtb.com"
       }
-    }
   }
 }

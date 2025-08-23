@@ -23,16 +23,17 @@ object Filters {
     filteredStates.map(_.x(0))
   }
 
-  /**
-   * NEW METHOD
-   * Provides a simplified interface to the full 1D Kalman filter for extracting the calculated velocity.
-   *
-   * In a financial context, the velocity can be interpreted as the momentum or rate-of-change of the price.
-   *
-   * @param values The list of prices/measurements, sorted from latest to earliest.
-   * @param gain   A value controlling the filter's responsiveness, mapped to process noise.
-   * @return A list of calculated velocities, sorted from latest to earliest.
-   */
+  /** NEW METHOD Provides a simplified interface to the full 1D Kalman filter for extracting the calculated velocity.
+    *
+    * In a financial context, the velocity can be interpreted as the momentum or rate-of-change of the price.
+    *
+    * @param values
+    *   The list of prices/measurements, sorted from latest to earliest.
+    * @param gain
+    *   A value controlling the filter's responsiveness, mapped to process noise.
+    * @return
+    *   A list of calculated velocities, sorted from latest to earliest.
+    */
   def kalmanVelocity(values: List[Double], gain: Double, measurementNoise: Double = 1.0): List[Double] = {
     val filteredStates = kalmanFilter1D(
       measurements = values,

@@ -83,6 +83,6 @@ final private class CachedValueTransformer(
 object ValueTransformer:
   def pure: ValueTransformer =
     new PureValueTransformer()
-    
+
   def cached: ValueTransformer =
     CachedValueTransformer(TrieMap.empty)

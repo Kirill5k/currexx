@@ -21,7 +21,7 @@ final case class SignalEntity(
   def toDomain: Signal = Signal(
     userId = UserId(userId),
     currencyPair = currencyPair,
-    interval = interval, 
+    interval = interval,
     condition = condition,
     triggeredBy = triggeredBy,
     time = time
@@ -34,6 +34,6 @@ object SignalEntity:
       currencyPair = signal.currencyPair,
       interval = signal.interval,
       condition = signal.condition,
-      triggeredBy = signal.triggeredBy, 
+      triggeredBy = signal.triggeredBy,
       time = signal.time
     )

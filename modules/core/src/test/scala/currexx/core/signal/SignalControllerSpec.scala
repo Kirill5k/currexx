@@ -6,7 +6,7 @@ import currexx.core.auth.Authenticator
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Sessions, Signals, Users}
 import currexx.domain.market.Interval
-import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation, Condition, Direction}
+import currexx.domain.signal.{Condition, Direction, Indicator, ValueSource, ValueTransformation}
 import currexx.domain.user.UserId
 import kirill5k.common.cats.Clock
 import org.http4s.implicits.*
@@ -37,14 +37,16 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         res mustHaveStatus (Status.NoContent, None)
-        verify(svc).submit(Signal(
-          userId = Users.uid,
-          currencyPair = Markets.gbpeur,
-          interval = Interval.H1,
-          condition = Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, None),
-          triggeredBy = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(16)),
-          time = now
-        ))
+        verify(svc).submit(
+          Signal(
+            userId = Users.uid,
+            currencyPair = Markets.gbpeur,
+            interval = Interval.H1,
+            condition = Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, None),
+            triggeredBy = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(16)),
+            time = now
+          )
+        )
       }
 
       "return error on unrecognized indicator" in {
@@ -55,7 +57,8 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
           .withBody("""{"interval":"H1","currencyPair":"GBP/EUR","triggeredBy": {"kind": "foo"}}""")
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val validIndicators = "trend-change-detection, keltner-channel, value-tracking, volatility-regime-detection, lines-crossing, threshold-crossing, composite"
+        val validIndicators =
+          "trend-change-detection, keltner-channel, value-tracking, volatility-regime-detection, lines-crossing, threshold-crossing, composite"
         val responseBody = s"""{"message":"Missing required field, Received unknown type: 'foo'. Exists only types: $validIndicators."}"""
         res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
@@ -74,7 +77,8 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
               |}""".stripMargin)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val validCondition = "value-updated, volatility-regime-change, lower-band-crossing, lines-crossing, threshold-crossing, composite, trend-direction-change, upper-band-crossing"
+        val validCondition =
+          "value-updated, volatility-regime-change, lower-band-crossing, lines-crossing, threshold-crossing, composite, trend-direction-change, upper-band-crossing"
         val responseBody = s"""{"message":"Received unknown type: 'foo'. Exists only types: $validCondition."}"""
         res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)

@@ -20,7 +20,7 @@ class SettingsRepositorySpec extends MongoSpec {
 
   "SettingsRepository" when {
     "get" should {
-      "return error settings do not exist" in {
+      "return error settings do not exist" in
         withEmbeddedMongoDb { db =>
           val result = for
             repo <- SettingsRepository.make[IO](db)
@@ -29,11 +29,10 @@ class SettingsRepositorySpec extends MongoSpec {
 
           result.attempt.map(_ mustBe Left(AppError.NotSetup("Global")))
         }
-      }
     }
 
     "update" should {
-      "create new entry if settings do not exist" in {
+      "create new entry if settings do not exist" in
         withEmbeddedMongoDb { db =>
           val result = for
             repo <- SettingsRepository.make[IO](db)
@@ -43,9 +42,8 @@ class SettingsRepositorySpec extends MongoSpec {
 
           result.map(_ mustBe Settings.global)
         }
-      }
 
-      "update existing settings" in {
+      "update existing settings" in
         withEmbeddedMongoDb { db =>
           val result = for
             repo <- SettingsRepository.make[IO](db)
@@ -56,11 +54,10 @@ class SettingsRepositorySpec extends MongoSpec {
 
           result.map(_ mustBe Settings.global.copy(trade = None, note = Some("update")))
         }
-      }
     }
 
     "createFor" should {
-      "create an entry in settings collection for a given user-id" in {
+      "create an entry in settings collection for a given user-id" in
         withEmbeddedMongoDb { db =>
           val result = for
             repo <- SettingsRepository.make[IO](db)
@@ -70,9 +67,8 @@ class SettingsRepositorySpec extends MongoSpec {
 
           result.map(_.userId mustBe Users.uid)
         }
-      }
 
-      "not create a config if it already exists" in {
+      "not create a config if it already exists" in
         withEmbeddedMongoDb { db =>
           val result = for
             repo <- SettingsRepository.make[IO](db)
@@ -83,7 +79,6 @@ class SettingsRepositorySpec extends MongoSpec {
 
           result.map(_ mustBe 1)
         }
-      }
     }
   }
 

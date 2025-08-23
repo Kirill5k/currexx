@@ -14,7 +14,8 @@ class VolatilitySpec extends AnyWordSpec with Matchers {
 
       val result = Volatility.averageTrueRange(closes, highs, lows, 14)
 
-      result.take(5) mustBe List(0.010395405950770225, 0.010738898716214088, 0.010274198617461325, 0.010324521588035275, 0.010603330940961062)
+      result.take(5) mustBe List(0.010395405950770225, 0.010738898716214088, 0.010274198617461325, 0.010324521588035275,
+        0.010603330940961062)
     }
   }
 

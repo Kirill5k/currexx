@@ -19,7 +19,7 @@ private[alphavantage] object ResponseMapper {
       timeSeriesField = "Time Series FX (Daily)"
       pricesJson    <- res(timeSeriesField).toRight(AppError.JsonParsingFailure(res.toString, s"Missing '$timeSeriesField' field"))
       pricesByDates <- pricesJson.as[ListMap[String, OHLC]].leftMap(e => AppError.JsonParsingFailure(res.toString, e.getMessage))
-      prices <- NonEmptyList
+      prices        <- NonEmptyList
         .fromList(pricesByDates.zipWithIndex.toList)
         .filter(_.size > 10)
         .toRight(AppError.NotEnoughDataPoints("alpha-vantage", pricesByDates.size))
@@ -42,7 +42,7 @@ private[alphavantage] object ResponseMapper {
       timeSeriesField = s"Time Series FX (${meta.`5. Interval`})"
       pricesJson    <- res(timeSeriesField).toRight(AppError.JsonParsingFailure(res.toString, s"Missing '$timeSeriesField' field"))
       pricesByDates <- pricesJson.as[ListMap[String, OHLC]].leftMap(e => AppError.JsonParsingFailure(res.toString, e.getMessage))
-      prices <- NonEmptyList
+      prices        <- NonEmptyList
         .fromList(pricesByDates.zipWithIndex.toList)
         .filter(_.size > 10)
         .toRight(AppError.NotEnoughDataPoints("alpha-vantage", pricesByDates.size))

@@ -12,7 +12,7 @@ import mongo4cats.operations.Filter
 trait Repository[F[_]] {
 
   import Repository.*
-  
+
   private def idEqFilter(name: String, id: String): Filter = Filter.eq(name, ObjectId(id))
   protected def idEq(id: String): Filter                   = idEqFilter(Field.Id, id)
   protected def userIdEq(uid: UserId): Filter              = idEqFilter(Field.UId, uid.value)
@@ -39,32 +39,32 @@ trait Repository[F[_]] {
 
 object Repository {
   object Field {
-    val Id = "_id"
-    val Name = "name"
-    val Time = "time"
-    val UId = "userId"
-    val Email = "email"
-    val Kind = "kind"
-    val LastQueriedAt = "lastQueriedAt"
-    val LastUpdatedAt = "lastUpdatedAt"
-    val Status = "status"
-    val LastAccessedAt = "lastAccessedAt"
-    val Active = "active"
-    val CurrencyPair = "currencyPair"
-    val CurrencyPairs = "currencyPairs"
+    val Id                = "_id"
+    val Name              = "name"
+    val Time              = "time"
+    val UId               = "userId"
+    val Email             = "email"
+    val Kind              = "kind"
+    val LastQueriedAt     = "lastQueriedAt"
+    val LastUpdatedAt     = "lastUpdatedAt"
+    val Status            = "status"
+    val LastAccessedAt    = "lastAccessedAt"
+    val Active            = "active"
+    val CurrencyPair      = "currencyPair"
+    val CurrencyPairs     = "currencyPairs"
     val OrderCurrencyPair = "order.currencyPair"
-    val Indicators = "indicators"
-    val TriggeredBy = "triggeredBy"
+    val Indicators        = "indicators"
+    val TriggeredBy       = "triggeredBy"
   }
-  
+
   object Collection {
-    val Sessions      = "sessions"
-    val Users         = "users"
-    val LogEvents     = "log-events"
-    val MarketState   = "market-state"
-    val Monitors      = "monitors"
-    val Settings      = "settings"
-    val Signals       = "signals"
-    val TradeOrders   = "trade-orders"
+    val Sessions    = "sessions"
+    val Users       = "users"
+    val LogEvents   = "log-events"
+    val MarketState = "market-state"
+    val Monitors    = "monitors"
+    val Settings    = "settings"
+    val Signals     = "signals"
+    val TradeOrders = "trade-orders"
   }
 }

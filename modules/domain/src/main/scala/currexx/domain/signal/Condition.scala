@@ -114,8 +114,8 @@ object Condition {
       // The point we are testing is the one in the middle of our window.
       // Since the list is latest-to-earliest, this point is `lookback` periods in the past.
       val candidateTurnPoint = window(lookback)
-      val beforeTurn = window.take(lookback)
-      val afterTurn = window.drop(lookback + 1)
+      val beforeTurn         = window.take(lookback)
+      val afterTurn          = window.drop(lookback + 1)
 
       if (beforeTurn.forall(_ < candidateTurnPoint) && afterTurn.forall(_ < candidateTurnPoint)) {
         Some(

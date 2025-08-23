@@ -21,15 +21,13 @@ object TradeOrder {
       currencyPair: CurrencyPair,
       price: BigDecimal,
       volume: BigDecimal
-  ) extends TradeOrder("enter")
-      derives Codec.AsObject:
+  ) extends TradeOrder("enter") derives Codec.AsObject:
     def isEnter: Boolean = true
 
   final case class Exit(
       currencyPair: CurrencyPair,
       price: BigDecimal
-  ) extends TradeOrder("exit")
-      derives Codec.AsObject:
+  ) extends TradeOrder("exit") derives Codec.AsObject:
     def isEnter: Boolean = false
 
   inline given Decoder[TradeOrder] = Decoder.instance { c =>

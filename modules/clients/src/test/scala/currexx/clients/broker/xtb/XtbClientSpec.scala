@@ -16,7 +16,7 @@ import scala.concurrent.duration.*
 class XtbClientSpec extends SttpWordSpec {
 
   given Logger[IO] = Slf4jLogger.getLogger[IO]
-  
+
   val config = XtbConfig("wss://ws.xtb.com")
   val pair   = CurrencyPair(EUR, CAD)
   val price  = BigDecimal(1.341)
@@ -24,7 +24,7 @@ class XtbClientSpec extends SttpWordSpec {
   val brokerConfig: BrokerParameters.Xtb = BrokerParameters.Xtb("foo", "bar", true)
 
   "A XtbClient" should {
-    
+
     "send enter market request" ignore {
       val result = Fs2Backend
         .resource[IO](options = BackendOptions(3.minutes, None))

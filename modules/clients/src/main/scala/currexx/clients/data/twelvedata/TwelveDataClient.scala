@@ -72,7 +72,6 @@ final private class LiveTwelveDataClient[F[_]](
                 F.sleep(delayBetweenConnectionFailures) >> fetchTimeSeriesData(pair, interval, numOfTicks)
         }
     }
-    
 
   extension (dateString: String)
     private def toInstant(i: Int): Instant =

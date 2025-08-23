@@ -12,8 +12,8 @@ import scala.concurrent.duration.*
 
 class TradeStrategySpec extends AnyWordSpec with Matchers {
 
-  val tradeAction: TradeAction = TradeAction.OpenLong
-  val anotherTradeAction: TradeAction = TradeAction.OpenShort
+  val tradeAction: TradeAction         = TradeAction.OpenLong
+  val anotherTradeAction: TradeAction  = TradeAction.OpenShort
   val closePositionAction: TradeAction = TradeAction.ClosePosition
 
   val previousProfile: MarketProfile = profile.copy(lastMomentumValue = Some(10.0))
@@ -36,7 +36,7 @@ class TradeStrategySpec extends AnyWordSpec with Matchers {
   val positionOpenForState: MarketState = trendChangedState.copy(
     currentPosition = Some(positionState.copy(openedAt = ts.minusSeconds(70)))
   )
-  val noPositionState: MarketState = trendChangedState.copy(currentPosition = None)
+  val noPositionState: MarketState    = trendChangedState.copy(currentPosition = None)
   val momentumStillState: MarketState =
     trendChangedState.copy(profile = trendChangedState.profile.copy(lastMomentumValue = Some(10.0)))
   val momentumEnteredState: MarketState = trendChangedState.copy(
@@ -123,7 +123,10 @@ class TradeStrategySpec extends AnyWordSpec with Matchers {
     }
 
     "evaluate AllOf condition" in {
-      val rule = Rule(closePositionAction, Condition.AllOf(List(Condition.PositionIs(TradeOrder.Position.Buy), Condition.TrendIs(Direction.Downward))))
+      val rule = Rule(
+        closePositionAction,
+        Condition.AllOf(List(Condition.PositionIs(TradeOrder.Position.Buy), Condition.TrendIs(Direction.Downward)))
+      )
       Rule.findTriggeredAction(List(rule), trendChangedState, previousProfile) mustBe Some(closePositionAction)
     }
 

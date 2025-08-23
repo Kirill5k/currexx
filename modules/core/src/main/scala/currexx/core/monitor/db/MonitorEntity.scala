@@ -30,8 +30,7 @@ object MonitorEntity {
       schedule: Schedule,
       lastQueriedAt: Option[Instant],
       limits: Limits
-  ) extends MonitorEntity("profit")
-      derives Codec.AsObject:
+  ) extends MonitorEntity("profit") derives Codec.AsObject:
     override def toDomain: Monitor =
       Monitor.Profit(
         MonitorId(_id),
@@ -51,8 +50,7 @@ object MonitorEntity {
       schedule: Schedule,
       lastQueriedAt: Option[Instant],
       interval: Interval
-  ) extends MonitorEntity("market-data")
-      derives Codec.AsObject:
+  ) extends MonitorEntity("market-data") derives Codec.AsObject:
     override def toDomain: Monitor =
       Monitor.MarketData(
         MonitorId(_id),

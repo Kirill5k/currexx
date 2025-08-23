@@ -92,7 +92,7 @@ val backtest = project
     name       := "currexx-backtest",
     moduleName := "currexx-backtest",
     libraryDependencies ++= Dependencies.test,
-    Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement,
+    Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
   )
 
 val root = project

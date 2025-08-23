@@ -42,11 +42,10 @@ final private class LiveMonitorService[F[_]](
   override def triggerMonitor(uid: UserId, id: MonitorId, manual: Boolean = false): F[Unit] =
     for
       mon <- get(uid, id)
-      _ <- F.whenA(mon.active) {
+      _   <- F.whenA(mon.active) {
         repository.updateQueriedTimestamp(uid, id) >> (mon match
           case md: Monitor.MarketData => actionDispatcher.dispatch(Action.FetchMarketData(uid, mon.currencyPairs, md.interval))
-          case p: Monitor.Profit      => actionDispatcher.dispatch(Action.AssertProfit(uid, mon.currencyPairs, p.limits))
-        )
+          case p: Monitor.Profit      => actionDispatcher.dispatch(Action.AssertProfit(uid, mon.currencyPairs, p.limits)))
       }
       _ <- F.unlessA(manual)(scheduleMonitor(clock.now)(mon))
     yield ()

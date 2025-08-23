@@ -9,8 +9,7 @@ object RequestArguments:
   final case class Login(
       userId: String,
       password: String
-  ) extends RequestArguments
-      derives Codec.AsObject
+  ) extends RequestArguments derives Codec.AsObject
 
   final case class TradeTransInfo(
       cmd: Option[Int],

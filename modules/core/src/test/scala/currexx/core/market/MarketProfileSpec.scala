@@ -18,8 +18,8 @@ class MarketProfileSpec extends AnyWordSpec with Matchers {
       }
 
       "not update anything when trend is the same" in {
-        val signal = Signals.trend(Direction.Upward)
-        val profile = MarketProfile(trend = Some(TrendState(Direction.Upward, Instant.parse("2023-10-01T00:00:00Z"))))
+        val signal         = Signals.trend(Direction.Upward)
+        val profile        = MarketProfile(trend = Some(TrendState(Direction.Upward, Instant.parse("2023-10-01T00:00:00Z"))))
         val updatedProfile = profile.update(signal)
         profile mustBe updatedProfile
       }

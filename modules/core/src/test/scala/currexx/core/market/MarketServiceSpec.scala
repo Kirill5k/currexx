@@ -136,7 +136,7 @@ class MarketServiceSpec extends IOWordSpec {
 
         val signal = Signals.trend(Direction.Upward)
         val result = for
-          svc <- MarketService.make[IO](stateRepo, disp)
+          svc   <- MarketService.make[IO](stateRepo, disp)
           state <- svc.processSignals(Users.uid, Markets.gbpeur, List(signal))
         yield state
 
@@ -144,7 +144,7 @@ class MarketServiceSpec extends IOWordSpec {
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verifyNoMoreInteractions(stateRepo)
           disp.submittedActions mustBe empty
-          res mustBe()
+          res mustBe ()
         }
       }
     }

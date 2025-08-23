@@ -231,7 +231,8 @@ class MonitorControllerSpec extends HttpRoutesWordSpec {
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val req = Request[IO](Method.PUT, uriWith(Monitors.mid)).withAuthHeader()
+        val req = Request[IO](Method.PUT, uriWith(Monitors.mid))
+          .withAuthHeader()
           .withBody(s"""{
                |"id": "${Monitors.mid}",
                |"kind": "market-data",
@@ -251,7 +252,8 @@ class MonitorControllerSpec extends HttpRoutesWordSpec {
         val svc                       = mock[MonitorService[IO]]
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val req = Request[IO](Method.PUT, uriWith(Monitors.mid)).withAuthHeader()
+        val req = Request[IO](Method.PUT, uriWith(Monitors.mid))
+          .withAuthHeader()
           .withBody(s"""{
                |"id": "foo",
                |"kind": "market-data",

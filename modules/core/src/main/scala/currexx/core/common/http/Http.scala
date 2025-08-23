@@ -28,7 +28,7 @@ final class Http[F[_]: Async] private (
 
   private val apiRoutes: HttpRoutes[F] = {
     given Authenticator[F] = auth.authenticator
-    val routes = auth.controller.routes <+>
+    val routes             = auth.controller.routes <+>
       signals.controller.routes <+>
       monitors.controller.routes <+>
       markets.controller.routes <+>
@@ -49,7 +49,7 @@ final class Http[F[_]: Async] private (
   private val loggers: HttpRoutes[F] => HttpRoutes[F] = { (http: HttpRoutes[F]) => RequestLogger.httpRoutes(true, true)(http) }
     .andThen((http: HttpRoutes[F]) => ResponseLogger.httpRoutes(true, true)(http))
 
-  val app: HttpRoutes[F] = (loggers(middleware(apiRoutes)) <+> healthRoutes)
+  val app: HttpRoutes[F] = loggers(middleware(apiRoutes)) <+> healthRoutes
 }
 
 object Http:

@@ -117,8 +117,7 @@ object MonitorController extends TapirSchema with TapirJson {
         currencyPairs: NonEmptySet[CurrencyPair],
         schedule: Schedule,
         interval: Interval
-    ) extends CreateMonitorRequest("market-data")
-        derives Codec.AsObject:
+    ) extends CreateMonitorRequest("market-data") derives Codec.AsObject:
       def toDomain(uid: UserId): CreateMonitor =
         CreateMonitor.MarketData(uid, currencyPairs.toNonEmptyList, schedule, interval)
 
@@ -126,8 +125,7 @@ object MonitorController extends TapirSchema with TapirJson {
         currencyPairs: NonEmptySet[CurrencyPair],
         schedule: Schedule,
         limits: Limits
-    ) extends CreateMonitorRequest("profit")
-        derives Codec.AsObject:
+    ) extends CreateMonitorRequest("profit") derives Codec.AsObject:
       def toDomain(uid: UserId): CreateMonitor =
         CreateMonitor.Profit(uid, currencyPairs.toNonEmptyList, schedule, limits)
 
@@ -163,8 +161,7 @@ object MonitorController extends TapirSchema with TapirJson {
         schedule: Schedule,
         lastQueriedAt: Option[Instant],
         interval: Interval
-    ) extends MonitorView("market-data")
-        derives Codec.AsObject:
+    ) extends MonitorView("market-data") derives Codec.AsObject:
       def toDomain(uid: UserId): Monitor =
         Monitor.MarketData(MonitorId(id), uid, active, currencyPairs.toNonEmptyList, schedule, lastQueriedAt, interval)
 
@@ -175,8 +172,7 @@ object MonitorController extends TapirSchema with TapirJson {
         schedule: Schedule,
         lastQueriedAt: Option[Instant],
         limits: Limits
-    ) extends MonitorView("profit")
-        derives Codec.AsObject:
+    ) extends MonitorView("profit") derives Codec.AsObject:
       def toDomain(uid: UserId): Monitor =
         Monitor.Profit(MonitorId(id), uid, active, currencyPairs.toNonEmptyList, schedule, lastQueriedAt, limits)
 
@@ -201,7 +197,7 @@ object MonitorController extends TapirSchema with TapirJson {
     }
   }
 
-  private val basePath = "monitors"
+  private val basePath      = "monitors"
   private val monitorIdPath = basePath / path[String]
     .validate(Controller.validId)
     .map((s: String) => MonitorId(s))(_.value)
