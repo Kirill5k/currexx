@@ -1,7 +1,6 @@
 package currexx.core
 
 import cats.effect.{IO, IOApp}
-import cats.syntax.apply.*
 import currexx.clients.Clients
 import currexx.core.auth.Auth
 import currexx.core.common.action.{Action, ActionDispatcher, ActionProcessor}
