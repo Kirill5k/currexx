@@ -41,6 +41,7 @@ object Application extends IOApp.Simple:
             actionProcessor <- ActionProcessor
               .make[IO](dispatcher, monitors.service, signals.service, markets.service, trades.service, settings.service)
             logProcessor <- LogEventProcessor.make[IO](res.mongo)
+            _            <- logger.info(s"starting http server on port ${config.server.port}")
             _            <- Stream(
               Server.serveEmber[IO](config.server, http.app),
               actionProcessor.run,
