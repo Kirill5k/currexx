@@ -1,6 +1,7 @@
 package currexx.core
 
 import cats.effect.{IO, IOApp}
+import cats.syntax.apply.*
 import currexx.clients.Clients
 import currexx.core.auth.Auth
 import currexx.core.common.action.{Action, ActionDispatcher, ActionProcessor}
@@ -29,15 +30,16 @@ object Application extends IOApp.Simple:
           for
             _               <- logger.info(s"starting currexx-core ${sys.env.getOrElse("VERSION", "")}")
             dispatcher      <- ActionDispatcher.make[IO].flatTap(_.dispatch(Action.RescheduleAllMonitors))
-            clients         <- Clients.make[IO](config.clients, res.fs2Backend)
-            health          <- Health.make[IO]
-            auth            <- Auth.make(config.auth, res.mongo, dispatcher)
-            signals         <- Signals.make(res.mongo, dispatcher)
-            monitors        <- Monitors.make(res.mongo, dispatcher)
-            markets         <- Markets.make(res.mongo, dispatcher)
-            trades          <- Trades.make(res.mongo, clients, dispatcher)
-            settings        <- Settings.make(res.mongo)
+            clients         <- Clients.make[IO](config.clients, res.fs2Backend) <* logger.info("created clients")
+            health          <- Health.make[IO] <* logger.info("created health")
+            auth            <- Auth.make(config.auth, res.mongo, dispatcher) <* logger.info("created auth")
+            signals         <- Signals.make(res.mongo, dispatcher) <* logger.info("created signals")
+            monitors        <- Monitors.make(res.mongo, dispatcher) <* logger.info("created monitors")
+            markets         <- Markets.make(res.mongo, dispatcher) <* logger.info("created markets")
+            trades          <- Trades.make(res.mongo, clients, dispatcher) <* logger.info("created trades")
+            settings        <- Settings.make(res.mongo) <* logger.info("created settings")
             http            <- Http.make[IO](health, auth, signals, monitors, markets, trades, settings)
+            _               <- logger.info("creating processors")
             actionProcessor <- ActionProcessor
               .make[IO](dispatcher, monitors.service, signals.service, markets.service, trades.service, settings.service)
             logProcessor <- LogEventProcessor.make[IO](res.mongo)
