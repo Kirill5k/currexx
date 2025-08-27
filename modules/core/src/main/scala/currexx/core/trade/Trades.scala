@@ -16,7 +16,7 @@ final class Trades[F[_]] private (
 )
 
 object Trades:
-  def make[F[_]: Async: Clock](
+  def make[F[_]: {Async, Clock}](
       database: MongoDatabase[F],
       clients: Clients[F],
       dispatcher: ActionDispatcher[F]
