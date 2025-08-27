@@ -4,6 +4,7 @@ import cats.Monad
 import cats.effect.Async
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
+import currexx.core.trade.{Rule, TradeStrategy}
 import currexx.domain.user.UserId
 import io.circe.Codec
 import org.http4s.HttpRoutes
@@ -31,12 +32,8 @@ final private class SettingsController[F[_]](
       .serverLogic(session => req => service.update(req.toDomain(session.userId)).voidResponse)
 
   override def routes(using authenticator: Authenticator[F]): HttpRoutes[F] =
-    Http4sServerInterpreter[F](Controller.serverOptions).toRoutes(
-      List(
-        getSettings,
-        updateSettings
-      )
-    )
+    Http4sServerInterpreter[F](Controller.serverOptions)
+      .toRoutes(List(getSettings, updateSettings))
 }
 
 object SettingsController extends TapirSchema with TapirJson {

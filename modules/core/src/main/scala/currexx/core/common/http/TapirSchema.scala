@@ -49,8 +49,8 @@ transparent trait TapirSchema extends SchemaDerivation {
   given Schema[TradeOrder]          = Schema.derived
   given Schema[BrokerParameters]    = Schema.derived
   given Schema[Schedule]            = Schema.derived
-  given Schema[RuleCondition]       = Schema.derived
   given Schema[ValueTransformation] = Schema.derived
+  given Schema[RuleCondition]       = Schema.string
   given Schema[Condition]           = Schema.string
   given Schema[Indicator]           = Schema.string
 }
