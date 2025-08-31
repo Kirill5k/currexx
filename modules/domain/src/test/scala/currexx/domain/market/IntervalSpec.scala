@@ -1,5 +1,6 @@
 package currexx.domain.market
 
+import io.circe.syntax.*
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -27,6 +28,10 @@ class IntervalSpec extends AnyWordSpec with Matchers {
 
     "have correct duration for D1" in {
       Interval.D1.toDuration.toSeconds mustEqual 86400
+    }
+
+    "decode order from json" in {
+      Interval.H1.asJson.noSpaces mustBe """"H1""""
     }
   }
 }
