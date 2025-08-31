@@ -62,7 +62,7 @@ final private class LiveActionProcessor[F[_]](
       logger.info(s"fetching market data for $uid/$cps") *>
         tradeService.fetchMarketData(uid, cps, interval)
     case Action.ProcessMarketData(uid, data) =>
-      logger.info(s"processing market data for $uid/${data.currencyPair}") *>
+      logger.info(s"processing market data for $uid/${data.currencyPair} (${data.prices.head.time})") *>
         marketService.updateTimeState(uid, data) *>
         signalService.processMarketData(uid, data)
     case Action.ProcessSignals(uid, cp, signals) =>
