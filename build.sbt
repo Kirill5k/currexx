@@ -33,8 +33,7 @@ val docker = Seq(
     val (before, after)  = stage1.splitAt(4)
     val installBash      = Cmd("RUN", "apk update && apk upgrade && apk add bash")
     stage0 ++ before ++ List(installBash) ++ after
-  },
-  Universal / javaOptions += "-Dcats.effect.tracing.mode=full",
+  }
 )
 
 val domain = project

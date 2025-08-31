@@ -1,5 +1,6 @@
 package currexx.core
 
+import cats.effect.unsafe.IORuntimeConfig
 import cats.effect.{IO, IOApp}
 import currexx.clients.Clients
 import currexx.core.auth.Auth
@@ -17,10 +18,15 @@ import kirill5k.common.cats.Clock
 import kirill5k.common.http4s.Server
 import fs2.Stream
 
+import scala.concurrent.duration.Duration
+
 object Application extends IOApp.Simple:
   given Conversion[ServerConfig, Server.Config] =
     (sc: ServerConfig) => Server.Config(sc.host, sc.port)
 
+  override def runtimeConfig: IORuntimeConfig =
+    super.runtimeConfig.copy(cpuStarvationCheckInitialDelay = Duration.Inf)
+  
   override val run: IO[Unit] =
     Logger.make[IO].flatMap { implicit logger =>
       for
