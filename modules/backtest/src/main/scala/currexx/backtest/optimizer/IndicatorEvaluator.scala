@@ -21,19 +21,19 @@ object IndicatorEvaluator {
   given Show[Indicator] = (ind: Indicator) => {
     def showInd(i: Indicator): String = i match
       case Indicator.TrendChangeDetection(vs, transformation) =>
-        s"${ind.kind}-${vs.print}-${transformation}"
+        s"TrendChangeDetection-${vs.print}-${transformation}"
       case Indicator.ThresholdCrossing(vs, transformation, upperBoundary, lowerBoundary) =>
-        s"${ind.kind}-${vs.print}-${transformation}-lb$lowerBoundary-up$upperBoundary"
+        s"ThresholdCrossing-${vs.print}-${transformation}-lb$lowerBoundary-up$upperBoundary"
       case Indicator.LinesCrossing(vs, slowTransformation, fastTransformation) =>
-        s"${ind.kind}-${vs.print}-${slowTransformation}-${fastTransformation}"
+        s"LinesCrossing-${vs.print}-${slowTransformation}-${fastTransformation}"
       case Indicator.KeltnerChannel(vs, vs1, vs2, atrLength, atrMultiplier) =>
-        s"${ind.kind}-${vs.print}-$vs1-$vs2-$atrLength-$atrMultiplier"
+        s"KeltnerChannel-${vs.print}-$vs1-$vs2-$atrLength-$atrMultiplier"
       case Indicator.Composite(indicators, combinator) =>
-        s"${ind.kind}-$combinator-${indicators.map(showInd).toList.mkString("-")}"
+        s"Composite-$combinator-${indicators.map(showInd).toList.mkString("-")}"
       case Indicator.VolatilityRegimeDetection(atrLength, smoothingType, smoothingLength) =>
-        s"${ind.kind}-${atrLength}-${smoothingType}-$smoothingLength"
+        s"VolatilityRegimeDetection-${atrLength}-${smoothingType}-$smoothingLength"
       case Indicator.ValueTracking(vs, transformation, targetValue) =>
-        s"${ind.kind}-${vs.print}-${transformation}-$targetValue"
+        s"ValueTracking-${vs.print}-${transformation}-$targetValue"
     showInd(ind)
   }
 
