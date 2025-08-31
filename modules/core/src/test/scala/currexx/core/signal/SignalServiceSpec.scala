@@ -9,7 +9,10 @@ import currexx.core.fixtures.{Indicators, Markets, Settings, Signals, Users}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.signal.{Condition, Direction, Indicator}
 import currexx.domain.user.UserId
+import kirill5k.common.cats.Clock
 import kirill5k.common.cats.test.IOWordSpec
+
+import java.time.temporal.ChronoUnit
 
 class SignalServiceSpec extends IOWordSpec {
 
@@ -56,12 +59,15 @@ class SignalServiceSpec extends IOWordSpec {
 
     "processMarketData" should {
       "not do anything when there are no changes in market data since last point" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(3))
+
+        given Clock[IO]                = Clock.mock(timeSeriesData.prices.head.time)
         val (signRepo, settRepo, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturnIO(Settings.signal)
 
         val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
-          res <- svc.processMarketData(Users.uid, Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(3)))
+          res <- svc.processMarketData(Users.uid, timeSeriesData)
         yield res
 
         result.asserting { res =>
@@ -73,12 +79,14 @@ class SignalServiceSpec extends IOWordSpec {
       }
 
       "create signal when trend direction changes" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
+
+        given Clock[IO]                = Clock.mock(timeSeriesData.prices.head.time)
         val (signRepo, settRepo, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturnIO(Settings.signal)
         when(signRepo.saveAll(anyList[Signal])).thenReturnUnit
 
-        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
-        val result         = for
+        val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
           res <- svc.processMarketData(Users.uid, timeSeriesData)
         yield res
@@ -102,11 +110,13 @@ class SignalServiceSpec extends IOWordSpec {
       }
 
       "not do anything when there are no changes in trend" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
+
+        given Clock[IO]                = Clock.mock(timeSeriesData.prices.head.time)
         val (signRepo, settRepo, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturnIO(Settings.signal)
 
-        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
-        val result         = for
+        val result = for
           svc <- SignalService.make[IO](signRepo, settRepo, disp)
           res <- svc.processMarketData(Users.uid, timeSeriesData)
         yield res
@@ -114,6 +124,26 @@ class SignalServiceSpec extends IOWordSpec {
         result.asserting { res =>
           verify(settRepo).get(Users.uid)
           verifyNoInteractions(signRepo)
+          disp.submittedActions must be(empty)
+          res mustBe ()
+        }
+      }
+
+      "not do anything when data is too old" in {
+        val timeSeriesData = Markets.timeSeriesData
+
+        given Clock[IO] = Clock.mock(timeSeriesData.prices.head.time.plus(2, ChronoUnit.DAYS))
+
+        val (signRepo, settRepo, disp) = mocks
+        when(settRepo.get(any[UserId])).thenReturnIO(Settings.signal)
+
+        val result = for
+          svc <- SignalService.make[IO](signRepo, settRepo, disp)
+          res <- svc.processMarketData(Users.uid, timeSeriesData)
+        yield res
+
+        result.asserting { res =>
+          verifyNoInteractions(signRepo, settRepo)
           disp.submittedActions must be(empty)
           res mustBe ()
         }
