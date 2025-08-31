@@ -66,7 +66,7 @@ final private class LiveActionProcessor[F[_]](
         marketService.updateTimeState(uid, data) *>
         signalService.processMarketData(uid, data)
     case Action.ProcessSignals(uid, cp, signals) =>
-      logger.info(s"processing submitted signals for $uid/$cp") *>
+      logger.info(s"processing ${signals.size} submitted signals for $uid/$cp") *>
         marketService.processSignals(uid, cp, signals)
     case Action.AssertProfit(uid, cps, limits) =>
       logger.info(s"verifying current position for $uid/$cps") *>
