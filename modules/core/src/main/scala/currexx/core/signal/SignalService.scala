@@ -11,7 +11,6 @@ import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.market.{CurrencyPair, MarketTimeSeriesData}
 import currexx.domain.signal.Indicator
 import kirill5k.common.cats.Clock
-import kirill5k.common.syntax.time.*
 
 trait SignalService[F[_]]:
   def submit(signal: Signal): F[Unit]
@@ -30,8 +29,8 @@ final private class LiveSignalService[F[_]](
   override def submit(signal: Signal): F[Unit] = saveAndDispatchAction(signal.userId, signal.currencyPair, List(signal))
 
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData, detector: SignalDetector): F[Unit] =
-    clock.now
-      .map(_.durationBetween(data.prices.head.time))
+    clock
+      .durationBetweenNowAnd(data.prices.head.time)
       .flatMap { timeGap =>
         F.whenA(timeGap < data.interval.toDuration * 2) {
           for
