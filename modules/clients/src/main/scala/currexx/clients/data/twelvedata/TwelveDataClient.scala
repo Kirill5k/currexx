@@ -55,15 +55,12 @@ final private class LiveTwelveDataClient[F[_]](
         .flatMap { r =>
           r.body match
             case Right(res) =>
-              val prices =
-                res.values.zipWithIndex.map((v, i) => PriceRange(v.open, v.high, v.low, v.close, 0d, v.datetime.toInstant(i)))
-              MarketTimeSeriesData(pair, interval, prices).pure[F]
+              MarketTimeSeriesData(pair, interval, res.priceRanges).pure[F]
+            case Left(ResponseException.DeserializationException(b, _, _)) if b.matches(".*\"code\":( )?429.*") =>
+              F.sleep(delayBetweenClientFailures) >> fetchTimeSeriesData(pair, interval, numOfTicks)
             case Left(ResponseException.DeserializationException(responseBody, error, _)) =>
-              if (responseBody.matches(".*\"code\":( )?429.*"))
-                F.sleep(delayBetweenClientFailures) >> fetchTimeSeriesData(pair, interval, numOfTicks)
-              else
-                logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
-                  F.raiseError(AppError.JsonParsingFailure(responseBody, s"Failed to parse $name response: ${error.getMessage}"))
+              logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
+                F.raiseError(AppError.JsonParsingFailure(responseBody, s"Failed to parse $name response: ${error.getMessage}"))
             case Left(ResponseException.UnexpectedStatusCode(body, meta)) if meta.code == StatusCode.Forbidden =>
               logger.error(s"$name-client/forbidden\n$body") >>
                 F.raiseError(AppError.AccessDenied(s"$name authentication has expired"))
@@ -72,6 +69,10 @@ final private class LiveTwelveDataClient[F[_]](
                 F.sleep(delayBetweenConnectionFailures) >> fetchTimeSeriesData(pair, interval, numOfTicks)
         }
     }
+
+  extension (ts: TimeSeriesResponse)
+    private def priceRanges: NonEmptyList[PriceRange] =
+      ts.values.zipWithIndex.map((v, i) => PriceRange(v.open, v.high, v.low, v.close, 0d, v.datetime.toInstant(i)))
 
   extension (dateString: String)
     private def toInstant(i: Int): Instant =
