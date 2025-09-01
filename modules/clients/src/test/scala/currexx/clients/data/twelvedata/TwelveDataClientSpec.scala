@@ -24,7 +24,8 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
         "symbol"     -> "EUR/USD",
         "interval"   -> "1day",
         "apikey"     -> "api-key",
-        "outputsize" -> "150"
+        "outputsize" -> "150",
+        "timezone" -> "UTC"
       )
 
       val testingBackend = fs2BackendStub

@@ -50,7 +50,7 @@ final private class LiveTwelveDataClient[F[_]](
     cache.evalPutIfNew(pair -> interval) {
       val sym = s"${pair.base}/${pair.quote}"
       val int = s"${interval.number}${if (interval.unit == "hour") "h" else interval.unit.slice(0, 3)}"
-      val uri = uri"${config.baseUri}/time_series?symbol=$sym&interval=$int&apikey=${config.apiKey}&outputsize=$numOfTicks"
+      val uri = uri"${config.baseUri}/time_series?symbol=$sym&interval=$int&apikey=${config.apiKey}&outputsize=$numOfTicks&timezone=UTC"
       dispatch(basicRequest.get(uri).response(asJson[TimeSeriesResponse]))
         .flatMap { r =>
           r.body match
