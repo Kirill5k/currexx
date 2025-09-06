@@ -20,9 +20,9 @@ final private class LiveXtbClient[F[_]](
     F: Async[F],
     logger: Logger[F]
 ) extends IgClient[F] {
-  
+
   override protected val name: String = "ig"
-  
+
   override def submit(params: BrokerParameters.Ig, order: TradeOrder): F[Unit] = ???
 
   override def getCurrentOrders(params: BrokerParameters.Ig, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]] = ???
