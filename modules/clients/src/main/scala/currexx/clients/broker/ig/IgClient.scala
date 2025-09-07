@@ -44,24 +44,24 @@ final private class LiveXtbClient[F[_]](
         .body(asJson(IgClient.LoginRequest(params.username, params.password)))
         .response(asJson[IgClient.LoginResponse])
         .post(uri"${baseUrl(params.demo)}")
-    ).flatMap {
-      case Right(res) =>
-        F.pure(res)
-      case Left(ResponseException.DeserializationException(responseBody, error, _)) =>
-        logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
-          F.raiseError(AppError.JsonParsingFailure(responseBody, s"${name} client returned $error"))
-      case Left(ResponseException.UnexpectedStatusCode(body, meta)) =>
-        logger.error(s"$name-client/${meta.code.code}\n$body") >>
-          F.raiseError(AppError.ClientFailure(name, s"$name return ${meta.code}"))
+    ).flatMap { r =>
+      r.body match
+        case Right(res) =>
+          F.pure(res)
+        case Left(ResponseException.DeserializationException(responseBody, error, _)) =>
+          logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
+            F.raiseError(AppError.JsonParsingFailure(responseBody, s"${name} client returned $error"))
+        case Left(ResponseException.UnexpectedStatusCode(body, meta)) =>
+          logger.error(s"$name-client/${meta.code.code}\n$body") >>
+            F.raiseError(AppError.ClientFailure(name, s"$name return ${meta.code}"))
     }
 }
 
 object IgClient {
-
   final case class LoginRequest(
       identifier: String,
       password: String
-  )
+  ) derives Codec.AsObject
 
   final case class LoginResponse(
       accountId: String,
@@ -70,5 +70,5 @@ object IgClient {
 
   final case class OauthToken(
       access_token: String
-  )
+  ) derives Codec.AsObject
 }
