@@ -48,14 +48,8 @@ final private class LiveXtbClient[F[_]](
         .post(uri"${baseUrl(params.demo)}")
     ).flatMap { r =>
       r.body match
-        case Right(res) =>
-          F.pure(res)
-        case Left(ResponseException.DeserializationException(responseBody, error, _)) =>
-          logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
-            F.raiseError(AppError.JsonParsingFailure(responseBody, s"${name} client returned $error"))
-        case Left(ResponseException.UnexpectedStatusCode(body, meta)) =>
-          logger.error(s"$name-client/${meta.code.code}\n$body") >>
-            F.raiseError(AppError.ClientFailure(name, s"$name return ${meta.code}"))
+        case Right(res)  => F.pure(res)
+        case Left(error) => handleError(error)
     }
 
   private def openPosition(login: IgClient.LoginResponse, params: BrokerParameters.Ig, order: TradeOrder.Enter): F[Unit] =
@@ -64,19 +58,25 @@ final private class LiveXtbClient[F[_]](
         .header("Version", "2")
         .header("X-IG-API-KEY", params.apiKey)
         .header("IG-ACCOUNT-ID", login.accountId)
-        .auth.bearer(login.oauthToken.access_token)
+        .auth
+        .bearer(login.oauthToken.access_token)
         .body(asJson(IgClient.OpenPositionRequest.from(params.currency, order)))
         .response(asJson[IgClient.OpenPositionResponse])
         .post(uri"${baseUrl(params.demo)}")
     ).flatMap { r =>
       r.body match
-        case Right(_) => F.unit
-        case Left(ResponseException.DeserializationException(responseBody, error, _)) =>
-          logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
-            F.raiseError(AppError.JsonParsingFailure(responseBody, s"${name} client returned $error"))
-        case Left(ResponseException.UnexpectedStatusCode(body, meta)) =>
-          logger.error(s"$name-client/${meta.code.code}\n$body") >>
-            F.raiseError(AppError.ClientFailure(name, s"$name return ${meta.code}"))
+        case Right(_)    => F.unit
+        case Left(error) => handleError(error)
+    }
+
+  private def handleError[A](error: ResponseException[String]): F[A] =
+    error match {
+      case ResponseException.DeserializationException(responseBody, error, _) =>
+        logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
+          F.raiseError(AppError.JsonParsingFailure(responseBody, s"${name} client returned $error"))
+      case ResponseException.UnexpectedStatusCode(body, meta) =>
+        logger.error(s"$name-client/${meta.code.code}\n$body") >>
+          F.raiseError(AppError.ClientFailure(name, s"$name return ${meta.code}"))
     }
 }
 
