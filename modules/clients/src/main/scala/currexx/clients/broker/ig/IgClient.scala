@@ -57,6 +57,27 @@ final private class LiveXtbClient[F[_]](
           logger.error(s"$name-client/${meta.code.code}\n$body") >>
             F.raiseError(AppError.ClientFailure(name, s"$name return ${meta.code}"))
     }
+
+  private def openPosition(login: IgClient.LoginResponse, params: BrokerParameters.Ig, order: TradeOrder.Enter): F[Unit] =
+    dispatch(
+      basicRequest
+        .header("Version", "2")
+        .header("X-IG-API-KEY", params.apiKey)
+        .header("IG-ACCOUNT-ID", login.accountId)
+        .auth.bearer(login.oauthToken.access_token)
+        .body(asJson(IgClient.OpenPositionRequest.from(params.currency, order)))
+        .response(asJson[IgClient.OpenPositionResponse])
+        .post(uri"${baseUrl(params.demo)}")
+    ).flatMap { r =>
+      r.body match
+        case Right(_) => F.unit
+        case Left(ResponseException.DeserializationException(responseBody, error, _)) =>
+          logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
+            F.raiseError(AppError.JsonParsingFailure(responseBody, s"${name} client returned $error"))
+        case Left(ResponseException.UnexpectedStatusCode(body, meta)) =>
+          logger.error(s"$name-client/${meta.code.code}\n$body") >>
+            F.raiseError(AppError.ClientFailure(name, s"$name return ${meta.code}"))
+    }
 }
 
 object IgClient {
@@ -74,7 +95,7 @@ object IgClient {
       access_token: String
   ) derives Codec.AsObject
 
-  final case class CreatePositionRequest(
+  final case class OpenPositionRequest(
       currencyCode: String,
       dealReference: String,
       direction: String,
@@ -86,9 +107,9 @@ object IgClient {
       size: Double
   ) derives Codec.AsObject
 
-  object CreatePositionRequest:
-    def from(currency: Currency, order: TradeOrder.Enter): CreatePositionRequest =
-      CreatePositionRequest(
+  object OpenPositionRequest:
+    def from(currency: Currency, order: TradeOrder.Enter): OpenPositionRequest =
+      OpenPositionRequest(
         currencyCode = currency.code,
         dealReference = UUID.randomUUID().toString,
         direction = order.position.print.toUpperCase,
@@ -100,5 +121,5 @@ object IgClient {
         size = order.volume.toDouble
       )
 
-  final case class CreatePositionResponse(dealReference: String) derives Codec.AsObject
+  final case class OpenPositionResponse(dealReference: String) derives Codec.AsObject
 }
