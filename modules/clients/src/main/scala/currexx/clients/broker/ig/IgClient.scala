@@ -7,12 +7,14 @@ import io.circe.Codec
 import currexx.clients.Fs2HttpClient
 import currexx.clients.broker.BrokerParameters
 import currexx.domain.errors.AppError
-import currexx.domain.market.{CurrencyPair, OpenedTradeOrder, TradeOrder}
+import currexx.domain.market.{Currency, CurrencyPair, OpenedTradeOrder, TradeOrder}
 import org.typelevel.log4cats.Logger
 import sttp.capabilities.fs2.Fs2Streams
 import sttp.client4.*
 import sttp.client4.circe.asJson
 import sttp.client4.WebSocketStreamBackend
+
+import java.util.UUID
 
 private[clients] trait IgClient[F[_]] extends Fs2HttpClient[F]:
   def submit(params: BrokerParameters.Ig, order: TradeOrder): F[Unit]
@@ -71,4 +73,32 @@ object IgClient {
   final case class OauthToken(
       access_token: String
   ) derives Codec.AsObject
+
+  final case class CreatePositionRequest(
+      currencyCode: String,
+      dealReference: String,
+      direction: String,
+      epic: String,
+      expiry: String,
+      forceOpen: Boolean,
+      guaranteedStop: Boolean,
+      orderType: String,
+      size: Double
+  ) derives Codec.AsObject
+
+  object CreatePositionRequest:
+    def from(currency: Currency, order: TradeOrder.Enter): CreatePositionRequest =
+      CreatePositionRequest(
+        currencyCode = currency.code,
+        dealReference = UUID.randomUUID().toString,
+        direction = order.position.print.toUpperCase,
+        epic = s"CS.D.${order.currencyPair}.TODAY.IP",
+        expiry = "DFB",
+        forceOpen = false,
+        guaranteedStop = false,
+        orderType = "MARKET",
+        size = order.volume.toDouble
+      )
+
+  final case class CreatePositionResponse(dealReference: String) derives Codec.AsObject
 }
