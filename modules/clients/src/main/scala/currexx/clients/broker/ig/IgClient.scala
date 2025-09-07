@@ -45,7 +45,7 @@ final private class LiveXtbClient[F[_]](
         .header("X-IG-API-KEY", params.apiKey)
         .body(asJson(IgClient.LoginRequest(params.username, params.password)))
         .response(asJson[IgClient.LoginResponse])
-        .post(uri"${baseUrl(params.demo)}")
+        .post(uri"${baseUrl(params.demo)}/session")
     ).flatMap { r =>
       r.body match
         case Right(res)  => F.pure(res)
@@ -62,7 +62,7 @@ final private class LiveXtbClient[F[_]](
         .bearer(login.oauthToken.access_token)
         .body(asJson(IgClient.OpenPositionRequest.from(params.currency, order)))
         .response(asJson[IgClient.OpenPositionResponse])
-        .post(uri"${baseUrl(params.demo)}")
+        .post(uri"${baseUrl(params.demo)}/positions/otc")
     ).flatMap { r =>
       r.body match
         case Right(_)    => F.unit
