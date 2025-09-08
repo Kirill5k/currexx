@@ -14,18 +14,16 @@ object Trades {
 
   lazy val order = TradeOrderPlacement(
     Users.uid,
-    TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, Markets.priceRange.close, BigDecimal(0.1)),
+    TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, BigDecimal(0.1)),
     broker,
     ts
   )
 
   lazy val openedOrder = OpenedTradeOrder(
-    Markets.gbpeur,
-    TradeOrder.Position.Buy,
-    Markets.priceRange.close,
-    Markets.priceRange.close,
-    ts,
-    BigDecimal(0.1),
-    BigDecimal(100)
+    currencyPair = Markets.gbpeur,
+    position = TradeOrder.Position.Buy,
+    openPrice = Markets.priceRange.close,
+    volume = BigDecimal(0.1),
+    profit = BigDecimal(100)
   )
 }
