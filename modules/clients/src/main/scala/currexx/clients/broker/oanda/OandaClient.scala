@@ -95,14 +95,13 @@ final private class LiveXtbClient[F[_]](
     }
 
   private def handleError[A](endpoint: String, error: ResponseException[String]): F[A] =
-    error match {
+    error match
       case ResponseException.DeserializationException(responseBody, error, _) =>
         logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
           F.raiseError(AppError.JsonParsingFailure(responseBody, s"${name} client returned $error"))
       case ResponseException.UnexpectedStatusCode(body, meta) =>
         logger.error(s"$name-client/${meta.code.code}\n$body") >>
           F.raiseError(AppError.ClientFailure(name, s"$endpoint returned ${meta.code}"))
-    }
 
   extension (cp: CurrencyPair) private def toInstrument: String = s"${cp.base}_${cp.quote}"
 
@@ -158,10 +157,37 @@ object OandaClient {
         longUnits = if (long.units == "0") "NONE" else "ALL",
         shortUnits = if (short.units == "0") "NONE" else "ALL"
       )
+    def toOpenedTradeOrder: Option[OpenedTradeOrder] =
+      Option.when(long.units != "0" || short.units != "0") {
+        val (position, volume, profit, openPrice) =
+          if (long.units != "0")
+            (
+              TradeOrder.Position.Buy,
+              BigDecimal(long.units) / LotSize,
+              BigDecimal(long.trueUnrealizedPL),
+              BigDecimal(long.averagePrice.getOrElse("0"))
+            )
+          else
+            (
+              TradeOrder.Position.Sell,
+              BigDecimal(short.units) / LotSize,
+              BigDecimal(short.trueUnrealizedPL),
+              BigDecimal(short.averagePrice.getOrElse("0"))
+            )
+        OpenedTradeOrder(
+          currencyPair = CurrencyPair.fromUnsafe(instrument.replace("_", "")),
+          position = position,
+          openPrice = openPrice,
+          volume = volume,
+          profit = profit
+        )
+      }
   }
 
   final case class PositionSide(
       units: String,
-      tradeIDs: Option[List[String]]
+      tradeIDs: Option[List[String]],
+      averagePrice: Option[String],
+      trueUnrealizedPL: String
   ) derives Codec.AsObject
 }

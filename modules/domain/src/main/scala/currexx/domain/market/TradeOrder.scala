@@ -42,7 +42,7 @@ object TradeOrder {
 final case class OpenedTradeOrder(
     currencyPair: CurrencyPair,
     position: TradeOrder.Position,
-    currentPrice: BigDecimal,
+    openPrice: BigDecimal,
     volume: BigDecimal,
     profit: BigDecimal
 )

@@ -18,6 +18,9 @@ object CurrencyPair:
       quote <- Currency.from(pair._2)
     yield CurrencyPair(base, quote)
 
+  inline def fromUnsafe(strRepr: String): CurrencyPair =
+    from(strRepr).fold(err => throw new IllegalArgumentException(err), identity)
+  
   inline given Encoder[CurrencyPair]  = Encoder.encodeString.contramap(_.toString)
   inline given Decoder[CurrencyPair]  = Decoder.decodeString.emap(CurrencyPair.from(_))
   inline given Order[CurrencyPair]    = Order.from((cp1, cp2) => cp1.toString.compareTo(cp2.toString))
