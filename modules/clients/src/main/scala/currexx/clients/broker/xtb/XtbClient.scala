@@ -212,8 +212,6 @@ object XtbClient:
           td.symbol,
           if (td.cmd == 0) TradeOrder.Position.Buy else TradeOrder.Position.Sell,
           td.close_price,
-          td.open_price,
-          Instant.ofEpochMilli(td.open_time),
           td.volume,
           td.profit.get
         )
