@@ -15,7 +15,7 @@ import mongo4cats.collection.MongoCollection
 import mongo4cats.operations.{Index, Update}
 import mongo4cats.database.MongoDatabase
 
-trait MarketStateRepository[F[_]] extends Repository[F]:
+trait MarketStateRepository[F[_]]:
   def update(uid: UserId, pair: CurrencyPair, profile: MarketProfile): F[MarketState]
   def update(uid: UserId, pair: CurrencyPair, position: Option[PositionState]): F[MarketState]
   def getAll(uid: UserId): F[List[MarketState]]
@@ -27,7 +27,7 @@ final private class LiveMarketStateRepository[F[_]](
     private val collection: MongoCollection[F, MarketStateEntity]
 )(using
     F: Async[F]
-) extends MarketStateRepository[F] {
+) extends MarketStateRepository[F] with Repository[F] {
 
   private val updateOptions = FindOneAndUpdateOptions(returnDocument = ReturnDocument.AFTER, upsert = true)
 
