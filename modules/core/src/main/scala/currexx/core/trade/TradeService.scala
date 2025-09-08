@@ -125,6 +125,7 @@ final private class LiveTradeService[F[_]](
       submitOrderPlacement(TradeOrderPlacement(state.userId, order, settings.broker, time), skipEvent)
     for
       time  <- clock.now
+      //TODO: remove latestPrice call
       price <- marketDataClient.latestPrice(state.currencyPair)
       _     <- action match
         case TradeAction.OpenLong =>

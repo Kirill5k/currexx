@@ -15,12 +15,12 @@ final private class LiveBrokerClient[F[_]](
   override def find(parameters: BrokerParameters, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]] =
     parameters match
       case params: BrokerParameters.Xtb => xtbClient.getCurrentOrders(params, cps)
-      case _: BrokerParameters.Ig       => ???
+      case _: BrokerParameters.Oanda    => ???
 
   override def submit(parameters: BrokerParameters, order: TradeOrder): F[Unit] =
     parameters match
       case params: BrokerParameters.Xtb => xtbClient.submit(params, order)
-      case _: BrokerParameters.Ig       => ???
+      case _: BrokerParameters.Oanda    => ???
 
 object BrokerClient:
   def make[F[_]: Monad](

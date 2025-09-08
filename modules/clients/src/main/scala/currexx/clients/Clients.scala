@@ -4,6 +4,7 @@ import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.clients.broker.BrokerClient
+import currexx.clients.broker.oanda.OandaConfig
 import currexx.clients.broker.xtb.{XtbClient, XtbConfig}
 import currexx.clients.data.MarketDataClient
 import currexx.clients.data.alphavantage.{AlphaVantageClient, AlphaVantageConfig}
@@ -15,7 +16,8 @@ import sttp.client4.WebSocketStreamBackend
 final case class ClientsConfig(
     alphaVantage: AlphaVantageConfig,
     twelveData: TwelveDataConfig,
-    xtb: XtbConfig
+    xtb: XtbConfig,
+    oanda: OandaConfig
 )
 
 final class Clients[F[_]] private (
