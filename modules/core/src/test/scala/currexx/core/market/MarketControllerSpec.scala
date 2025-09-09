@@ -73,8 +73,7 @@ class MarketControllerSpec extends HttpRoutesWordSpec {
              |  "GBPEUR": {
              |    "currentPosition": {
              |      "position": "buy",
-             |      "openedAt": "${Markets.ts}",
-             |      "openPrice": 3.0
+             |      "openedAt": "${Markets.ts}"
              |    },
              |    "profile" : {
              |      "trend" : {
