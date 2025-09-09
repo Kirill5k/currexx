@@ -141,8 +141,7 @@ object MarketProfile {
 
 final case class PositionState(
     position: TradeOrder.Position,
-    openedAt: Instant,
-    openPrice: BigDecimal
+    openedAt: Instant
 ) derives Codec.AsObject
 
 final case class MarketState(

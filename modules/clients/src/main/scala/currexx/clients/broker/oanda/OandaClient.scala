@@ -1,8 +1,10 @@
 package currexx.clients.broker.oanda
 
+import cats.Monad
 import cats.data.NonEmptyList
 import cats.effect.Async
 import cats.syntax.flatMap.*
+import cats.syntax.functor.*
 import currexx.clients.Fs2HttpClient
 import currexx.clients.broker.BrokerParameters
 import currexx.clients.broker.oanda.OandaClient.ClosePositionRequest
@@ -20,7 +22,7 @@ private[clients] trait OandaClient[F[_]] extends Fs2HttpClient[F]:
   def submit(params: BrokerParameters.Oanda, order: TradeOrder): F[Unit]
   def getCurrentOrders(params: BrokerParameters.Oanda, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]]
 
-final private class LiveXtbClient[F[_]](
+final private class LiveOandaClient[F[_]](
     override protected val backend: WebSocketStreamBackend[F, Fs2Streams[F]],
     private val config: OandaConfig
 )(using
@@ -29,9 +31,39 @@ final private class LiveXtbClient[F[_]](
 ) extends OandaClient[F] {
   override protected val name: String = "oanda"
 
-  override def submit(params: BrokerParameters.Oanda, order: TradeOrder): F[Unit] = ???
+  override def submit(params: BrokerParameters.Oanda, order: TradeOrder): F[Unit] = order match
+    case enter: TradeOrder.Enter =>
+      for
+        accountId <- getAccountId(params)
+        _         <- openPosition(accountId, params, enter)
+      yield ()
+    case exit: TradeOrder.Exit =>
+      for
+        accountId <- getAccountId(params)
+        position  <- getPosition(accountId, params, exit.currencyPair)
+        _         <- if position.isOpen then closePosition(accountId, params, position) else F.unit
+      yield ()
 
-  override def getCurrentOrders(params: BrokerParameters.Oanda, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]] = ???
+  override def getCurrentOrders(params: BrokerParameters.Oanda, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]] =
+    for
+      accountId <- getAccountId(params)
+      positions <- getPositions(accountId, params)
+      instruments  = cps.toList.map(_.toInstrument).toSet
+      openedOrders = positions.filter(p => instruments.contains(p.instrument)).flatMap(_.toOpenedTradeOrder)
+    yield openedOrders
+
+  private def getPositions(accountId: String, params: BrokerParameters.Oanda): F[List[OandaClient.Position]] =
+    dispatch {
+      basicRequest
+        .get(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/positions")
+        .auth
+        .bearer(params.apiKey)
+        .response(asJson[OandaClient.PositionsResponse])
+    }.flatMap { r =>
+      r.body match
+        case Right(res) => F.pure(res.positions)
+        case Left(err)  => handleError("get-positions", err)
+    }
 
   private def getPosition(accountId: String, params: BrokerParameters.Oanda, currencyPair: CurrencyPair): F[OandaClient.Position] =
     dispatch {
@@ -145,6 +177,8 @@ object OandaClient {
 
   final case class Account(id: String) derives Codec.AsObject
 
+  final case class PositionsResponse(positions: List[Position]) derives Codec.AsObject
+
   final case class PositionResponse(position: Position) derives Codec.AsObject
 
   final case class Position(
@@ -152,34 +186,22 @@ object OandaClient {
       long: PositionSide,
       short: PositionSide
   ) derives Codec.AsObject {
+    def isOpen: Boolean                              = long.units != "0" || short.units != "0"
     def toClosePositionRequest: ClosePositionRequest =
       ClosePositionRequest(
         longUnits = if (long.units == "0") "NONE" else "ALL",
         shortUnits = if (short.units == "0") "NONE" else "ALL"
       )
     def toOpenedTradeOrder: Option[OpenedTradeOrder] =
-      Option.when(long.units != "0" || short.units != "0") {
-        val (position, volume, profit, openPrice) =
-          if (long.units != "0")
-            (
-              TradeOrder.Position.Buy,
-              BigDecimal(long.units) / LotSize,
-              BigDecimal(long.trueUnrealizedPL),
-              BigDecimal(long.averagePrice.getOrElse("0"))
-            )
-          else
-            (
-              TradeOrder.Position.Sell,
-              BigDecimal(short.units) / LotSize,
-              BigDecimal(short.trueUnrealizedPL),
-              BigDecimal(short.averagePrice.getOrElse("0"))
-            )
+      Option.when(isOpen) {
+        val isBuy = long.units != "0"
+        val side  = if isBuy then long else short
         OpenedTradeOrder(
           currencyPair = CurrencyPair.fromUnsafe(instrument.replace("_", "")),
-          position = position,
-          openPrice = openPrice,
-          volume = volume,
-          profit = profit
+          position = if isBuy then TradeOrder.Position.Buy else TradeOrder.Position.Sell,
+          openPrice = BigDecimal(side.averagePrice.getOrElse("0")),
+          volume = BigDecimal(side.units) / LotSize,
+          profit = BigDecimal(side.trueUnrealizedPL)
         )
       }
   }
@@ -190,4 +212,10 @@ object OandaClient {
       averagePrice: Option[String],
       trueUnrealizedPL: String
   ) derives Codec.AsObject
+
+  def make[F[_]: {Async, Logger}](
+      config: OandaConfig,
+      backend: WebSocketStreamBackend[F, Fs2Streams[F]]
+  ): F[OandaClient[F]] =
+    Monad[F].pure(LiveOandaClient(backend, config))
 }

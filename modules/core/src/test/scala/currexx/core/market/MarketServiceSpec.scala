@@ -98,7 +98,7 @@ class MarketServiceSpec extends IOWordSpec {
           verify(stateRepo).update(
             Users.uid,
             Markets.gbpeur,
-            Some(PositionState(TradeOrder.Position.Buy, Trades.ts, Markets.priceRange.close))
+            Some(PositionState(TradeOrder.Position.Buy, Trades.ts))
           )
           disp.submittedActions mustBe empty
           res mustBe ()

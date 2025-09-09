@@ -16,7 +16,6 @@ object RequestArguments:
       `type`: Int,
       symbol: String,
       customComment: String,
-      price: BigDecimal,
       volume: BigDecimal,
       sl: Option[BigDecimal] = None,
       tp: Option[BigDecimal] = None,
@@ -64,7 +63,6 @@ object XtbRequest {
             customComment = s"Currexx - ${TradeOrder.Position.Buy.toString} ${order.currencyPair}",
             offset = None,
             volume = order.volume,
-            price = order.price,
             sl = None,
             tp = None
           )
@@ -87,7 +85,6 @@ object XtbRequest {
             cmd = None,
             symbol = cp.toString,
             customComment = s"Currexx - Close $cp",
-            price = data.close_price,
             volume = data.volume,
             order = Some(data.position)
           )
