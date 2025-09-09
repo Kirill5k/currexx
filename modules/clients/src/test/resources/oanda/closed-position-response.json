@@ -1,0 +1,17 @@
+{
+  "position": {
+    "instrument": "EUR_USD",
+    "long": {
+      "units": "0",
+      "tradeIDs": null,
+      "averagePrice": null,
+      "trueUnrealizedPL": "0.00"
+    },
+    "short": {
+      "units": "0",
+      "tradeIDs": null,
+      "averagePrice": null,
+      "trueUnrealizedPL": "0.00"
+    }
+  }
+}

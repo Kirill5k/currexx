@@ -122,7 +122,7 @@ final private class LiveOandaClient[F[_]](
     }.flatMap { r =>
       r.body match
         case Right(res) if res.accounts.nonEmpty => F.pure(res.accounts.head.id)
-        case Right(_)                            => F.raiseError(AppError.ClientFailure(name, s"$name returned empty accounts list"))
+        case Right(_)                            => F.raiseError(AppError.ClientFailure(name, s"Get accounts returned empty accounts list"))
         case Left(err)                           => handleError("get-account", err)
     }
 
