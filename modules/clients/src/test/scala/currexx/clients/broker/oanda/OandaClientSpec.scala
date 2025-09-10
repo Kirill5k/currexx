@@ -66,7 +66,7 @@ class OandaClientSpec extends Sttp4WordSpec {
           case r if r.isGet && r.hasPath("/v3/accounts/123-456-789/positions/EUR_USD") =>
             ResponseStub.adjust(readJson("oanda/position-success-response.json"))
           case r if r.isPut && r.hasPath("/v3/accounts/123-456-789/positions/EUR_USD/close") =>
-            ResponseStub.adjust("")
+            ResponseStub.adjust("""{"lastTransactionID":"1"}""")
           case _ => throw new RuntimeException("Unexpected request")
         }
 
