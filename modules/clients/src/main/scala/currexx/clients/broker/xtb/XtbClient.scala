@@ -21,7 +21,6 @@ import sttp.ws.WebSocketFrame
 import sttp.ws.WebSocketFrame.Text
 
 import java.nio.charset.StandardCharsets
-import java.time.Instant
 import scala.concurrent.duration.*
 
 private[clients] trait XtbClient[F[_]] extends Fs2HttpClient[F]:
@@ -209,13 +208,12 @@ object XtbClient:
     def openedTradeOrders: List[OpenedTradeOrder] =
       retrievedOrders.map { td =>
         OpenedTradeOrder(
-          td.symbol,
-          if (td.cmd == 0) TradeOrder.Position.Buy else TradeOrder.Position.Sell,
-          td.close_price,
-          td.open_price,
-          Instant.ofEpochMilli(td.open_time),
-          td.volume,
-          td.profit.get
+          currencyPair = td.symbol,
+          position = if (td.cmd == 0) TradeOrder.Position.Buy else TradeOrder.Position.Sell,
+          openPrice = td.open_price,
+          currentPrice = td.close_price,
+          volume = td.volume,
+          profit = td.profit.get
         )
       }
   }

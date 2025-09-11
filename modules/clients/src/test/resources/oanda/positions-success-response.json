@@ -6,13 +6,15 @@
         "units": "100000",
         "tradeIDs": ["123"],
         "averagePrice": "1.1050",
-        "trueUnrealizedPL": "50.00"
+        "trueUnrealizedPL": "50.00",
+        "unrealizedPL": "52.00"
       },
       "short": {
         "units": "0",
         "tradeIDs": null,
         "averagePrice": null,
-        "trueUnrealizedPL": "0.00"
+        "trueUnrealizedPL": "0.00",
+        "unrealizedPL": "0.00"
       }
     },
     {
@@ -21,13 +23,15 @@
         "units": "0",
         "tradeIDs": null,
         "averagePrice": null,
-        "trueUnrealizedPL": "0.00"
+        "trueUnrealizedPL": "0.00",
+        "unrealizedPL": "0.00"
       },
       "short": {
         "units": "50000",
         "tradeIDs": ["456"],
         "averagePrice": "1.2500",
-        "trueUnrealizedPL": "-25.00"
+        "trueUnrealizedPL": "-25.00",
+        "unrealizedPL": "-27.00"
       }
     }
   ]

@@ -46,6 +46,7 @@ final case class OpenedTradeOrder(
     currencyPair: CurrencyPair,
     position: TradeOrder.Position,
     openPrice: BigDecimal,
+    currentPrice: BigDecimal,
     volume: BigDecimal,
     profit: BigDecimal
 )

@@ -34,7 +34,7 @@ class OandaClientSpec extends Sttp4WordSpec {
 
       val result = for
         client <- OandaClient.make[IO](config, testingBackend)
-        _      <- client.submit(params, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal("1.0")))
+        _      <- client.submit(params, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0")))
       yield ()
 
       result.asserting(_ mustBe ())
@@ -52,7 +52,7 @@ class OandaClientSpec extends Sttp4WordSpec {
 
       val result = for
         client <- OandaClient.make[IO](config, testingBackend)
-        _      <- client.submit(params, TradeOrder.Enter(TradeOrder.Position.Sell, eurUsdPair, BigDecimal("0.5")))
+        _      <- client.submit(params, TradeOrder.Enter(TradeOrder.Position.Sell, eurUsdPair, BigDecimal(1), BigDecimal("0.5")))
       yield ()
 
       result.asserting(_ mustBe ())
@@ -72,7 +72,7 @@ class OandaClientSpec extends Sttp4WordSpec {
 
       val result = for
         client <- OandaClient.make[IO](config, testingBackend)
-        _      <- client.submit(params, TradeOrder.Exit(eurUsdPair))
+        _      <- client.submit(params, TradeOrder.Exit(eurUsdPair, BigDecimal(1)))
       yield ()
 
       result.asserting(_ mustBe ())
@@ -90,7 +90,7 @@ class OandaClientSpec extends Sttp4WordSpec {
 
       val result = for
         client <- OandaClient.make[IO](config, testingBackend)
-        _      <- client.submit(params, TradeOrder.Exit(eurUsdPair))
+        _      <- client.submit(params, TradeOrder.Exit(eurUsdPair, BigDecimal(1)))
       yield ()
 
       result.asserting(_ mustBe ())
@@ -161,7 +161,7 @@ class OandaClientSpec extends Sttp4WordSpec {
 
       val result = for
         client <- OandaClient.make[IO](config, testingBackend)
-        _      <- client.submit(params, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal("1.0")))
+        _      <- client.submit(params, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0")))
       yield ()
 
       result.assertThrows(AppError.ClientFailure("oanda", "Open position returned 400"))
@@ -198,7 +198,7 @@ class OandaClientSpec extends Sttp4WordSpec {
       val liveParams: BrokerParameters.Oanda = BrokerParameters.Oanda("test-api-key", demo = false, None)
       val result                             = for
         client <- OandaClient.make[IO](config, testingBackend)
-        _      <- client.submit(liveParams, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal("1.0")))
+        _      <- client.submit(liveParams, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0")))
       yield ()
 
       result.asserting(_ mustBe ())
@@ -214,7 +214,7 @@ class OandaClientSpec extends Sttp4WordSpec {
 
       val result = for
         client <- OandaClient.make[IO](config, testingBackend)
-        _      <- client.submit(params, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal("1.0")))
+        _      <- client.submit(params, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0")))
       yield ()
 
       result.assertThrows(AppError.ClientFailure("oanda", s"Get accounts returned empty accounts list"))

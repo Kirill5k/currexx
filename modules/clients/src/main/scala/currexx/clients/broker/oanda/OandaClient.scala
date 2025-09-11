@@ -107,9 +107,9 @@ final private class LiveOandaClient[F[_]](
         .response(asStringAlways)
     }.flatMap { r =>
       r.code match {
-        case StatusCode.Created => F.unit
+        case StatusCode.Created   => F.unit
         case StatusCode.Forbidden => clock.sleep(30.seconds) >> openPosition(accountId, params, position)
-        case status             =>
+        case status               =>
           logger.error(s"$name-client/open-position-${status.code}\n${r.body}") >>
             F.raiseError(AppError.ClientFailure(name, s"Open position returned ${status.code}"))
       }
@@ -124,13 +124,14 @@ final private class LiveOandaClient[F[_]](
         .response(asJsonEither[OandaClient.ErrorResponse, OandaClient.AccountsResponse])
     }.flatMap { r =>
       r.body match
-        case Right(res) if params.accountId.nonEmpty => {
+        case Right(res) if params.accountId.nonEmpty =>
           val accId = params.accountId.get
-          F.fromEither(Either.cond(res.accounts.exists(_.id == accId), accId, AppError.ClientFailure(name, s"Account id $accId does not exist")))
-        }
-        case Right(res) if res.accounts.nonEmpty     => F.pure(res.accounts.head.id)
-        case Right(_)  => F.raiseError(AppError.ClientFailure(name, s"Get accounts returned empty accounts list"))
-        case Left(err) => handleError("get-account", err)
+          F.fromEither(
+            Either.cond(res.accounts.exists(_.id == accId), accId, AppError.ClientFailure(name, s"Account id $accId does not exist"))
+          )
+        case Right(res) if res.accounts.nonEmpty => F.pure(res.accounts.head.id)
+        case Right(_)                            => F.raiseError(AppError.ClientFailure(name, s"Get accounts returned empty accounts list"))
+        case Left(err)                           => handleError("get-account", err)
     }
 
   private def handleError[A](endpoint: String, error: ResponseException[OandaClient.ErrorResponse]): F[A] =
@@ -211,6 +212,7 @@ object OandaClient {
           currencyPair = CurrencyPair.fromUnsafe(instrument.replace("_", "")),
           position = if isBuy then TradeOrder.Position.Buy else TradeOrder.Position.Sell,
           openPrice = BigDecimal(side.averagePrice.getOrElse("0")),
+          currentPrice = BigDecimal(side.averagePrice.getOrElse("0")) + (BigDecimal(side.unrealizedPL) / BigDecimal(side.units)),
           volume = BigDecimal(side.units) / LotSize,
           profit = BigDecimal(side.trueUnrealizedPL)
         )
@@ -221,7 +223,8 @@ object OandaClient {
       units: String,
       tradeIDs: Option[List[String]],
       averagePrice: Option[String],
-      trueUnrealizedPL: String
+      trueUnrealizedPL: String,
+      unrealizedPL: String
   ) derives Codec.AsObject
 
   final case class ErrorResponse(errorMessage: String) derives Codec.AsObject
