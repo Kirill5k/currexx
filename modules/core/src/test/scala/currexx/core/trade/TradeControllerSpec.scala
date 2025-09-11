@@ -80,6 +80,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
              |  "order" : {
              |    "kind" : "enter",
              |    "position" : "buy",
+             |    "price" : 3.0,
              |    "volume" : 0.1,
              |    "currencyPair" : "GBPEUR"
              |  },
