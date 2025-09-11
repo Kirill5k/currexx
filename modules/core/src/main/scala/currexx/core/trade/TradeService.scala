@@ -46,7 +46,6 @@ final private class LiveTradeService[F[_]](
   override def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]] =
     orderRepository.getAll(uid, sp)
 
-  //TODO: Move to signal service?
   override def fetchMarketData(uid: UserId, cps: NonEmptyList[CurrencyPair], interval: Interval): F[Unit] =
     cps.traverse { cp =>
       marketDataClient
@@ -75,8 +74,11 @@ final private class LiveTradeService[F[_]](
       .findLatestBy(uid, cp)
       .flatMapOption(F.unit) { top =>
         F.whenA(top.order.isEnter) {
-          clock.now
-            .flatTap(time => submitOrderPlacement(top.copy(time = time, order = TradeOrder.Exit(cp))))
+          for
+            time  <- clock.now
+            price <- marketDataClient.latestPrice(cp)
+            _     <- submitOrderPlacement(top.copy(time = time, order = TradeOrder.Exit(cp, price.close)))
+          yield ()
         }
       }
 
@@ -88,7 +90,7 @@ final private class LiveTradeService[F[_]](
       _           <- foundOrders
         .collect {
           case o if limits.min.exists(o.profit < _) || limits.max.exists(o.profit > _) =>
-            TradeOrder.Exit(o.currencyPair)
+            TradeOrder.Exit(o.currencyPair, o.currentPrice)
         }
         .traverse(to => submitOrderPlacement(TradeOrderPlacement(uid, to, settings.broker, time)))
     yield ()
@@ -122,28 +124,30 @@ final private class LiveTradeService[F[_]](
     def submit(order: TradeOrder, time: Instant, skipEvent: Boolean = false): F[Unit] =
       submitOrderPlacement(TradeOrderPlacement(state.userId, order, settings.broker, time), skipEvent)
     for
-      time <- clock.now
-      _    <- action match
+      time  <- clock.now
+      //TODO: remove latestPrice call
+      price <- marketDataClient.latestPrice(state.currencyPair)
+      _     <- action match
         case TradeAction.OpenLong =>
-          val order = settings.trading.toOrder(TradeOrder.Position.Buy, state.currencyPair)
+          val order = settings.trading.toOrder(TradeOrder.Position.Buy, state.currencyPair, price.close)
           submit(order, time)
 
         case TradeAction.FlipToLong =>
-          val exitOrder = TradeOrder.Exit(state.currencyPair)
-          val openOrder = settings.trading.toOrder(TradeOrder.Position.Buy, state.currencyPair)
+          val exitOrder = TradeOrder.Exit(state.currencyPair, price.close)
+          val openOrder = settings.trading.toOrder(TradeOrder.Position.Buy, state.currencyPair, price.close)
           submit(exitOrder, time, skipEvent = true) >> submit(openOrder, time)
 
         case TradeAction.OpenShort =>
-          val order = settings.trading.toOrder(TradeOrder.Position.Sell, state.currencyPair)
+          val order = settings.trading.toOrder(TradeOrder.Position.Sell, state.currencyPair, price.close)
           submit(order, time)
 
         case TradeAction.FlipToShort =>
-          val exitOrder = TradeOrder.Exit(state.currencyPair)
-          val openOrder = settings.trading.toOrder(TradeOrder.Position.Sell, state.currencyPair)
+          val exitOrder = TradeOrder.Exit(state.currencyPair, price.close)
+          val openOrder = settings.trading.toOrder(TradeOrder.Position.Sell, state.currencyPair, price.close)
           submit(exitOrder, time, skipEvent = true) >> submit(openOrder, time)
 
         case TradeAction.ClosePosition =>
-          val order = TradeOrder.Exit(state.currencyPair)
+          val order = TradeOrder.Exit(state.currencyPair, price.close)
           submit(order, time)
     yield ()
   }

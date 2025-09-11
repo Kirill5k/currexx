@@ -4,9 +4,12 @@ import currexx.domain.types.EnumType
 import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder, Json}
 import io.circe.syntax.*
 
+import java.time.Instant
+
 sealed trait TradeOrder(val kind: String):
   def isEnter: Boolean
   def currencyPair: CurrencyPair
+  def price: BigDecimal
 
 object TradeOrder {
   object Position extends EnumType[Position](() => Position.values)
@@ -16,12 +19,14 @@ object TradeOrder {
   final case class Enter(
       position: TradeOrder.Position,
       currencyPair: CurrencyPair,
+      price: BigDecimal,
       volume: BigDecimal
   ) extends TradeOrder("enter") derives Codec.AsObject:
     def isEnter: Boolean = true
 
   final case class Exit(
-      currencyPair: CurrencyPair
+      currencyPair: CurrencyPair,
+      price: BigDecimal
   ) extends TradeOrder("exit") derives Codec.AsObject:
     def isEnter: Boolean = false
 
