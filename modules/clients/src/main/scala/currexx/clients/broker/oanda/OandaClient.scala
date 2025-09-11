@@ -11,12 +11,15 @@ import currexx.clients.broker.oanda.OandaClient.ClosePositionRequest
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, OpenedTradeOrder, TradeOrder}
 import io.circe.Codec
+import kirill5k.common.cats.Clock
 import org.typelevel.log4cats.Logger
 import sttp.capabilities.fs2.Fs2Streams
 import sttp.client4.*
 import sttp.client4.circe.{asJson, asJsonEither}
 import sttp.client4.WebSocketStreamBackend
 import sttp.model.StatusCode
+
+import scala.concurrent.duration.*
 
 private[clients] trait OandaClient[F[_]] extends Fs2HttpClient[F]:
   def submit(params: BrokerParameters.Oanda, order: TradeOrder): F[Unit]
@@ -27,7 +30,8 @@ final private class LiveOandaClient[F[_]](
     private val config: OandaConfig
 )(using
     F: Async[F],
-    logger: Logger[F]
+    logger: Logger[F],
+    clock: Clock[F]
 ) extends OandaClient[F] {
   override protected val name: String = "oanda"
 
@@ -104,6 +108,7 @@ final private class LiveOandaClient[F[_]](
     }.flatMap { r =>
       r.code match {
         case StatusCode.Created => F.unit
+        case StatusCode.Forbidden => clock.sleep(30.seconds) >> openPosition(accountId, params, position)
         case status             =>
           logger.error(s"$name-client/open-position-${status.code}\n${r.body}") >>
             F.raiseError(AppError.ClientFailure(name, s"Open position returned ${status.code}"))
@@ -221,7 +226,7 @@ object OandaClient {
 
   final case class ErrorResponse(errorMessage: String) derives Codec.AsObject
 
-  def make[F[_]: {Async, Logger}](
+  def make[F[_]: {Async, Logger, Clock}](
       config: OandaConfig,
       backend: WebSocketStreamBackend[F, Fs2Streams[F]]
   ): F[OandaClient[F]] =
