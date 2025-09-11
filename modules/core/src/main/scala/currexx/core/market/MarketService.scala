@@ -34,7 +34,7 @@ final private class LiveMarketService[F[_]](
 
   override def processTradeOrderPlacement(top: TradeOrderPlacement): F[Unit] = {
     val position = top.order match
-      case enter: TradeOrder.Enter => Some(PositionState(enter.position, top.time, top.order.price))
+      case enter: TradeOrder.Enter => Some(PositionState(enter.position, top.time))
       case _: TradeOrder.Exit      => None
     stateRepo.update(top.userId, top.order.currencyPair, position).void
   }

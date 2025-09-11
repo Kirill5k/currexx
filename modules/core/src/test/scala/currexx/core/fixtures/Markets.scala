@@ -16,7 +16,7 @@ object Markets {
   lazy val priceRange: PriceRange               = PriceRange(2.0, 4.0, 1.0, 3.0, 1000d, ts)
   lazy val timeSeriesData: MarketTimeSeriesData = MarketTimeSeriesData(gbpeur, Interval.H1, NonEmptyList.one(priceRange))
 
-  lazy val positionState: PositionState = PositionState(TradeOrder.Position.Buy, ts, priceRange.close)
+  lazy val positionState: PositionState = PositionState(TradeOrder.Position.Buy, ts)
 
   lazy val profile: MarketProfile = MarketProfile(trend = Some(TrendState(Direction.Upward, ts)))
 
