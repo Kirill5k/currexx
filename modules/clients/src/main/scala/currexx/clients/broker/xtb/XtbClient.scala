@@ -21,6 +21,7 @@ import sttp.ws.WebSocketFrame
 import sttp.ws.WebSocketFrame.Text
 
 import java.nio.charset.StandardCharsets
+import java.time.Instant
 import scala.concurrent.duration.*
 
 private[clients] trait XtbClient[F[_]] extends Fs2HttpClient[F]:

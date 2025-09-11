@@ -4,8 +4,6 @@ import currexx.domain.types.EnumType
 import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder, Json}
 import io.circe.syntax.*
 
-import java.time.Instant
-
 sealed trait TradeOrder(val kind: String):
   def isEnter: Boolean
   def currencyPair: CurrencyPair

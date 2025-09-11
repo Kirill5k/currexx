@@ -4,7 +4,7 @@ import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.clients.broker.BrokerClient
-import currexx.clients.broker.oanda.{OandaClient, OandaConfig}
+import currexx.clients.broker.oanda.OandaConfig
 import currexx.clients.broker.xtb.{XtbClient, XtbConfig}
 import currexx.clients.data.MarketDataClient
 import currexx.clients.data.alphavantage.{AlphaVantageClient, AlphaVantageConfig}
@@ -34,7 +34,6 @@ object Clients:
       alphavantage <- AlphaVantageClient.make[F](config.alphaVantage, fs2Backend)
       twelvedata   <- TwelveDataClient.make(config.twelveData, fs2Backend)
       xtb          <- XtbClient.make[F](config.xtb, fs2Backend)
-      oanda        <- OandaClient.make[F](config.oanda, fs2Backend)
-      broker       <- BrokerClient.make[F](xtb, oanda)
+      broker       <- BrokerClient.make[F](xtb)
       data         <- MarketDataClient.make[F](alphavantage, twelvedata)
     yield Clients[F](data, broker)

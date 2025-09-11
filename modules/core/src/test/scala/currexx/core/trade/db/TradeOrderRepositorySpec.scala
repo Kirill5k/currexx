@@ -80,7 +80,7 @@ class TradeOrderRepositorySpec extends MongoSpec {
         val result = for
           repo <- TradeOrderRepository.make(db)
           _    <- repo.save(Trades.order)
-          _    <- repo.save(Trades.order.copy(order = TradeOrder.Enter(TradeOrder.Position.Sell, Markets.gbpusd, 0.1)))
+          _    <- repo.save(Trades.order.copy(order = TradeOrder.Enter(TradeOrder.Position.Sell, Markets.gbpusd, 5, 0.1)))
           res  <- repo.getAllTradedCurrencies(Users.uid)
         yield res
 

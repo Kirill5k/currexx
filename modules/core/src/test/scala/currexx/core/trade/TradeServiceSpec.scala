@@ -51,7 +51,7 @@ class TradeServiceSpec extends IOWordSpec {
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
-        val order  = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, 0.1)
+        val order  = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, 1.3, 0.1)
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
           _   <- svc.placeOrder(Users.uid, order, false)
@@ -76,7 +76,7 @@ class TradeServiceSpec extends IOWordSpec {
         when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturnNone
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
-        val order  = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, BigDecimal(0.1))
+        val order  = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, BigDecimal(1.3), BigDecimal(0.1))
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
           _   <- svc.placeOrder(Users.uid, order, true)
@@ -116,7 +116,7 @@ class TradeServiceSpec extends IOWordSpec {
       "not do anything when latest order is exit" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair]))
-          .thenReturnSome(Trades.order.copy(order = TradeOrder.Exit(Markets.gbpeur)))
+          .thenReturnSome(Trades.order.copy(order = TradeOrder.Exit(Markets.gbpeur, 1.5)))
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, brokerClient, dataClient, disp)
@@ -133,6 +133,7 @@ class TradeServiceSpec extends IOWordSpec {
 
       "close existing order" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
+        when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
         when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturnSome(Trades.order)
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
@@ -143,9 +144,10 @@ class TradeServiceSpec extends IOWordSpec {
         yield ()
 
         result.asserting { res =>
-          val exitOrder   = TradeOrder.Exit(Markets.gbpeur)
+          val exitOrder   = TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close)
           val placedOrder = TradeOrderPlacement(Users.uid, exitOrder, Trades.broker, now)
           verifyNoInteractions(settRepo)
+          verify(dataClient).latestPrice(Markets.gbpeur)
           verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
           verify(brokerClient).submit(Trades.broker, exitOrder)
           verify(orderRepo).save(placedOrder)
@@ -190,7 +192,7 @@ class TradeServiceSpec extends IOWordSpec {
         yield ()
 
         result.asserting { res =>
-          val exitOrder   = TradeOrder.Exit(Markets.gbpeur)
+          val exitOrder   = TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close)
           val placedOrder = TradeOrderPlacement(Users.uid, exitOrder, Trades.broker, now)
           verifyNoInteractions(dataClient)
           verify(settRepo).get(Users.uid)
@@ -217,7 +219,7 @@ class TradeServiceSpec extends IOWordSpec {
         yield ()
 
         result.asserting { res =>
-          val exitOrder   = TradeOrder.Exit(Markets.gbpeur)
+          val exitOrder   = TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close)
           val placedOrder = TradeOrderPlacement(Users.uid, exitOrder, Trades.broker, now)
           verifyNoInteractions(dataClient)
           verify(settRepo).get(Users.uid)
@@ -299,6 +301,7 @@ class TradeServiceSpec extends IOWordSpec {
         val openLongRule                                          = Rule(TradeAction.OpenLong, Rule.Condition.TrendIs(Direction.Upward))
         val settings                                              = Settings.trade.copy(strategy = TradeStrategy(List(openLongRule), Nil))
         when(settRepo.get(any[UserId])).thenReturnIO(settings)
+        when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
@@ -309,10 +312,11 @@ class TradeServiceSpec extends IOWordSpec {
         yield ()
 
         result.asserting { res =>
-          val order       = settings.trading.toOrder(TradeOrder.Position.Buy, state.currencyPair)
+          val order       = settings.trading.toOrder(TradeOrder.Position.Buy, state.currencyPair, Markets.priceRange.close)
           val placedOrder = TradeOrderPlacement(Users.uid, order, Trades.broker, now)
 
           verify(settRepo).get(state.userId)
+          verify(dataClient).latestPrice(state.currencyPair)
           verify(brokerClient).submit(settings.broker, order)
           verify(orderRepo).save(placedOrder)
           disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
@@ -325,6 +329,7 @@ class TradeServiceSpec extends IOWordSpec {
         val closeRule = Rule(TradeAction.ClosePosition, Rule.Condition.PositionIs(TradeOrder.Position.Buy))
         val settings  = Settings.trade.copy(strategy = TradeStrategy(Nil, List(closeRule)))
         when(settRepo.get(any[UserId])).thenReturnIO(settings)
+        when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
@@ -334,10 +339,11 @@ class TradeServiceSpec extends IOWordSpec {
         yield ()
 
         result.asserting { res =>
-          val order       = TradeOrder.Exit(state.currencyPair)
+          val order       = TradeOrder.Exit(state.currencyPair, Markets.priceRange.close)
           val placedOrder = TradeOrderPlacement(Users.uid, order, Trades.broker, now)
 
           verify(settRepo).get(state.userId)
+          verify(dataClient).latestPrice(state.currencyPair)
           verify(brokerClient).submit(settings.broker, order)
           verify(orderRepo).save(placedOrder)
           disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
@@ -350,6 +356,7 @@ class TradeServiceSpec extends IOWordSpec {
         val openShortRule                                         = Rule(TradeAction.OpenShort, Rule.Condition.TrendIs(Direction.Upward))
         val settings = Settings.trade.copy(strategy = TradeStrategy(openRules = List(openShortRule), closeRules = Nil))
         when(settRepo.get(any[UserId])).thenReturnIO(settings)
+        when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
@@ -359,12 +366,13 @@ class TradeServiceSpec extends IOWordSpec {
         yield ()
 
         result.asserting { res =>
-          val exitOrder       = TradeOrder.Exit(state.currencyPair)
+          val exitOrder       = TradeOrder.Exit(state.currencyPair, Markets.priceRange.close)
           val placedExitOrder = TradeOrderPlacement(Users.uid, exitOrder, Trades.broker, now)
-          val openOrder       = settings.trading.toOrder(TradeOrder.Position.Sell, state.currencyPair)
+          val openOrder       = settings.trading.toOrder(TradeOrder.Position.Sell, state.currencyPair, Markets.priceRange.close)
           val placedOpenOrder = TradeOrderPlacement(Users.uid, openOrder, Trades.broker, now)
 
           verify(settRepo).get(state.userId)
+          verify(dataClient).latestPrice(state.currencyPair)
           verify(brokerClient).submit(settings.broker, exitOrder)
           verify(brokerClient).submit(settings.broker, openOrder)
           verify(orderRepo).save(placedExitOrder)
