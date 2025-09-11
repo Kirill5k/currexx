@@ -198,33 +198,33 @@ object OandaClient {
       long: PositionSide,
       short: PositionSide
   ) derives Codec.AsObject {
-    def isOpen: Boolean                              = long.units != "0" || short.units != "0"
+    def isOpen: Boolean                              = long.units > 0 || short.units > 0
     def toClosePositionRequest: ClosePositionRequest =
       ClosePositionRequest(
-        longUnits = if (long.units == "0") "NONE" else "ALL",
-        shortUnits = if (short.units == "0") "NONE" else "ALL"
+        longUnits = if (long.units == 0) "NONE" else "ALL",
+        shortUnits = if (short.units == 0) "NONE" else "ALL"
       )
     def toOpenedTradeOrder: Option[OpenedTradeOrder] =
       Option.when(isOpen) {
-        val isBuy = long.units != "0"
+        val isBuy = long.units > 0
         val side  = if isBuy then long else short
         OpenedTradeOrder(
           currencyPair = CurrencyPair.fromUnsafe(instrument.replace("_", "")),
           position = if isBuy then TradeOrder.Position.Buy else TradeOrder.Position.Sell,
-          openPrice = BigDecimal(side.averagePrice.getOrElse("0")),
-          currentPrice = BigDecimal(side.averagePrice.getOrElse("0")) + (BigDecimal(side.unrealizedPL) / BigDecimal(side.units)),
-          volume = BigDecimal(side.units) / LotSize,
-          profit = BigDecimal(side.trueUnrealizedPL)
+          openPrice = side.averagePrice.getOrElse(BigDecimal(0)),
+          currentPrice = side.averagePrice.getOrElse(BigDecimal(0)) + (side.unrealizedPL / side.units),
+          volume = side.units / LotSize,
+          profit = side.trueUnrealizedPL
         )
       }
   }
 
   final case class PositionSide(
-      units: String,
+      units: BigDecimal,
       tradeIDs: Option[List[String]],
-      averagePrice: Option[String],
-      trueUnrealizedPL: String,
-      unrealizedPL: String
+      averagePrice: Option[BigDecimal],
+      trueUnrealizedPL: BigDecimal,
+      unrealizedPL: BigDecimal
   ) derives Codec.AsObject
 
   final case class ErrorResponse(errorMessage: String) derives Codec.AsObject
