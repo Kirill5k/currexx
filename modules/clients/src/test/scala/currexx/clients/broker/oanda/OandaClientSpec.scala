@@ -17,7 +17,7 @@ class OandaClientSpec extends Sttp4WordSpec {
   given Logger[IO] = Slf4jLogger.getLogger[IO]
 
   val config                         = OandaConfig("https://api-fxpractice.oanda.com", "https://api-fxtrade.oanda.com")
-  val params: BrokerParameters.Oanda = BrokerParameters.Oanda("test-api-key", demo = true)
+  val params: BrokerParameters.Oanda = BrokerParameters.Oanda("test-api-key", demo = true, None)
   val eurUsdPair                     = CurrencyPair(EUR, USD)
   val gbpUsdPair                     = CurrencyPair(GBP, USD)
 
@@ -195,7 +195,7 @@ class OandaClientSpec extends Sttp4WordSpec {
           case _ => throw new RuntimeException("Unexpected request")
         }
 
-      val liveParams: BrokerParameters.Oanda = BrokerParameters.Oanda("test-api-key", demo = false)
+      val liveParams: BrokerParameters.Oanda = BrokerParameters.Oanda("test-api-key", demo = false, None)
       val result                             = for
         client <- OandaClient.make[IO](config, testingBackend)
         _      <- client.submit(liveParams, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal("1.0")))
