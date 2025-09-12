@@ -62,5 +62,5 @@ object TestServices:
       clients    <- TestClients.make[F]
       market     <- TestMarketService.make[F](settings.marketState, dispatcher)
       trade      <- TestTradeService.make[F](settings.trade, clients, dispatcher)(using Temporal[F], clock)
-      signal     <- TestSignalService.make[F](settings.signal, dispatcher)
+      signal     <- TestSignalService.make[F](settings.signal, dispatcher)(using Temporal[F], clock)
     yield TestServices[F](settings, signal, market, trade, clients, clock, dispatcher)
