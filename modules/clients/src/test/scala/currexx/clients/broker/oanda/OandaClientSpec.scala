@@ -17,7 +17,7 @@ class OandaClientSpec extends Sttp4WordSpec {
   given Logger[IO] = Slf4jLogger.getLogger[IO]
 
   val config                         = OandaConfig("https://api-fxpractice.oanda.com", "https://api-fxtrade.oanda.com")
-  val params: BrokerParameters.Oanda = BrokerParameters.Oanda("test-api-key", demo = true, None)
+  val params: BrokerParameters.Oanda = BrokerParameters.Oanda("test-api-key", demo = true, "123-456-789")
   val eurUsdPair                     = CurrencyPair(EUR, USD)
   val gbpUsdPair                     = CurrencyPair(GBP, USD)
 
@@ -181,7 +181,10 @@ class OandaClientSpec extends Sttp4WordSpec {
       yield orders
 
       result.assertThrows(
-        AppError.JsonParsingFailure("invalid json", "oanda client returned ParsingFailure: expected json value got 'invali...' (line 1, column 1)")
+        AppError.JsonParsingFailure(
+          "invalid json",
+          "oanda client returned ParsingFailure: expected json value got 'invali...' (line 1, column 1)"
+        )
       )
     }
 
@@ -195,7 +198,7 @@ class OandaClientSpec extends Sttp4WordSpec {
           case _ => throw new RuntimeException("Unexpected request")
         }
 
-      val liveParams: BrokerParameters.Oanda = BrokerParameters.Oanda("test-api-key", demo = false, None)
+      val liveParams: BrokerParameters.Oanda = BrokerParameters.Oanda("test-api-key", demo = false, "123-456-789")
       val result                             = for
         client <- OandaClient.make[IO](config, testingBackend)
         _      <- client.submit(liveParams, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0")))
@@ -204,7 +207,7 @@ class OandaClientSpec extends Sttp4WordSpec {
       result.asserting(_ mustBe ())
     }
 
-    "handle empty accounts list" in {
+    "handle invalid account id" in {
       val testingBackend = fs2BackendStub
         .whenRequestMatchesPartial {
           case r if r.isGet && r.isGoingTo("api-fxpractice.oanda.com/v3/accounts") =>
@@ -214,7 +217,10 @@ class OandaClientSpec extends Sttp4WordSpec {
 
       val result = for
         client <- OandaClient.make[IO](config, testingBackend)
-        _      <- client.submit(params, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0")))
+        _      <- client.submit(
+          BrokerParameters.Oanda("test-api-key", demo = true, "123"),
+          TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0"))
+        )
       yield ()
 
       result.assertThrows(AppError.ClientFailure("oanda", s"Get accounts returned empty accounts list"))

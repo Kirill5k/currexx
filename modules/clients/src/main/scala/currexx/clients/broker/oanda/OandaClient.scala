@@ -124,14 +124,9 @@ final private class LiveOandaClient[F[_]](
         .response(asJsonEither[OandaClient.ErrorResponse, OandaClient.AccountsResponse])
     }.flatMap { r =>
       r.body match
-        case Right(res) if params.accountId.nonEmpty =>
-          val accId = params.accountId.get
-          F.fromEither(
-            Either.cond(res.accounts.exists(_.id == accId), accId, AppError.ClientFailure(name, s"Account id $accId does not exist"))
-          )
-        case Right(res) if res.accounts.nonEmpty => F.pure(res.accounts.head.id)
-        case Right(_)                            => F.raiseError(AppError.ClientFailure(name, s"Get accounts returned empty accounts list"))
-        case Left(err)                           => handleError("get-account", err)
+        case Right(res) if res.accounts.exists(_.id == params.accountId) => F.pure(params.accountId)
+        case Right(_)  => F.raiseError(AppError.ClientFailure(name, s"Account id ${params.accountId} does not exist"))
+        case Left(err) => handleError("get-account", err)
     }
 
   private def handleError[A](endpoint: String, error: ResponseException[OandaClient.ErrorResponse]): F[A] =
