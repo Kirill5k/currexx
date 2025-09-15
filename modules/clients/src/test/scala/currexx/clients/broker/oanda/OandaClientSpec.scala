@@ -223,7 +223,7 @@ class OandaClientSpec extends Sttp4WordSpec {
         )
       yield ()
 
-      result.assertThrows(AppError.ClientFailure("oanda", s"Get accounts returned empty accounts list"))
+      result.assertThrows(AppError.ClientFailure("oanda", s"Account id 123 does not exist"))
     }
   }
 }
