@@ -6,7 +6,7 @@ ThisBuild / scalaVersion                        := "3.7.2"
 ThisBuild / version                             := scala.sys.process.Process("git rev-parse HEAD").!!.trim.slice(0, 7)
 ThisBuild / organization                        := "io.github.kirill5k"
 ThisBuild / githubWorkflowPublishTargetBranches := Nil
-ThisBuild / githubWorkflowJavaVersions          := Seq(JavaSpec.temurin("24"))
+ThisBuild / githubWorkflowJavaVersions          := Seq(JavaSpec.temurin("25"))
 ThisBuild / scalacOptions ++= Seq("-Wunused:all", "-Xmax-inlines:256")
 ThisBuild / Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
 
@@ -21,7 +21,7 @@ val docker = Seq(
   packageName        := moduleName.value,
   version            := version.value,
   maintainer         := "immotional@aol.com",
-  dockerBaseImage    := "amazoncorretto:24-alpine",
+  dockerBaseImage    := "amazoncorretto:25-alpine",
   dockerUpdateLatest := true,
   dockerUsername     := sys.env.get("DOCKER_USERNAME"),
   dockerRepository   := sys.env.get("DOCKER_REPO_URI"),
