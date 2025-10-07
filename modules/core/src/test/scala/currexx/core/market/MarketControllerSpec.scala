@@ -85,7 +85,8 @@ class MarketControllerSpec extends HttpRoutesWordSpec {
              |      "lastMomentumValue" : null,
              |      "volatility" : null,
              |      "lastVolatilityValue" : null,
-             |      "lastVelocityValue": null
+             |      "lastVelocityValue": null,
+             |      "lastBandCrossing" : null
              |    },
              |    "lastUpdatedAt": "${Markets.ts}",
              |    "createdAt": "${Markets.ts}"
