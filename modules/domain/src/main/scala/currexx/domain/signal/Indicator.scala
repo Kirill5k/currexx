@@ -15,7 +15,7 @@ enum ValueSource:
 
 object ValueRole extends EnumType[ValueRole](() => ValueRole.values)
 enum ValueRole:
-  case Momentum, Volatility, Velocity
+  case Momentum, Volatility, Velocity, ChannelMiddleBand
 
 enum ValueTransformation derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Sequenced(sequence: List[ValueTransformation])                             extends ValueTransformation
@@ -63,38 +63,43 @@ enum Indicator derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWit
   case Composite(
       indicators: NonEmptyList[Indicator],
       combinator: CombinationLogic
-  ) extends Indicator
+  )
   case TrendChangeDetection(
       source: ValueSource,
       transformation: ValueTransformation
-  ) extends Indicator
+  )
   case ThresholdCrossing(
       source: ValueSource,
       transformation: ValueTransformation,
       upperBoundary: Double,
       lowerBoundary: Double
-  ) extends Indicator
+  )
   case LinesCrossing(
       source: ValueSource,
       line1Transformation: ValueTransformation, // SLOW
       line2Transformation: ValueTransformation  // FAST
-  ) extends Indicator
+  )
   case KeltnerChannel(
       source: ValueSource,
       middleBand: ValueTransformation,
       atrLength: Int,
       atrMultiplier: Double
-  ) extends Indicator
+  )
   case VolatilityRegimeDetection(
       atrLength: Int,
       smoothingType: ValueTransformation,
       smoothingLength: Int
-  ) extends Indicator
+  )
   case ValueTracking(
       role: ValueRole,
       source: ValueSource,
       transformation: ValueTransformation
-  ) extends Indicator
+  )
+  case PriceLineCrossing(
+      source: ValueSource,
+      role: ValueRole,
+      transformation: ValueTransformation
+  )
 
 object Indicator:
   given JsonTaggedAdt.Config[Indicator] = JsonTaggedAdt.Config.Values[Indicator](
@@ -105,7 +110,8 @@ object Indicator:
       "threshold-crossing"          -> JsonTaggedAdt.tagged[Indicator.ThresholdCrossing],
       "lines-crossing"              -> JsonTaggedAdt.tagged[Indicator.LinesCrossing],
       "keltner-channel"             -> JsonTaggedAdt.tagged[Indicator.KeltnerChannel],
-      "value-tracking"              -> JsonTaggedAdt.tagged[Indicator.ValueTracking]
+      "value-tracking"              -> JsonTaggedAdt.tagged[Indicator.ValueTracking],
+      "price-line-crossing"         -> JsonTaggedAdt.tagged[Indicator.PriceLineCrossing]
     ),
     strict = true,
     typeFieldName = "kind"

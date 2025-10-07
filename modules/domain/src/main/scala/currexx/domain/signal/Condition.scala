@@ -25,6 +25,7 @@ enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWit
   case TrendDirectionChange(from: Direction, to: Direction, previousTrendLength: Option[Int] = None)
   case VolatilityRegimeChange(from: Option[VolatilityRegime], to: VolatilityRegime)
   case ValueUpdated(role: ValueRole, value: BigDecimal)
+  case PriceCrossedLine(lineRole: ValueRole, direction: Direction)
 
 object Condition {
   given JsonTaggedAdt.Config[Condition] = JsonTaggedAdt.Config.Values[Condition](
@@ -36,7 +37,8 @@ object Condition {
       "threshold-crossing"       -> JsonTaggedAdt.tagged[Condition.ThresholdCrossing],
       "volatility-regime-change" -> JsonTaggedAdt.tagged[Condition.VolatilityRegimeChange],
       "trend-direction-change"   -> JsonTaggedAdt.tagged[Condition.TrendDirectionChange],
-      "value-updated"            -> JsonTaggedAdt.tagged[Condition.ValueUpdated]
+      "value-updated"            -> JsonTaggedAdt.tagged[Condition.ValueUpdated],
+      "price-crossed-line"       -> JsonTaggedAdt.tagged[Condition.PriceCrossedLine]
     ),
     strict = true,
     typeFieldName = "kind"
@@ -83,6 +85,14 @@ object Condition {
       case (l1c :: l1p :: _, l2c :: l2p :: _) if l1c >= l2c && l1p < l2p => Some(Direction.Upward)
       case (l1c :: l1p :: _, l2c :: l2p :: _) if l1c <= l2c && l1p > l2p => Some(Direction.Downward)
       case _                                                             => None
+
+  def priceCrossedLine(
+      priceLine: List[Double],
+      otherLine: List[Double],
+      lineRole: ValueRole
+  ): Option[Condition] =
+    crossingDirection(priceLine, otherLine)
+      .map(PriceCrossedLine(lineRole, _))
 
   /** Detects a significant turn (peak or trough) in a time-series line. This method is more reliable than a simple slope change but has a
     * lag of `lookback` periods.

@@ -3,7 +3,7 @@ package currexx.core.fixtures
 import cats.data.NonEmptyList
 import currexx.core.signal.Signal
 import currexx.domain.market.{CurrencyPair, Interval}
-import currexx.domain.signal.{Boundary, CombinationLogic, Condition, Direction, Indicator, ValueSource, ValueTransformation}
+import currexx.domain.signal.{Boundary, CombinationLogic, Condition, Direction, Indicator, ValueRole, ValueSource, ValueTransformation}
 import currexx.domain.user.UserId
 import kirill5k.common.syntax.time.*
 
@@ -124,6 +124,21 @@ object Signals {
       time = time,
       cp = cp,
       condition = Condition.LowerBandCrossing(direction),
+      triggeredBy = Indicators.trendChangeDetection
+    )
+
+  def priceCrossedLine(
+      role: ValueRole,
+      direction: Direction,
+      uid: UserId = Users.uid,
+      time: Instant = ts,
+      cp: CurrencyPair = Markets.gbpeur
+  ): Signal =
+    make(
+      uid = uid,
+      time = time,
+      cp = cp,
+      condition = Condition.PriceCrossedLine(role, direction),
       triggeredBy = Indicators.trendChangeDetection
     )
 }

@@ -1,7 +1,7 @@
 package currexx.core.market
 
 import currexx.core.fixtures.{Indicators, Signals}
-import currexx.domain.signal.{Boundary, Direction}
+import currexx.domain.signal.{Boundary, Direction, ValueRole}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -94,6 +94,39 @@ class MarketProfileSpec extends AnyWordSpec with Matchers {
         
         val profile2 = profile1.update(signal2)
         profile2.lastBandCrossing mustBe Some(BandCrossingState(Boundary.Lower, Direction.Downward, signal2.time))
+      }
+
+      "update price line crossing state for PriceCrossedLine with upward direction" in {
+        val signal  = Signals.priceCrossedLine(ValueRole.ChannelMiddleBand, Direction.Upward)
+        val profile = MarketProfile().update(signal)
+        profile.lastPriceLineCrossing mustBe Some(PriceLineCrossingState(ValueRole.ChannelMiddleBand, Direction.Upward, signal.time))
+      }
+
+      "update price line crossing state for PriceCrossedLine with downward direction" in {
+        val signal  = Signals.priceCrossedLine(ValueRole.ChannelMiddleBand, Direction.Downward)
+        val profile = MarketProfile().update(signal)
+        profile.lastPriceLineCrossing mustBe Some(PriceLineCrossingState(ValueRole.ChannelMiddleBand, Direction.Downward, signal.time))
+      }
+
+      "update price line crossing state for different ValueRole types" in {
+        val signal1 = Signals.priceCrossedLine(ValueRole.Momentum, Direction.Upward)
+        val profile1 = MarketProfile().update(signal1)
+        profile1.lastPriceLineCrossing mustBe Some(PriceLineCrossingState(ValueRole.Momentum, Direction.Upward, signal1.time))
+
+        val signal2 = Signals.priceCrossedLine(ValueRole.Volatility, Direction.Downward)
+        val profile2 = MarketProfile().update(signal2)
+        profile2.lastPriceLineCrossing mustBe Some(PriceLineCrossingState(ValueRole.Volatility, Direction.Downward, signal2.time))
+      }
+
+      "replace previous price line crossing state when a new crossing occurs" in {
+        val signal1 = Signals.priceCrossedLine(ValueRole.ChannelMiddleBand, Direction.Upward)
+        val signal2 = Signals.priceCrossedLine(ValueRole.ChannelMiddleBand, Direction.Downward)
+        
+        val profile1 = MarketProfile().update(signal1)
+        profile1.lastPriceLineCrossing mustBe Some(PriceLineCrossingState(ValueRole.ChannelMiddleBand, Direction.Upward, signal1.time))
+        
+        val profile2 = profile1.update(signal2)
+        profile2.lastPriceLineCrossing mustBe Some(PriceLineCrossingState(ValueRole.ChannelMiddleBand, Direction.Downward, signal2.time))
       }
     }
   }

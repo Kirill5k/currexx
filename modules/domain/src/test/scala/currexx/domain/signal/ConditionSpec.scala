@@ -116,5 +116,71 @@ class ConditionSpec extends AnyWordSpec with Matchers {
         Condition.bandCrossing(line1, upperBarrier, lowerBarrier) mustBe None
       }
     }
+
+    "priceCrossedLine" should {
+      val lineRole = ValueRole.ChannelMiddleBand
+
+      "return PriceCrossedLine with Upward direction when price crosses above line" in {
+        val priceLine = List(5.0, 3.0, 3.0, 3.0)
+        val otherLine = List(4.0, 4.0, 4.0, 4.0)
+
+        Condition.priceCrossedLine(priceLine, otherLine, lineRole) mustBe Some(
+          Condition.PriceCrossedLine(lineRole, Direction.Upward)
+        )
+      }
+
+      "return PriceCrossedLine with Downward direction when price crosses below line" in {
+        val priceLine = List(3.0, 5.0, 5.0, 5.0)
+        val otherLine = List(4.0, 4.0, 4.0, 4.0)
+
+        Condition.priceCrossedLine(priceLine, otherLine, lineRole) mustBe Some(
+          Condition.PriceCrossedLine(lineRole, Direction.Downward)
+        )
+      }
+
+      "return None when price doesn't cross the line" in {
+        val priceLine = List(5.0, 5.5, 5.5, 5.5)
+        val otherLine = List(4.0, 4.0, 4.0, 4.0)
+
+        Condition.priceCrossedLine(priceLine, otherLine, lineRole) mustBe None
+      }
+
+      "return None when price touches but doesn't cross" in {
+        val priceLine = List(4.0, 4.0, 4.0, 4.0)
+        val otherLine = List(4.0, 4.0, 4.0, 4.0)
+
+        Condition.priceCrossedLine(priceLine, otherLine, lineRole) mustBe None
+      }
+
+      "return None when insufficient data" in {
+        val priceLine1 = List(5.0)
+        val otherLine1 = List(4.0, 4.0)
+
+        Condition.priceCrossedLine(priceLine1, otherLine1, lineRole) mustBe None
+
+        val priceLine2 = List(5.0, 3.0)
+        val otherLine2 = List(4.0)
+
+        Condition.priceCrossedLine(priceLine2, otherLine2, lineRole) mustBe None
+      }
+
+      "handle equal values correctly for upward crossing" in {
+        val priceLine = List(4.0, 3.0, 3.0, 3.0)
+        val otherLine = List(4.0, 4.0, 4.0, 4.0)
+
+        Condition.priceCrossedLine(priceLine, otherLine, lineRole) mustBe Some(
+          Condition.PriceCrossedLine(lineRole, Direction.Upward)
+        )
+      }
+
+      "handle equal values correctly for downward crossing" in {
+        val priceLine = List(4.0, 5.0, 5.0, 5.0)
+        val otherLine = List(4.0, 4.0, 4.0, 4.0)
+
+        Condition.priceCrossedLine(priceLine, otherLine, lineRole) mustBe Some(
+          Condition.PriceCrossedLine(lineRole, Direction.Downward)
+        )
+      }
+    }
   }
 }
