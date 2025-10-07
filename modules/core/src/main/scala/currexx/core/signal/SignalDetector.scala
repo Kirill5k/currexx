@@ -15,6 +15,7 @@ trait SignalDetector:
   def detectVolatilityRegimeChange(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.VolatilityRegimeDetection): Option[Signal]
   def detectValue(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.ValueTracking): Option[Signal]
   def detectComposite(uid: UserId, data: MarketTimeSeriesData, composite: Indicator.Composite): Option[Signal]
+  def detectPriceLineCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.PriceLineCrossing): Option[Signal]
 
 final private class PureSignalDetector extends SignalDetector {
   private val transformer: ValueTransformer = ValueTransformer.pure
@@ -38,6 +39,7 @@ final private class PureSignalDetector extends SignalDetector {
       case kc: Indicator.KeltnerChannel             => detectBarrierCrossing(uid, data, kc)
       case vrd: Indicator.VolatilityRegimeDetection => detectVolatilityRegimeChange(uid, data, vrd)
       case c: Indicator.Composite                   => detectComposite(uid, data, c)
+      case plc: Indicator.PriceLineCrossing         => detectPriceLineCrossing(uid, data, plc)
 
   def detectThresholdCrossing(
       uid: UserId,
@@ -86,8 +88,8 @@ final private class PureSignalDetector extends SignalDetector {
     // 3. Calculate ATR using the required High, Low, and Close data directly.
     val atrLine = Volatility.averageTrueRange(data.closings, data.highs, data.lows, indicator.atrLength)
     // 4. Calculate the upper and lower bands based on the middle band and ATR.
-    val upperBand = middleBand.lazyZip(atrLine).map { (mid, atr) => mid + (atr * indicator.atrMultiplier) }.toList
-    val lowerBand = middleBand.lazyZip(atrLine).map { (mid, atr) => mid - (atr * indicator.atrMultiplier) }.toList
+    val upperBand = middleBand.lazyZip(atrLine).map((mid, atr) => mid + (atr * indicator.atrMultiplier)).toList
+    val lowerBand = middleBand.lazyZip(atrLine).map((mid, atr) => mid - (atr * indicator.atrMultiplier)).toList
     // 5. CORRECT: Check if the `priceLine` crosses the calculated bands.
     Condition
       .bandCrossing(priceLine, upperBand, lowerBand)
@@ -143,6 +145,15 @@ final private class PureSignalDetector extends SignalDetector {
           time = data.prices.head.time
         )
       }
+
+  def detectPriceLineCrossing(
+      uid: UserId,
+      data: MarketTimeSeriesData,
+      plc: Indicator.PriceLineCrossing
+  ): Option[Signal] =
+    val priceLine = transformer.extractFrom(data, plc.source)
+    val otherLine = transformer.transformTo(priceLine, data, plc.transformation)
+    Condition.priceCrossedLine(priceLine, otherLine, plc.role).map(makeSignal(uid, data, plc))
 }
 
 final private class CachedSignalDetector(
@@ -180,6 +191,9 @@ final private class CachedSignalDetector(
 
   def detectComposite(uid: UserId, data: MarketTimeSeriesData, composite: Indicator.Composite): Option[Signal] =
     detector.detectComposite(uid, data, composite)
+
+  def detectPriceLineCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.PriceLineCrossing): Option[Signal] =
+    detector.detectPriceLineCrossing(uid, data, indicator)
 }
 
 object SignalDetector:

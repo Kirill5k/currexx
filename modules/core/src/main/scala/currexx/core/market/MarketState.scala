@@ -39,6 +39,12 @@ final case class BandCrossingState(
     confirmedAt: Instant
 ) derives Codec.AsObject
 
+final case class PriceLineCrossingState(
+    role: ValueRole,
+    direction: Direction,
+    confirmedAt: Instant
+) derives Codec.AsObject
+
 final case class MarketProfile(
     trend: Option[TrendState] = None,
     crossover: Option[CrossoverState] = None,
@@ -47,7 +53,9 @@ final case class MarketProfile(
     volatility: Option[VolatilityState] = None,
     lastVolatilityValue: Option[BigDecimal] = None,
     lastVelocityValue: Option[BigDecimal] = None,
-    lastBandCrossing: Option[BandCrossingState] = None
+    lastBandCrossing: Option[BandCrossingState] = None,
+    lastChannelMiddleBandValue: Option[BigDecimal] = None,
+    lastPriceLineCrossing: Option[PriceLineCrossingState] = None
 ) derives Codec.AsObject
 
 object MarketProfile {
@@ -56,9 +64,10 @@ object MarketProfile {
       signal.condition match {
         case Condition.ValueUpdated(role, value) =>
           role match
-            case ValueRole.Momentum   => profile.copy(lastMomentumValue = Some(value))
-            case ValueRole.Volatility => profile.copy(lastVolatilityValue = Some(value))
-            case ValueRole.Velocity   => profile.copy(lastVelocityValue = Some(value))
+            case ValueRole.Momentum          => profile.copy(lastMomentumValue = Some(value))
+            case ValueRole.Volatility        => profile.copy(lastVolatilityValue = Some(value))
+            case ValueRole.Velocity          => profile.copy(lastVelocityValue = Some(value))
+            case ValueRole.ChannelMiddleBand => profile.copy(lastChannelMiddleBandValue = Some(value))
         // --- Trend Signal ---
         case Condition.TrendDirectionChange(_, to, _) =>
           // A trend change occurred. Create a new TrendState.
@@ -138,6 +147,9 @@ object MarketProfile {
           )
           profile.copy(lastBandCrossing = Some(newState))
 
+        case Condition.PriceCrossedLine(role, direction) =>
+          profile.copy(lastPriceLineCrossing = Some(PriceLineCrossingState(role, direction, signal.time)))
+          
         // ... other cases ...
         // --- Composite Signal ---
         case Condition.Composite(conditions) =>

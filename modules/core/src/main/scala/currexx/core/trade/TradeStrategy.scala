@@ -4,7 +4,7 @@ import currexx.core.market.{MarketProfile, MarketState, MomentumZone}
 import currexx.core.trade
 import currexx.domain.JsonCodecs
 import currexx.domain.market.TradeOrder
-import currexx.domain.signal.{Boundary, Direction, VolatilityRegime}
+import currexx.domain.signal.{Boundary, Direction, ValueRole, VolatilityRegime}
 import currexx.domain.types.EnumType
 import io.circe.Codec
 import org.latestbit.circe.adt.codec.*
@@ -43,24 +43,25 @@ final case class Rule(
 object Rule extends JsonCodecs {
 
   enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
-    case AllOf(conditions: List[Condition])                        extends Condition
-    case AnyOf(conditions: List[Condition])                        extends Condition
-    case Not(condition: Condition)                                 extends Condition
-    case TrendChangedTo(direction: Direction)                      extends Condition
-    case TrendIs(direction: Direction)                             extends Condition
-    case TrendActiveFor(duration: FiniteDuration)                  extends Condition
-    case CrossoverOccurred(direction: Direction)                   extends Condition
-    case MomentumEntered(zone: MomentumZone)                       extends Condition
-    case MomentumIsIn(zone: MomentumZone)                          extends Condition
-    case MomentumIs(direction: Direction)                          extends Condition
-    case VolatilityIs(regime: VolatilityRegime)                    extends Condition
-    case VelocityIs(direction: Direction)                          extends Condition
-    case VelocityCrossedLevel(level: Double, direction: Direction) extends Condition
-    case PositionIs(position: TradeOrder.Position)                 extends Condition
-    case PositionOpenFor(duration: FiniteDuration)                 extends Condition
-    case NoPosition                                                extends Condition
-    case UpperBandCrossed(direction: Direction)                    extends Condition
-    case LowerBandCrossed(direction: Direction)                    extends Condition
+    case AllOf(conditions: List[Condition])
+    case AnyOf(conditions: List[Condition])
+    case Not(condition: Condition)
+    case TrendChangedTo(direction: Direction)
+    case TrendIs(direction: Direction)
+    case TrendActiveFor(duration: FiniteDuration)
+    case CrossoverOccurred(direction: Direction)
+    case MomentumEntered(zone: MomentumZone)
+    case MomentumIsIn(zone: MomentumZone)
+    case MomentumIs(direction: Direction)
+    case VolatilityIs(regime: VolatilityRegime)
+    case VelocityIs(direction: Direction)
+    case VelocityCrossedLevel(level: Double, direction: Direction)
+    case PositionIs(position: TradeOrder.Position)
+    case PositionOpenFor(duration: FiniteDuration)
+    case NoPosition
+    case UpperBandCrossed(direction: Direction)
+    case LowerBandCrossed(direction: Direction)
+    case PriceCrossedLine(lineRole: ValueRole, direction: Direction)
 
   object Condition:
     given JsonTaggedAdt.Config[Condition] = JsonTaggedAdt.Config.Values[Condition](
@@ -82,7 +83,8 @@ object Rule extends JsonCodecs {
         "position-open-for"      -> JsonTaggedAdt.tagged[Condition.PositionOpenFor],
         "no-position"            -> JsonTaggedAdt.tagged[Condition.NoPosition.type],
         "upper-band-crossed"     -> JsonTaggedAdt.tagged[Condition.UpperBandCrossed],
-        "lower-band-crossed"     -> JsonTaggedAdt.tagged[Condition.LowerBandCrossed]
+        "lower-band-crossed"     -> JsonTaggedAdt.tagged[Condition.LowerBandCrossed],
+        "price-crossed-line"     -> JsonTaggedAdt.tagged[Condition.PriceCrossedLine]
       ),
       strict = true,
       typeFieldName = "kind"
@@ -211,13 +213,16 @@ object Rule extends JsonCodecs {
         // 2. It was an UPPER band crossing.
         // 3. The direction matches the rule.
         // 4. AND it's a "fresh" event (different from the previous one).
-        currentProfile.lastBandCrossing.exists(cross =>cross.boundary == Boundary.Upper && cross.direction == direction) 
-          && currentProfile.lastBandCrossing != previousProfile.lastBandCrossing
+        currentProfile.lastBandCrossing.exists(cross => cross.boundary == Boundary.Upper && cross.direction == direction)
+        && currentProfile.lastBandCrossing != previousProfile.lastBandCrossing
 
       case Condition.LowerBandCrossed(direction) =>
-        currentProfile.lastBandCrossing.exists(cross => cross.boundary == Boundary.Lower && cross.direction == direction) 
-          && currentProfile.lastBandCrossing != previousProfile.lastBandCrossing
+        currentProfile.lastBandCrossing.exists(cross => cross.boundary == Boundary.Lower && cross.direction == direction)
+        && currentProfile.lastBandCrossing != previousProfile.lastBandCrossing
 
+      case Rule.Condition.PriceCrossedLine(lineRole, direction) =>
+        currentProfile.lastPriceLineCrossing.exists(cross => cross.role == lineRole && cross.direction == direction)
+        && currentProfile.lastPriceLineCrossing != previousProfile.lastPriceLineCrossing
     }
   }
 }
