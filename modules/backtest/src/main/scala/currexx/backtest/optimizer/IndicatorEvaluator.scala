@@ -26,14 +26,16 @@ object IndicatorEvaluator {
         s"ThresholdCrossing-${vs.print}-${transformation}-lb$lowerBoundary-up$upperBoundary"
       case Indicator.LinesCrossing(vs, slowTransformation, fastTransformation) =>
         s"LinesCrossing-${vs.print}-${slowTransformation}-${fastTransformation}"
-      case Indicator.KeltnerChannel(vs, vs1, vs2, atrLength, atrMultiplier) =>
-        s"KeltnerChannel-${vs.print}-$vs1-$vs2-$atrLength-$atrMultiplier"
+      case Indicator.KeltnerChannel(vs, md, atrLength, atrMultiplier) =>
+        s"KeltnerChannel-${vs.print}-$md-$atrLength-$atrMultiplier"
       case Indicator.Composite(indicators, combinator) =>
         s"Composite-$combinator-${indicators.map(showInd).toList.mkString("-")}"
       case Indicator.VolatilityRegimeDetection(atrLength, smoothingType, smoothingLength) =>
         s"VolatilityRegimeDetection-${atrLength}-${smoothingType}-$smoothingLength"
       case Indicator.ValueTracking(vs, transformation, targetValue) =>
         s"ValueTracking-${vs.print}-${transformation}-$targetValue"
+      case Indicator.PriceLineCrossing(vs, role, transformation) =>
+        s"PriceLineCrossing-${vs.print}-$role-$transformation"
     showInd(ind)
   }
 

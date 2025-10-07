@@ -31,14 +31,15 @@ object IndicatorInitialiser:
           Indicator.ThresholdCrossing(vs, randomiseVt(vt), rand.nextInt(49) + 50, rand.nextInt(49) + 1)
         case Indicator.LinesCrossing(vs, vt1, vt2) =>
           Indicator.LinesCrossing(vs, randomiseVt(vt1), randomiseVt(vt2))
-        case Indicator.KeltnerChannel(vs, vt1, vt2, atrL, atrR) =>
-          Indicator.KeltnerChannel(vs, randomiseVt(vt1), randomiseVt(vt2), atrL, atrR)
+        case Indicator.KeltnerChannel(vs, md, atrL, atrR) =>
+          Indicator.KeltnerChannel(vs, randomiseVt(md), atrL, atrR)
         case Indicator.VolatilityRegimeDetection(_, vt, _) =>
           Indicator.VolatilityRegimeDetection(rand.nextInt(49) + 1, randomiseVt(vt), rand.nextInt(49) + 1)
         case Indicator.Composite(is, combinator) =>
           Indicator.Composite(is.map(randomiseInd), combinator)
         case Indicator.ValueTracking(vr, vs, vt) =>
           Indicator.ValueTracking(vr, vs, randomiseVt(vt))
-
+        case Indicator.PriceLineCrossing(vs, role, vt) =>
+          Indicator.PriceLineCrossing(vs, role, randomiseVt(vt))
       F.delay(randomiseInd(ind))
     }

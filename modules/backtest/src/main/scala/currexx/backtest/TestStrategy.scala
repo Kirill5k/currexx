@@ -251,7 +251,7 @@ object TestStrategy {
     )
   )
 
-  val s1_indicators_v2 = List(
+  val s1_indicators_v2 = Indicator.compositeAnyOf(
     // 1. Trend Indicator (Unchanged)
     Indicator.TrendChangeDetection(
       source = ValueSource.HLC3,

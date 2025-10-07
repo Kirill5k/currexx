@@ -73,13 +73,14 @@ object IndicatorMutator {
             Indicator.ThresholdCrossing(vs, mutVt(vt), mutatedUb, mutatedLb)
           case Indicator.LinesCrossing(vs, vt1, vt2) =>
             Indicator.LinesCrossing(vs, mutVt(vt1), mutVt(vt2))
-          case Indicator.KeltnerChannel(vs, vt1, vt2, atrL, atrM) =>
-            Indicator.KeltnerChannel(vs, mutVt(vt1), mutVt(vt2), mutInt(atrL, 5, 50), mutDouble(atrM, 0.5, 5.0, 0.1))
+          case Indicator.KeltnerChannel(vs, md, atrL, atrM) =>
+            Indicator.KeltnerChannel(vs, mutVt(md), mutInt(atrL, 5, 50), mutDouble(atrM, 0.5, 5.0, 0.1))
           case Indicator.VolatilityRegimeDetection(atrL, smoothing, smoothingL) =>
             Indicator.VolatilityRegimeDetection(mutInt(atrL, 5, 50), mutVt(smoothing), mutInt(smoothingL, 5, 50))
           case Indicator.ValueTracking(vr, vs, vt) =>
             Indicator.ValueTracking(vr, vs, mutVt(vt))
-
+          case Indicator.PriceLineCrossing(vs, role, vt) =>
+            Indicator.PriceLineCrossing(vs, role, mutVt(vt))
         F.delay(mutInd(ind))
       }
     }

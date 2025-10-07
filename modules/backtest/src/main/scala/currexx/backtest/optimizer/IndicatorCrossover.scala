@@ -105,8 +105,10 @@ object IndicatorCrossover:
                 val (finalLb, finalUb) = if (crossedLb > crossedUb) (crossedUb, crossedLb) else (crossedLb, crossedUb)
                 Indicator.ThresholdCrossing(s, t, finalUb, finalLb)
               }
-          case (Indicator.KeltnerChannel(vs, st1, ft1, al, ar), Indicator.KeltnerChannel(_, st2, ft2, _, _)) =>
-            (crossVt(st1, st2), crossVt(ft1, ft2)).mapN((st, ft) => Indicator.KeltnerChannel(vs, st, ft, al, ar))
+          case (Indicator.KeltnerChannel(vs, md1, al, ar), Indicator.KeltnerChannel(_, md2, _, _)) =>
+            crossVt(md1, md2). map(md => Indicator.KeltnerChannel(vs, md, al, ar))
+          case (Indicator.PriceLineCrossing(s, r, vt1), Indicator.PriceLineCrossing(_, _, vt2)) =>
+            crossVt(vt1, vt2).map(Indicator.PriceLineCrossing(s, r, _))
           case _ =>
             Left(new IllegalArgumentException("both parents must be of the same type"))
 

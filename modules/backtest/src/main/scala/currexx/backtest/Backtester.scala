@@ -19,8 +19,8 @@ object Backtester extends IOApp.Simple {
           _ <- logger.info(s"Processing $filePath")
           settings = TestSettings.make(
             MarketDataProvider.cpFromFilePath(filePath),
-            TestStrategy.s1_rules,
-            List(TestStrategy.s1_indicator)
+            TestStrategy.s1_rules_v2,
+            List(TestStrategy.s1_indicators_v2)
           )
           services <- TestServices.make[IO](settings)
           _        <- MarketDataProvider
