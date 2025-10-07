@@ -4,7 +4,7 @@ import currexx.core.market.{MarketProfile, MarketState, MomentumZone}
 import currexx.core.trade
 import currexx.domain.JsonCodecs
 import currexx.domain.market.TradeOrder
-import currexx.domain.signal.{Direction, VolatilityRegime}
+import currexx.domain.signal.{Boundary, Direction, VolatilityRegime}
 import currexx.domain.types.EnumType
 import io.circe.Codec
 import org.latestbit.circe.adt.codec.*
@@ -59,6 +59,8 @@ object Rule extends JsonCodecs {
     case PositionIs(position: TradeOrder.Position)                 extends Condition
     case PositionOpenFor(duration: FiniteDuration)                 extends Condition
     case NoPosition                                                extends Condition
+    case UpperBandCrossed(direction: Direction)                    extends Condition
+    case LowerBandCrossed(direction: Direction)                    extends Condition
 
   object Condition:
     given JsonTaggedAdt.Config[Condition] = JsonTaggedAdt.Config.Values[Condition](
@@ -78,7 +80,9 @@ object Rule extends JsonCodecs {
         "velocity-crossed-level" -> JsonTaggedAdt.tagged[Condition.VelocityCrossedLevel],
         "position-is"            -> JsonTaggedAdt.tagged[Condition.PositionIs],
         "position-open-for"      -> JsonTaggedAdt.tagged[Condition.PositionOpenFor],
-        "no-position"            -> JsonTaggedAdt.tagged[Condition.NoPosition.type]
+        "no-position"            -> JsonTaggedAdt.tagged[Condition.NoPosition.type],
+        "upper-band-crossed"     -> JsonTaggedAdt.tagged[Condition.UpperBandCrossed],
+        "lower-band-crossed"     -> JsonTaggedAdt.tagged[Condition.LowerBandCrossed]
       ),
       strict = true,
       typeFieldName = "kind"
@@ -200,6 +204,20 @@ object Rule extends JsonCodecs {
             }
           case _ => false // Cannot determine a cross without two consecutive points.
         }
+
+      case Condition.UpperBandCrossed(direction) =>
+        // The condition is met if:
+        // 1. A band crossing event exists.
+        // 2. It was an UPPER band crossing.
+        // 3. The direction matches the rule.
+        // 4. AND it's a "fresh" event (different from the previous one).
+        currentProfile.lastBandCrossing.exists(cross =>cross.boundary == Boundary.Upper && cross.direction == direction) 
+          && currentProfile.lastBandCrossing != previousProfile.lastBandCrossing
+
+      case Condition.LowerBandCrossed(direction) =>
+        currentProfile.lastBandCrossing.exists(cross => cross.boundary == Boundary.Lower && cross.direction == direction) 
+          && currentProfile.lastBandCrossing != previousProfile.lastBandCrossing
+
     }
   }
 }

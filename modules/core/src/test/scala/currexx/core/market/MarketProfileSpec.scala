@@ -1,7 +1,7 @@
 package currexx.core.market
 
 import currexx.core.fixtures.{Indicators, Signals}
-import currexx.domain.signal.Direction
+import currexx.domain.signal.{Boundary, Direction}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -59,6 +59,41 @@ class MarketProfileSpec extends AnyWordSpec with Matchers {
         val profile = MarketProfile().update(signal)
         profile.momentum mustBe Some(MomentumState(MomentumZone.Oversold, signal.time))
         profile.lastMomentumValue mustBe Some(15.0)
+      }
+
+      "update band crossing state for UpperBandCrossing with upward direction" in {
+        val signal  = Signals.upperBandCrossing(Direction.Upward)
+        val profile = MarketProfile().update(signal)
+        profile.lastBandCrossing mustBe Some(BandCrossingState(Boundary.Upper, Direction.Upward, signal.time))
+      }
+
+      "update band crossing state for UpperBandCrossing with downward direction" in {
+        val signal  = Signals.upperBandCrossing(Direction.Downward)
+        val profile = MarketProfile().update(signal)
+        profile.lastBandCrossing mustBe Some(BandCrossingState(Boundary.Upper, Direction.Downward, signal.time))
+      }
+
+      "update band crossing state for LowerBandCrossing with upward direction" in {
+        val signal  = Signals.lowerBandCrossing(Direction.Upward)
+        val profile = MarketProfile().update(signal)
+        profile.lastBandCrossing mustBe Some(BandCrossingState(Boundary.Lower, Direction.Upward, signal.time))
+      }
+
+      "update band crossing state for LowerBandCrossing with downward direction" in {
+        val signal  = Signals.lowerBandCrossing(Direction.Downward)
+        val profile = MarketProfile().update(signal)
+        profile.lastBandCrossing mustBe Some(BandCrossingState(Boundary.Lower, Direction.Downward, signal.time))
+      }
+
+      "replace previous band crossing state when a new band crossing occurs" in {
+        val signal1 = Signals.upperBandCrossing(Direction.Upward)
+        val signal2 = Signals.lowerBandCrossing(Direction.Downward)
+        
+        val profile1 = MarketProfile().update(signal1)
+        profile1.lastBandCrossing mustBe Some(BandCrossingState(Boundary.Upper, Direction.Upward, signal1.time))
+        
+        val profile2 = profile1.update(signal2)
+        profile2.lastBandCrossing mustBe Some(BandCrossingState(Boundary.Lower, Direction.Downward, signal2.time))
       }
     }
   }

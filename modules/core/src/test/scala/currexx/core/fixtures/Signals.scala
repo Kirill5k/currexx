@@ -98,4 +98,32 @@ object Signals {
       condition = Condition.ThresholdCrossing(threshold, value, Direction.Downward, Boundary.Lower),
       triggeredBy = Indicators.trendChangeDetection
     )
+
+  def upperBandCrossing(
+      direction: Direction,
+      uid: UserId = Users.uid,
+      time: Instant = ts,
+      cp: CurrencyPair = Markets.gbpeur
+  ): Signal =
+    make(
+      uid = uid,
+      time = time,
+      cp = cp,
+      condition = Condition.UpperBandCrossing(direction),
+      triggeredBy = Indicators.trendChangeDetection
+    )
+
+  def lowerBandCrossing(
+      direction: Direction,
+      uid: UserId = Users.uid,
+      time: Instant = ts,
+      cp: CurrencyPair = Markets.gbpeur
+  ): Signal =
+    make(
+      uid = uid,
+      time = time,
+      cp = cp,
+      condition = Condition.LowerBandCrossing(direction),
+      triggeredBy = Indicators.trendChangeDetection
+    )
 }

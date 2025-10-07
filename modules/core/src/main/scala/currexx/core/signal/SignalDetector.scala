@@ -1,6 +1,7 @@
 package currexx.core.signal
 
 import cats.data.NonEmptyList
+import currexx.calculations.Volatility
 import currexx.domain.market.MarketTimeSeriesData
 import currexx.domain.signal.{CombinationLogic, Condition, Indicator}
 import currexx.domain.user.UserId
@@ -77,15 +78,19 @@ final private class PureSignalDetector extends SignalDetector {
       data: MarketTimeSeriesData,
       indicator: Indicator.KeltnerChannel
   ): Option[Signal] =
-    val source    = transformer.extractFrom(data, indicator.source)
-    val line1     = transformer.transformTo(source, data, indicator.line1Transformation)
-    val line2     = transformer.transformTo(source, data, indicator.line2Transformation)
-    val atr       = transformer.averageTrueRange(source, data, indicator.atrLength)
-    val upperBand = line1.lazyZip(atr).map((l1, a) => l1 + (a * indicator.atrMultiplier))
-    val lowerBand = line1.lazyZip(atr).map((l1, a) => l1 - (a * indicator.atrMultiplier))
+    // 1. Get the raw price line that we will check against the bands.
+    // This is the primary input for the indicator.
+    val priceLine = transformer.extractFrom(data, indicator.source)
+    // 2. Calculate the middle band (e.g., EMA of the priceLine).
+    val middleBand = transformer.transformTo(priceLine, data, indicator.middleBand)
+    // 3. Calculate ATR using the required High, Low, and Close data directly.
+    val atrLine = Volatility.averageTrueRange(data.closings, data.highs, data.lows, indicator.atrLength)
+    // 4. Calculate the upper and lower bands based on the middle band and ATR.
+    val upperBand = middleBand.lazyZip(atrLine).map { (mid, atr) => mid + (atr * indicator.atrMultiplier) }.toList
+    val lowerBand = middleBand.lazyZip(atrLine).map { (mid, atr) => mid - (atr * indicator.atrMultiplier) }.toList
+    // 5. CORRECT: Check if the `priceLine` crosses the calculated bands.
     Condition
-      .barrierCrossing(line2, upperBand, lowerBand)
-      .orElse(Condition.linesCrossing(line1, line2))
+      .bandCrossing(priceLine, upperBand, lowerBand)
       .map(makeSignal(uid, data, indicator))
 
   def detectVolatilityRegimeChange(

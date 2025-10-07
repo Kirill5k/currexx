@@ -33,6 +33,12 @@ final case class VolatilityState(
     confirmedAt: Instant
 ) derives Codec.AsObject
 
+final case class BandCrossingState(
+    boundary: Boundary,
+    direction: Direction,
+    confirmedAt: Instant
+) derives Codec.AsObject
+
 final case class MarketProfile(
     trend: Option[TrendState] = None,
     crossover: Option[CrossoverState] = None,
@@ -40,7 +46,8 @@ final case class MarketProfile(
     lastMomentumValue: Option[BigDecimal] = None,
     volatility: Option[VolatilityState] = None,
     lastVolatilityValue: Option[BigDecimal] = None,
-    lastVelocityValue: Option[BigDecimal] = None
+    lastVelocityValue: Option[BigDecimal] = None,
+    lastBandCrossing: Option[BandCrossingState] = None
 ) derives Codec.AsObject
 
 object MarketProfile {
@@ -115,15 +122,23 @@ object MarketProfile {
           } else profile
 
         // --- Volatility Signals (e.g., from Keltner Channel) ---
-        // Here we just pass the condition through. A more advanced system might create a VolatilityState.
-        case _ @(_: Condition.UpperBandCrossing | _: Condition.LowerBandCrossing) =>
-          // This part of the profile could be enhanced further, but for now, we just note the event.
-          // Let's assume the `VolatilityState` logic is not yet fully implemented.
-          // For now, we can just update the last known value from a related indicator if available.
-          // This part is highly dependent on how you define volatility signals.
-          // As a placeholder, we do nothing with the state, just the value if we had it.
-          profile // No change to the profile state, maybe just update a raw value if one was passed.
+        case Condition.UpperBandCrossing(direction) =>
+          val newState = BandCrossingState(
+            boundary = Boundary.Upper,
+            direction = direction,
+            confirmedAt = signal.time
+          )
+          profile.copy(lastBandCrossing = Some(newState))
 
+        case Condition.LowerBandCrossing(direction) =>
+          val newState = BandCrossingState(
+            boundary = Boundary.Lower,
+            direction = direction,
+            confirmedAt = signal.time
+          )
+          profile.copy(lastBandCrossing = Some(newState))
+
+        // ... other cases ...
         // --- Composite Signal ---
         case Condition.Composite(conditions) =>
           // A composite signal is just a bundle of other signals.

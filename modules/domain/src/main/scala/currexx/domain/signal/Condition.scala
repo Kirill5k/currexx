@@ -73,7 +73,7 @@ object Condition {
     crossingDirection(line1, line2)
       .map(Condition.LinesCrossing(_))
 
-  def barrierCrossing(line: List[Double], upperBarrier: List[Double], lowerBarrier: List[Double]): Option[Condition] =
+  def bandCrossing(line: List[Double], upperBarrier: List[Double], lowerBarrier: List[Double]): Option[Condition] =
     crossingDirection(line, upperBarrier)
       .map(Condition.UpperBandCrossing(_))
       .orElse(crossingDirection(line, lowerBarrier).map(Condition.LowerBandCrossing(_)))

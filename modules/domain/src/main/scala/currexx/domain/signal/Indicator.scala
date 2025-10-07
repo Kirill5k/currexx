@@ -81,8 +81,7 @@ enum Indicator derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWit
   ) extends Indicator
   case KeltnerChannel(
       source: ValueSource,
-      line1Transformation: ValueTransformation, // SLOW
-      line2Transformation: ValueTransformation, // FAST
+      middleBand: ValueTransformation,
       atrLength: Int,
       atrMultiplier: Double
   ) extends Indicator
