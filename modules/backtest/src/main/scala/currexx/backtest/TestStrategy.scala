@@ -2,7 +2,7 @@ package currexx.backtest
 
 import currexx.core.market.MomentumZone
 import currexx.core.trade.{Rule, TradeAction, TradeStrategy}
-import currexx.domain.signal.{Direction, Indicator, ValueRole, ValueSource, ValueTransformation, VolatilityRegime}
+import currexx.domain.signal.{Direction, Indicator, ValueRole, ValueSource, ValueTransformation}
 
 import scala.concurrent.duration.*
 
@@ -252,39 +252,10 @@ object TestStrategy {
   )
 
   val s1_indicators_v2 = Indicator.compositeAnyOf(
-    // 1. Trend Indicator (Unchanged)
-    Indicator.TrendChangeDetection(
-      source = ValueSource.HLC3,
-      transformation = ValueTransformation.JMA(length = 29, phase = 60, power = 3)
-    ),
-
-    // 2. Momentum Indicator (Unchanged)
-    Indicator.ThresholdCrossing(
-      source = ValueSource.Close,
-      transformation = ValueTransformation.STOCH(length = 14),
-      upperBoundary = 80.0,
-      lowerBoundary = 20.0
-    ),
-
-    // 3. Continuous Value Tracker for Momentum (Unchanged)
-    Indicator.ValueTracking(
-      role = ValueRole.Momentum,
-      source = ValueSource.Close,
-      transformation = ValueTransformation.STOCH(length = 14)
-    ),
-
-    // 4. NEW: Volatility Regime Filter
-    Indicator.VolatilityRegimeDetection(
-      atrLength = 14,
-      smoothingType = ValueTransformation.SMA(20),
-      smoothingLength = 20
-    ),
-
-    Indicator.PriceLineCrossing(
-      source = ValueSource.Close,
-      role = ValueRole.ChannelMiddleBand,
-      transformation = ValueTransformation.EMA(20)
-    ),
+    Indicator.TrendChangeDetection(source = ValueSource.HLC3, transformation = ValueTransformation.JMA(29, 60, 3)),
+    Indicator.ThresholdCrossing(source = ValueSource.Close, transformation = ValueTransformation.STOCH(14), upperBoundary = 80.0, lowerBoundary = 20.0),
+    Indicator.ValueTracking(role = ValueRole.Momentum, source = ValueSource.Close, transformation = ValueTransformation.STOCH(14)),
+    Indicator.VolatilityRegimeDetection(atrLength = 14, smoothingType = ValueTransformation.SMA(20), smoothingLength = 20)
   )
 
   val s1_rules_v2 = TradeStrategy(
@@ -297,9 +268,6 @@ object TestStrategy {
           Rule.Condition.NoPosition,
           Rule.Condition.trendIsUpward,
           Rule.Condition.TrendActiveFor(12.hours),
-
-          // NEW: VOLATILITY FILTER - Only take trades in calm, predictable markets.
-          Rule.Condition.VolatilityIs(VolatilityRegime.Low),
 
           // Pullback Entry Logic (same as before, but now safer)
           Rule.Condition.anyOf(
@@ -318,7 +286,7 @@ object TestStrategy {
           Rule.Condition.NoPosition,
           Rule.Condition.trendIsDownward,
           Rule.Condition.TrendActiveFor(12.hours),
-          Rule.Condition.VolatilityIs(VolatilityRegime.Low), // Apply filter to shorts as well
+          Rule.Condition.volatilityIsHigh, // Apply filter to shorts as well
           Rule.Condition.anyOf(
             Rule.Condition.MomentumEntered(MomentumZone.Neutral),
             Rule.Condition.allOf(
@@ -333,22 +301,15 @@ object TestStrategy {
       Rule(
         action = TradeAction.ClosePosition,
         conditions = Rule.Condition.anyOf(
-          // --- MASTER STOP-LOSS: The primary trend flips against us ---
           Rule.Condition.allOf(Rule.Condition.positionIsBuy, Rule.Condition.TrendChangedTo(Direction.Downward)),
           Rule.Condition.allOf(Rule.Condition.positionIsSell, Rule.Condition.TrendChangedTo(Direction.Upward)),
 
-          // --- NEW, DYNAMIC TAKE-PROFIT / TRAILING STOP ---
-          // Exit a long position if the price closes back below the Keltner middle band.
-          // This allows the trade to profit from the full extent of a strong trend.
-          Rule.Condition.allOf(
-            Rule.Condition.positionIsBuy,
-            Rule.Condition.PriceCrossedLine(ValueRole.ChannelMiddleBand, Direction.Downward)
-          ),
-          // Symmetrical exit for a short position.
-          Rule.Condition.allOf(
-            Rule.Condition.positionIsSell,
-            Rule.Condition.PriceCrossedLine(ValueRole.ChannelMiddleBand, Direction.Upward)
-          )
+          // Take-Profit: Momentum is exhausted
+          Rule.Condition.allOf(Rule.Condition.positionIsBuy, Rule.Condition.momentumEnteredOverbought),
+          Rule.Condition.allOf(Rule.Condition.positionIsSell, Rule.Condition.momentumEnteredOversold),
+
+          // NEW: Emergency Exit - Volatility explodes, get out of the market.
+//          Rule.Condition.volatilityIsHigh
         )
       )
     )
