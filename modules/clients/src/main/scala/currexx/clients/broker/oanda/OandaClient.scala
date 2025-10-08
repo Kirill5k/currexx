@@ -45,7 +45,11 @@ final private class LiveOandaClient[F[_]](
       for
         accountId <- getAccountId(params)
         position  <- getPosition(accountId, params, exit.currencyPair)
-        _         <- if position.isOpen then closePosition(accountId, params, position) else F.unit
+        _         <- position match {
+          case None                     => F.unit
+          case Some(pos) if !pos.isOpen => F.unit
+          case Some(pos)                => closePosition(accountId, params, pos)
+        }
       yield ()
 
   override def getCurrentOrders(params: BrokerParameters.Oanda, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]] =
@@ -69,7 +73,7 @@ final private class LiveOandaClient[F[_]](
         case Left(err)  => handleError("get-positions", err)
     }
 
-  private def getPosition(accountId: String, params: BrokerParameters.Oanda, currencyPair: CurrencyPair): F[OandaClient.Position] =
+  private def getPosition(accountId: String, params: BrokerParameters.Oanda, currencyPair: CurrencyPair): F[Option[OandaClient.Position]] =
     dispatch {
       basicRequest
         .get(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/positions/${currencyPair.toInstrument}")
@@ -78,8 +82,12 @@ final private class LiveOandaClient[F[_]](
         .response(asJsonEither[OandaClient.ErrorResponse, OandaClient.PositionResponse])
     }.flatMap { r =>
       r.body match
-        case Right(res) => F.pure(res.position)
-        case Left(err)  => handleError("get-position", err)
+        case Right(res) =>
+          F.pure(Some(res.position))
+        case Left(_) if r.code == StatusCode.NotFound =>
+          logger.warn(s"$name-client/get-position-404: No position for $accountId / ${currencyPair.toInstrument}").as(None)
+        case Left(err) =>
+          handleError("get-position", err)
     }
 
   private def closePosition(accountId: String, params: BrokerParameters.Oanda, position: OandaClient.Position): F[Unit] =
