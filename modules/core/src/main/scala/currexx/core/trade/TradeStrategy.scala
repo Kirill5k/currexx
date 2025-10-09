@@ -42,6 +42,10 @@ final case class Rule(
 
 object Rule extends JsonCodecs {
 
+  object Operator extends EnumType[Operator](() => Operator.values)
+  enum Operator:
+    case GreaterThan, LessThan, EqualTo
+
   enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
     case AllOf(conditions: List[Condition])
     case AnyOf(conditions: List[Condition])
@@ -53,9 +57,11 @@ object Rule extends JsonCodecs {
     case MomentumEntered(zone: MomentumZone)
     case MomentumIsIn(zone: MomentumZone)
     case MomentumIs(direction: Direction)
+    case MomentumValueIs(operator: Operator, level: Double)
     case VolatilityIs(regime: VolatilityRegime)
     case VelocityIs(direction: Direction)
     case VelocityCrossedLevel(level: Double, direction: Direction)
+    case VelocityIsBelow(threshold: Double)
     case PositionIs(position: TradeOrder.Position)
     case PositionOpenFor(duration: FiniteDuration)
     case NoPosition
@@ -76,8 +82,10 @@ object Rule extends JsonCodecs {
         "momentum-entered"       -> JsonTaggedAdt.tagged[Condition.MomentumEntered],
         "momentum-is-in"         -> JsonTaggedAdt.tagged[Condition.MomentumIsIn],
         "momentum-is"            -> JsonTaggedAdt.tagged[Condition.MomentumIs],
+        "momentum-value-is"      -> JsonTaggedAdt.tagged[Condition.MomentumValueIs],
         "volatility-is"          -> JsonTaggedAdt.tagged[Condition.VolatilityIs],
         "velocity-is"            -> JsonTaggedAdt.tagged[Condition.VelocityIs],
+        "velocity-is-below"      -> JsonTaggedAdt.tagged[Condition.VelocityIsBelow],
         "velocity-crossed-level" -> JsonTaggedAdt.tagged[Condition.VelocityCrossedLevel],
         "position-is"            -> JsonTaggedAdt.tagged[Condition.PositionIs],
         "position-open-for"      -> JsonTaggedAdt.tagged[Condition.PositionOpenFor],
@@ -171,6 +179,14 @@ object Rule extends JsonCodecs {
           case _ => false // Cannot determine direction without two consecutive values.
         }
 
+      case Condition.MomentumValueIs(operator, level) =>
+        currentProfile.lastMomentumValue.exists { value =>
+          operator match
+            case Operator.GreaterThan => value > level
+            case Operator.LessThan    => value < level
+            case Operator.EqualTo     => value == level
+        }
+
       case Condition.VolatilityIs(regime) =>
         currentProfile.volatility.exists(_.regime == regime)
 
@@ -195,6 +211,10 @@ object Rule extends JsonCodecs {
             }
           case None => false // Cannot determine if velocity is not present.
         }
+
+      case Condition.VelocityIsBelow(threshold) =>
+        currentProfile.lastVelocityValue.exists(velocity => velocity.abs < threshold)
+
       case Condition.VelocityCrossedLevel(level, direction) =>
         // This requires both the current and previous velocity values.
         (currentProfile.lastVelocityValue, previousProfile.lastVelocityValue) match {
@@ -220,7 +240,7 @@ object Rule extends JsonCodecs {
         currentProfile.lastBandCrossing.exists(cross => cross.boundary == Boundary.Lower && cross.direction == direction)
         && currentProfile.lastBandCrossing != previousProfile.lastBandCrossing
 
-      case Rule.Condition.PriceCrossedLine(lineRole, direction) =>
+      case Condition.PriceCrossedLine(lineRole, direction) =>
         currentProfile.lastPriceLineCrossing.exists(cross => cross.role == lineRole && cross.direction == direction)
         && currentProfile.lastPriceLineCrossing != previousProfile.lastPriceLineCrossing
     }
