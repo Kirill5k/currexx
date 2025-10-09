@@ -1,7 +1,7 @@
 package currexx.core.signal
 
 import cats.data.NonEmptyList
-import currexx.calculations.Volatility
+import currexx.calculations.{Statistics, Volatility}
 import currexx.domain.market.MarketTimeSeriesData
 import currexx.domain.signal.{CombinationLogic, Condition, Indicator}
 import currexx.domain.user.UserId
@@ -12,6 +12,7 @@ trait SignalDetector:
   def detectTrendChange(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.TrendChangeDetection): Option[Signal]
   def detectLinesCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.LinesCrossing): Option[Signal]
   def detectBarrierCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.KeltnerChannel): Option[Signal]
+  def detectBollingerBandsCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.BollingerBands): Option[Signal]
   def detectVolatilityRegimeChange(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.VolatilityRegimeDetection): Option[Signal]
   def detectValue(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.ValueTracking): Option[Signal]
   def detectComposite(uid: UserId, data: MarketTimeSeriesData, composite: Indicator.Composite): Option[Signal]
@@ -40,6 +41,7 @@ final private class PureSignalDetector extends SignalDetector {
       case vrd: Indicator.VolatilityRegimeDetection => detectVolatilityRegimeChange(uid, data, vrd)
       case c: Indicator.Composite                   => detectComposite(uid, data, c)
       case plc: Indicator.PriceLineCrossing         => detectPriceLineCrossing(uid, data, plc)
+      case bb: Indicator.BollingerBands             => detectBollingerBandsCrossing(uid, data, bb)
 
   def detectThresholdCrossing(
       uid: UserId,
@@ -154,6 +156,20 @@ final private class PureSignalDetector extends SignalDetector {
     val priceLine = transformer.extractFrom(data, plc.source)
     val otherLine = transformer.transformTo(priceLine, data, plc.transformation)
     Condition.priceCrossedLine(priceLine, otherLine, plc.role).map(makeSignal(uid, data, plc))
+
+  def detectBollingerBandsCrossing(
+      uid: UserId,
+      data: MarketTimeSeriesData,
+      indicator: Indicator.BollingerBands
+  ): Option[Signal] =
+    val priceLine      = transformer.extractFrom(data, indicator.source)
+    val middleBandLine = transformer.transformTo(priceLine, data, indicator.middleBand)
+    val stdDevLine     = Statistics.standardDeviation(priceLine, indicator.stdDevLength)
+    val upperBand      = middleBandLine.lazyZip(stdDevLine).map((mid, stdev) => mid + (stdev * indicator.stdDevMultiplier))
+    val lowerBand      = middleBandLine.lazyZip(stdDevLine).map((mid, stdev) => mid - (stdev * indicator.stdDevMultiplier))
+    Condition
+      .bandCrossing(priceLine, upperBand, lowerBand)
+      .map(makeSignal(uid, data, indicator))
 }
 
 final private class CachedSignalDetector(
@@ -194,6 +210,9 @@ final private class CachedSignalDetector(
 
   def detectPriceLineCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.PriceLineCrossing): Option[Signal] =
     detector.detectPriceLineCrossing(uid, data, indicator)
+
+  def detectBollingerBandsCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.BollingerBands): Option[Signal] =
+    detector.detectBollingerBandsCrossing(uid, data, indicator)
 }
 
 object SignalDetector:

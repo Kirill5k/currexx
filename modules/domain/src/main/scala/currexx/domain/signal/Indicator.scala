@@ -18,18 +18,19 @@ enum ValueRole:
   case Momentum, Volatility, Velocity, ChannelMiddleBand
 
 enum ValueTransformation derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
-  case Sequenced(sequence: List[ValueTransformation])                             extends ValueTransformation
-  case Kalman(gain: Double, measurementNoise: Double)                             extends ValueTransformation
-  case KalmanVelocity(gain: Double, measurementNoise: Double)                     extends ValueTransformation
-  case RSX(length: Int)                                                           extends ValueTransformation
-  case JRSX(length: Int)                                                          extends ValueTransformation
-  case WMA(length: Int)                                                           extends ValueTransformation
-  case SMA(length: Int)                                                           extends ValueTransformation
-  case EMA(length: Int)                                                           extends ValueTransformation
-  case HMA(length: Int)                                                           extends ValueTransformation
-  case NMA(length: Int, signalLength: Int, lambda: Double, maCalc: MovingAverage) extends ValueTransformation
-  case JMA(length: Int, phase: Int, power: Int)                                   extends ValueTransformation
-  case STOCH(length: Int)                                                         extends ValueTransformation
+  case Sequenced(sequence: List[ValueTransformation])
+  case StandardDeviation(length: Int)
+  case Kalman(gain: Double, measurementNoise: Double)
+  case KalmanVelocity(gain: Double, measurementNoise: Double)
+  case RSX(length: Int)
+  case JRSX(length: Int)
+  case WMA(length: Int)
+  case SMA(length: Int)
+  case EMA(length: Int)
+  case HMA(length: Int)
+  case NMA(length: Int, signalLength: Int, lambda: Double, maCalc: MovingAverage)
+  case JMA(length: Int, phase: Int, power: Int)
+  case STOCH(length: Int)
 
 object ValueTransformation {
   def sequenced(vt: ValueTransformation, vtSequence: ValueTransformation*): ValueTransformation =
@@ -40,6 +41,7 @@ object ValueTransformation {
       "sequenced"       -> JsonTaggedAdt.tagged[ValueTransformation.Sequenced],
       "kalman"          -> JsonTaggedAdt.tagged[ValueTransformation.Kalman],
       "kalman-velocity" -> JsonTaggedAdt.tagged[ValueTransformation.KalmanVelocity],
+      "stdev"           -> JsonTaggedAdt.tagged[ValueTransformation.StandardDeviation],
       "rsx"             -> JsonTaggedAdt.tagged[ValueTransformation.RSX],
       "jrsx"            -> JsonTaggedAdt.tagged[ValueTransformation.JRSX],
       "stoch"           -> JsonTaggedAdt.tagged[ValueTransformation.STOCH],
@@ -100,6 +102,12 @@ enum Indicator derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWit
       role: ValueRole,
       transformation: ValueTransformation
   )
+  case BollingerBands(
+      source: ValueSource,
+      middleBand: ValueTransformation,
+      stdDevLength: Int,
+      stdDevMultiplier: Double
+  )
 
 object Indicator:
   given JsonTaggedAdt.Config[Indicator] = JsonTaggedAdt.Config.Values[Indicator](
@@ -110,6 +118,7 @@ object Indicator:
       "threshold-crossing"          -> JsonTaggedAdt.tagged[Indicator.ThresholdCrossing],
       "lines-crossing"              -> JsonTaggedAdt.tagged[Indicator.LinesCrossing],
       "keltner-channel"             -> JsonTaggedAdt.tagged[Indicator.KeltnerChannel],
+      "bollinger-bands"             -> JsonTaggedAdt.tagged[Indicator.BollingerBands],
       "value-tracking"              -> JsonTaggedAdt.tagged[Indicator.ValueTracking],
       "price-line-crossing"         -> JsonTaggedAdt.tagged[Indicator.PriceLineCrossing]
     ),

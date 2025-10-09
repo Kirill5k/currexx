@@ -1,6 +1,6 @@
 package currexx.core.signal
 
-import currexx.calculations.{Filters, MomentumOscillators, MovingAverages, Volatility}
+import currexx.calculations.{Filters, MomentumOscillators, MovingAverages, Statistics, Volatility}
 import currexx.domain.market.MarketTimeSeriesData
 import currexx.domain.signal.{MovingAverage, ValueSource as VS, ValueTransformation as VT}
 
@@ -28,6 +28,7 @@ final private class PureValueTransformer() extends ValueTransformer {
         case VT.Sequenced(transformations)             => transformations.foldLeft(data)((d, t) => t.transform(d, ref))
         case VT.Kalman(gain, measurementNoise)         => Filters.kalman(data, gain, measurementNoise)
         case VT.KalmanVelocity(gain, measurementNoise) => Filters.kalmanVelocity(data, gain, measurementNoise)
+        case VT.StandardDeviation(length)              => Statistics.standardDeviation(data, length)
         case VT.RSX(length)                            => MomentumOscillators.relativeStrengthIndex(data, length)
         case VT.JRSX(length)                           => MomentumOscillators.jurikRelativeStrengthIndex(data, length)
         case VT.STOCH(length)                          => MomentumOscillators.stochastic(data, ref.highs, ref.lows, length)
