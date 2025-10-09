@@ -17,11 +17,8 @@ object Backtester extends IOApp.Simple {
       .parEvalMap(16) { filePath =>
         for
           _ <- logger.info(s"Processing $filePath")
-          settings = TestSettings.make(
-            MarketDataProvider.cpFromFilePath(filePath),
-            TestStrategy.s1_rules_v2,
-            List(TestStrategy.s1_indicators_v2)
-          )
+          cp = MarketDataProvider.cpFromFilePath(filePath)
+          settings = TestSettings.make(cp, TestStrategy.s4_strategy, List(TestStrategy.s4_indicators))
           services <- TestServices.make[IO](settings)
           _        <- MarketDataProvider
             .read[IO](filePath)
@@ -29,7 +26,7 @@ object Backtester extends IOApp.Simple {
             .compile
             .drain
           orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
-          _          <- logger.info(orderStats.toString)
+          _          <- logger.info(s"$cp: ${orderStats.toString}")
         yield orderStats
       }
       .compile
