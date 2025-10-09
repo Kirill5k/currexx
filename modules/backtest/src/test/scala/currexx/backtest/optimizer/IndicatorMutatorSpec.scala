@@ -26,6 +26,52 @@ class IndicatorMutatorSpec extends IOWordSpec {
       }
     }
 
+    "mutating trend-change-detection with StandardDeviation" should {
+      "generate numbers in an expected range" in {
+        given Random = Random(100)
+
+        val result = for
+          mutator <- IndicatorMutator.make[IO]
+          ind = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.StandardDeviation(30))
+          res <- mutator.mutate(ind, 1.0d)
+        yield res
+
+        result.asserting { ind =>
+          ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.StandardDeviation(20))
+        }
+      }
+
+      "not return values below minimum" in {
+        given Random = Random(1)
+
+        val result = for
+          mutator <- IndicatorMutator.make[IO]
+          ind = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.StandardDeviation(5))
+          res <- mutator.mutate(ind, 1.0d)
+        yield res
+
+        result.asserting { ind =>
+          ind mustBe Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.StandardDeviation(5))
+        }
+      }
+    }
+
+    "mutating BollingerBands indicator" should {
+      "mutate all parameters correctly" in {
+        given Random = Random(50)
+
+        val result = for
+          mutator <- IndicatorMutator.make[IO]
+          ind = Indicator.BollingerBands(ValueSource.Close, ValueTransformation.SMA(20), 20, 2.0)
+          res <- mutator.mutate(ind, 1.0d)
+        yield res
+
+        result.asserting { ind =>
+          ind mustBe Indicator.BollingerBands(ValueSource.Close, ValueTransformation.SMA(34), 27, 2.5)
+        }
+      }
+    }
+
     "mutating trend-change-detection with HMA" should {
       "generate numbers in an expected range" in {
         given Random = Random(100)

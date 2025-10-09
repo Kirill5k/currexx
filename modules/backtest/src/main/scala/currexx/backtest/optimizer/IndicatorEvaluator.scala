@@ -36,6 +36,8 @@ object IndicatorEvaluator {
         s"ValueTracking-${vs.print}-${transformation}-$targetValue"
       case Indicator.PriceLineCrossing(vs, role, transformation) =>
         s"PriceLineCrossing-${vs.print}-$role-$transformation"
+      case Indicator.BollingerBands(vs, mb, sdLength, sdMultiplier) =>
+        s"BollingerBands-${vs.print}-$mb-$sdLength-$sdMultiplier"
     showInd(ind)
   }
 

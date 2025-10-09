@@ -39,6 +39,8 @@ object IndicatorMutator {
         def mutVt(vt: VT): VT = vt match
           case VT.Sequenced(sequence) =>
             VT.Sequenced(sequence.map(mutVt))
+          case VT.StandardDeviation(length) =>
+            VT.StandardDeviation(mutInt(length, 5, 100))
           case VT.Kalman(gain, measurementNoise) =>
             VT.Kalman(mutDouble(gain, 0.01, 0.5, 0.01), mutDouble(measurementNoise, 0.01, 1.0, 0.01))
           case VT.KalmanVelocity(gain, measurementNoise) =>
@@ -75,6 +77,8 @@ object IndicatorMutator {
             Indicator.LinesCrossing(vs, mutVt(vt1), mutVt(vt2))
           case Indicator.KeltnerChannel(vs, md, atrL, atrM) =>
             Indicator.KeltnerChannel(vs, mutVt(md), mutInt(atrL, 5, 50), mutDouble(atrM, 0.5, 5.0, 0.1))
+          case Indicator.BollingerBands(vs, md, stdDevL, stdDevM) =>
+            Indicator.BollingerBands(vs, mutVt(md), mutInt(stdDevL, 5, 50), mutDouble(stdDevM, 1.0, 4.0, 0.1))
           case Indicator.VolatilityRegimeDetection(atrL, smoothing, smoothingL) =>
             Indicator.VolatilityRegimeDetection(mutInt(atrL, 5, 50), mutVt(smoothing), mutInt(smoothingL, 5, 50))
           case Indicator.ValueTracking(vr, vs, vt) =>

@@ -11,18 +11,19 @@ object IndicatorInitialiser:
     Initialiser.simple[F, Indicator] { ind =>
 
       def randomiseVt(transformation: VT): VT = transformation match
-        case VT.Sequenced(sequence) => VT.Sequenced(sequence.map(randomiseVt))
-        case _: VT.Kalman           => VT.Kalman(rand.nextInt(19) * 0.05d + 0.05d, (rand.nextInt(50) + 50) / 100)
-        case _: VT.KalmanVelocity   => VT.KalmanVelocity(rand.nextInt(19) * 0.05d + 0.05d, rand.nextInt(10) / 100)
-        case _: VT.STOCH            => VT.STOCH(rand.nextInt(41) + 2)
-        case _: VT.RSX              => VT.RSX(rand.nextInt(41) + 2)
-        case _: VT.JRSX             => VT.JRSX(rand.nextInt(41) + 2)
-        case _: VT.WMA              => VT.WMA(rand.nextInt(41) + 2)
-        case _: VT.SMA              => VT.SMA(rand.nextInt(41) + 2)
-        case _: VT.EMA              => VT.EMA(rand.nextInt(41) + 2)
-        case _: VT.HMA              => VT.HMA(rand.nextInt(41) + 2)
-        case _: VT.JMA              => VT.JMA(rand.nextInt(41) + 2, rand.nextInt(40) * 5 - 100, rand.nextInt(2) + 2)
-        case nma: VT.NMA            => VT.NMA(rand.nextInt(48) + 2, rand.nextInt(28) + 2, (1 + rand.nextInt(80)) * 0.25d, nma.maCalc)
+        case VT.Sequenced(sequence)  => VT.Sequenced(sequence.map(randomiseVt))
+        case _: VT.StandardDeviation => VT.StandardDeviation(rand.nextInt(41) + 2)
+        case _: VT.Kalman            => VT.Kalman(rand.nextInt(19) * 0.05d + 0.05d, (rand.nextInt(50) + 50) / 100)
+        case _: VT.KalmanVelocity    => VT.KalmanVelocity(rand.nextInt(19) * 0.05d + 0.05d, rand.nextInt(10) / 100)
+        case _: VT.STOCH             => VT.STOCH(rand.nextInt(41) + 2)
+        case _: VT.RSX               => VT.RSX(rand.nextInt(41) + 2)
+        case _: VT.JRSX              => VT.JRSX(rand.nextInt(41) + 2)
+        case _: VT.WMA               => VT.WMA(rand.nextInt(41) + 2)
+        case _: VT.SMA               => VT.SMA(rand.nextInt(41) + 2)
+        case _: VT.EMA               => VT.EMA(rand.nextInt(41) + 2)
+        case _: VT.HMA               => VT.HMA(rand.nextInt(41) + 2)
+        case _: VT.JMA               => VT.JMA(rand.nextInt(41) + 2, rand.nextInt(40) * 5 - 100, rand.nextInt(2) + 2)
+        case nma: VT.NMA             => VT.NMA(rand.nextInt(48) + 2, rand.nextInt(28) + 2, (1 + rand.nextInt(80)) * 0.25d, nma.maCalc)
 
       def randomiseInd(indicator: Indicator): Indicator = indicator match
         case Indicator.TrendChangeDetection(vs, vt) =>
@@ -33,6 +34,8 @@ object IndicatorInitialiser:
           Indicator.LinesCrossing(vs, randomiseVt(vt1), randomiseVt(vt2))
         case Indicator.KeltnerChannel(vs, md, atrL, atrR) =>
           Indicator.KeltnerChannel(vs, randomiseVt(md), atrL, atrR)
+        case Indicator.BollingerBands(vs, md, _, _) =>
+          Indicator.BollingerBands(vs, randomiseVt(md), rand.nextInt(41) + 2, (rand.nextInt(20) + 10) / 10.0)
         case Indicator.VolatilityRegimeDetection(_, vt, _) =>
           Indicator.VolatilityRegimeDetection(rand.nextInt(49) + 1, randomiseVt(vt), rand.nextInt(49) + 1)
         case Indicator.Composite(is, combinator) =>

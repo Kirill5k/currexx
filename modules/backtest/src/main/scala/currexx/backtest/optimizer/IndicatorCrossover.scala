@@ -49,6 +49,7 @@ object IndicatorCrossover:
         }
 
         def crossVt(so1: VT, so2: VT): Either[Throwable, VT] = (so1, so2) match
+          case (VT.StandardDeviation(l1), VT.StandardDeviation(l2)) => Right(VT.StandardDeviation(crossInt(l1, l2, Some(5))))
           case (VT.RSX(l1), VT.RSX(l2))                 => Right(VT.RSX(crossInt(l1, l2, Some(5))))
           case (VT.JRSX(l1), VT.JRSX(l2))               => Right(VT.JRSX(crossInt(l1, l2, Some(5))))
           case (VT.STOCH(l1), VT.STOCH(l2))             => Right(VT.STOCH(crossInt(l1, l2, Some(5))))
@@ -107,6 +108,8 @@ object IndicatorCrossover:
               }
           case (Indicator.KeltnerChannel(vs, md1, al, ar), Indicator.KeltnerChannel(_, md2, _, _)) =>
             crossVt(md1, md2). map(md => Indicator.KeltnerChannel(vs, md, al, ar))
+          case (Indicator.BollingerBands(vs, md1, sdl1, sdm1), Indicator.BollingerBands(_, md2, sdl2, sdm2)) =>
+            crossVt(md1, md2).map(md => Indicator.BollingerBands(vs, md, crossInt(sdl1, sdl2, Some(5)), crossDouble(sdm1, sdm2, 0.1)))
           case (Indicator.PriceLineCrossing(s, r, vt1), Indicator.PriceLineCrossing(_, _, vt2)) =>
             crossVt(vt1, vt2).map(Indicator.PriceLineCrossing(s, r, _))
           case _ =>
