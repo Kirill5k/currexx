@@ -58,7 +58,7 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val validIndicators =
-          "trend-change-detection, keltner-channel, value-tracking, volatility-regime-detection, lines-crossing, threshold-crossing, price-line-crossing, composite"
+          "trend-change-detection, keltner-channel, bollinger-bands, value-tracking, volatility-regime-detection, lines-crossing, threshold-crossing, price-line-crossing, composite"
         val responseBody = s"""{"message":"Missing required field, Received unknown type: 'foo'. Exists only types: $validIndicators."}"""
         res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
         verifyNoInteractions(svc)
