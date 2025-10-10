@@ -16,9 +16,9 @@ object Backtester extends IOApp.Simple {
       .emits(MarketDataProvider.majors1h)
       .parEvalMap(16) { filePath =>
         for
-          _ <- logger.info(s"Processing $filePath")
+          _ <- IO.println(s"Processing $filePath")
           cp = MarketDataProvider.cpFromFilePath(filePath)
-          settings = TestSettings.make(cp, TestStrategy.s4_strategy, List(TestStrategy.s4_indicators))
+          settings = TestSettings.make(cp, TestStrategy.s1_rules, List(TestStrategy.s1_indicator))
           services <- TestServices.make[IO](settings)
           _        <- MarketDataProvider
             .read[IO](filePath)
@@ -26,13 +26,13 @@ object Backtester extends IOApp.Simple {
             .compile
             .drain
           orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
-          _          <- logger.info(s"$cp: ${orderStats.toString}")
+          _          <- IO.println(s"$cp: ${orderStats.toString}")
         yield orderStats
       }
       .compile
       .toList
       .flatMap { stats =>
-        logger.info(
+        IO.println(
           s"total profit: ${stats.map(_.totalProfit).sum}, median: ${stats.map(_.totalProfit).median}, median loss: ${stats.map(_.meanLoss).median}"
         )
       }
