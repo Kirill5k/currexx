@@ -22,6 +22,7 @@ enum ValueTransformation derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.
   case StandardDeviation(length: Int)
   case Kalman(gain: Double, measurementNoise: Double)
   case KalmanVelocity(gain: Double, measurementNoise: Double)
+  case ATR(length: Int)
   case RSX(length: Int)
   case JRSX(length: Int)
   case WMA(length: Int)
@@ -42,6 +43,7 @@ object ValueTransformation {
       "kalman"          -> JsonTaggedAdt.tagged[ValueTransformation.Kalman],
       "kalman-velocity" -> JsonTaggedAdt.tagged[ValueTransformation.KalmanVelocity],
       "stdev"           -> JsonTaggedAdt.tagged[ValueTransformation.StandardDeviation],
+      "atr"             -> JsonTaggedAdt.tagged[ValueTransformation.ATR],
       "rsx"             -> JsonTaggedAdt.tagged[ValueTransformation.RSX],
       "jrsx"            -> JsonTaggedAdt.tagged[ValueTransformation.JRSX],
       "stoch"           -> JsonTaggedAdt.tagged[ValueTransformation.STOCH],

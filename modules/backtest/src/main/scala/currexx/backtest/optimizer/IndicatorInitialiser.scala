@@ -16,6 +16,7 @@ object IndicatorInitialiser:
         case _: VT.Kalman            => VT.Kalman(rand.nextInt(19) * 0.05d + 0.05d, (rand.nextInt(50) + 50) / 100)
         case _: VT.KalmanVelocity    => VT.KalmanVelocity(rand.nextInt(19) * 0.05d + 0.05d, rand.nextInt(10) / 100)
         case _: VT.STOCH             => VT.STOCH(rand.nextInt(41) + 2)
+        case _: VT.ATR               => VT.ATR(rand.nextInt(41) + 2)
         case _: VT.RSX               => VT.RSX(rand.nextInt(41) + 2)
         case _: VT.JRSX              => VT.JRSX(rand.nextInt(41) + 2)
         case _: VT.WMA               => VT.WMA(rand.nextInt(41) + 2)

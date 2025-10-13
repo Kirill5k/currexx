@@ -47,6 +47,8 @@ object IndicatorMutator {
             VT.KalmanVelocity(mutDouble(gain, 0.01, 0.5, 0.01), mutDouble(measurementNoise, 0.01, 1.0, 0.01))
           case VT.STOCH(length) =>
             VT.STOCH(mutInt(length, 5, 50))
+          case VT.ATR(length) =>
+            VT.ATR(mutInt(length, 5, 50))
           case VT.RSX(length) =>
             VT.RSX(mutInt(length, 5, 50))
           case VT.JRSX(length) =>
