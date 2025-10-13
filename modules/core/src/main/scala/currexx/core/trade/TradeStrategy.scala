@@ -57,7 +57,6 @@ object Rule extends JsonCodecs {
     case MomentumEntered(zone: MomentumZone)
     case MomentumIsIn(zone: MomentumZone)
     case MomentumIs(direction: Direction)
-    case MomentumValueIs(operator: Operator, level: Double)
     case PreviousVolatilityIs(regime: VolatilityRegime)
     case VolatilityIs(regime: VolatilityRegime)
     case VelocityIs(direction: Direction)
@@ -69,6 +68,7 @@ object Rule extends JsonCodecs {
     case UpperBandCrossed(direction: Direction)
     case LowerBandCrossed(direction: Direction)
     case PriceCrossedLine(lineRole: ValueRole, direction: Direction)
+    case ValueIs(role: ValueRole, operator: Operator, level: Double)
 
   object Condition:
     given JsonTaggedAdt.Config[Condition] = JsonTaggedAdt.Config.Values[Condition](
@@ -76,6 +76,7 @@ object Rule extends JsonCodecs {
         "all-of"                 -> JsonTaggedAdt.tagged[Condition.AllOf],
         "any-of"                 -> JsonTaggedAdt.tagged[Condition.AnyOf],
         "not"                    -> JsonTaggedAdt.tagged[Condition.Not],
+        "value-is"               -> JsonTaggedAdt.tagged[Condition.ValueIs],
         "trend-changed-to"       -> JsonTaggedAdt.tagged[Condition.TrendChangedTo],
         "trend-is"               -> JsonTaggedAdt.tagged[Condition.TrendIs],
         "trend-active-for"       -> JsonTaggedAdt.tagged[Condition.TrendActiveFor],
@@ -83,7 +84,6 @@ object Rule extends JsonCodecs {
         "momentum-entered"       -> JsonTaggedAdt.tagged[Condition.MomentumEntered],
         "momentum-is-in"         -> JsonTaggedAdt.tagged[Condition.MomentumIsIn],
         "momentum-is"            -> JsonTaggedAdt.tagged[Condition.MomentumIs],
-        "momentum-value-is"      -> JsonTaggedAdt.tagged[Condition.MomentumValueIs],
         "previous-volatility-is" -> JsonTaggedAdt.tagged[Condition.PreviousVolatilityIs],
         "volatility-is"          -> JsonTaggedAdt.tagged[Condition.VolatilityIs],
         "velocity-is"            -> JsonTaggedAdt.tagged[Condition.VelocityIs],
@@ -142,6 +142,19 @@ object Rule extends JsonCodecs {
       case Condition.Not(c) =>
         !isSatisfied(c, state, previousProfile)
 
+      case Rule.Condition.ValueIs(role, operator, level) =>
+        val valueToTest = role match
+          case ValueRole.Momentum          => currentProfile.lastMomentumValue
+          case ValueRole.Volatility          => currentProfile.lastVolatilityValue
+          case ValueRole.Velocity          => currentProfile.lastVelocityValue
+          case ValueRole.ChannelMiddleBand => currentProfile.lastChannelMiddleBandValue
+        valueToTest.exists { value =>
+          operator match
+            case Operator.GreaterThan => value > level
+            case Operator.LessThan    => value < level
+            case Operator.EqualTo     => value == level
+        }
+
       case Condition.TrendChangedTo(direction) =>
         val currentDirection  = currentProfile.trend.map(_.direction)
         val previousDirection = previousProfile.trend.map(_.direction)
@@ -179,14 +192,6 @@ object Rule extends JsonCodecs {
               case Direction.Still    => current == previous
             }
           case _ => false // Cannot determine direction without two consecutive values.
-        }
-
-      case Condition.MomentumValueIs(operator, level) =>
-        currentProfile.lastMomentumValue.exists { value =>
-          operator match
-            case Operator.GreaterThan => value > level
-            case Operator.LessThan    => value < level
-            case Operator.EqualTo     => value == level
         }
 
       case Condition.PreviousVolatilityIs(regime) =>

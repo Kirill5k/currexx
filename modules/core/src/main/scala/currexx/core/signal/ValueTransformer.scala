@@ -29,6 +29,7 @@ final private class PureValueTransformer() extends ValueTransformer {
         case VT.Kalman(gain, measurementNoise)         => Filters.kalman(data, gain, measurementNoise)
         case VT.KalmanVelocity(gain, measurementNoise) => Filters.kalmanVelocity(data, gain, measurementNoise)
         case VT.StandardDeviation(length)              => Statistics.standardDeviation(data, length)
+        case VT.ATR(length)                            => Volatility.averageTrueRange(data, ref.highs, ref.highs, length)
         case VT.RSX(length)                            => MomentumOscillators.relativeStrengthIndex(data, length)
         case VT.JRSX(length)                           => MomentumOscillators.jurikRelativeStrengthIndex(data, length)
         case VT.STOCH(length)                          => MomentumOscillators.stochastic(data, ref.highs, ref.lows, length)
