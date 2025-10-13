@@ -58,6 +58,7 @@ object Rule extends JsonCodecs {
     case MomentumIsIn(zone: MomentumZone)
     case MomentumIs(direction: Direction)
     case MomentumValueIs(operator: Operator, level: Double)
+    case PreviousVolatilityIs(regime: VolatilityRegime)
     case VolatilityIs(regime: VolatilityRegime)
     case VelocityIs(direction: Direction)
     case VelocityCrossedLevel(level: Double, direction: Direction)
@@ -83,6 +84,7 @@ object Rule extends JsonCodecs {
         "momentum-is-in"         -> JsonTaggedAdt.tagged[Condition.MomentumIsIn],
         "momentum-is"            -> JsonTaggedAdt.tagged[Condition.MomentumIs],
         "momentum-value-is"      -> JsonTaggedAdt.tagged[Condition.MomentumValueIs],
+        "previous-volatility-is" -> JsonTaggedAdt.tagged[Condition.PreviousVolatilityIs],
         "volatility-is"          -> JsonTaggedAdt.tagged[Condition.VolatilityIs],
         "velocity-is"            -> JsonTaggedAdt.tagged[Condition.VelocityIs],
         "velocity-is-below"      -> JsonTaggedAdt.tagged[Condition.VelocityIsBelow],
@@ -186,6 +188,9 @@ object Rule extends JsonCodecs {
             case Operator.LessThan    => value < level
             case Operator.EqualTo     => value == level
         }
+
+      case Condition.PreviousVolatilityIs(regime) =>
+        previousProfile.volatility.exists(_.regime == regime)
 
       case Condition.VolatilityIs(regime) =>
         currentProfile.volatility.exists(_.regime == regime)
