@@ -11,6 +11,7 @@ import currexx.core.market.MarketState
 import currexx.core.settings.{SignalSettings, TradeSettings}
 import currexx.core.trade.TradeOrderPlacement
 import currexx.domain.market.MarketTimeSeriesData
+import currexx.domain.user.UserId
 
 import java.time.Instant
 import scala.collection.mutable.ListBuffer
@@ -22,7 +23,8 @@ final class ApplicationState[F[_]](
     val signalSettingsRef: Ref[F, SignalSettings],
     val clockRef: Ref[F, Option[Instant]],
     val dataRef: Ref[F, Option[MarketTimeSeriesData]],
-    val dispatcherQueue: Queue[F, Action]
+    val dispatcherQueue: Queue[F, Action],
+    val userIdRef: Ref[F, UserId]
 )(using F: Monad[F]) {
 
   def reset(newSettings: TestSettings): F[Unit] =
@@ -34,6 +36,7 @@ final class ApplicationState[F[_]](
       _ <- clockRef.set(None)
       _ <- dataRef.set(None)
       _ <- dispatcherQueue.tryTakeN(None).void
+      _ <- userIdRef.set(newSettings.userId)
     yield ()
 }
 
@@ -47,6 +50,7 @@ object ApplicationState {
       tradeSettingsRef  <- Ref.of[F, TradeSettings](settings.trade)
       tradeOrdersRef    <- Ref.of[F, ListBuffer[TradeOrderPlacement]](ListBuffer.empty)
       signalSettingsRef <- Ref.of[F, SignalSettings](settings.signal)
+      userIdRef         <- Ref.of[F, UserId](settings.userId)
     yield ApplicationState[F](
       marketStateRef = marketStateRef,
       tradeSettingsRef = tradeSettingsRef,
@@ -54,6 +58,7 @@ object ApplicationState {
       signalSettingsRef = signalSettingsRef,
       clockRef = clockRef,
       dataRef = dataRef,
-      dispatcherQueue = dispatcherQueue
+      dispatcherQueue = dispatcherQueue,
+      userIdRef = userIdRef
     )
 }
