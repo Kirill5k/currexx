@@ -28,3 +28,5 @@ final private class LiveActionDispatcher[F[_]: Monad](
 object ActionDispatcher:
   def make[F[_]: Concurrent]: F[ActionDispatcher[F]] =
     Queue.bounded[F, Action](1024).map(LiveActionDispatcher[F](_))
+  def make[F[_]: Monad](submittedActions: Queue[F, Action]) =
+    Monad[F].pure(LiveActionDispatcher[F](submittedActions))
