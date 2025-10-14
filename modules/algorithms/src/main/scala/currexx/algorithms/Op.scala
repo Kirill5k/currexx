@@ -85,7 +85,8 @@ object Op:
         case Op.SortByFitness(population) =>
           F.delay(population.sortBy(_._2)(using Ordering[Fitness].reverse))
         case Op.ApplyToAll(population, op) =>
-          Stream.emits(population).mapAsync(Int.MaxValue)(i => apply(op(i))).compile.toVector
+          val parallelism = Math.max(1, Runtime.getRuntime.availableProcessors())
+          Stream.emits(population).mapAsync(parallelism)(i => apply(op(i))).compile.toVector
         case _ | null =>
           F.raiseError(new IllegalArgumentException("Unexpected Op type: null or something else"))
   }
@@ -100,3 +101,4 @@ object Op:
       updateFn: Option[(Int, Int) => F[Unit]] = None
   )(using F: Async[F], rand: Random): Op[*, I] ~> F =
     new OpInterpreter[F, I](initialiser, crossover, mutator, evaluator, selector, elitism, updateFn)
+

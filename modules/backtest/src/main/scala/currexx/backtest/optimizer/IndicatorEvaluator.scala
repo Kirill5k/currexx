@@ -4,7 +4,6 @@ import cats.{Parallel, Show}
 import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import cats.syntax.traverse.*
 import cats.syntax.parallel.*
 import currexx.algorithms.Fitness
 import currexx.algorithms.operators.Evaluator
@@ -48,7 +47,7 @@ object IndicatorEvaluator {
       signalDetector: SignalDetector = SignalDetector.pure
   ): F[Evaluator[F, Indicator]] =
     for
-      testDataSets <- testFilePaths.traverse(MarketDataProvider.read[F](_).compile.toList)
+      testDataSets <- testFilePaths.parTraverse(MarketDataProvider.read[F](_).compile.toList)
       eval         <- Evaluator.cached[F, Indicator] { ind =>
         testDataSets
           .parTraverse { testData =>
