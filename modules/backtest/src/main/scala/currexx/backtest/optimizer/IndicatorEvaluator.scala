@@ -5,9 +5,10 @@ import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
+import cats.syntax.traverse.*
 import currexx.algorithms.Fitness
 import currexx.algorithms.operators.Evaluator
-import currexx.backtest.services.TestServices
+import currexx.backtest.services.TestServicesPool
 import currexx.backtest.syntax.*
 import currexx.backtest.{MarketDataProvider, OrderStatsCollector, TestSettings}
 import currexx.core.signal.SignalDetector
@@ -44,22 +45,29 @@ object IndicatorEvaluator {
       testFilePaths: List[String],
       ts: TradeStrategy,
       otherIndicators: List[Indicator] = Nil,
-      signalDetector: SignalDetector = SignalDetector.pure
+      signalDetector: SignalDetector = SignalDetector.pure,
+      poolSize: Int = Runtime.getRuntime.availableProcessors()
   ): F[Evaluator[F, Indicator]] =
     for
       testDataSets <- testFilePaths.parTraverse(MarketDataProvider.read[F](_).compile.toList)
+      // Create a pool of TestServices for each test dataset to enable parallel evaluation
+      pools        <- testDataSets.traverse { testData =>
+        val initialSettings = TestSettings.make(testData.head.currencyPair, ts, otherIndicators)
+        TestServicesPool.make[F](initialSettings, poolSize).map(pool => testData -> pool)
+      }
       eval         <- Evaluator.cached[F, Indicator] { ind =>
-        testDataSets
-          .parTraverse { testData =>
-            for
-              services <- TestServices.make[F](TestSettings.make(testData.head.currencyPair, ts, ind :: otherIndicators))
-              _        <- Stream
-                .emits(testData)
-                .through(services.processMarketData(signalDetector))
-                .compile
-                .drain
-              orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
-            yield orderStats.medianProfitByMonth
+        pools
+          .parTraverse { case (testData, pool) =>
+            pool.use(TestSettings.make(testData.head.currencyPair, ts, ind :: otherIndicators)) { services =>
+              for
+                _ <- Stream
+                  .emits(testData)
+                  .through(services.processMarketData(signalDetector))
+                  .compile
+                  .drain
+                orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
+              yield orderStats.medianProfitByMonth
+            }
           }
           .map(res => ind -> Fitness(res.mean.roundTo(5)))
       }
