@@ -49,8 +49,6 @@ object IndicatorEvaluator {
   ): F[Evaluator[F, Indicator]] =
     for
       testDataSets <- testFilePaths.parTraverse(MarketDataProvider.read[F](_).compile.toList)
-      // Create a single pool of TestServices that will be reused across all test datasets
-      // We use a dummy initial currency pair since services are reset before each use anyway
       initialSettings = TestSettings.make(testDataSets.head.head.currencyPair, ts, otherIndicators)
       pool <- TestServicesPool.make[F](initialSettings, poolSize)
       eval <- Evaluator.cached[F, Indicator] { ind =>
