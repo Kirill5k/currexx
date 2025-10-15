@@ -16,14 +16,14 @@ object TestStrategy {
     Indicator.ThresholdCrossing(
       source = ValueSource.Close,
       transformation = ValueTransformation.STOCH(length = 14),
-      upperBoundary = 80.0,
-      lowerBoundary = 20.0
+      upperBoundary = 83.0,
+      lowerBoundary = 23.0
     ),
     // CRITICAL: We MUST track the Stochastic value to use MomentumIs
     Indicator.ValueTracking(
       role = ValueRole.Momentum,
       source = ValueSource.Close,
-      transformation = ValueTransformation.STOCH(length = 14)
+      transformation = ValueTransformation.STOCH(length = 17)
     )
   )
 
