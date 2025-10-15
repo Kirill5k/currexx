@@ -5,7 +5,6 @@ import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
-import cats.syntax.traverse.*
 import currexx.algorithms.Fitness
 import currexx.algorithms.operators.Evaluator
 import currexx.backtest.services.TestServicesPool
@@ -50,14 +49,13 @@ object IndicatorEvaluator {
   ): F[Evaluator[F, Indicator]] =
     for
       testDataSets <- testFilePaths.parTraverse(MarketDataProvider.read[F](_).compile.toList)
-      // Create a pool of TestServices for each test dataset to enable parallel evaluation
-      pools        <- testDataSets.traverse { testData =>
-        val initialSettings = TestSettings.make(testData.head.currencyPair, ts, otherIndicators)
-        TestServicesPool.make[F](initialSettings, poolSize).map(pool => testData -> pool)
-      }
-      eval         <- Evaluator.cached[F, Indicator] { ind =>
-        pools
-          .parTraverse { case (testData, pool) =>
+      // Create a single pool of TestServices that will be reused across all test datasets
+      // We use a dummy initial currency pair since services are reset before each use anyway
+      initialSettings = TestSettings.make(testDataSets.head.head.currencyPair, ts, otherIndicators)
+      pool <- TestServicesPool.make[F](initialSettings, poolSize)
+      eval <- Evaluator.cached[F, Indicator] { ind =>
+        testDataSets
+          .parTraverse { testData =>
             pool.use(TestSettings.make(testData.head.currencyPair, ts, ind :: otherIndicators)) { services =>
               for
                 _ <- Stream
@@ -66,10 +64,10 @@ object IndicatorEvaluator {
                   .compile
                   .drain
                 orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
-              yield orderStats.medianProfitByMonth
+              yield orderStats.totalProfit
             }
           }
-          .map(res => ind -> Fitness(res.mean.roundTo(5)))
+          .map(res => ind -> Fitness(res.sum.roundTo(5)))
       }
     yield eval
 }
