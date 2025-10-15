@@ -9,6 +9,7 @@ import currexx.domain.signal.Indicator
 import currexx.backtest.optimizer.*
 import currexx.core.signal.SignalDetector
 
+import java.time.Instant
 import scala.util.Random
 
 object Optimizer extends IOApp.Simple {
@@ -21,16 +22,16 @@ object Optimizer extends IOApp.Simple {
     crossoverProbability = 0.7,
     mutationProbability = 0.2,
     elitismRatio = 0.025,
-    shuffle = true
+    shuffle = false
   )
 
-  val testDataSets    = MarketDataProvider.majors
+  val testDataSets    = MarketDataProvider.majors1h
   val strategy        = TestStrategy.s1_rules
   val target          = TestStrategy.s1_indicator
   val otherIndicators = Nil
 
   override def run: IO[Unit] = for
-    _       <- IO.println(s"Starting optimization of $target")
+    _       <- IO.println(s"Starting optimization of $target; starting time - ${Instant.now}")
     startTs <- IO.monotonic
     init    <- IndicatorInitialiser.make[IO]
     cross   <- IndicatorCrossover.make[IO]
