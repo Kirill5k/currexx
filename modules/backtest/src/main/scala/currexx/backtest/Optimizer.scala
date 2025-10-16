@@ -22,12 +22,12 @@ object Optimizer extends IOApp.Simple {
     crossoverProbability = 0.7,
     mutationProbability = 0.2,
     elitismRatio = 0.025,
-    shuffle = false
+    shuffle = true
   )
 
   val testDataSets    = MarketDataProvider.majors1h
-  val strategy        = TestStrategy.s1_rules
-  val target          = TestStrategy.s1_indicator
+  val strategy        = TestStrategy.s2_rules
+  val target          = TestStrategy.s2_indicator
   val otherIndicators = Nil
 
   override def run: IO[Unit] = for

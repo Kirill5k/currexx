@@ -11,7 +11,7 @@ object TestStrategy {
   val s1_indicator = Indicator.compositeAnyOf(
     Indicator.TrendChangeDetection(
       source = ValueSource.HLC3,
-      transformation = ValueTransformation.JMA(length = 29, phase = 60, power = 3)
+      transformation = ValueTransformation.JMA(length = 21, phase = 100, power = 2)
     ),
     Indicator.ThresholdCrossing(
       source = ValueSource.Close,
