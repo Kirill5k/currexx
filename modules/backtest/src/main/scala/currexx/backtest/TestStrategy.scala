@@ -84,24 +84,24 @@ object TestStrategy {
     Indicator.LinesCrossing(
       source = ValueSource.HLC3, // Use a smooth price source for the JMAs
       // The FAST line: short length, positive phase for responsiveness
-      line1Transformation = ValueTransformation.JMA(length = 7, phase = 50, power = 2),
+      line1Transformation = ValueTransformation.JMA(length = 21, phase = 53, power = 3),
       // The SLOW line: longer length, negative phase for extreme smoothness
-      line2Transformation = ValueTransformation.JMA(length = 30, phase = -50, power = 2)
+      line2Transformation = ValueTransformation.JMA(length = 24, phase = -62, power = 4)
     ),
 
     // The momentum filter indicator.
     Indicator.ThresholdCrossing(
       source = ValueSource.Close,
-      transformation = ValueTransformation.RSX(length = 14),
-      upperBoundary = 80.0, // Defines the Overbought zone
-      lowerBoundary = 20.0  // Defines the Oversold zone
+      transformation = ValueTransformation.RSX(length = 17),
+      upperBoundary = 93.0, // Defines the Overbought zone
+      lowerBoundary = 9.0  // Defines the Oversold zone
     ),
 
     // The volatility filter indicator.
     Indicator.VolatilityRegimeDetection(
-      atrLength = 14,
-      smoothingType = ValueTransformation.SMA(length = 20), // Compare ATR to its 20-period SMA
-      smoothingLength = 20
+      atrLength = 30,
+      smoothingType = ValueTransformation.SMA(length = 33), // Compare ATR to its 20-period SMA
+      smoothingLength = 16
     )
   )
 
