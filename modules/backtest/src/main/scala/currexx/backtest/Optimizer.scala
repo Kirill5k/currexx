@@ -26,21 +26,20 @@ object Optimizer extends IOApp.Simple {
   )
 
   val testDataSets    = MarketDataProvider.majors1h
-  val strategy        = TestStrategy.s2_rules
-  val target          = TestStrategy.s2_indicator
+  val strategy        = TestStrategy.s1
   val otherIndicators = Nil
 
   override def run: IO[Unit] = for
-    _       <- IO.println(s"Starting optimization of $target; starting time - ${Instant.now}")
+    _       <- IO.println(s"Starting optimization of ${strategy.indicator}; starting time - ${Instant.now}")
     startTs <- IO.monotonic
     init    <- IndicatorInitialiser.make[IO]
     cross   <- IndicatorCrossover.make[IO]
     mut     <- IndicatorMutator.make[IO]
-    eval    <- IndicatorEvaluator.make[IO](testDataSets, strategy, otherIndicators, SignalDetector.pure)
+    eval    <- IndicatorEvaluator.make[IO](testDataSets, strategy.rules, otherIndicators, SignalDetector.pure)
     sel     <- Selector.tournament[IO, Indicator]
     elit    <- Elitism.simple[IO, Indicator]
     updateFn = (currentGen: Int, maxGen: Int) => IO.whenA(currentGen % 10 == 0)(IO.println(s"$currentGen out of $maxGen"))
-    res   <- OptimisationAlgorithm.ga[IO, Indicator](init, cross, mut, eval, sel, elit, updateFn).optimise(target, gaParameters)
+    res   <- OptimisationAlgorithm.ga[IO, Indicator](init, cross, mut, eval, sel, elit, updateFn).optimise(strategy.indicator, gaParameters)
     endTs <- IO.monotonic
     _     <- IO.println(s"Total duration ${(endTs - startTs).toMinutes}m")
     _     <- res.zipWithIndex.take(25).traverse { case ((ind, f), i) => IO.println(s"${i + 1}: $f - $ind") }

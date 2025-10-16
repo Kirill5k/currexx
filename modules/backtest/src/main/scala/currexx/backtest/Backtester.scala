@@ -11,6 +11,8 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 object Backtester extends IOApp.Simple {
   inline given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
+  val testStrategy = TestStrategy.s1_v2
+
   override val run: IO[Unit] =
     Stream
       .emits(MarketDataProvider.majors1h)
@@ -18,7 +20,7 @@ object Backtester extends IOApp.Simple {
         for
           _ <- IO.println(s"Processing $filePath")
           cp = MarketDataProvider.cpFromFilePath(filePath)
-          settings = TestSettings.make(cp, TestStrategy.s1_rules_v2, List(TestStrategy.s1_indicator_v2))
+          settings = TestSettings.make(cp, testStrategy.rules, List(testStrategy.indicator))
           services <- TestServices.make[IO](settings)
           _        <- MarketDataProvider
             .read[IO](filePath)
