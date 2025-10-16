@@ -251,10 +251,10 @@ object TestStrategy {
     )
   )
 
-  val s1_indicators_v2 = Indicator.compositeAnyOf(
-    Indicator.TrendChangeDetection(source = ValueSource.HLC3, transformation = ValueTransformation.JMA(29, 60, 3)),
-    Indicator.ThresholdCrossing(source = ValueSource.Close, transformation = ValueTransformation.STOCH(14), upperBoundary = 80.0, lowerBoundary = 20.0),
-    Indicator.ValueTracking(role = ValueRole.Momentum, source = ValueSource.Close, transformation = ValueTransformation.STOCH(14)),
+  val s1_indicator_v2 = Indicator.compositeAnyOf(
+    Indicator.TrendChangeDetection(source = ValueSource.HLC3, transformation = ValueTransformation.JMA(21, 100, 2)),
+    Indicator.ThresholdCrossing(source = ValueSource.Close, transformation = ValueTransformation.STOCH(14), upperBoundary = 83.0, lowerBoundary = 23.0),
+    Indicator.ValueTracking(role = ValueRole.Momentum, source = ValueSource.Close, transformation = ValueTransformation.STOCH(17)),
     Indicator.VolatilityRegimeDetection(atrLength = 14, smoothingType = ValueTransformation.SMA(20), smoothingLength = 20)
   )
 
@@ -303,13 +303,8 @@ object TestStrategy {
         conditions = Rule.Condition.anyOf(
           Rule.Condition.allOf(Rule.Condition.positionIsBuy, Rule.Condition.TrendChangedTo(Direction.Downward)),
           Rule.Condition.allOf(Rule.Condition.positionIsSell, Rule.Condition.TrendChangedTo(Direction.Upward)),
-
-          // Take-Profit: Momentum is exhausted
           Rule.Condition.allOf(Rule.Condition.positionIsBuy, Rule.Condition.momentumEnteredOverbought),
           Rule.Condition.allOf(Rule.Condition.positionIsSell, Rule.Condition.momentumEnteredOversold),
-
-          // NEW: Emergency Exit - Volatility explodes, get out of the market.
-//          Rule.Condition.volatilityIsHigh
         )
       )
     )

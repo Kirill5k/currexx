@@ -18,7 +18,7 @@ object Backtester extends IOApp.Simple {
         for
           _ <- IO.println(s"Processing $filePath")
           cp = MarketDataProvider.cpFromFilePath(filePath)
-          settings = TestSettings.make(cp, TestStrategy.s2_rules, List(TestStrategy.s2_indicator))
+          settings = TestSettings.make(cp, TestStrategy.s1_rules_v2, List(TestStrategy.s1_indicator_v2))
           services <- TestServices.make[IO](settings)
           _        <- MarketDataProvider
             .read[IO](filePath)
