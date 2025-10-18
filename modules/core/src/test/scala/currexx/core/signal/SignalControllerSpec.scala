@@ -60,7 +60,7 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
         val validIndicators =
           "trend-change-detection, keltner-channel, bollinger-bands, value-tracking, volatility-regime-detection, lines-crossing, threshold-crossing, price-line-crossing, composite"
         val responseBody = s"""{"message":"Missing required field, Received unknown type: 'foo'. Exists only types: $validIndicators."}"""
-        res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
+        res mustHaveStatus (Status.UnprocessableContent, Some(responseBody))
         verifyNoInteractions(svc)
       }
 
@@ -80,7 +80,7 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
         val validCondition =
           "value-updated, volatility-regime-change, lower-band-crossing, lines-crossing, composite, trend-direction-change, upper-band-crossing, threshold-crossing, price-crossed-line"
         val responseBody = s"""{"message":"Received unknown type: 'foo'. Exists only types: $validCondition."}"""
-        res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
+        res mustHaveStatus (Status.UnprocessableContent, Some(responseBody))
         verifyNoInteractions(svc)
       }
 
@@ -99,7 +99,7 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
 
         val responseBody =
           """{"message":"Unknown currency code FOO; Available currencies are: PLN, CAD, AUD, GBP, CHF, DKK, JPY, USD, RUB, NZD, NOK, EUR"}"""
-        res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
+        res mustHaveStatus (Status.UnprocessableContent, Some(responseBody))
         verifyNoInteractions(svc)
       }
 
@@ -116,7 +116,7 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
               |}""".stripMargin)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        res mustHaveStatus (Status.UnprocessableEntity, Some("""{"message":"FOO-BAR is not valid currency pair representation"}"""))
+        res mustHaveStatus (Status.UnprocessableContent, Some("""{"message":"FOO-BAR is not valid currency pair representation"}"""))
         verifyNoInteractions(svc)
       }
     }
@@ -150,7 +150,7 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody = s"""{"message":"Date 'from' must be before date 'to'"}"""
-        res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
+        res mustHaveStatus (Status.UnprocessableContent, Some(responseBody))
         verifyNoInteractions(svc)
       }
     }

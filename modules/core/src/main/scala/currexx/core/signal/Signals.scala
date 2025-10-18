@@ -15,7 +15,7 @@ final class Signals[F[_]] private (
 )
 
 object Signals:
-  def make[F[_]: Async: Clock](database: MongoDatabase[F], dispatcher: ActionDispatcher[F]): F[Signals[F]] =
+  def make[F[_]: {Async, Clock}](database: MongoDatabase[F], dispatcher: ActionDispatcher[F]): F[Signals[F]] =
     for
       signRepo <- SignalRepository.make[F](database)
       settRepo <- SignalSettingsRepository.make[F](database)

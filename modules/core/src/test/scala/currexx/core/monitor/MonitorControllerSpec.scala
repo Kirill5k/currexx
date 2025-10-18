@@ -72,7 +72,7 @@ class MonitorControllerSpec extends HttpRoutesWordSpec {
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody = s"""{"message":"Limits must have at least one of the fields defined"}"""
-        res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
+        res mustHaveStatus (Status.UnprocessableContent, Some(responseBody))
         verifyNoInteractions(svc)
       }
     }
@@ -99,7 +99,7 @@ class MonitorControllerSpec extends HttpRoutesWordSpec {
         val req = Request[IO](Method.PUT, uri"/monitors/foo/pause").withAuthHeader()
         val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        res mustHaveStatus (Status.UnprocessableEntity, Some("""{"message":"Invalid hexadecimal representation of an id: foo"}"""))
+        res mustHaveStatus (Status.UnprocessableContent, Some("""{"message":"Invalid hexadecimal representation of an id: foo"}"""))
         verifyNoInteractions(svc)
       }
 

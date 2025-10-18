@@ -105,7 +105,7 @@ class AuthControllerSpec extends HttpRoutesWordSpec {
           .withBody("""{"email":"foo@bar.com","password":"","firstName":"John","lastName":"Bloggs"}""")
         val res = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
-        res mustHaveStatus (Status.UnprocessableEntity, Some("""{"message":"password must not be empty"}"""))
+        res mustHaveStatus (Status.UnprocessableContent, Some("""{"message":"password must not be empty"}"""))
         verifyNoInteractions(usrSvc, sessSvc)
       }
 
@@ -138,7 +138,7 @@ class AuthControllerSpec extends HttpRoutesWordSpec {
         val res = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         val responseBody = """{"message":"Invalid message body: Could not decode expected \" got 'foo}' (line 1, column 2) json"}"""
-        res mustHaveStatus (Status.UnprocessableEntity, Some(responseBody))
+        res mustHaveStatus (Status.UnprocessableContent, Some(responseBody))
         verifyNoInteractions(usrSvc, sessSvc)
       }
 
@@ -150,7 +150,7 @@ class AuthControllerSpec extends HttpRoutesWordSpec {
         val res = AuthController.make[IO](usrSvc, sessSvc).flatMap(_.routes.orNotFound.run(req))
 
         val resBody = """{"message":"foo is not a valid email, password must not be empty"}"""
-        res mustHaveStatus (Status.UnprocessableEntity, Some(resBody))
+        res mustHaveStatus (Status.UnprocessableContent, Some(resBody))
         verifyNoInteractions(usrSvc, sessSvc)
       }
 
