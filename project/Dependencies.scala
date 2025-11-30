@@ -5,7 +5,7 @@ object Dependencies {
     val fs2            = "3.12.2"
     val cats           = "2.13.0"
     val commonScala    = "0.1.27"
-    val mongo4cats     = "0.7.15"
+    val mongo4cats     = "0.7.16"
     val pureConfig     = "0.17.9"
     val circe          = "0.14.15"
     val circeRefined   = "0.15.1"
