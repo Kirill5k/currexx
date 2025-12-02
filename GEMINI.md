@@ -32,7 +32,7 @@ Before live deployment, strategies are improved using the offline **Optimizer** 
 ## Indicators & Data Transformations
 
 ### Indicator Types (`Indicator`)
-Defines high-level analytical goals:
+Defines high-level analytical goals. (Defined in `modules/domain/src/main/scala/currexx/domain/signal/Indicator.scala`)
 - **Composite**: Combines indicators (All/Any logic).
 - **TrendChangeDetection**: Detects turning points.
 - **ThresholdCrossing** / **LinesCrossing**: Value vs. Boundary or Line vs. Line.
@@ -42,7 +42,7 @@ Defines high-level analytical goals:
 - **PriceLineCrossing**: Price vs. Calculated Line.
 
 ### Data Transformations (`ValueTransformation`)
-Mathematical functions applied to price data:
+Mathematical functions applied to price data: (Defined in `modules/domain/src/main/scala/currexx/domain/signal/Indicator.scala`)
 - **Moving Averages**: SMA, EMA, WMA, HMA, NMA (Nyquist), JMA (Jurik).
 - **Momentum Oscillators**: STOCH (Stochastic), RSX, JRSX (Jurik RSI).
 - **Filters**: Kalman (smoothing), KalmanVelocity (momentum).
@@ -53,7 +53,7 @@ Mathematical functions applied to price data:
 - Close, Open, HL2, HLC3.
 
 ## Strategy Rule Conditions
-Strategies are built using readable, semantic conditions:
+Strategies are built using readable, semantic conditions. The overall `TradeStrategy` is defined in `modules/core/src/main/scala/currexx/core/trade/TradeStrategy.scala`.
 
 - **Logical**: `AllOf`, `AnyOf`, `Not`.
 - **Position State**: `NoPosition`, `PositionIs`, `PositionOpenFor`.
