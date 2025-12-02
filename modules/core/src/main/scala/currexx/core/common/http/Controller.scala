@@ -64,7 +64,7 @@ object Controller extends TapirSchema with TapirJson with TapirCodecs {
     .and(query[Option[Instant]]("to"))
     .and(query[Option[CurrencyPair]]("currencyPair"))
     .and(query[Option[Int]]("limit"))
-    .map((f, t, cp, l) => SearchParams(f, t, cp, l))(sp => (sp.from, sp.to, sp.currencyPair, sp.limit))
+    .mapTo[SearchParams]
 
   val publicEndpoint: PublicEndpoint[Unit, (StatusCode, ErrorResponse), Unit, Any] =
     endpoint.errorOut(error)
