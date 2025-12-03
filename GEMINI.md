@@ -82,3 +82,6 @@ Strategies are built using readable, semantic conditions. The overall `TradeStra
     - `sbt test`
     - `sbt "project core" run`
     - `sbt docker:publishLocal`
+- **Backtesting**: 
+  - Run the `Backtest` in the `backtest` module with configured strategies and historical data.
+  - `sbt "backtest/runMain currexx.backtest.Backtester"`

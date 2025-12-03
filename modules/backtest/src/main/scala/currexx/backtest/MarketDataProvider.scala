@@ -2,7 +2,7 @@ package currexx.backtest
 
 import cats.effect.Async
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
-import fs2.io.file.{Files, Path}
+import fs2.io.readClassResource
 import fs2.{Stream, text}
 
 import java.time.format.DateTimeFormatter
@@ -68,9 +68,7 @@ object MarketDataProvider:
   def read[F[_]: Async](filePath: String): Stream[F, MarketTimeSeriesData] = {
     val interval = if (filePath.contains("1h")) Interval.H1 else Interval.D1
     val cp       = cpFromFilePath(filePath)
-    Files
-      .forAsync[F]
-      .readAll(Path(getClass.getClassLoader.getResource(filePath).getPath))
+    readClassResource[F, MarketDataProvider.type](s"/$filePath")
       .through(text.utf8.decode)
       .through(text.lines)
       .drop(1)
