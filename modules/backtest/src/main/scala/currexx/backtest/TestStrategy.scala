@@ -91,17 +91,17 @@ object TestStrategy {
       Indicator.LinesCrossing(
         source = ValueSource.HLC3, // Use a smooth price source for the JMAs
         // The FAST line: short length, positive phase for responsiveness
-        line1Transformation = ValueTransformation.JMA(length = 21, phase = 53, power = 3),
+        line1Transformation = ValueTransformation.JMA(length = 20, phase = 53, power = 3),
         // The SLOW line: longer length, negative phase for extreme smoothness
-        line2Transformation = ValueTransformation.JMA(length = 24, phase = -62, power = 4)
+        line2Transformation = ValueTransformation.JMA(length = 26, phase = -62, power = 4)
       ),
 
       // The momentum filter indicator.
       Indicator.ThresholdCrossing(
         source = ValueSource.Close,
         transformation = ValueTransformation.RSX(length = 17),
-        upperBoundary = 93.0, // Defines the Overbought zone
-        lowerBoundary = 9.0   // Defines the Oversold zone
+        upperBoundary = 95.0, // Defines the Overbought zone
+        lowerBoundary = 5.0   // Defines the Oversold zone
       ),
 
       // The volatility filter indicator.
@@ -147,9 +147,6 @@ object TestStrategy {
         Rule(
           action = TradeAction.ClosePosition,
           conditions = Rule.Condition.anyOf(
-            // Emergency Exit 1: Volatility explodes. Get out and wait for calm.
-            Rule.Condition.volatilityIsHigh,
-
             // Emergency Exit 2 (Take Profit): Momentum becomes completely exhausted.
             Rule.Condition.allOf(
               Rule.Condition.positionIsBuy,
