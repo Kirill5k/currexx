@@ -18,7 +18,7 @@ object TestStrategy {
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
         source = ValueSource.HLC3,
-        transformation = ValueTransformation.HMA(length = 21)
+        transformation = ValueTransformation.HMA(length = 25)
       ),
       Indicator.ThresholdCrossing(
         source = ValueSource.Close,
