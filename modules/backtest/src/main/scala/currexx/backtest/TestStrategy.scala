@@ -200,7 +200,7 @@ object TestStrategy {
             // Prerequisites:
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsUpward,
-            Rule.Condition.TrendActiveFor(12.hours), // CONFIRMATION: The trend must be established for at least 4 hours.
+            Rule.Condition.TrendActiveFor(18.hours), // CONFIRMATION: The trend must be established for at least 4 hours.
             Rule.Condition.volatilityIsLow,         // FILTER: Only enter during low-volatility periods.
 
             // The Entry Trigger:
@@ -215,7 +215,7 @@ object TestStrategy {
             // Prerequisites:
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsDownward,
-            Rule.Condition.TrendActiveFor(12.hours), // CONFIRMATION
+            Rule.Condition.TrendActiveFor(18.hours), // CONFIRMATION
             Rule.Condition.volatilityIsLow,         // FILTER
 
             // The Entry Trigger:
@@ -232,12 +232,12 @@ object TestStrategy {
             // For a long position, we exit if velocity is no longer positive.
             Rule.Condition.allOf(
               Rule.Condition.positionIsBuy,
-              Rule.Condition.VelocityCrossedLevel(level = -0.0001, direction = Direction.Downward)
+              Rule.Condition.VelocityCrossedLevel(level = -0.0002, direction = Direction.Downward)
             ),
             // For a short position, we exit if velocity is no longer negative.
             Rule.Condition.allOf(
               Rule.Condition.positionIsSell,
-              Rule.Condition.VelocityCrossedLevel(level = 0.0001, direction = Direction.Upward)
+              Rule.Condition.VelocityCrossedLevel(level = 0.0002, direction = Direction.Upward)
             ),
 
             // --- TAKE-PROFIT: Momentum is exhausted ---
