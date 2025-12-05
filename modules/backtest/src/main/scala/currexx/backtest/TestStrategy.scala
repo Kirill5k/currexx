@@ -319,4 +319,75 @@ object TestStrategy {
       )
     )
   )
+
+  val s4 = TestStrategy(
+    indicator = Indicator.compositeAnyOf(
+      // 1. Trend: JMA 50
+      Indicator.TrendChangeDetection(
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.JMA(length = 50, phase = 0, power = 2)
+      ),
+      // 2. Breakout Channel: Keltner Channel
+      Indicator.KeltnerChannel(
+        source = ValueSource.Close,
+        middleBand = ValueTransformation.EMA(length = 20),
+        atrLength = 20,
+        atrMultiplier = 1.5
+      ),
+      // 3. Exit Momentum: RSX
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 14),
+        upperBoundary = 85.0,
+        lowerBoundary = 15.0
+      ),
+      // 4. Volatility
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 14,
+        smoothingType = ValueTransformation.SMA(length = 20),
+        smoothingLength = 20
+      )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsUpward,
+            Rule.Condition.TrendActiveFor(4.hours),
+            Rule.Condition.volatilityIsLow, // Squeeze
+            Rule.Condition.UpperBandCrossed(Direction.Upward) // Breakout
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsDownward,
+            Rule.Condition.TrendActiveFor(4.hours),
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.LowerBandCrossed(Direction.Downward)
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            Rule.Condition.TrendChangedTo(Direction.Downward),
+            Rule.Condition.TrendChangedTo(Direction.Upward),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.momentumEnteredOverbought
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.momentumEnteredOversold
+            )
+          )
+        )
+      )
+    )
+  )
 }
