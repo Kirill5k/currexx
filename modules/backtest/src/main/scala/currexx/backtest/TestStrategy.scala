@@ -206,7 +206,7 @@ object TestStrategy {
             // The Entry Trigger:
             // Velocity must surge above a symmetrical positive threshold.
             // This confirms a real breakout in momentum.
-            Rule.Condition.VelocityCrossedLevel(level = 0.0010, direction = Direction.Upward)
+            Rule.Condition.VelocityCrossedLevel(level = 0.0012, direction = Direction.Upward)
           )
         ),
         Rule(
@@ -220,7 +220,7 @@ object TestStrategy {
 
             // The Entry Trigger:
             // Velocity must break below a symmetrical negative threshold.
-            Rule.Condition.VelocityCrossedLevel(level = -0.0010, direction = Direction.Downward)
+            Rule.Condition.VelocityCrossedLevel(level = -0.0012, direction = Direction.Downward)
           )
         )
       ),
