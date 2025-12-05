@@ -200,13 +200,13 @@ object TestStrategy {
             // Prerequisites:
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsUpward,
-            Rule.Condition.TrendActiveFor(4.hours), // CONFIRMATION: The trend must be established for at least 4 hours.
+            Rule.Condition.TrendActiveFor(12.hours), // CONFIRMATION: The trend must be established for at least 4 hours.
             Rule.Condition.volatilityIsLow,         // FILTER: Only enter during low-volatility periods.
 
             // The Entry Trigger:
             // Velocity must surge above a symmetrical positive threshold.
             // This confirms a real breakout in momentum.
-            Rule.Condition.VelocityCrossedLevel(level = 0.0003, direction = Direction.Upward)
+            Rule.Condition.VelocityCrossedLevel(level = 0.0005, direction = Direction.Upward)
           )
         ),
         Rule(
@@ -215,12 +215,12 @@ object TestStrategy {
             // Prerequisites:
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsDownward,
-            Rule.Condition.TrendActiveFor(4.hours), // CONFIRMATION
+            Rule.Condition.TrendActiveFor(12.hours), // CONFIRMATION
             Rule.Condition.volatilityIsLow,         // FILTER
 
             // The Entry Trigger:
             // Velocity must break below a symmetrical negative threshold.
-            Rule.Condition.VelocityCrossedLevel(level = -0.0003, direction = Direction.Downward)
+            Rule.Condition.VelocityCrossedLevel(level = -0.0005, direction = Direction.Downward)
           )
         )
       ),
