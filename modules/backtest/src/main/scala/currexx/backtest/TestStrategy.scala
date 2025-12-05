@@ -200,7 +200,7 @@ object TestStrategy {
             // Prerequisites:
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsUpward,
-            Rule.Condition.TrendActiveFor(12.hours), // CONFIRMATION: The trend must be established for at least 4 hours.
+            Rule.Condition.TrendActiveFor(4.hours), // CONFIRMATION: The trend must be established for at least 4 hours.
             Rule.Condition.volatilityIsLow,         // FILTER: Only enter during low-volatility periods.
 
             // The Entry Trigger:
@@ -215,7 +215,7 @@ object TestStrategy {
             // Prerequisites:
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsDownward,
-            Rule.Condition.TrendActiveFor(12.hours), // CONFIRMATION
+            Rule.Condition.TrendActiveFor(4.hours), // CONFIRMATION
             Rule.Condition.volatilityIsLow,         // FILTER
 
             // The Entry Trigger:
