@@ -22,9 +22,19 @@ object IndicatorEvaluator {
   object ScoringFunction {
     val totalProfit: ScoringFunction = _.foldLeft(BigDecimal(0))(_ + _.totalProfit).roundTo(5)
 
-    val averageWinLossRatio: ScoringFunction = stats =>
+    def averageWinLossRatio(minOrders: Option[Int] = None, maxOrders: Option[Int] = None): ScoringFunction = stats => {
       if (stats.isEmpty) BigDecimal(0)
-      else (stats.foldLeft(BigDecimal(0))(_ + _.winLossRatio) / BigDecimal(stats.size)).roundTo(5)
+      else {
+        val penalizedRatios = stats.map { os =>
+          val numOrders = os.total
+          val isBelowMin = minOrders.exists(numOrders < _)
+          val isAboveMax = maxOrders.exists(numOrders > _)
+
+          if (isBelowMin || isAboveMax) BigDecimal(0) else os.winLossRatio
+        }
+        (penalizedRatios.foldLeft(BigDecimal(0))(_ + _) / BigDecimal(stats.size)).roundTo(5)
+      }
+    }
 
     val averageMedianProfitByMonth: ScoringFunction = stats =>
       if (stats.isEmpty) BigDecimal(0)
