@@ -62,10 +62,10 @@ object IndicatorEvaluator {
                   .compile
                   .drain
                 orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
-              yield orderStats.totalProfit
+              yield orderStats
             }
           }
-          .map(res => ind -> Fitness(res.sum.roundTo(5)))
+          .map(res => ind -> Fitness(res.map(_.totalProfit).sum.roundTo(5)))
       }
     yield eval
 }
