@@ -39,17 +39,17 @@ final case class OrderStats(
 
   override def toString: String =
     s"""OrderStats(
-       |totalOrders=$total,
-       |winLossRatio=$winLossRatio,
        |totalProfit=$totalProfit,
-       |medianProfitByMonth=$medianProfitByMonth,
+       |winLossRatio=$winLossRatio,
        |meanProfitByMonth=$meanProfitByMonth,
+       |medianProfitByMonth=$medianProfitByMonth,
+       |biggestWin=$biggestWin,
+       |biggestLoss=$biggestLoss,
+       |meanLoss=$meanLoss,
+       |totalOrders=$total,
        |buys=$buys,
        |sells=$sells,
-       |losses=${losses.size},
-       |biggestWin=$biggestWin,
-       |meanLoss=$meanLoss,
-       |biggestLoss=$biggestLoss
+       |losses=${losses.size}
        |)""".stripMargin.replaceAll("\n", "")
 
 object OrderStatsCollector:
