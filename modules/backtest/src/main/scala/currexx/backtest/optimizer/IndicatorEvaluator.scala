@@ -9,13 +9,27 @@ import currexx.algorithms.Fitness
 import currexx.algorithms.operators.Evaluator
 import currexx.backtest.services.TestServicesPool
 import currexx.backtest.syntax.*
-import currexx.backtest.{MarketDataProvider, OrderStatsCollector, TestSettings}
+import currexx.backtest.{MarketDataProvider, OrderStatsCollector, OrderStats, TestSettings}
 import currexx.core.signal.SignalDetector
 import currexx.core.trade.TradeStrategy
 import currexx.domain.signal.Indicator
 import fs2.Stream
 
 object IndicatorEvaluator {
+
+  type ScoringFunction = List[OrderStats] => BigDecimal
+
+  object ScoringFunction {
+    val totalProfit: ScoringFunction = _.foldLeft(BigDecimal(0))(_ + _.totalProfit).roundTo(5)
+
+    val averageWinLossRatio: ScoringFunction = stats =>
+      if (stats.isEmpty) BigDecimal(0)
+      else (stats.foldLeft(BigDecimal(0))(_ + _.winLossRatio) / BigDecimal(stats.size)).roundTo(5)
+
+    val averageMedianProfitByMonth: ScoringFunction = stats =>
+      if (stats.isEmpty) BigDecimal(0)
+      else (stats.foldLeft(BigDecimal(0))(_ + _.medianProfitByMonth) / BigDecimal(stats.size)).roundTo(5)
+  }
 
   given Show[Indicator] = (ind: Indicator) => {
     def showInd(i: Indicator): String = i match
@@ -45,7 +59,8 @@ object IndicatorEvaluator {
       ts: TradeStrategy,
       otherIndicators: List[Indicator] = Nil,
       signalDetector: SignalDetector = SignalDetector.pure,
-      poolSize: Int = Runtime.getRuntime.availableProcessors()
+      poolSize: Int = Runtime.getRuntime.availableProcessors(),
+      scoringFunction: ScoringFunction = ScoringFunction.totalProfit
   ): F[Evaluator[F, Indicator]] =
     for
       testDataSets <- testFilePaths.parTraverse(MarketDataProvider.read[F](_).compile.toList)
@@ -65,7 +80,7 @@ object IndicatorEvaluator {
               yield orderStats
             }
           }
-          .map(res => ind -> Fitness(res.map(_.totalProfit).sum.roundTo(5)))
+          .map(res => ind -> Fitness(scoringFunction(res)))
       }
     yield eval
 }
