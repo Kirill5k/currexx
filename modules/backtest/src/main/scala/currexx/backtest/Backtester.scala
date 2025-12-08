@@ -35,7 +35,10 @@ object Backtester extends IOApp.Simple {
       .toList
       .flatMap { stats =>
         IO.println(
-          s"total profit: ${stats.map(_.totalProfit).sum}, median: ${stats.map(_.totalProfit).median}, median loss: ${stats.map(_.meanLoss).median}"
+          s"""median win-to-loss ratio: ${stats.map(_.winLossRatio).median},
+             |total profit: ${stats.map(_.totalProfit).sum}, 
+             |median: ${stats.map(_.totalProfit).median}, 
+             |median loss: ${stats.map(_.meanLoss).median}""".stripMargin.replaceAll("\n", "")
         )
       }
 }
