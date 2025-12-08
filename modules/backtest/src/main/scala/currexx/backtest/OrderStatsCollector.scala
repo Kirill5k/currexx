@@ -34,7 +34,7 @@ final case class OrderStats(
       }
     )
   def winLossRatio: BigDecimal =
-    if (losses.size == 0) BigDecimal(0)
+    if (losses.isEmpty) if (total == 0) BigDecimal(0) else BigDecimal(total)
     else (BigDecimal(total - losses.size) / BigDecimal(losses.size)).roundTo(5)
 
   override def toString: String =
