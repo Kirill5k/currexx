@@ -29,7 +29,7 @@ object TestStrategy {
       Indicator.ValueTracking(
         role = ValueRole.Momentum,
         source = ValueSource.Close,
-        transformation = ValueTransformation.STOCH(length = 16)
+        transformation = ValueTransformation.STOCH(length = 15)
       )
     ),
     rules = TradeStrategy(
