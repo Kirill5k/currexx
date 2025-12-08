@@ -67,7 +67,7 @@ object TestServices:
       clock   = TestClock[F](appState.clockRef)
       clients = TestClients[F](TestBrokerClient[F], TestMarketDataClient[F](appState.dataRef))
 
-      market <- MarketService.make[F](TestMarketStateRepository[F](appState.marketStateRef), dispatcher)
+      market <- MarketService.make[F](TestMarketStateRepository[F](appState.marketStateRef)(using Temporal[F], clock), dispatcher)
 
       tradeSettingsRepo = new TestTradeSettingsRepository[F](appState.tradeSettingsRef)
       tradeOrdersRepo   = new TestTradeOrderRepository[F](appState.tradeOrdersRef)
