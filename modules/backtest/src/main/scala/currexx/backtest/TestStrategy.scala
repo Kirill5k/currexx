@@ -29,7 +29,12 @@ object TestStrategy {
       Indicator.ValueTracking(
         role = ValueRole.Momentum,
         source = ValueSource.Close,
-        transformation = ValueTransformation.STOCH(length = 15)
+        transformation = ValueTransformation.STOCH(length = 14)
+      ),
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 14,
+        smoothingType = ValueTransformation.SMA(length = 20),
+        smoothingLength = 20
       )
     ),
     rules = TradeStrategy(
@@ -40,7 +45,8 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsUpward,
-            Rule.Condition.TrendActiveFor(2.hours),
+            Rule.Condition.TrendActiveFor(1.hour),
+            Rule.Condition.volatilityIsHigh,
             // The original logic was good, and now it's robust because we have ValueTracking.
             Rule.Condition.anyOf(
               Rule.Condition.MomentumEntered(MomentumZone.Neutral),
@@ -55,7 +61,8 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsDownward,
-            Rule.Condition.TrendActiveFor(2.hours),
+            Rule.Condition.TrendActiveFor(1.hour),
+            Rule.Condition.volatilityIsHigh,
             Rule.Condition.anyOf(
               Rule.Condition.MomentumEntered(MomentumZone.Neutral),
               Rule.Condition.MomentumIs(Direction.Downward)
