@@ -26,10 +26,10 @@ object Optimizer extends IOApp.Simple {
   )
 
   val testDataSets    = MarketDataProvider.majors1h
-  val strategy        = TestStrategy.s1
+  val strategy        = TestStrategy.s2
   val otherIndicators = Nil
 
-  val scoringFunction = ScoringFunction.averageWinLossRatio(Some(50), Some(500))
+  val scoringFunction = ScoringFunction.medianWinLossRatio(Some(50), Some(500))
 
   override def run: IO[Unit] = for
     _       <- IO.println(s"Starting optimization of ${strategy.indicator}; starting time - ${Instant.now}")

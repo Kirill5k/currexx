@@ -11,7 +11,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 object Backtester extends IOApp.Simple {
   inline given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
-  val testStrategy = TestStrategy.s1
+  val testStrategy = TestStrategy.s2
 
   override val run: IO[Unit] =
     Stream
