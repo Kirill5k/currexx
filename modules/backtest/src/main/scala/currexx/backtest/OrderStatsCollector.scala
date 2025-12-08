@@ -40,13 +40,13 @@ final case class OrderStats(
   override def toString: String =
     s"""OrderStats(
        |totalProfit=$totalProfit,
+       |totalOrders=$total,
        |winLossRatio=$winLossRatio,
        |meanProfitByMonth=$meanProfitByMonth,
        |medianProfitByMonth=$medianProfitByMonth,
        |biggestWin=$biggestWin,
        |biggestLoss=$biggestLoss,
        |meanLoss=$meanLoss,
-       |totalOrders=$total,
        |buys=$buys,
        |sells=$sells,
        |losses=${losses.size}
