@@ -32,7 +32,7 @@ object TestStrategy {
         transformation = ValueTransformation.STOCH(length = 14)
       ),
       Indicator.VolatilityRegimeDetection(
-        atrLength = 14,
+        atrLength = 10,
         smoothingType = ValueTransformation.SMA(length = 20),
         smoothingLength = 20
       )
