@@ -33,18 +33,23 @@ final case class OrderStats(
         profitByMonth + (date -> (profitByMonth.getOrElse(date, BigDecimal(0)) + profit))
       }
     )
+  def winLossRatio: BigDecimal =
+    if (losses.size == 0) BigDecimal(0)
+    else (BigDecimal(total - losses.size) / BigDecimal(losses.size)).roundTo(5)
+
   override def toString: String =
     s"""OrderStats(
        |totalProfit=$totalProfit,
-       |medianProfitByMonth=$medianProfitByMonth,
+       |winLossRatio=$winLossRatio,
        |meanProfitByMonth=$meanProfitByMonth,
+       |medianProfitByMonth=$medianProfitByMonth,
+       |biggestWin=$biggestWin,
+       |biggestLoss=$biggestLoss,
+       |meanLoss=$meanLoss,
        |totalOrders=$total,
        |buys=$buys,
        |sells=$sells,
-       |losses=${losses.size},
-       |biggestWin=$biggestWin,
-       |meanLoss=$meanLoss,
-       |biggestLoss=$biggestLoss
+       |losses=${losses.size}
        |)""".stripMargin.replaceAll("\n", "")
 
 object OrderStatsCollector:
