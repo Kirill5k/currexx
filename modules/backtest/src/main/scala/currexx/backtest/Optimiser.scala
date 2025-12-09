@@ -3,7 +3,7 @@ package currexx.backtest
 import cats.Show
 import cats.effect.{IO, IOApp}
 import cats.syntax.traverse.*
-import currexx.algorithms.{EvaluatedPopulation, Parameters}
+import currexx.algorithms.Parameters
 import currexx.algorithms.operators.{Elitism, Selector}
 import currexx.domain.signal.Indicator
 import currexx.backtest.optimizer.*
@@ -32,16 +32,16 @@ object Optimiser extends IOApp.Simple {
   val scoringFunction = ScoringFunction.medianWinLossRatio(Some(50), Some(500))
 
   override def run: IO[Unit] = for
-    _       <- IO.println(s"Starting optimization of ${strategy.indicator}; starting time - ${Instant.now}")
-    startTs <- IO.monotonic
-    init    <- IndicatorInitialiser.make[IO]
-    cross   <- IndicatorCrossover.make[IO]
-    mut     <- IndicatorMutator.make[IO]
-    eval    <- IndicatorEvaluator.make[IO](testDataSets, strategy.rules, scoringFunction = scoringFunction)
-    sel     <- Selector.tournament[IO, Indicator]
-    elit    <- Elitism.simple[IO, Indicator]
-    updateFn = (currentGen: Int, maxGen: Int, _: EvaluatedPopulation[Indicator]) => IO.whenA(currentGen % 10 == 0)(IO.println(s"$currentGen out of $maxGen"))
-    res   <- OptimisationAlgorithm.ga[IO, Indicator](init, cross, mut, eval, sel, elit, updateFn).optimise(strategy.indicator, gaParameters)
+    _        <- IO.println(s"Starting optimization of ${strategy.indicator}; starting time - ${Instant.now}")
+    startTs  <- IO.monotonic
+    init     <- IndicatorInitialiser.make[IO]
+    cross    <- IndicatorCrossover.make[IO]
+    mut      <- IndicatorMutator.make[IO]
+    eval     <- IndicatorEvaluator.make[IO](testDataSets, strategy.rules, scoringFunction = scoringFunction)
+    sel      <- Selector.tournament[IO, Indicator]
+    elit     <- Elitism.simple[IO, Indicator]
+    progress <- ProgressTracker.make[IO, Indicator](logInterval = 5, showTopMember = true, showTopN = 3)
+    res      <- OptimisationAlgorithm.ga[IO, Indicator](init, cross, mut, eval, sel, elit, progress.update).optimise(strategy.indicator, gaParameters)
     endTs <- IO.monotonic
     _     <- IO.println(s"Total duration ${(endTs - startTs).toMinutes}m")
     _     <- res.zipWithIndex.take(25).traverse { case ((ind, f), i) => IO.println(s"${i + 1}: $f - $ind") }
