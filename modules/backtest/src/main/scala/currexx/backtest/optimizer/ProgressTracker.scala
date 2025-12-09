@@ -4,7 +4,8 @@ import cats.effect.Async
 import currexx.algorithms.{EvaluatedPopulation, Fitness}
 
 trait ProgressTracker[F[_], T]:
-  def update(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[T]): F[Unit]
+  def displayProgress(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[T]): F[Unit]
+  def displayFinal(population: EvaluatedPopulation[T], topN: Int): F[Unit]
 
 object ProgressTracker:
 
@@ -31,39 +32,19 @@ object ProgressTracker:
   def make[F[_]: Async, T](
       logInterval: Int = 10,
       showTopMember: Boolean = true,
-      showTopN: Int = 1
+      showTopN: Int = 1,
+      showStats: Boolean = false
   ): F[ProgressTracker[F, T]] =
     Async[F].pure {
       new ProgressTracker[F, T]:
-        override def update(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[T]): F[Unit] =
+        override def displayProgress(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[T]): F[Unit] =
           Async[F].whenA(currentGen % logInterval == 0) {
             val progress   = progressMsg(currentGen, maxGen)
-            val topMembers = if (showTopMember && population.nonEmpty) membersMsg(population, showTopN) else ""
-            Async[F].delay(println(s"$progress\n$topMembers"))
+            val topMembers = if (showTopMember && population.nonEmpty) "\n" + membersMsg(population, showTopN) else ""
+            val stats = if (showStats) "\n" + statsMsg(population) else ""
+            Async[F].delay(println(s"$progress$topMembers$stats"))
           }
-    }
 
-  def simple[F[_]: Async, T](logInterval: Int = 10): F[ProgressTracker[F, T]] =
-    Async[F].pure {
-      new ProgressTracker[F, T]:
-        override def update(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[T]): F[Unit] =
-          Async[F].whenA(currentGen % logInterval == 0) {
-            Async[F].delay(println(progressMsg(currentGen, maxGen)))
-          }
-    }
-
-  def detailed[F[_]: Async, T](
-      logInterval: Int = 10,
-      showTopN: Int = 5,
-      showStats: Boolean = true
-  ): F[ProgressTracker[F, T]] =
-    Async[F].pure {
-      new ProgressTracker[F, T]:
-        override def update(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[T]): F[Unit] =
-          Async[F].whenA(currentGen % logInterval == 0) {
-            val progress = progressMsg(currentGen, maxGen)
-            val members  = membersMsg(population, showTopN)
-            val stats    = if (showStats) statsMsg(population) else ""
-            Async[F].delay(println(s"$progress\n$members\n$stats"))
-          }
+        override def displayFinal(population: EvaluatedPopulation[T], topN: Int): F[Unit] =
+          Async[F].delay(println(s"Final top $topN members:\n${membersMsg(population, topN)}\n${statsMsg(population)}"))
     }
