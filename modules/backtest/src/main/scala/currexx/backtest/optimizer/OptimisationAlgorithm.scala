@@ -17,7 +17,7 @@ object OptimisationAlgorithm:
       evaluator: Evaluator[F, T],
       selector: Selector[F, T],
       elitism: Elitism[F, T],
-      updateFn: (Int, Int) => F[Unit]
+      updateFn: (Int, Int, EvaluatedPopulation[T]) => F[Unit]
   ): OptimisationAlgorithm[F, Alg.GA, Parameters.GA, T] = new OptimisationAlgorithm[F, Alg.GA, Parameters.GA, T]:
     override def optimise(target: T, params: Parameters.GA)(using rand: Random): F[EvaluatedPopulation[T]] =
       Algorithm.GA

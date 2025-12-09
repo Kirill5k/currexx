@@ -42,14 +42,14 @@ type DistributedPopulation[I] = Vector[(I, I)]
 enum Op[A, I]:
   case UpdateOnProgress[I](iteration: Int, maxGen: Int, population: EvaluatedPopulation[I]) extends Op[Unit, I]
   case InitPopulation[I](seed: I, size: Int, shuffle: Boolean)                              extends Op[Population[I], I]
-  case Cross[I](ind1: I, ind2: I, prob: Double)                                         extends Op[I, I]
-  case Mutate[I](ind: I, prob: Double)                                                  extends Op[I, I]
-  case EvaluateOne[I](ind: I)                                                           extends Op[(I, Fitness), I]
-  case EvaluatePopulation[I](population: Population[I])                                 extends Op[EvaluatedPopulation[I], I]
-  case SelectElites[I](population: EvaluatedPopulation[I], popSize: Int, ratio: Double) extends Op[Population[I], I]
-  case SelectPairs[I](population: EvaluatedPopulation[I], limit: Int)                   extends Op[DistributedPopulation[I], I]
-  case SortByFitness[I](population: EvaluatedPopulation[I])                             extends Op[EvaluatedPopulation[I], I]
-  case ApplyToAll[A, B, I](population: Population[A], op: A => Op[B, I])                extends Op[Population[B], I]
+  case Cross[I](ind1: I, ind2: I, prob: Double)                                             extends Op[I, I]
+  case Mutate[I](ind: I, prob: Double)                                                      extends Op[I, I]
+  case EvaluateOne[I](ind: I)                                                               extends Op[(I, Fitness), I]
+  case EvaluatePopulation[I](population: Population[I])                                     extends Op[EvaluatedPopulation[I], I]
+  case SelectElites[I](population: EvaluatedPopulation[I], popSize: Int, ratio: Double)     extends Op[Population[I], I]
+  case SelectPairs[I](population: EvaluatedPopulation[I], limit: Int)                       extends Op[DistributedPopulation[I], I]
+  case SortByFitness[I](population: EvaluatedPopulation[I])                                 extends Op[EvaluatedPopulation[I], I]
+  case ApplyToAll[A, B, I](population: Population[A], op: A => Op[B, I])                    extends Op[Population[B], I]
 
 object Op:
   extension [A, I](fa: Op[A, I]) def freeM: Free[Op[*, I], A] = Free.liftF(fa)
@@ -61,13 +61,13 @@ object Op:
       evaluator: Evaluator[F, I],
       selector: Selector[F, I],
       elitism: Elitism[F, I],
-      updateFn: Option[(Int, Int) => F[Unit]]
+      updateFn: Option[(Int, Int, EvaluatedPopulation[I]) => F[Unit]]
   )(using F: Async[F], rand: Random)
       extends ~>[Op[*, I], F] {
     def apply[A](fa: Op[A, I]): F[A] =
       fa match
-        case Op.UpdateOnProgress(iteration, maxGen, _) =>
-          updateFn.fold(F.unit)(f => f(iteration, maxGen))
+        case Op.UpdateOnProgress(iteration, maxGen, evPop) =>
+          updateFn.fold(F.unit)(f => f(iteration, maxGen, evPop))
         case Op.InitPopulation(seed, size, shuffle) =>
           initialiser.initialisePopulation(seed, size, shuffle)
         case Op.Cross(ind1, ind2, prob) =>
@@ -98,6 +98,6 @@ object Op:
       evaluator: Evaluator[F, I],
       selector: Selector[F, I],
       elitism: Elitism[F, I],
-      updateFn: Option[(Int, Int) => F[Unit]] = None
+      updateFn: Option[(Int, Int, EvaluatedPopulation[I]) => F[Unit]] = None
   )(using F: Async[F], rand: Random): Op[*, I] ~> F =
     new OpInterpreter[F, I](initialiser, crossover, mutator, evaluator, selector, elitism, updateFn)

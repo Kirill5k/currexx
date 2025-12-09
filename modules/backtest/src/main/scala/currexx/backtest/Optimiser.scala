@@ -3,7 +3,7 @@ package currexx.backtest
 import cats.Show
 import cats.effect.{IO, IOApp}
 import cats.syntax.traverse.*
-import currexx.algorithms.Parameters
+import currexx.algorithms.{EvaluatedPopulation, Parameters}
 import currexx.algorithms.operators.{Elitism, Selector}
 import currexx.domain.signal.Indicator
 import currexx.backtest.optimizer.*
@@ -12,7 +12,7 @@ import currexx.backtest.optimizer.IndicatorEvaluator.ScoringFunction
 import java.time.Instant
 import scala.util.Random
 
-object Optimizer extends IOApp.Simple {
+object Optimiser extends IOApp.Simple {
 
   given Random = Random()
 
@@ -40,7 +40,7 @@ object Optimizer extends IOApp.Simple {
     eval    <- IndicatorEvaluator.make[IO](testDataSets, strategy.rules, scoringFunction = scoringFunction)
     sel     <- Selector.tournament[IO, Indicator]
     elit    <- Elitism.simple[IO, Indicator]
-    updateFn = (currentGen: Int, maxGen: Int) => IO.whenA(currentGen % 10 == 0)(IO.println(s"$currentGen out of $maxGen"))
+    updateFn = (currentGen: Int, maxGen: Int, _: EvaluatedPopulation[Indicator]) => IO.whenA(currentGen % 10 == 0)(IO.println(s"$currentGen out of $maxGen"))
     res   <- OptimisationAlgorithm.ga[IO, Indicator](init, cross, mut, eval, sel, elit, updateFn).optimise(strategy.indicator, gaParameters)
     endTs <- IO.monotonic
     _     <- IO.println(s"Total duration ${(endTs - startTs).toMinutes}m")
