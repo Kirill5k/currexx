@@ -25,21 +25,21 @@ object Algorithm {
   case object GA extends Algorithm[Alg.GA, Parameters.GA] {
     override def optimise[I](target: I, params: Parameters.GA): Free[Op[*, I], EvaluatedPopulation[I]] =
       for
-        pop      <- Op.InitPopulation(target, params.populationSize, params.shuffle).freeM
-        finalPop <- iterate(pop, params.maxGen) { (currentPop, i) =>
+        pop         <- Op.InitPopulation(target, params.populationSize, params.shuffle).freeM
+        initialEval <- Op.EvaluatePopulation(pop).freeM
+        initialSort <- Op.SortByFitness(initialEval).freeM
+        finalPop    <- iterate(initialSort, params.maxGen) { (currentPop, i) =>
           for
-            _           <- Op.UpdateOnProgress(i, params.maxGen).freeM
-            evPop       <- Op.EvaluatePopulation(currentPop).freeM
-            sortedEvPop <- Op.SortByFitness(evPop).freeM
-            elites      <- Op.SelectElites(sortedEvPop, params.populationSize, params.elitismRatio).freeM
-            pairs       <- Op.SelectPairs(sortedEvPop, params.populationSize).freeM
-            crossed1    <- Op.ApplyToAll(pairs, (i1, i2) => Op.Cross(i1, i2, params.crossoverProbability)).freeM
-            crossed2    <- Op.ApplyToAll(pairs, (i1, i2) => Op.Cross(i2, i1, params.crossoverProbability)).freeM
-            mutated     <- Op.ApplyToAll(crossed1 ++ crossed2, i => Op.Mutate(i, params.mutationProbability)).freeM
-          yield mutated ++ elites
+            elites      <- Op.SelectElites(currentPop, params.populationSize, params.elitismRatio).freeM
+            pairs       <- Op.SelectPairs(currentPop, params.populationSize).freeM
+            crossed1    <- Op.ApplyToAll(pairs, pair => Op.Cross(pair._1, pair._2, params.crossoverProbability)).freeM
+            crossed2    <- Op.ApplyToAll(pairs, pair => Op.Cross(pair._2, pair._1, params.crossoverProbability)).freeM
+            mutated     <- Op.ApplyToAll(crossed1 ++ crossed2, ind => Op.Mutate(ind, params.mutationProbability)).freeM
+            evPop       <- Op.EvaluatePopulation(mutated ++ elites).freeM
+            sortedPop   <- Op.SortByFitness(evPop).freeM
+            _           <- Op.UpdateOnProgress(i, params.maxGen, sortedPop).freeM
+          yield sortedPop
         }
-        evPop    <- Op.EvaluatePopulation(finalPop).freeM
-        finalPop <- Op.SortByFitness(evPop).freeM
       yield finalPop
   }
 

@@ -18,24 +18,24 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
 
       result.mkString mustBe
         """Initialise population of size 5 with shuffle=true
+          |Evaluate entire population
+          |Sorting evaluated population by fitness
+          |Select 1.25 elites from the current population
+          |Distribute population in pairs
+          |Applied to the entire population: Crossover 2 individuals with probability 0.5
+          |Applied to the entire population: Crossover 2 individuals with probability 0.5
+          |Applied to the entire population: Mutate individual with probability 0.2
+          |Evaluate entire population
+          |Sorting evaluated population by fitness
           |Iteration 1 of 2
-          |Evaluate entire population
-          |Sorting evaluated population by fitness
           |Select 1.25 elites from the current population
           |Distribute population in pairs
           |Applied to the entire population: Crossover 2 individuals with probability 0.5
           |Applied to the entire population: Crossover 2 individuals with probability 0.5
           |Applied to the entire population: Mutate individual with probability 0.2
+          |Evaluate entire population
+          |Sorting evaluated population by fitness
           |Iteration 2 of 2
-          |Evaluate entire population
-          |Sorting evaluated population by fitness
-          |Select 1.25 elites from the current population
-          |Distribute population in pairs
-          |Applied to the entire population: Crossover 2 individuals with probability 0.5
-          |Applied to the entire population: Crossover 2 individuals with probability 0.5
-          |Applied to the entire population: Mutate individual with probability 0.2
-          |Evaluate entire population
-          |Sorting evaluated population by fitness
           |""".stripMargin
     }
   }
@@ -45,7 +45,7 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
       case Op.InitPopulation(seed, size, shuffle) =>
         State.modify[List[String]](_ :+ s"Initialise population of size $size with shuffle=$shuffle\n") >>
           State.pure(Vector.fill(size)(seed))
-      case Op.UpdateOnProgress(i, maxGen) =>
+      case Op.UpdateOnProgress(i, maxGen, _) =>
         State.modify[List[String]](_ :+ s"Iteration $i of $maxGen\n")
       case Op.Cross(ind1, ind2, prob) =>
         State.modify[List[String]](_ :+ s"Crossover 2 individuals with probability $prob\n") >>

@@ -40,8 +40,8 @@ type EvaluatedPopulation[I]   = Vector[(I, Fitness)]
 type DistributedPopulation[I] = Vector[(I, I)]
 
 enum Op[A, I]:
-  case UpdateOnProgress[I](iteration: Int, maxGen: Int)                                 extends Op[Unit, I]
-  case InitPopulation[I](seed: I, size: Int, shuffle: Boolean)                          extends Op[Population[I], I]
+  case UpdateOnProgress[I](iteration: Int, maxGen: Int, population: EvaluatedPopulation[I]) extends Op[Unit, I]
+  case InitPopulation[I](seed: I, size: Int, shuffle: Boolean)                              extends Op[Population[I], I]
   case Cross[I](ind1: I, ind2: I, prob: Double)                                         extends Op[I, I]
   case Mutate[I](ind: I, prob: Double)                                                  extends Op[I, I]
   case EvaluateOne[I](ind: I)                                                           extends Op[(I, Fitness), I]
@@ -66,7 +66,7 @@ object Op:
       extends ~>[Op[*, I], F] {
     def apply[A](fa: Op[A, I]): F[A] =
       fa match
-        case Op.UpdateOnProgress(iteration, maxGen) =>
+        case Op.UpdateOnProgress(iteration, maxGen, _) =>
           updateFn.fold(F.unit)(f => f(iteration, maxGen))
         case Op.InitPopulation(seed, size, shuffle) =>
           initialiser.initialisePopulation(seed, size, shuffle)
@@ -101,4 +101,3 @@ object Op:
       updateFn: Option[(Int, Int) => F[Unit]] = None
   )(using F: Async[F], rand: Random): Op[*, I] ~> F =
     new OpInterpreter[F, I](initialiser, crossover, mutator, evaluator, selector, elitism, updateFn)
-
