@@ -2,7 +2,7 @@ package currexx.backtest
 
 import cats.Show
 import cats.effect.{IO, IOApp}
-import currexx.algorithms.Parameters
+import currexx.algorithms.{Parameters, ProgressTracker}
 import currexx.algorithms.operators.{Elitism, Selector}
 import currexx.domain.signal.Indicator
 import currexx.backtest.optimizer.*
@@ -38,12 +38,11 @@ object Optimiser extends IOApp.Simple {
     eval    <- IndicatorEvaluator.make[IO](testDataSets, strategy.rules, scoringFunction = scoringFunction)
     sel     <- Selector.tournament[IO, Indicator]
     elit    <- Elitism.simple[IO, Indicator]
-    prog    <- ProgressTracker.make[IO, Indicator](logInterval = 5, showTopMember = true, showTopN = 3)
-    res     <- OptimisationAlgorithm
-      .ga[IO, Indicator](init, cross, mut, eval, sel, elit, prog.displayProgress)
+    prog    <- ProgressTracker.make[IO, Indicator](logInterval = 10, showTopMember = true, showTopN = 3, showStats = false, finalTopN = 25)
+    _       <- OptimisationAlgorithm
+      .ga[IO, Indicator](init, cross, mut, eval, sel, elit, prog)
       .optimise(strategy.indicator, gaParameters)
     endTs <- IO.monotonic
     _     <- IO.println(s"Total duration ${(endTs - startTs).toMinutes}m")
-    _     <- prog.displayFinal(res, topN = 25)
   yield ()
 }

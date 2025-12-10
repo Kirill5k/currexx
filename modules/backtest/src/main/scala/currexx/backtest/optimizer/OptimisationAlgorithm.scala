@@ -17,9 +17,9 @@ object OptimisationAlgorithm:
       evaluator: Evaluator[F, T],
       selector: Selector[F, T],
       elitism: Elitism[F, T],
-      updateFn: (Int, Int, EvaluatedPopulation[T]) => F[Unit]
+      progressTracker: ProgressTracker[F, T]
   ): OptimisationAlgorithm[F, Alg.GA, Parameters.GA, T] = new OptimisationAlgorithm[F, Alg.GA, Parameters.GA, T]:
     override def optimise(target: T, params: Parameters.GA)(using rand: Random): F[EvaluatedPopulation[T]] =
       Algorithm.GA
         .optimise[T](target, params)
-        .foldMap(Op.ioInterpreter[F, T](initialiser, crossover, mutator, evaluator, selector, elitism, Some(updateFn)))
+        .foldMap(Op.ioInterpreter[F, T](initialiser, crossover, mutator, evaluator, selector, elitism, progressTracker))
