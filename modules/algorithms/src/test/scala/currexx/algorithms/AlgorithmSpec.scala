@@ -36,6 +36,7 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
           |Evaluate entire population
           |Sorting evaluated population by fitness
           |Iteration 2 of 2
+          |Final population displayed
           |""".stripMargin
     }
   }
@@ -45,8 +46,10 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
       case Op.InitPopulation(seed, size, shuffle) =>
         State.modify[List[String]](_ :+ s"Initialise population of size $size with shuffle=$shuffle\n") >>
           State.pure(Vector.fill(size)(seed))
-      case Op.UpdateOnProgress(i, maxGen, _) =>
+      case Op.DisplayProgress(i, maxGen, _) =>
         State.modify[List[String]](_ :+ s"Iteration $i of $maxGen\n")
+      case Op.DisplayFinal(_) =>
+        State.modify[List[String]](_ :+ "Final population displayed\n")
       case Op.Cross(ind1, ind2, prob) =>
         State.modify[List[String]](_ :+ s"Crossover 2 individuals with probability $prob\n") >>
           State.pure(ind1)
