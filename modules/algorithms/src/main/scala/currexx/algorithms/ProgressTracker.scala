@@ -1,12 +1,13 @@
 package currexx.algorithms
 
+import cats.Monad
 import cats.effect.Async
 
 trait ProgressTracker[F[_], I]:
   def displayProgress(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[I]): F[Unit]
   def displayFinal(population: EvaluatedPopulation[I]): F[Unit]
 
-object ProgressTracker:
+object ProgressTracker {
 
   private def progressMsg(currentGen: Int, maxGen: Int): String =
     s"Generation $currentGen out of $maxGen"
@@ -41,7 +42,7 @@ object ProgressTracker:
           Async[F].whenA(currentGen % logInterval == 0) {
             val progress   = progressMsg(currentGen, maxGen)
             val topMembers = if (showTopMember && population.nonEmpty) "\n" + membersMsg(population, showTopN) else ""
-            val stats = if (showStats) "\n" + statsMsg(population) else ""
+            val stats      = if (showStats) "\n" + statsMsg(population) else ""
             Async[F].delay(println(s"$progress$topMembers$stats"))
           }
 
@@ -49,3 +50,10 @@ object ProgressTracker:
           Async[F].delay(println(s"Final top $finalTopN members:\n${membersMsg(population, finalTopN)}\n${statsMsg(population)}"))
     }
 
+  def noop[F[_]: Monad, I]: F[ProgressTracker[F, I]] =
+    Monad[F].pure {
+      new ProgressTracker[F, I]:
+        override def displayProgress(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[I]): F[Unit] = Monad[F].unit
+        override def displayFinal(population: EvaluatedPopulation[I]): F[Unit]                                  = Monad[F].unit
+    }
+}
