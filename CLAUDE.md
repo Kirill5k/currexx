@@ -89,9 +89,9 @@ The `ActionDispatcher` queues actions and the `ActionProcessor` handles them asy
 
 ## Trading Strategy System
 
-### Indicators
+### Indicators (`Indicator`)
 
-Indicators define what to detect in market data (modules/domain/src/main/scala/currexx/domain/signal/Indicator.scala):
+Indicators define what to detect in market data: (Defined in `modules/domain/src/main/scala/currexx/domain/signal/Indicator.scala`)
 - **Composite** - Combine multiple indicators with All/Any logic
 - **TrendChangeDetection** - Detect trend reversals
 - **ThresholdCrossing** - Value crossing upper/lower boundaries (e.g., RSI overbought/oversold)
@@ -101,13 +101,16 @@ Indicators define what to detect in market data (modules/domain/src/main/scala/c
 - **ValueTracking** - Track specific calculated values (momentum, velocity, volatility)
 - **PriceLineCrossing** - Price crossing a calculated line
 
-### Value Transformations
+### Value Transformations (`ValueTransformation`)
 
-Applied to price sources to calculate indicators:
+Mathematical functions applied to price data to calculate indicators: (Defined in `modules/domain/src/main/scala/currexx/domain/signal/Indicator.scala`)
 - Moving Averages: SMA, EMA, WMA, HMA, NMA (Nyquist), JMA (Jurik)
 - Oscillators: RSX, JRSX (Jurik RSI), STOCH (Stochastic)
 - Filters: Kalman (smoothing), KalmanVelocity (momentum)
 - Statistical: StandardDeviation, ATR
+
+### Price Sources
+- Close, Open, HL2, HLC3.
 
 ### Trading Rules
 
@@ -125,17 +128,19 @@ Strategies are defined in `TradeStrategy` (modules/core/src/main/scala/currexx/c
 
 The `backtest` module provides a genetic algorithm for discovering optimal strategy parameters:
 1. **Population** - Generate random parameter sets
-2. **Backtesting** - Evaluate each parameter set against historical data
+2. **Evaluation** - Evaluate each parameter set against historical data
 3. **Selection** - Keep best-performing strategies
 4. **Crossover** - Breed new strategies from successful ones
 5. **Mutation** - Introduce random variations
 6. **Evolution** - Repeat for hundreds of generations
 
-Run via `sbt "backtest/runMain currexx.backtest.Backtester"`
+Run via Optimiser: `sbt "backtest/runMain currexx.backtest.Optimiser"`
+
+Testing a strategy against historical set of data via Backtester: `sbt "backtest/runMain currexx.backtest.Backtester"`
 
 ## Key Technologies
 
-- **Language**: Scala 3.7.2
+- **Language**: Scala 3.7.4
 - **Effect System**: Cats Effect 3, FS2 streams
 - **Functional**: Cats Free (Free Monad for algorithms)
 - **HTTP**: Tapir (endpoint definitions) + Http4s (server) + Sttp4 (clients)
