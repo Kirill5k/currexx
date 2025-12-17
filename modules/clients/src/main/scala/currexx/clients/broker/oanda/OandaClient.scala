@@ -15,7 +15,7 @@ import kirill5k.common.cats.Clock
 import org.typelevel.log4cats.Logger
 import sttp.capabilities.fs2.Fs2Streams
 import sttp.client4.*
-import sttp.client4.circe.{asJson, asJsonEither}
+import sttp.client4.circe.asJson
 import sttp.client4.WebSocketStreamBackend
 import sttp.model.StatusCode
 
@@ -66,7 +66,7 @@ final private class LiveOandaClient[F[_]](
         .get(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/positions")
         .auth
         .bearer(params.apiKey)
-        .response(asJsonEither[OandaClient.ErrorResponse, OandaClient.PositionsResponse])
+        .response(asJson[OandaClient.PositionsResponse])
     }.flatMap { r =>
       r.body match
         case Right(res) => F.pure(res.positions)
@@ -79,7 +79,7 @@ final private class LiveOandaClient[F[_]](
         .get(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/positions/${currencyPair.toInstrument}")
         .auth
         .bearer(params.apiKey)
-        .response(asJsonEither[OandaClient.ErrorResponse, OandaClient.PositionResponse])
+        .response(asJson[OandaClient.PositionResponse])
     }.flatMap { r =>
       r.body match
         case Right(res) =>
@@ -97,7 +97,7 @@ final private class LiveOandaClient[F[_]](
         .auth
         .bearer(params.apiKey)
         .body(asJson(position.toClosePositionRequest))
-        .response(asJsonEither[OandaClient.ErrorResponse, OandaClient.ClosePositionResponse])
+        .response(asJson[OandaClient.ClosePositionResponse])
     }.flatMap { r =>
       r.body match {
         case Right(_)  => F.unit
@@ -129,7 +129,7 @@ final private class LiveOandaClient[F[_]](
         .get(uri"${config.baseUri(params.demo)}/v3/accounts")
         .auth
         .bearer(params.apiKey)
-        .response(asJsonEither[OandaClient.ErrorResponse, OandaClient.AccountsResponse])
+        .response(asJson[OandaClient.AccountsResponse])
     }.flatMap { r =>
       r.body match
         case Right(res) if res.accounts.exists(_.id == params.accountId) => F.pure(params.accountId)
@@ -137,14 +137,15 @@ final private class LiveOandaClient[F[_]](
         case Left(err) => handleError("get-account", err)
     }
 
-  private def handleError[A](endpoint: String, error: ResponseException[OandaClient.ErrorResponse]): F[A] =
+  private def handleError[A](endpoint: String, error: Any): F[A] =
     error match
       case ResponseException.DeserializationException(responseBody, error, _) =>
         logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
           F.raiseError(AppError.JsonParsingFailure(responseBody, s"${name} client returned $error"))
       case ResponseException.UnexpectedStatusCode(body, meta) =>
-        logger.error(s"$name-client/${meta.code.code}: ${body.errorMessage}") >>
-          F.raiseError(AppError.ClientFailure(name, s"$endpoint returned ${meta.code}: ${body.errorMessage}"))
+        val errorMessage = body.toString.trim
+        logger.error(s"$name-client/${meta.code.code}: $errorMessage") >>
+          F.raiseError(AppError.ClientFailure(name, s"$endpoint returned ${meta.code}: $errorMessage"))
 
   extension (cp: CurrencyPair) private def toInstrument: String = s"${cp.base}_${cp.quote}"
 
