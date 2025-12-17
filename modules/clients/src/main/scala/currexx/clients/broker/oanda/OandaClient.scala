@@ -45,11 +45,7 @@ final private class LiveOandaClient[F[_]](
       for
         accountId <- getAccountId(params)
         position  <- getPosition(accountId, params, exit.currencyPair)
-        _         <- position match {
-          case None                     => F.unit
-          case Some(pos) if !pos.isOpen => F.unit
-          case Some(pos)                => closePosition(accountId, params, pos)
-        }
+        _         <- F.whenA(position.exists(_.isOpen))(closePosition(accountId, params, position.get))
       yield ()
 
   override def getCurrentOrders(params: BrokerParameters.Oanda, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]] =
