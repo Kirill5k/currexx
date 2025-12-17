@@ -225,5 +225,39 @@ class OandaClientSpec extends Sttp4WordSpec {
 
       result.assertThrows(AppError.ClientFailure("oanda", s"Account id 123 does not exist"))
     }
+
+    "retry on server errors and eventually succeed" in {
+      val testingBackend = fs2BackendStub
+        .whenRequestMatches(_.hasPath("/v3/accounts"))
+        .thenRespondCyclic(
+          ResponseStub.adjust("Server error", StatusCode.InternalServerError),
+          ResponseStub.adjust("Server error", StatusCode.InternalServerError),
+          ResponseStub.adjust(readJson("oanda/accounts-success-response.json"))
+        )
+        .whenRequestMatches(_.hasPath("/v3/accounts/123-456-789/positions"))
+        .thenRespond(ResponseStub.adjust(readJson("oanda/positions-success-response.json")))
+
+      val result = for
+        client <- OandaClient.make[IO](config, testingBackend)
+        orders <- client.getCurrentOrders(params, NonEmptyList.of(eurUsdPair, gbpUsdPair))
+      yield orders
+
+      result.asserting { orders =>
+        orders must have size 2
+      }
+    }
+
+    "retry on server errors and fail after max retries" in {
+      val testingBackend = fs2BackendStub
+        .whenRequestMatches(_.hasPath("/v3/accounts"))
+        .thenRespondCyclic(ResponseStub.adjust("Server error", StatusCode.ServiceUnavailable))
+
+      val result = for
+        client <- OandaClient.make[IO](config, testingBackend)
+        orders <- client.getCurrentOrders(params, NonEmptyList.of(eurUsdPair))
+      yield orders
+
+      result.assertThrows(AppError.ClientFailure("oanda", "get-account returned 503: Server error"))
+    }
   }
 }
