@@ -3,6 +3,7 @@ package currexx.clients
 import cats.effect.Temporal
 import cats.syntax.applicativeError.*
 import cats.syntax.apply.*
+import cats.syntax.flatMap.*
 import fs2.Stream
 import org.typelevel.log4cats.Logger
 import sttp.capabilities.fs2.Fs2Streams
@@ -43,6 +44,15 @@ trait Fs2HttpClient[F[_]] {
   ): F[Response[T]] =
     request
       .send[F](backend)
+      .flatMap { response =>
+        if (response.code.code >= 500 && attempt < maxRetries) {
+          val message = s"$name-client/server-error-${response.code.code}-attempt-$attempt: ${response.body}"
+          (if (attempt >= 50 && attempt % 10 == 0) logger.error(message) else logger.warn(message)) *>
+            F.sleep(calculateBackoffDelay(attempt)) *> dispatchWithRetry(request, attempt + 1, maxRetries)
+        } else {
+          F.pure(response)
+        }
+      }
       .handleErrorWith { error =>
         if (attempt < maxRetries) {
           val cause   = Option(error.getCause).getOrElse(error)
