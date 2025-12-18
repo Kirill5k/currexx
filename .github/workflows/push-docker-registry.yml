@@ -29,4 +29,4 @@ jobs:
       - name: Setup sbt
         uses: sbt/setup-sbt@v1
       - name: Build and push Docker images
-        run: sbt docker:publish
+        run: sbt "project core" docker:publish
