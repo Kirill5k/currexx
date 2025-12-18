@@ -95,10 +95,9 @@ final private class LiveOandaClient[F[_]](
         .body(asJson(position.toClosePositionRequest))
         .response(asJson[OandaClient.ClosePositionResponse])
     }.flatMap { r =>
-      r.body match {
+      r.body match
         case Right(_)  => F.unit
         case Left(err) => handleError("close-position", err)
-      }
     }
 
   private def openPosition(accountId: String, params: BrokerParameters.Oanda, position: TradeOrder.Enter): F[Unit] =
@@ -110,13 +109,12 @@ final private class LiveOandaClient[F[_]](
         .body(asJson(OandaClient.OpenPositionRequest.from(position)))
         .response(asStringAlways)
     }.flatMap { r =>
-      r.code match {
+      r.code match
         case StatusCode.Created   => F.unit
         case StatusCode.Forbidden => clock.sleep(30.seconds) >> openPosition(accountId, params, position)
         case status               =>
           logger.error(s"$name-client/open-position-${status.code}\n${r.body}") >>
             F.raiseError(AppError.ClientFailure(name, s"Open position returned ${status.code}"))
-      }
     }
 
   private def getAccountId(params: BrokerParameters.Oanda): F[String] =
@@ -226,8 +224,6 @@ object OandaClient {
       trueUnrealizedPL: BigDecimal,
       unrealizedPL: BigDecimal
   ) derives Codec.AsObject
-
-  final case class ErrorResponse(errorMessage: String) derives Codec.AsObject
 
   def make[F[_]: {Async, Logger, Clock}](
       config: OandaConfig,

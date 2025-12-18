@@ -47,18 +47,14 @@ trait Fs2HttpClient[F[_]] {
       .flatMap { response =>
         if (response.code.code >= 500 && attempt < maxRetries) {
           val message = s"$name-client/server-error-${response.code.code}-attempt-$attempt: ${response.body}"
-          (if (attempt >= 50 && attempt % 10 == 0) logger.error(message) else logger.warn(message)) *>
-            F.sleep(calculateBackoffDelay(attempt)) *> dispatchWithRetry(request, attempt + 1, maxRetries)
-        } else {
-          F.pure(response)
-        }
+          logger.warn(message) *> F.sleep(calculateBackoffDelay(attempt)) *> dispatchWithRetry(request, attempt + 1, maxRetries)
+        } else F.pure(response)
       }
       .handleErrorWith { error =>
         if (attempt < maxRetries) {
           val cause   = Option(error.getCause).getOrElse(error)
           val message = s"$name-client/${cause.getClass.getSimpleName.toLowerCase}-$attempt: ${cause.getMessage}\n$error"
-          (if (attempt >= 50 && attempt % 10 == 0) logger.error(message) else logger.warn(message)) *>
-            F.sleep(calculateBackoffDelay(attempt)) *> dispatchWithRetry(request, attempt + 1, maxRetries)
+          logger.warn(message) *> F.sleep(calculateBackoffDelay(attempt)) *> dispatchWithRetry(request, attempt + 1, maxRetries)
         } else F.raiseError(error)
       }
 
