@@ -10,18 +10,23 @@ jobs:
       DOCKER_REPO_URI: "registry.hub.docker.com"
       DOCKER_USERNAME: "kirill1"
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
+      - name: Checkout current branch
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: Login to Container Registry
-        uses: docker/login-action@v1
+        uses: docker/login-action@v3
         with:
-          registry: "registry.hub.docker.com"
-          username: "kirill1"
+          registry: ${{ env.DOCKER_REPO_URI }}
+          username: ${{ env.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_API_KEY }}
-
-      - uses: olafurpg/setup-scala@v11
+      - name: Setup Java
+        uses: actions/setup-java@v5
         with:
-          java-version: amazon-corretto@1.17
+          distribution: temurin
+          java-version: 25
+          cache: sbt
+      - name: Setup sbt
+        uses: sbt/setup-sbt@v1
       - name: Build and push Docker images
-        run: sbt "project core" docker:publish
+        run: sbt docker:publish
