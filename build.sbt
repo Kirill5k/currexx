@@ -8,7 +8,6 @@ ThisBuild / organization                        := "io.github.kirill5k"
 ThisBuild / githubWorkflowPublishTargetBranches := Nil
 ThisBuild / githubWorkflowJavaVersions          := Seq(JavaSpec.temurin("25"))
 ThisBuild / scalacOptions ++= Seq("-Wunused:all", "-Xmax-inlines:256")
-ThisBuild / Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
 
 val noPublish = Seq(
   publish         := {},
@@ -36,41 +35,45 @@ val docker = Seq(
   }
 )
 
+val common = Seq(
+  Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
+)
+
 val domain = project
   .in(file("modules/domain"))
+  .settings(common)
   .settings(
     name       := "currexx-domain",
     moduleName := "currexx-domain",
-    libraryDependencies ++= Dependencies.domain ++ Dependencies.test,
-    Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
+    libraryDependencies ++= Dependencies.domain ++ Dependencies.test
   )
 
 val algorithms = project
   .in(file("modules/algorithms"))
+  .settings(common)
   .settings(
     name       := "currexx-algorithms",
     moduleName := "currexx-algorithms",
-    libraryDependencies ++= Dependencies.algorithms ++ Dependencies.test,
-    Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
+    libraryDependencies ++= Dependencies.algorithms ++ Dependencies.test
   )
 
 val calculations = project
   .in(file("modules/calculations"))
+  .settings(common)
   .settings(
     name       := "currexx-calculations",
     moduleName := "currexx-calculations",
     libraryDependencies ++= Dependencies.calculations ++ Dependencies.test,
-    Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
   )
 
 val clients = project
   .in(file("modules/clients"))
   .dependsOn(domain)
+  .settings(common)
   .settings(
     name       := "currexx-clients",
     moduleName := "currexx-clients",
     libraryDependencies ++= Dependencies.clients ++ Dependencies.test,
-    Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
   )
 
 val core = project
@@ -78,21 +81,21 @@ val core = project
   .enablePlugins(JavaAppPackaging, JavaAgent, DockerPlugin)
   .dependsOn(domain % "compile->compile;test->test", clients, calculations)
   .settings(docker)
+  .settings(common)
   .settings(
     name       := "currexx-core",
     moduleName := "currexx-core",
     libraryDependencies ++= Dependencies.core,
-    Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
   )
 
 val backtest = project
   .in(file("modules/backtest"))
   .dependsOn(core, algorithms)
+  .settings(common)
   .settings(
     name       := "currexx-backtest",
     moduleName := "currexx-backtest",
     libraryDependencies ++= Dependencies.test,
-    Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement,
     Compile / run / fork := true
   )
 
