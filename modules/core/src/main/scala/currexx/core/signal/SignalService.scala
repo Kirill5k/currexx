@@ -11,6 +11,7 @@ import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.domain.market.{CurrencyPair, MarketTimeSeriesData}
 import currexx.domain.signal.Indicator
 import kirill5k.common.cats.Clock
+import org.typelevel.log4cats.Logger
 
 trait SignalService[F[_]]:
   def submit(signal: Signal): F[Unit]
@@ -23,7 +24,8 @@ final private class LiveSignalService[F[_]](
     private val dispatcher: ActionDispatcher[F]
 )(using
     F: Concurrent[F],
-    clock: Clock[F]
+    clock: Clock[F],
+    logger: Logger[F]
 ) extends SignalService[F] {
   override def getAll(uid: UserId, sp: SearchParams): F[List[Signal]] = signalRepo.getAll(uid, sp)
   override def submit(signal: Signal): F[Unit] = saveAndDispatchAction(signal.userId, signal.currencyPair, List(signal))
@@ -32,12 +34,14 @@ final private class LiveSignalService[F[_]](
     clock
       .durationBetweenNowAnd(data.prices.head.time)
       .flatMap { timeGap =>
-        F.whenA(timeGap < data.interval.toDuration * 2) {
+        if (timeGap < data.interval.toDuration * 2) {
           for
             settings <- settingsRepo.get(uid)
             signals = settings.indicators.flatMap(detector.detect(uid, data))
             _ <- F.whenA(signals.nonEmpty)(saveAndDispatchAction(uid, data.currencyPair, signals))
           yield ()
+        } else {
+          logger.info(s"Skipping market data processing because of the time gap (time=${data.prices.head.time}, gap=$timeGap)")
         }
       }
 
@@ -47,7 +51,7 @@ final private class LiveSignalService[F[_]](
 }
 
 object SignalService:
-  def make[F[_]: {Concurrent, Clock}](
+  def make[F[_]: {Concurrent, Clock, Logger}](
       signalRepo: SignalRepository[F],
       settingsRepo: SignalSettingsRepository[F],
       dispatcher: ActionDispatcher[F]

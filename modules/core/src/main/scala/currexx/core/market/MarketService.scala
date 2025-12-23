@@ -57,6 +57,7 @@ final private class LiveMarketService[F[_]](
         val timeGap = previousCandle.time.durationBetween(latestCandle.time)
         F.whenA(timeGap > (data.interval.toDuration * 2)) {
           stateRepo.find(uid, cp).flatMap {
+            //TODO: Update ALL states
             case Some(previousState) =>
               val shiftedProfile = previousState.profile.copy(
                 trend = previousState.profile.trend.map(s => s.copy(confirmedAt = s.confirmedAt.plus(timeGap))),

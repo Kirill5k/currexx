@@ -11,11 +11,14 @@ import currexx.domain.signal.{Condition, Direction, Indicator}
 import currexx.domain.user.UserId
 import kirill5k.common.cats.Clock
 import kirill5k.common.cats.test.IOWordSpec
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import java.time.temporal.ChronoUnit
 
 class SignalServiceSpec extends IOWordSpec {
-
+  given Logger[IO] = Slf4jLogger.getLogger[IO]
+  
   "A SignalService" when {
     "submit" should {
       "store new signal in the repository and dispatch an action" in {
