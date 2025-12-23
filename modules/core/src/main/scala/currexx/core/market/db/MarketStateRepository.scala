@@ -18,6 +18,7 @@ import mongo4cats.database.MongoDatabase
 trait MarketStateRepository[F[_]]:
   def update(uid: UserId, pair: CurrencyPair, profile: MarketProfile): F[MarketState]
   def update(uid: UserId, pair: CurrencyPair, position: Option[PositionState]): F[MarketState]
+  def update(uid: UserId, pair: CurrencyPair, profile: MarketProfile, position: Option[PositionState]): F[MarketState]
   def getAll(uid: UserId): F[List[MarketState]]
   def deleteAll(uid: UserId): F[Unit]
   def delete(uid: UserId, cp: CurrencyPair): F[Unit]
@@ -48,6 +49,22 @@ final private class LiveMarketStateRepository[F[_]](
           .currentDate(Repository.Field.LastUpdatedAt)
           .setOnInsert("userId", uid.toObjectId)
           .setOnInsert("currencyPair", cp)
+          .setOnInsert("createdAt", java.time.Instant.now()),
+        updateOptions
+      )
+      .flatMap(opt => F.fromOption(opt, AppError.Internal("could not upsert market state")))
+      .map(_.toDomain)
+
+  override def update(uid: UserId, pair: CurrencyPair, profile: MarketProfile, position: Option[PositionState]): F[MarketState] =
+    collection
+      .findOneAndUpdate(
+        userIdAndCurrencyPairEq(uid, pair),
+        Update
+          .set("profile", profile)
+          .set("currentPosition", position)
+          .currentDate(Repository.Field.LastUpdatedAt)
+          .setOnInsert("userId", uid.toObjectId)
+          .setOnInsert("currencyPair", pair)
           .setOnInsert("createdAt", java.time.Instant.now()),
         updateOptions
       )

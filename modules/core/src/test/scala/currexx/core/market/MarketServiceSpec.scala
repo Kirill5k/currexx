@@ -153,7 +153,7 @@ class MarketServiceSpec extends IOWordSpec {
       "fastforward confirmedAt when the gap between latest and 2nd to latest candle is greater than interval" in {
         val (stateRepo, disp) = mocks
         when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnIO(Some(Markets.state))
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[MarketProfile])).thenReturnIO(Markets.state)
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[MarketProfile], any[Option[PositionState]])).thenReturnIO(Markets.state)
 
         val dataWithGap = Markets.timeSeriesData.copy(
           prices = Markets.priceRanges.head.copy(time = Markets.ts.plus(1.day)) :: Markets.priceRanges
@@ -169,8 +169,43 @@ class MarketServiceSpec extends IOWordSpec {
           verify(stateRepo).update(
             Users.uid,
             Markets.gbpeur,
-            MarketProfile(trend = Some(TrendState(Direction.Upward, Markets.ts.plus(1.day))))
+            MarketProfile(trend = Some(TrendState(Direction.Upward, Markets.ts.plus(1.day))), lastBandCrossing = None, lastPriceLineCrossing = None, crossover = None),
+            Some(PositionState(TradeOrder.Position.Buy, Markets.ts.plus(1.day)))
           )
+          disp.submittedActions mustBe empty
+          res mustBe ()
+        }
+      }
+
+      "not shift timestamps if they have already been shifted (would result in future timestamp)" in {
+        val (stateRepo, disp) = mocks
+
+        // State is already shifted: confirmedAt is at ts + 1 day
+        val alreadyShiftedProfile = MarketProfile(
+          trend = Some(TrendState(Direction.Upward, Markets.ts.plus(1.day))),
+          momentum = None, // Simplified
+          volatility = None,
+          crossover = None,
+          lastBandCrossing = None,
+          lastPriceLineCrossing = None
+        )
+        val alreadyShiftedState = Markets.state.copy(profile = alreadyShiftedProfile, currentPosition = Some(PositionState(TradeOrder.Position.Buy, Markets.ts.plus(1.day))))
+
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnIO(Some(alreadyShiftedState))
+
+        // Data shows the gap that caused the shift
+        val dataWithGap = Markets.timeSeriesData.copy(
+          prices = Markets.priceRanges.head.copy(time = Markets.ts.plus(1.day)) :: Markets.priceRanges
+        )
+
+        val result = for
+          svc   <- MarketService.make[IO](stateRepo, disp)
+          state <- svc.updateTimeState(Users.uid, dataWithGap)
+        yield state
+
+        result.asserting { res =>
+          verify(stateRepo).find(Users.uid, Markets.gbpeur)
+          verifyNoMoreInteractions(stateRepo) // Expect NO update
           disp.submittedActions mustBe empty
           res mustBe ()
         }
