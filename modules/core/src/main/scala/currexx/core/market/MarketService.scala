@@ -10,6 +10,7 @@ import currexx.core.trade.TradeOrderPlacement
 import currexx.domain.market.{CurrencyPair, MarketTimeSeriesData, TradeOrder}
 import currexx.domain.user.UserId
 import kirill5k.common.syntax.time.*
+import org.typelevel.log4cats.Logger
 
 trait MarketService[F[_]]:
   def getState(uid: UserId): F[List[MarketState]]
@@ -23,7 +24,8 @@ final private class LiveMarketService[F[_]](
     private val stateRepo: MarketStateRepository[F],
     private val dispatcher: ActionDispatcher[F]
 )(using
-    F: Monad[F]
+    F: Monad[F],
+    logger: Logger[F]
 ) extends MarketService[F] {
   override def getState(uid: UserId): F[List[MarketState]]                   = stateRepo.getAll(uid)
   override def clearState(uid: UserId, closePendingOrders: Boolean): F[Unit] =
@@ -67,7 +69,8 @@ final private class LiveMarketService[F[_]](
                 lastPriceLineCrossing = None
               )
               val shiftedPosition = previousState.currentPosition.map(p => p.copy(openedAt = p.openedAt.plus(timeGap)))
-              stateRepo.update(uid, cp, shiftedProfile, shiftedPosition).void
+              logger.info(s"shifted state by $timeGap to adjustment for market close time for $uid/$cp") >>
+                stateRepo.update(uid, cp, shiftedProfile, shiftedPosition).void
             case None => F.unit
           }
         }
@@ -75,7 +78,7 @@ final private class LiveMarketService[F[_]](
 }
 
 object MarketService:
-  def make[F[_]: Monad](
+  def make[F[_]: {Monad, Logger}](
       stateRepo: MarketStateRepository[F],
       dispatcher: ActionDispatcher[F]
   ): F[MarketService[F]] =

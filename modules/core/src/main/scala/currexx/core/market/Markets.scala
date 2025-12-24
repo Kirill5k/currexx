@@ -7,6 +7,7 @@ import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.Controller
 import currexx.core.market.db.MarketStateRepository
 import mongo4cats.database.MongoDatabase
+import org.typelevel.log4cats.Logger
 
 final class Markets[F[_]] private (
     val service: MarketService[F],
@@ -14,7 +15,7 @@ final class Markets[F[_]] private (
 )
 
 object Markets:
-  def make[F[_]: Async](
+  def make[F[_]: {Async, Logger}](
       database: MongoDatabase[F],
       dispatcher: ActionDispatcher[F]
   ): F[Markets[F]] =

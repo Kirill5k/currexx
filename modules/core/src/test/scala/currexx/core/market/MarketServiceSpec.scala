@@ -10,11 +10,14 @@ import currexx.domain.market.{CurrencyPair, TradeOrder}
 import currexx.domain.signal.Direction
 import kirill5k.common.cats.test.IOWordSpec
 import kirill5k.common.syntax.time.*
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import scala.concurrent.duration.*
 
 class MarketServiceSpec extends IOWordSpec {
-
+  given Logger[IO] = Slf4jLogger.getLogger[IO]
+  
   "A MarketService" when {
     "clearState" should {
       "delete all existing market states and close orders" in {
