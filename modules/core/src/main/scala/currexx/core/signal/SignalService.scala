@@ -41,7 +41,7 @@ final private class LiveSignalService[F[_]](
             _ <- F.whenA(signals.nonEmpty)(saveAndDispatchAction(uid, data.currencyPair, signals))
           yield ()
         } else {
-          logger.info(s"skipping market data processing because of the time gap (time=${data.prices.head.time}, gap=$timeGap)")
+          logger.info(s"skipping market data processing because of the time gap (time=${data.prices.head.time}, gap=${timeGap.toHours}h)")
         }
       }
 
