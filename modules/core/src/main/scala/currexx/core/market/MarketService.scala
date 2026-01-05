@@ -69,7 +69,7 @@ final private class LiveMarketService[F[_]](
                 lastPriceLineCrossing = None
               )
               val shiftedPosition = previousState.currentPosition.map(p => p.copy(openedAt = p.openedAt.plus(timeGap)))
-              logger.info(s"shifted state by $timeGap to adjustment for market close time for $uid/$cp") >>
+              logger.info(s"shifted state by ${timeGap.toHours}h to adjustment for market close time for $uid/$cp") >>
                 stateRepo.update(uid, cp, shiftedProfile, shiftedPosition).void
             case None => F.unit
           }
