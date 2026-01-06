@@ -158,9 +158,7 @@ object OandaClient {
 
   final case class OpenPositionRequest(order: OpenPositionOrder) derives Codec.AsObject
 
-  final case class ClosePositionResponse(
-      lastTransactionID: String
-  ) derives Codec.AsObject
+  final case class ClosePositionResponse(lastTransactionID: String) derives Codec.AsObject
 
   object OpenPositionRequest:
     def from(order: TradeOrder.Enter): OpenPositionRequest =
@@ -210,8 +208,8 @@ object OandaClient {
           currencyPair = CurrencyPair.fromUnsafe(instrument.replace("_", "")),
           position = if isBuy then TradeOrder.Position.Buy else TradeOrder.Position.Sell,
           openPrice = side.averagePrice.getOrElse(BigDecimal(0)),
-          currentPrice = side.averagePrice.getOrElse(BigDecimal(0)) + (side.unrealizedPL / side.units),
-          volume = side.units / LotSize,
+          currentPrice = side.averagePrice.getOrElse(BigDecimal(0)) + Option.when(side.units != 0)(side.unrealizedPL / side.units).getOrElse(BigDecimal(0)),
+          volume = side.units.abs / LotSize,
           profit = side.trueUnrealizedPL
         )
       }

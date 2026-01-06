@@ -214,10 +214,11 @@ object Rule extends JsonCodecs {
       case Condition.VelocityIs(direction) =>
         currentProfile.lastVelocityValue match {
           case Some(v) =>
+            val epsilon = 1e-10
             direction match {
-              case Direction.Upward   => v > 0.0
-              case Direction.Downward => v < 0.0
-              case Direction.Still    => v == 0.0
+              case Direction.Upward   => v > epsilon
+              case Direction.Downward => v < -epsilon
+              case Direction.Still    => v.abs <= epsilon
             }
           case None => false // Cannot determine if velocity is not present.
         }

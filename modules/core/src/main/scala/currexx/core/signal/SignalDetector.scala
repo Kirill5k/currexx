@@ -173,7 +173,8 @@ final private class PureSignalDetector extends SignalDetector {
 }
 
 final private class CachedSignalDetector(
-    private val cache: collection.mutable.Map[String, Option[Signal]]
+    private val cache: collection.mutable.LinkedHashMap[String, Option[Signal]],
+    private val maxCacheSize: Int = 10000
 ) extends SignalDetector {
   private val detector = new PureSignalDetector()
 
@@ -181,7 +182,19 @@ final private class CachedSignalDetector(
     s"${data.currencyPair}-${data.interval}-${data.prices.head.time}-$indicator"
 
   override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal] =
-    cache.getOrElseUpdate(cacheKey(data, indicator), detector.detect(uid, data)(indicator))
+    synchronized {
+      val key = cacheKey(data, indicator)
+      cache.get(key) match {
+        case Some(result) => result
+        case None =>
+          val result = detector.detect(uid, data)(indicator)
+          if (cache.size >= maxCacheSize) {
+            cache.headOption.foreach { case (oldestKey, _) => cache.remove(oldestKey) }
+          }
+          val _ = cache.put(key, result)
+          result
+      }
+    }
 
   def detectThresholdCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.ThresholdCrossing): Option[Signal] =
     detector.detectThresholdCrossing(uid, data, indicator)
@@ -217,4 +230,4 @@ final private class CachedSignalDetector(
 
 object SignalDetector:
   def pure: SignalDetector   = PureSignalDetector()
-  def cached: SignalDetector = CachedSignalDetector(collection.concurrent.TrieMap.empty)
+  def cached: SignalDetector = CachedSignalDetector(collection.mutable.LinkedHashMap.empty)

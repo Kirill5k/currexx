@@ -35,7 +35,7 @@ final private class LiveActionProcessor[F[_]](
   private def handle(action: Action): F[Unit] =
     (action match
       case Action.Retried(action, attempt) =>
-        val delay = scala.math.pow(2, attempt).toInt.seconds
+        val delay = math.min(scala.math.pow(2, attempt).toInt, 3600).seconds
         logger.info(s"retrying action $action in $delay (attempt $attempt)") *> F.sleep(delay) *> processAction(action)
       case action => processAction(action)
     ).handleErrorWith {
