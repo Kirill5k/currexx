@@ -7,7 +7,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.clients.Fs2HttpClient
 import currexx.clients.data.MarketDataClient
-import kirill5k.common.cats.Cache
+import kirill5k.common.cats.{Cache, Clock}
 import kirill5k.common.syntax.time.*
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
@@ -33,7 +33,8 @@ final private class LiveTwelveDataClient[F[_]](
     private val cache: Cache[F, (CurrencyPair, Interval), MarketTimeSeriesData]
 )(using
     F: Temporal[F],
-    logger: Logger[F]
+    logger: Logger[F],
+    C: Clock[F]
 ) extends TwelveDataClient[F] {
   import TwelveDataClient.*
 
@@ -41,7 +42,15 @@ final private class LiveTwelveDataClient[F[_]](
   override protected val delayBetweenConnectionFailures: FiniteDuration = 5.seconds
 
   override def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] =
-    fetchTimeSeriesData(pair, interval, 150)
+    for
+      timeSeriesData <- fetchTimeSeriesData(pair, interval, 150)
+      now <- C.now
+      excludeFirstCandle = isFirstCandleIncomplete(timeSeriesData.prices.head, interval, now)
+    yield if excludeFirstCandle then timeSeriesData.copy(prices = NonEmptyList.fromListUnsafe(timeSeriesData.prices.tail)) else timeSeriesData
+
+  private def isFirstCandleIncomplete(firstCandle: PriceRange, interval: Interval, now: Instant): Boolean =
+    val candleEndTime = firstCandle.time.plus(interval.toDuration)
+    now.isBefore(candleEndTime)
 
   override def latestPrice(pair: CurrencyPair): F[PriceRange] =
     fetchTimeSeriesData(pair, Interval.M1, 1).map(_.prices.head)
@@ -104,7 +113,7 @@ private[clients] object TwelveDataClient {
       values: NonEmptyList[TimeSeriesValue]
   ) derives Codec.AsObject
 
-  def make[F[_]: {Temporal, Logger}](
+  def make[F[_]: {Temporal, Logger, Clock}](
       config: TwelveDataConfig,
       fs2Backend: WebSocketStreamBackend[F, Fs2Streams[F]],
       delayBetweenClientFailures: FiniteDuration = 1.minute
