@@ -4,6 +4,7 @@ import cats.effect.IO
 import currexx.domain.market.Currency.{EUR, USD}
 import currexx.domain.market.{CurrencyPair, Interval, PriceRange}
 import kirill5k.common.sttp.test.Sttp4WordSpec
+import kirill5k.common.cats.Clock
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import sttp.client4.testing.ResponseStub
@@ -20,6 +21,8 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
 
   "A TwelveDataClient" should {
     "retrieve time-series data" in {
+      given Clock = Clock.mock(Instant.now("2022-11-08"))
+
       val requestParams = Map(
         "symbol"     -> "EUR/USD",
         "interval"   -> "1day",
@@ -51,6 +54,8 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
     }
 
     "retry after some delay in case of api limit error" in {
+      given Clock = Clock.mock(Instant.now("2022-11-08"))
+
       val testingBackend = fs2BackendStub.whenAnyRequest
         .thenRespondCyclic(
           ResponseStub.adjust(readJson("twelvedata/limit-error.json")),

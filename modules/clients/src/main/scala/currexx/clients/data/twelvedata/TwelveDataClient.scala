@@ -45,12 +45,25 @@ final private class LiveTwelveDataClient[F[_]](
     for
       timeSeriesData <- fetchTimeSeriesData(pair, interval, 150)
       now <- C.now
-      excludeFirstCandle = isFirstCandleIncomplete(timeSeriesData.prices.head, interval, now)
-    yield if excludeFirstCandle then timeSeriesData.copy(prices = NonEmptyList.fromListUnsafe(timeSeriesData.prices.tail)) else timeSeriesData
+      result <- filterIncompleteCandleIfNeeded(timeSeriesData, interval, now)
+    yield result
 
-  private def isFirstCandleIncomplete(firstCandle: PriceRange, interval: Interval, now: Instant): Boolean =
+  private def filterIncompleteCandleIfNeeded(
+      data: MarketTimeSeriesData,
+      interval: Interval,
+      now: Instant
+  ): F[MarketTimeSeriesData] =
+    val firstCandle = data.prices.head
     val candleEndTime = firstCandle.time.plus(interval.toDuration)
-    now.isBefore(candleEndTime)
+    val shouldExclude = now.isBefore(candleEndTime)
+    
+    if (shouldExclude && data.prices.size > 1) {
+      F.pure(data.copy(prices = NonEmptyList.fromListUnsafe(data.prices.tail)))
+    } else if (shouldExclude && data.prices.size == 1) {
+      logger.warn(s"Only incomplete candle available for ${data.currencyPair} at ${data.interval}") >> F.pure(data)
+    } else {
+      F.pure(data)
+    }
 
   override def latestPrice(pair: CurrencyPair): F[PriceRange] =
     fetchTimeSeriesData(pair, Interval.M1, 1).map(_.prices.head)
