@@ -55,8 +55,8 @@ final private class LiveTwelveDataClient[F[_]](
   ): F[MarketTimeSeriesData] =
     val firstCandle = data.prices.head
     val candleEndTime = firstCandle.time.plus(interval.toDuration)
-    val shouldExclude = now.isBefore(candleEndTime)
-    
+    val shouldExclude = candleEndTime.isAfter(now)
+
     if (shouldExclude && data.prices.size > 1) {
       F.pure(data.copy(prices = NonEmptyList.fromListUnsafe(data.prices.tail)))
     } else if (shouldExclude && data.prices.size == 1) {
@@ -129,9 +129,17 @@ private[clients] object TwelveDataClient {
   def make[F[_]: {Temporal, Logger, Clock}](
       config: TwelveDataConfig,
       fs2Backend: WebSocketStreamBackend[F, Fs2Streams[F]],
-      delayBetweenClientFailures: FiniteDuration = 1.minute
+      delayBetweenClientFailures: FiniteDuration
   ): F[TwelveDataClient[F]] =
     Cache
       .make[F, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)
-      .map(cache => LiveTwelveDataClient(fs2Backend, config, delayBetweenClientFailures, cache))
+      .flatMap(cache => make(config, fs2Backend, cache, delayBetweenClientFailures))
+      
+  def make[F[_]: {Temporal, Logger, Clock}](
+      config: TwelveDataConfig,
+      fs2Backend: WebSocketStreamBackend[F, Fs2Streams[F]],
+      cache: Cache[F, (CurrencyPair, Interval), MarketTimeSeriesData],
+      delayBetweenClientFailures: FiniteDuration
+  ): F[TwelveDataClient[F]] =
+    Temporal[F].pure(LiveTwelveDataClient(fs2Backend, config, delayBetweenClientFailures, cache))
 }

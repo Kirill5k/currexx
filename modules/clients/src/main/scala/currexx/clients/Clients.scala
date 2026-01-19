@@ -13,6 +13,8 @@ import org.typelevel.log4cats.Logger
 import sttp.capabilities.fs2.Fs2Streams
 import sttp.client4.WebSocketStreamBackend
 
+import scala.concurrent.duration.*
+
 final case class ClientsConfig(
     alphaVantage: AlphaVantageConfig,
     twelveData: TwelveDataConfig,
@@ -32,7 +34,7 @@ object Clients:
   ): F[Clients[F]] =
     for
       alphavantage <- AlphaVantageClient.make[F](config.alphaVantage, fs2Backend)
-      twelvedata   <- TwelveDataClient.make(config.twelveData, fs2Backend)
+      twelvedata   <- TwelveDataClient.make(config.twelveData, fs2Backend, delayBetweenClientFailures = 1.minute)
       xtb          <- XtbClient.make[F](config.xtb, fs2Backend)
       oanda        <- OandaClient.make[F](config.oanda, fs2Backend)
       broker       <- BrokerClient.make[F](xtb, oanda)
