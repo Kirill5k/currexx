@@ -20,7 +20,7 @@ import sttp.client4.WebSocketStreamBackend
 import sttp.model.StatusCode
 
 import java.time.temporal.ChronoUnit
-import java.time.{Instant, LocalDate, LocalTime, ZoneOffset}
+import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.concurrent.duration.*
 
 private[clients] trait TwelveDataClient[F[_]] extends MarketDataClient[F] with Fs2HttpClient[F]:
@@ -43,9 +43,9 @@ final private class LiveTwelveDataClient[F[_]](
 
   override def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] =
     for
-      timeSeriesData <- fetchTimeSeriesData(pair, interval, 150)
-      now <- C.now
-      result <- filterIncompleteCandleIfNeeded(timeSeriesData, interval, now)
+      now            <- C.now
+      timeSeriesData <- fetchTimeSeriesData(pair, interval, 150, now)
+      result         <- filterIncompleteCandleIfNeeded(timeSeriesData, interval, now)
     yield result
 
   private def filterIncompleteCandleIfNeeded(
@@ -53,7 +53,7 @@ final private class LiveTwelveDataClient[F[_]](
       interval: Interval,
       now: Instant
   ): F[MarketTimeSeriesData] =
-    val firstCandle = data.prices.head
+    val firstCandle   = data.prices.head
     val candleEndTime = firstCandle.time.plus(interval.toDuration)
     val shouldExclude = candleEndTime.isAfter(now)
 
@@ -66,9 +66,11 @@ final private class LiveTwelveDataClient[F[_]](
     }
 
   override def latestPrice(pair: CurrencyPair): F[PriceRange] =
-    fetchTimeSeriesData(pair, Interval.M1, 1).map(_.prices.head)
+    C.now.flatMap { now =>
+      fetchTimeSeriesData(pair, Interval.M1, 1, now).map(_.prices.head)
+    }
 
-  private def fetchTimeSeriesData(pair: CurrencyPair, interval: Interval, numOfTicks: Int): F[MarketTimeSeriesData] =
+  private def fetchTimeSeriesData(pair: CurrencyPair, interval: Interval, numOfTicks: Int, now: Instant): F[MarketTimeSeriesData] =
     cache.evalPutIfNew(pair -> interval) {
       val sym = s"${pair.base}/${pair.quote}"
       val int = s"${interval.number}${if (interval.unit == "hour") "h" else interval.unit.slice(0, 3)}"
@@ -77,9 +79,9 @@ final private class LiveTwelveDataClient[F[_]](
         .flatMap { r =>
           r.body match
             case Right(res) =>
-              MarketTimeSeriesData(pair, interval, res.priceRanges).pure[F]
+              MarketTimeSeriesData(pair, interval, res.toPriceRanges(now)).pure[F]
             case Left(ResponseException.DeserializationException(b, _, _)) if b.matches(".*\"code\":( )?429.*") =>
-              F.sleep(delayBetweenClientFailures) >> fetchTimeSeriesData(pair, interval, numOfTicks)
+              F.sleep(delayBetweenClientFailures) >> fetchTimeSeriesData(pair, interval, numOfTicks, now)
             case Left(ResponseException.DeserializationException(responseBody, error, _)) =>
               logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
                 F.raiseError(AppError.JsonParsingFailure(responseBody, s"Failed to parse $name response: ${error.getMessage}"))
@@ -88,18 +90,19 @@ final private class LiveTwelveDataClient[F[_]](
                 F.raiseError(AppError.AccessDenied(s"$name authentication has expired"))
             case Left(ResponseException.UnexpectedStatusCode(body, meta)) =>
               logger.error(s"$name-client/${meta.code.code}\n$body") >>
-                F.sleep(delayBetweenConnectionFailures) >> fetchTimeSeriesData(pair, interval, numOfTicks)
+                F.sleep(delayBetweenConnectionFailures) >> fetchTimeSeriesData(pair, interval, numOfTicks, now)
         }
     }
 
   extension (ts: TimeSeriesResponse)
-    private def priceRanges: NonEmptyList[PriceRange] =
-      ts.values.zipWithIndex.map((v, i) => PriceRange(v.open, v.high, v.low, v.close, 0d, v.datetime.toInstant(i)))
+    private def toPriceRanges(now: Instant): NonEmptyList[PriceRange] =
+      ts.values.zipWithIndex.map((v, i) => PriceRange(v.open, v.high, v.low, v.close, 0d, v.datetime.toInstant(i, now)))
 
   extension (dateString: String)
-    private def toInstant(i: Int): Instant =
+    private def toInstant(i: Int, now: Instant): Instant =
       if (dateString.length == 10 && i == 0)
-        LocalDate.parse(dateString).atTime(LocalTime.now().truncatedTo(ChronoUnit.MINUTES)).toInstant(ZoneOffset.UTC)
+        val currentTime = now.atZone(ZoneOffset.UTC).toLocalTime.truncatedTo(ChronoUnit.MINUTES)
+        LocalDate.parse(dateString).atTime(currentTime).toInstant(ZoneOffset.UTC)
       else if (dateString.length == 10)
         LocalDate.parse(dateString).toInstantAtStartOfDay
       else
@@ -134,7 +137,7 @@ private[clients] object TwelveDataClient {
     Cache
       .make[F, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)
       .flatMap(cache => make(config, fs2Backend, cache, delayBetweenClientFailures))
-      
+
   def make[F[_]: {Temporal, Logger, Clock}](
       config: TwelveDataConfig,
       fs2Backend: WebSocketStreamBackend[F, Fs2Streams[F]],

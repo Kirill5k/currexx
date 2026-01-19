@@ -48,8 +48,8 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
         timeSeriesData.currencyPair mustBe pair
         timeSeriesData.interval mustBe Interval.D1
         timeSeriesData.prices must have size 149
-        timeSeriesData.prices.head mustBe PriceRange(1.0027, 1.0032, 0.9973, 1.0005, 0.0, Instant.parse(s"2022-11-07T00:00:00Z"))
-        timeSeriesData.prices.last mustBe PriceRange(1.05475, 1.055, 1.05405, 1.0547, 0.0, Instant.parse("2022-05-08T00:00:00Z"))
+        timeSeriesData.prices.head mustBe PriceRange(0.99105, 1.0034, 0.9899, 1.0025, 0.0, Instant.parse(s"2022-11-07T00:00:00Z"))
+        timeSeriesData.prices.last mustBe PriceRange(1.05475, 1.055, 1.05405, 1.0547, 0.0, Instant.parse("2022-05-07T00:00:00Z"))
       }
     }
 
@@ -72,8 +72,8 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
         timeSeriesData.currencyPair mustBe pair
         timeSeriesData.interval mustBe Interval.D1
         timeSeriesData.prices must have size 149
-        timeSeriesData.prices.head mustBe PriceRange(1.0027, 1.0032, 0.9973, 1.0005, 0.0, Instant.parse(s"2022-11-07T00:00:00Z"))
-        timeSeriesData.prices.last mustBe PriceRange(1.05475, 1.055, 1.05405, 1.0547, 0.0, Instant.parse("2022-05-06T00:00:00Z"))
+        timeSeriesData.prices.head mustBe PriceRange(0.99105, 1.0034, 0.9899, 1.0025, 0.0, Instant.parse(s"2022-11-07T00:00:00Z"))
+        timeSeriesData.prices.last mustBe PriceRange(1.05475, 1.055, 1.05405, 1.0547, 0.0, Instant.parse("2022-05-07T00:00:00Z"))
       }
     }
 
