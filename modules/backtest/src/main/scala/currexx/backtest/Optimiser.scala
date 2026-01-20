@@ -27,7 +27,23 @@ object Optimiser extends IOApp.Simple {
   val testDataSets    = MarketDataProvider.majors1h
   val strategy        = TestStrategy.s1
 
-  val scoringFunction = ScoringFunction.medianWinLossRatio(Some(50), Some(700))
+  // Scoring function selection - see SCORING_GUIDE.md for detailed guide
+  
+  // Recommended: Balanced scoring (combines profit, win/loss ratio, and consistency)
+  val scoringFunction = ScoringFunction.balanced(
+    profitWeight = 0.4,          // 40% weight on total profit
+    ratioWeight = 0.3,           // 30% weight on win/loss ratio
+    consistencyWeight = 0.3,     // 30% weight on monthly consistency
+    minOrders = Some(50),        // Minimum orders per dataset
+    maxOrders = Some(700),       // Maximum orders per dataset
+    targetRatio = 2.0            // Target win/loss ratio for normalization
+  )
+  
+  // Alternative options:
+  // val scoringFunction = ScoringFunction.riskAdjusted(Some(50), Some(700))
+  // val scoringFunction = ScoringFunction.totalProfit
+  // val scoringFunction = ScoringFunction.medianWinLossRatio(Some(50), Some(700))
+  // val scoringFunction = ScoringFunction.averageMedianProfitByMonth
 
   override def run: IO[Unit] = for
     _       <- IO.println(s"Starting optimization of ${strategy.indicator}; starting time - ${Instant.now}")

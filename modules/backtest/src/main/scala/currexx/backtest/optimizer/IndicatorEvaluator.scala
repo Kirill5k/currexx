@@ -39,6 +39,96 @@ object IndicatorEvaluator {
     val averageMedianProfitByMonth: ScoringFunction = stats =>
       if (stats.isEmpty) BigDecimal(0)
       else (stats.foldLeft(BigDecimal(0))(_ + _.medianProfitByMonth) / BigDecimal(stats.size)).roundTo(5)
+
+    /** Balanced scoring function that combines multiple objectives:
+      * - Total profit (absolute returns)
+      * - Win/loss ratio (trade quality)
+      * - Median profit by month (consistency)
+      * - Penalizes strategies with too few or too many trades
+      *
+      * @param profitWeight Weight for total profit component (default: 0.4)
+      * @param ratioWeight Weight for win/loss ratio component (default: 0.3)
+      * @param consistencyWeight Weight for consistency component (default: 0.3)
+      * @param minOrders Minimum number of orders per dataset (penalize if below)
+      * @param maxOrders Maximum number of orders per dataset (penalize if above)
+      * @param targetRatio Target win/loss ratio for normalization (default: 2.0)
+      * @return Weighted composite score
+      */
+    def balanced(
+        profitWeight: Double = 0.4,
+        ratioWeight: Double = 0.3,
+        consistencyWeight: Double = 0.3,
+        minOrders: Option[Int] = Some(30),
+        maxOrders: Option[Int] = Some(500),
+        targetRatio: Double = 2.0
+    ): ScoringFunction = stats => {
+      if (stats.isEmpty) BigDecimal(0)
+      else {
+        // Check order count constraints
+        val orderCountPenalty = stats.map { os =>
+          val numOrders = os.total
+          val isBelowMin = minOrders.exists(numOrders < _)
+          val isAboveMax = maxOrders.exists(numOrders > _)
+          if (isBelowMin || isAboveMax) 0.0 else 1.0
+        }.sum / stats.size.toDouble
+
+        // If most strategies violate order constraints, heavily penalize
+        if (orderCountPenalty < 0.5) BigDecimal(0)
+        else {
+          // Component 1: Total profit (normalized)
+          val totalProfitScore = stats.foldLeft(BigDecimal(0))(_ + _.totalProfit)
+
+          // Component 2: Win/Loss Ratio (normalized and capped)
+          val avgWinLossRatio = stats.map(_.winLossRatio).sum / BigDecimal(stats.size)
+          val normalizedRatio = (avgWinLossRatio / BigDecimal(targetRatio)).min(BigDecimal(1))
+
+          // Component 3: Consistency (median profit by month)
+          val avgConsistency = stats.foldLeft(BigDecimal(0))(_ + _.medianProfitByMonth) / BigDecimal(stats.size)
+
+          // Combine with weights
+          val compositeScore =
+            (totalProfitScore * BigDecimal(profitWeight)) +
+            (normalizedRatio * BigDecimal(ratioWeight)) +
+            (avgConsistency * BigDecimal(consistencyWeight))
+
+          // Apply order count penalty
+          (compositeScore * BigDecimal(orderCountPenalty)).roundTo(5)
+        }
+      }
+    }
+
+    /** Risk-adjusted return scoring that prioritizes profitability while controlling drawdown
+      * Uses Sharpe-like ratio: (total profit / risk measure)
+      *
+      * @param minOrders Minimum number of orders per dataset
+      * @param maxOrders Maximum number of orders per dataset
+      * @return Score based on risk-adjusted returns
+      */
+    def riskAdjusted(
+        minOrders: Option[Int] = Some(30),
+        maxOrders: Option[Int] = Some(500)
+    ): ScoringFunction = stats => {
+      if (stats.isEmpty) BigDecimal(0)
+      else {
+        val validStats = stats.filter { os =>
+          val numOrders = os.total
+          val isBelowMin = minOrders.exists(numOrders < _)
+          val isAboveMax = maxOrders.exists(numOrders > _)
+          !isBelowMin && !isAboveMax
+        }
+
+        if (validStats.isEmpty) BigDecimal(0)
+        else {
+          val totalProfit = validStats.foldLeft(BigDecimal(0))(_ + _.totalProfit)
+          val avgBiggestLoss = validStats.map(_.biggestLoss.abs).sum / BigDecimal(validStats.size)
+
+          // Risk-adjusted return: profit / max drawdown
+          // Add small epsilon to avoid division by zero
+          val epsilon = BigDecimal(0.001)
+          (totalProfit / (avgBiggestLoss + epsilon)).roundTo(5)
+        }
+      }
+    }
   }
 
   given Show[Indicator] = (ind: Indicator) => {
