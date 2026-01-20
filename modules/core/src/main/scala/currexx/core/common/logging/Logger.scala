@@ -1,5 +1,6 @@
 package currexx.core.common.logging
 
+import cats.Monad
 import cats.effect.{Async, Temporal}
 import cats.effect.std.Queue
 import cats.syntax.apply.*
@@ -46,9 +47,26 @@ final private class LiveLogger[F[_]](
   override def info(t: Throwable)(message: => String): F[Unit]  = enqueue(LogLevel.Info, t, message) *> logger.info(t)(message)
 }
 
+final private class NoopLogger[F[_]](using F: Monad[F]) extends Logger[F] {
+  override def events: Stream[F, LogEvent]                      = Stream.empty
+  override def error(t: Throwable)(message: => String): F[Unit] = F.unit
+  override def error(message: => String): F[Unit]               = F.unit
+  override def warn(t: Throwable)(message: => String): F[Unit]  = F.unit
+  override def warn(message: => String): F[Unit]                = F.unit
+  override def debug(t: Throwable)(message: => String): F[Unit] = F.unit
+  override def debug(message: => String): F[Unit]               = F.unit
+  override def trace(message: => String): F[Unit]               = F.unit
+  override def trace(t: Throwable)(message: => String): F[Unit] = F.unit
+  override def info(message: => String): F[Unit]                = F.unit
+  override def info(t: Throwable)(message: => String): F[Unit]  = F.unit
+}
+
 object Logger {
   def apply[F[_]](using ev: Logger[F]): Logger[F] = ev
 
   def make[F[_]: Async]: F[Logger[F]] =
     Queue.unbounded[F, LogEvent].map(q => LiveLogger[F](Slf4jLogger.getLogger[F], q))
+
+  def noop[F[_]: Monad]: Logger[F] =
+    NoopLogger[F]()
 }
