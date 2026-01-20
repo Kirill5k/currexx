@@ -7,6 +7,7 @@ import cats.syntax.traverse.*
 import currexx.backtest.TestSettings
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
+import currexx.core.common.logging.Logger
 import currexx.core.market.MarketService
 import currexx.core.signal.{SignalDetector, SignalService}
 import currexx.core.trade.{TradeOrderPlacement, TradeService}
@@ -60,6 +61,7 @@ final class TestServices[F[_]] private (
 
 object TestServices:
   def make[F[_]: Temporal](settings: TestSettings): F[TestServices[F]] =
+    given logger: Logger[F] = Logger.noop[F]
     for
       appState   <- ApplicationState.make[F](settings)
       dispatcher <- ActionDispatcher.make[F](appState.dispatcherQueue)

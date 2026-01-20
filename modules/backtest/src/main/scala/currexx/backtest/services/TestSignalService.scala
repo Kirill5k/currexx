@@ -10,6 +10,7 @@ import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
 import currexx.core.signal.{Signal, SignalService}
 import currexx.domain.user.UserId
 import kirill5k.common.cats.Clock
+import org.typelevel.log4cats.Logger
 
 final private class TestSignalRepository[F[_]](using F: Monad[F]) extends SignalRepository[F]:
   override def saveAll(signals: List[Signal]): F[Unit]                   = F.unit
@@ -21,5 +22,5 @@ final private class TestSignalSettingsRepository[F[_]](
   override def get(uid: UserId): F[SignalSettings] = settings.get
 
 object TestSignalService:
-  def make[F[_]: {Temporal, Clock}](initialSettings: SignalSettings, dispatcher: ActionDispatcher[F]): F[SignalService[F]] =
+  def make[F[_]: {Temporal, Clock, Logger}](initialSettings: SignalSettings, dispatcher: ActionDispatcher[F]): F[SignalService[F]] =
     Ref.of(initialSettings).flatMap(s => SignalService.make(TestSignalRepository[F], TestSignalSettingsRepository[F](s), dispatcher))
