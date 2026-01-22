@@ -7,7 +7,7 @@ import currexx.core.common.action.Action
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Indicators, Markets, Settings, Signals, Users}
 import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
-import currexx.domain.signal.{Condition, Direction, Indicator}
+import currexx.domain.signal.{Condition, Direction}
 import currexx.domain.user.UserId
 import kirill5k.common.cats.Clock
 import kirill5k.common.cats.test.IOWordSpec

@@ -2,7 +2,7 @@ import com.typesafe.sbt.packager.docker.*
 import org.typelevel.scalacoptions.ScalacOptions
 import sbtghactions.JavaSpec
 
-ThisBuild / scalaVersion                        := "3.7.4"
+ThisBuild / scalaVersion                        := "3.8.0"
 ThisBuild / version                             := scala.sys.process.Process("git rev-parse HEAD").!!.trim.slice(0, 7)
 ThisBuild / organization                        := "io.github.kirill5k"
 ThisBuild / githubWorkflowPublishTargetBranches := Nil
@@ -36,7 +36,9 @@ val docker = Seq(
 )
 
 val common = Seq(
-  Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement
+  Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement,
+  tpolecatExcludeOptions ++= Set(ScalacOptions.fatalWarnings),
+  scalacOptions += "-Werror"
 )
 
 val domain = project
