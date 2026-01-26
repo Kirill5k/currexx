@@ -14,6 +14,7 @@ final case class TestStrategy(
 
 object TestStrategy {
 
+  // median win-to-loss ratio: 1.50425, total profit: 0.41534, total orders: 2879, median profit: 0.07230, median loss: -0.00157
   val s1 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -91,6 +92,7 @@ object TestStrategy {
     )
   )
 
+  // median win-to-loss ratio: 5.901785, total profit: 0.20349, total orders: 652, median profit: 0.04662, median loss: -0.004795
   val s2 = TestStrategy(
     // --- The Set of Indicators for the Filtered JMA Crossover Strategy ---
     indicator = Indicator.compositeAnyOf(
@@ -169,6 +171,7 @@ object TestStrategy {
     )
   )
 
+  // median win-to-loss ratio: 0.580955, total profit: -0.01253, total orders: 230, median profit: -0.00369, median loss: -0.001455
   val s3 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       // 1. The TREND filter: A slow Kalman filter on the price.
@@ -327,6 +330,7 @@ object TestStrategy {
     )
   )
 
+  // median win-to-loss ratio: 0.62435, total profit: 0.17587, total orders: 448, median profit: 0.02513, median loss: -0.00291
   val s4 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       // 1. Trend: JMA 50
@@ -398,6 +402,7 @@ object TestStrategy {
     )
   )
 
+  // median win-to-loss ratio: 0.835085, total profit: 0.26284, total orders: 423, median profit: 0.03555, median loss: -0.002855
   val s5 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       // 1. Trend: JMA 50
