@@ -13,6 +13,7 @@ import currexx.core.signal.{SignalDetector, SignalService}
 import currexx.core.trade.{TradeOrderPlacement, TradeService}
 import currexx.domain.market.MarketTimeSeriesData
 import fs2.Pipe
+import kirill5k.common.syntax.time.*
 
 final class TestServices[F[_]] private (
     private val signalService: SignalService[F],
@@ -40,7 +41,9 @@ final class TestServices[F[_]] private (
       for
         userId <- appState.userIdRef.get
         _      <- clients.data.setData(data)
-        _      <- clock.setTime(data.prices.head.time)
+        // Simulate live trading: process data with 1 interval delay + cron offset (3 minutes)
+        // E.g., 12:00 candle is processed at 13:03, matching when incomplete 13:00 candle is filtered out
+        _      <- clock.setTime(data.prices.head.time.plus(data.interval.toDuration).plusSeconds(180))
         _      <- marketService.updateTimeState(userId, data)
         _      <- signalService.processMarketData(userId, data, signalDetector)
         _      <- collectPendingActions { case Action.ProcessSignals(uid, cp, signals) =>
