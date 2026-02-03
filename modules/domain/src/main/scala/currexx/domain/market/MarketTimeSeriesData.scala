@@ -35,4 +35,5 @@ final case class MarketTimeSeriesData(
   def closings: List[Double] = prices.toList.map(_.close)
   def highs: List[Double]    = prices.toList.map(_.high)
   def lows: List[Double]     = prices.toList.map(_.low)
+  def latestTime: Instant   = prices.head.time
 }

@@ -15,6 +15,8 @@ import currexx.domain.market.MarketTimeSeriesData
 import fs2.Pipe
 import kirill5k.common.syntax.time.*
 
+import scala.concurrent.duration.*
+
 final class TestServices[F[_]] private (
     private val signalService: SignalService[F],
     private val marketService: MarketService[F],
@@ -43,7 +45,7 @@ final class TestServices[F[_]] private (
         _      <- clients.data.setData(data)
         // Simulate live trading: process data with 1 interval delay + cron offset (3 minutes)
         // E.g., 12:00 candle is processed at 13:03, matching when incomplete 13:00 candle is filtered out
-        _      <- clock.setTime(data.prices.head.time.plus(data.interval.toDuration).plusSeconds(180))
+        _      <- clock.setTime(data.latestTime.plus(data.interval.toDuration + 100.seconds))
         _      <- marketService.updateTimeState(userId, data)
         _      <- signalService.processMarketData(userId, data, signalDetector)
         _      <- collectPendingActions { case Action.ProcessSignals(uid, cp, signals) =>
