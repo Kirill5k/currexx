@@ -1,10 +1,12 @@
 package currexx.backtest.services
 
+import cats.Parallel
 import cats.effect.Temporal
 import cats.effect.std.Queue
 import cats.syntax.applicativeError.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import currexx.backtest.TestSettings
 
@@ -60,13 +62,13 @@ object TestServicesPool {
    * @param initialSettings Settings to initialize the services with
    * @param poolSize Number of services to maintain in the pool (should match parallelism level)
    */
-  def make[F[_]: Temporal](
+  def make[F[_]: {Temporal, Parallel}](
       initialSettings: TestSettings,
       poolSize: Int
   ): F[TestServicesPool[F]] =
     for
       queue    <- Queue.bounded[F, TestServices[F]](poolSize)
-      services <- List.fill(poolSize)(TestServices.make[F](initialSettings)).sequence
+      services <- List.fill(poolSize)(TestServices.make[F](initialSettings)).parSequence
       _        <- services.traverse(queue.offer)
     yield TestServicesPool[F](queue, poolSize)
 }
