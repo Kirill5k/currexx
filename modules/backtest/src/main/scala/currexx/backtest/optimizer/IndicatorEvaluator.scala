@@ -25,14 +25,15 @@ object IndicatorEvaluator {
     def medianWinLossRatio(minOrders: Option[Int] = None, maxOrders: Option[Int] = None): ScoringFunction = stats => {
       if (stats.isEmpty) BigDecimal(0)
       else {
-        val penalizedRatios = stats.map { os =>
+        // Single-pass filtering and mapping - using List with prepend for O(1) operations
+        val validRatios = stats.foldLeft(List.empty[BigDecimal]) { (acc, os) =>
           val numOrders = os.total
           val isBelowMin = minOrders.exists(numOrders < _)
           val isAboveMax = maxOrders.exists(numOrders > _)
 
-          if (isBelowMin || isAboveMax) BigDecimal(0) else os.winLossRatio
+          if (isBelowMin || isAboveMax) BigDecimal(0) :: acc else os.winLossRatio :: acc
         }
-        penalizedRatios.median
+        validRatios.median
       }
     }
 
@@ -64,30 +65,37 @@ object IndicatorEvaluator {
     ): ScoringFunction = stats => {
       if (stats.isEmpty) BigDecimal(0)
       else {
-        // Check order count constraints
-        val orderCountPenalty = stats.map { os =>
-          val numOrders = os.total
-          val isBelowMin = minOrders.exists(numOrders < _)
-          val isAboveMax = maxOrders.exists(numOrders > _)
-          if (isBelowMin || isAboveMax) 0.0 else 1.0
-        }.sum / stats.size.toDouble
+        // Single-pass calculation of all metrics
+        val (validCount, totalProfit, totalWinLossRatio, totalConsistency) = stats.foldLeft((0, BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
+          case ((count, profit, ratio, consistency), os) =>
+            val numOrders = os.total
+            val isBelowMin = minOrders.exists(numOrders < _)
+            val isAboveMax = maxOrders.exists(numOrders > _)
+            val isValid = !isBelowMin && !isAboveMax
+
+            (
+              if (isValid) count + 1 else count,
+              profit + os.totalProfit,
+              ratio + os.winLossRatio,
+              consistency + os.medianProfitByMonth
+            )
+        }
+
+        val orderCountPenalty = validCount.toDouble / stats.size.toDouble
 
         // If most strategies violate order constraints, heavily penalize
         if (orderCountPenalty < 0.5) BigDecimal(0)
         else {
-          // Component 1: Total profit (normalized)
-          val totalProfitScore = stats.foldLeft(BigDecimal(0))(_ + _.totalProfit)
-
           // Component 2: Win/Loss Ratio (normalized and capped)
-          val avgWinLossRatio = stats.map(_.winLossRatio).sum / BigDecimal(stats.size)
+          val avgWinLossRatio = totalWinLossRatio / BigDecimal(stats.size)
           val normalizedRatio = (avgWinLossRatio / BigDecimal(targetRatio)).min(BigDecimal(1))
 
           // Component 3: Consistency (median profit by month)
-          val avgConsistency = stats.foldLeft(BigDecimal(0))(_ + _.medianProfitByMonth) / BigDecimal(stats.size)
+          val avgConsistency = totalConsistency / BigDecimal(stats.size)
 
           // Combine with weights
           val compositeScore =
-            (totalProfitScore * BigDecimal(profitWeight)) +
+            (totalProfit * BigDecimal(profitWeight)) +
             (normalizedRatio * BigDecimal(ratioWeight)) +
             (avgConsistency * BigDecimal(consistencyWeight))
 
@@ -110,17 +118,24 @@ object IndicatorEvaluator {
     ): ScoringFunction = stats => {
       if (stats.isEmpty) BigDecimal(0)
       else {
-        val validStats = stats.filter { os =>
-          val numOrders = os.total
-          val isBelowMin = minOrders.exists(numOrders < _)
-          val isAboveMax = maxOrders.exists(numOrders > _)
-          !isBelowMin && !isAboveMax
+        // Single-pass calculation with filtering
+        val (validCount, totalProfit, totalBiggestLoss) = stats.foldLeft((0, BigDecimal(0), BigDecimal(0))) {
+          case ((count, profit, loss), os) =>
+            val numOrders = os.total
+            val isBelowMin = minOrders.exists(numOrders < _)
+            val isAboveMax = maxOrders.exists(numOrders > _)
+            val isValid = !isBelowMin && !isAboveMax
+
+            if (isValid) {
+              (count + 1, profit + os.totalProfit, loss + os.biggestLoss.abs)
+            } else {
+              (count, profit, loss)
+            }
         }
 
-        if (validStats.isEmpty) BigDecimal(0)
+        if (validCount == 0) BigDecimal(0)
         else {
-          val totalProfit = validStats.foldLeft(BigDecimal(0))(_ + _.totalProfit)
-          val avgBiggestLoss = validStats.map(_.biggestLoss.abs).sum / BigDecimal(validStats.size)
+          val avgBiggestLoss = totalBiggestLoss / BigDecimal(validCount)
 
           // Risk-adjusted return: profit / max drawdown
           // Add small epsilon to avoid division by zero
@@ -157,9 +172,9 @@ object IndicatorEvaluator {
   def make[F[_]: {Async, Parallel}](
       testFilePaths: List[String],
       ts: TradeStrategy,
+      poolSize: Int,
       otherIndicators: List[Indicator] = Nil,
       signalDetector: SignalDetector = SignalDetector.pure,
-      poolSize: Int = Runtime.getRuntime.availableProcessors(),
       scoringFunction: ScoringFunction = ScoringFunction.totalProfit
   ): F[Evaluator[F, Indicator]] =
     for

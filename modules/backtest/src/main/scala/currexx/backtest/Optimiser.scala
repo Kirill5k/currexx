@@ -24,6 +24,11 @@ object Optimiser extends IOApp.Simple {
     shuffle = true
   )
 
+  // Pool size for parallel evaluation
+  // Using 3x CPU cores since backtesting is I/O-bound (reading data, processing streams)
+  // rather than CPU-bound. Adjust based on available memory.
+  val evaluatorPoolSize = Runtime.getRuntime.availableProcessors() * 3
+
   val testDataSets    = MarketDataProvider.majors1h
   val strategy        = TestStrategy.s1
 
@@ -51,7 +56,7 @@ object Optimiser extends IOApp.Simple {
     init    <- IndicatorInitialiser.make[IO]
     cross   <- IndicatorCrossover.make[IO]
     mut     <- IndicatorMutator.make[IO]
-    eval    <- IndicatorEvaluator.make[IO](testDataSets, strategy.rules, scoringFunction = scoringFunction)
+    eval    <- IndicatorEvaluator.make[IO](testDataSets, strategy.rules, poolSize = evaluatorPoolSize, scoringFunction = scoringFunction)
     sel     <- Selector.tournament[IO, Indicator]
     elit    <- Elitism.simple[IO, Indicator]
     prog    <- ProgressTracker.make[IO, Indicator](logInterval = 10, showTopMember = true, showTopN = 3, showStats = false, finalTopN = 25)
