@@ -90,8 +90,6 @@ object Op:
         case Op.ApplyToAll(population, op) =>
           val parallelism = Math.max(1, Runtime.getRuntime.availableProcessors())
           Stream.emits(population).mapAsync(parallelism)(i => apply(op(i))).compile.toVector
-        case _ | null =>
-          F.raiseError(new IllegalArgumentException("Unexpected Op type: null or something else"))
   }
 
   inline def ioInterpreter[F[_], I](
