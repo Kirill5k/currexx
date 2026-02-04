@@ -113,6 +113,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# JVM GC logs
+gc.log*
+*.log
+
 # Editor directories and files
 .vscode
 *.suo

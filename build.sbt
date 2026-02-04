@@ -98,7 +98,23 @@ val backtest = project
     name       := "currexx-backtest",
     moduleName := "currexx-backtest",
     libraryDependencies ++= Dependencies.test,
-    Compile / run / fork := true
+    Compile / run / fork := true,
+    // JVM options for optimization and backtesting
+    // Adjust heap size based on available RAM:
+    //   < 8GB RAM: use -Xms2g -Xmx4g
+    //   > 16GB RAM: use -Xms8g -Xmx16g
+    Compile / run / javaOptions ++= Seq(
+      "-Xms8g",                                    // Initial heap size
+      "-Xmx16g",                                   // Maximum heap size
+      "-XX:+UseG1GC",                              // Use G1 garbage collector
+      "-XX:MaxGCPauseMillis=200",                  // Target max GC pause
+      "-XX:G1ReservePercent=10",                   // Reserve heap to reduce GC
+      "-XX:InitiatingHeapOccupancyPercent=45",     // When to start GC
+      "-XX:+AggressiveOpts",                       // Enable aggressive optimizations
+      "-Xss2m",                                    // Stack size
+      "-XX:+TieredCompilation",                    // Use tiered compilation
+      "-XX:TieredStopAtLevel=4"                    // Maximum optimization level
+    )
   )
 
 val root = project
