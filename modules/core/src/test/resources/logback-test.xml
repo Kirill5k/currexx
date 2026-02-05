@@ -1,0 +1,28 @@
+<configuration>
+
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+        <pattern>%date [%12.12thread] %highlight(%-5level) %cyan(%logger{16}) - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Application loggers -->
+  <logger name="stockschecker" level="INFO" />
+
+  <!-- HTTP4s loggers - reduce noise in tests -->
+  <logger name="org.http4s.client.middleware" level="WARN"/>
+  <logger name="org.http4s.server.middleware" level="WARN"/>
+  <logger name="org.http4s.blaze.channel" level="ERROR" />
+
+  <!-- MongoDB loggers - reduce noise in tests -->
+  <logger name="org.mongodb.driver" level="WARN" />
+
+  <!-- STTP loggers - reduce noise in tests -->
+  <logger name="sttp.client4" level="WARN" />
+
+  <root level="INFO">
+    <appender-ref ref="STDOUT" />
+  </root>
+
+</configuration>
+
