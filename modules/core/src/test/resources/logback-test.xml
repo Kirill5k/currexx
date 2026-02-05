@@ -7,7 +7,7 @@
   </appender>
 
   <!-- Application loggers -->
-  <logger name="stockschecker" level="INFO" />
+  <logger name="currexx" level="INFO" />
 
   <!-- HTTP4s loggers - reduce noise in tests -->
   <logger name="org.http4s.client.middleware" level="WARN"/>
