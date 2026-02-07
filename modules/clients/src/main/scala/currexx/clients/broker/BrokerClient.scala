@@ -2,7 +2,7 @@ package currexx.clients.broker
 
 import cats.Monad
 import cats.data.NonEmptyList
-import currexx.clients.broker.oanda.OandaClient
+import currexx.clients.broker.oanda.OandaBrokerClient
 import currexx.clients.broker.xtb.XtbClient
 import currexx.domain.market.{CurrencyPair, OpenedTradeOrder, TradeOrder}
 
@@ -12,7 +12,7 @@ trait BrokerClient[F[_]]:
 
 final private class LiveBrokerClient[F[_]](
     private val xtbClient: XtbClient[F],
-    private val oandaClient: OandaClient[F]
+    private val oandaClient: OandaBrokerClient[F]
 ) extends BrokerClient[F]:
   override def find(parameters: BrokerParameters, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]] =
     parameters match
@@ -27,6 +27,6 @@ final private class LiveBrokerClient[F[_]](
 object BrokerClient:
   def make[F[_]: Monad](
       xtbClient: XtbClient[F],
-      oandaClient: OandaClient[F]
+      oandaClient: OandaBrokerClient[F]
   ): F[BrokerClient[F]] =
     Monad[F].pure(LiveBrokerClient[F](xtbClient, oandaClient))

@@ -7,7 +7,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.clients.Fs2HttpClient
 import currexx.clients.broker.BrokerParameters
-import currexx.clients.broker.oanda.OandaClient.ClosePositionRequest
+import currexx.clients.broker.oanda.OandaBrokerClient.ClosePositionRequest
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, OpenedTradeOrder, TradeOrder}
 import io.circe.Codec
@@ -21,18 +21,18 @@ import sttp.model.StatusCode
 
 import scala.concurrent.duration.*
 
-private[clients] trait OandaClient[F[_]] extends Fs2HttpClient[F]:
+private[clients] trait OandaBrokerClient[F[_]] extends Fs2HttpClient[F]:
   def submit(params: BrokerParameters.Oanda, order: TradeOrder): F[Unit]
   def getCurrentOrders(params: BrokerParameters.Oanda, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]]
 
-final private class LiveOandaClient[F[_]](
+final private class LiveOandaBrokerClient[F[_]](
     override protected val backend: WebSocketStreamBackend[F, Fs2Streams[F]],
     private val config: OandaConfig
 )(using
     F: Async[F],
     logger: Logger[F],
     clock: Clock[F]
-) extends OandaClient[F] {
+) extends OandaBrokerClient[F] {
   override protected val name: String = "oanda"
 
   override def submit(params: BrokerParameters.Oanda, order: TradeOrder): F[Unit] = order match
@@ -56,26 +56,26 @@ final private class LiveOandaClient[F[_]](
       openedOrders = positions.filter(p => instruments.contains(p.instrument)).flatMap(_.toOpenedTradeOrder)
     yield openedOrders
 
-  private def getPositions(accountId: String, params: BrokerParameters.Oanda): F[List[OandaClient.Position]] =
+  private def getPositions(accountId: String, params: BrokerParameters.Oanda): F[List[OandaBrokerClient.Position]] =
     dispatch {
       basicRequest
         .get(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/positions")
         .auth
         .bearer(params.apiKey)
-        .response(asJson[OandaClient.PositionsResponse])
+        .response(asJson[OandaBrokerClient.PositionsResponse])
     }.flatMap { r =>
       r.body match
         case Right(res) => F.pure(res.positions)
         case Left(err)  => handleError("get-positions", err)
     }
 
-  private def getPosition(accountId: String, params: BrokerParameters.Oanda, currencyPair: CurrencyPair): F[Option[OandaClient.Position]] =
+  private def getPosition(accountId: String, params: BrokerParameters.Oanda, currencyPair: CurrencyPair): F[Option[OandaBrokerClient.Position]] =
     dispatch {
       basicRequest
         .get(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/positions/${currencyPair.toInstrument}")
         .auth
         .bearer(params.apiKey)
-        .response(asJson[OandaClient.PositionResponse])
+        .response(asJson[OandaBrokerClient.PositionResponse])
     }.flatMap { r =>
       r.body match
         case Right(res) =>
@@ -86,14 +86,14 @@ final private class LiveOandaClient[F[_]](
           handleError("get-position", err)
     }
 
-  private def closePosition(accountId: String, params: BrokerParameters.Oanda, position: OandaClient.Position): F[Unit] =
+  private def closePosition(accountId: String, params: BrokerParameters.Oanda, position: OandaBrokerClient.Position): F[Unit] =
     dispatch {
       basicRequest
         .put(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/positions/${position.instrument}/close")
         .auth
         .bearer(params.apiKey)
         .body(asJson(position.toClosePositionRequest))
-        .response(asJson[OandaClient.ClosePositionResponse])
+        .response(asJson[OandaBrokerClient.ClosePositionResponse])
     }.flatMap { r =>
       r.body match
         case Right(_)  => F.unit
@@ -106,7 +106,7 @@ final private class LiveOandaClient[F[_]](
         .post(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/orders")
         .auth
         .bearer(params.apiKey)
-        .body(asJson(OandaClient.OpenPositionRequest.from(position)))
+        .body(asJson(OandaBrokerClient.OpenPositionRequest.from(position)))
         .response(asStringAlways)
     }.flatMap { r =>
       r.code match
@@ -123,7 +123,7 @@ final private class LiveOandaClient[F[_]](
         .get(uri"${config.baseUri(params.demo)}/v3/accounts")
         .auth
         .bearer(params.apiKey)
-        .response(asJson[OandaClient.AccountsResponse])
+        .response(asJson[OandaBrokerClient.AccountsResponse])
     }.flatMap { r =>
       r.body match
         case Right(res) if res.accounts.exists(_.id == params.accountId) => F.pure(params.accountId)
@@ -148,7 +148,7 @@ final private class LiveOandaClient[F[_]](
       if (demo) c.demoBaseUri else c.liveBaseUri
 }
 
-object OandaClient {
+object OandaBrokerClient {
   private val LotSize = 100000
 
   final case class ClosePositionRequest(
@@ -226,6 +226,6 @@ object OandaClient {
   def make[F[_]: {Async, Logger, Clock}](
       config: OandaConfig,
       backend: WebSocketStreamBackend[F, Fs2Streams[F]]
-  ): F[OandaClient[F]] =
-    Monad[F].pure(LiveOandaClient(backend, config))
+  ): F[OandaBrokerClient[F]] =
+    Monad[F].pure(LiveOandaBrokerClient(backend, config))
 }
