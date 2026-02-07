@@ -11,6 +11,7 @@ class AppConfigSpec extends IOWordSpec {
   System.setProperty("MONGO_PASSWORD", "password")
   System.setProperty("ALPHA_VANTAGE_API_KEY", "av-key")
   System.setProperty("TWELVE_DATA_API_KEY", "td-key")
+  System.setProperty("OANDA_DATA_API_KEY`", "od-key")
 
   "An AppConfig" should {
 
@@ -20,6 +21,7 @@ class AppConfigSpec extends IOWordSpec {
         config.mongo.connectionUri mustBe "mongodb+srv://user:password@mongo/currexx"
         config.clients.alphaVantage.apiKey mustBe "av-key"
         config.clients.twelveData.apiKey mustBe "td-key"
+        config.clients.oandaData.apiKey mustBe "od-key"
         config.clients.xtb.baseUri mustBe "wss://ws.xtb.com"
       }
   }
