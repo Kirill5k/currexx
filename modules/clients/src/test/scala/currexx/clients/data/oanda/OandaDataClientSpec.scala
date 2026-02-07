@@ -24,8 +24,8 @@ class OandaDataClientSpec extends Sttp4WordSpec {
       given Clock[IO] = Clock.mock[IO](Instant.parse("2026-02-06T22:00:00Z"))
 
       val requestParams = Map(
-        "granularity" -> "H1",
-        "count"       -> "150",
+        "granularity"       -> "H1",
+        "count"             -> "150",
         "alignmentTimezone" -> "UTC"
       )
 
@@ -39,7 +39,7 @@ class OandaDataClientSpec extends Sttp4WordSpec {
       val result = for
         cache <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
         client = LiveOandaDataClient[IO](testingBackend, config, cache)
-        res    <- client.timeSeriesData(pair, Interval.H1)
+        res <- client.timeSeriesData(pair, Interval.H1)
       yield res
 
       result.asserting { timeSeriesData =>

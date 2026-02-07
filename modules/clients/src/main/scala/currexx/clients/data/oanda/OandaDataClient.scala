@@ -8,6 +8,7 @@ import cats.syntax.functor.*
 import currexx.clients.Fs2HttpClient
 import currexx.clients.data.MarketDataClient
 import kirill5k.common.cats.{Cache, Clock}
+import kirill5k.common.syntax.time.*
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import org.typelevel.log4cats.Logger
@@ -18,7 +19,7 @@ import sttp.client4.circe.asJson
 import sttp.client4.WebSocketStreamBackend
 import sttp.model.StatusCode
 
-import java.time.{Duration as JDuration, Instant}
+import java.time.Instant
 import scala.concurrent.duration.*
 
 private[clients] trait OandaDataClient[F[_]] extends MarketDataClient[F] with Fs2HttpClient[F]:
@@ -51,7 +52,7 @@ final private class LiveOandaDataClient[F[_]](
       now: Instant
   ): F[MarketTimeSeriesData] =
     val firstCandle   = data.prices.head
-    val candleEndTime = firstCandle.time.plus(JDuration.ofNanos(interval.toDuration.toNanos))
+    val candleEndTime = firstCandle.time.plus(interval.toDuration)
     val shouldExclude = candleEndTime.isAfter(now)
 
     if (shouldExclude && data.prices.size > 1) {
@@ -78,30 +79,21 @@ final private class LiveOandaDataClient[F[_]](
         case Interval.H1  => "H1"
         case Interval.D1  => "D"
 
-      val uri = uri"${config.baseUri}/v3/instruments/$instrument/candles?granularity=$granularity&count=$numOfTicks&alignmentTimezone=UTC"
-      dispatch(
+      dispatch {
         basicRequest
-          .get(uri)
-          .auth.bearer(config.apiKey)
+          .get(uri"${config.baseUri}/v3/instruments/$instrument/candles?granularity=$granularity&count=$numOfTicks&alignmentTimezone=UTC")
+          .auth
+          .bearer(config.apiKey)
           .response(asJson[CandlesResponse])
-      ).flatMap { r =>
+      }.flatMap { r =>
         r.body match
           case Right(res) =>
-            val prices = res.candles.map { c =>
-              PriceRange(
-                open = c.mid.o.toDouble,
-                high = c.mid.h.toDouble,
-                low = c.mid.l.toDouble,
-                close = c.mid.c.toDouble,
-                volume = c.volume.toDouble,
-                time = Instant.parse(c.time)
-              )
-            }.reverse
-            MarketTimeSeriesData(pair, interval, prices).pure[F]
+            MarketTimeSeriesData(pair, interval, res.prices).pure[F]
           case Left(ResponseException.DeserializationException(responseBody, error, _)) =>
             logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
               F.raiseError(AppError.JsonParsingFailure(responseBody, s"Failed to parse $name response: ${error.getMessage}"))
-          case Left(ResponseException.UnexpectedStatusCode(body, meta)) if meta.code == StatusCode.Forbidden || meta.code == StatusCode.Unauthorized =>
+          case Left(ResponseException.UnexpectedStatusCode(body, meta))
+              if meta.code == StatusCode.Forbidden || meta.code == StatusCode.Unauthorized =>
             logger.error(s"$name-client/${meta.code.code}\n$body") >>
               F.raiseError(AppError.AccessDenied(s"$name authentication has expired or is invalid"))
           case Left(ResponseException.UnexpectedStatusCode(body, meta)) =>
@@ -131,7 +123,19 @@ private[clients] object OandaDataClient {
       instrument: String,
       granularity: String,
       candles: NonEmptyList[Candle]
-  ) derives Codec.AsObject
+  ) derives Codec.AsObject {
+    def prices: NonEmptyList[PriceRange] =
+      candles.map { c =>
+        PriceRange(
+          open = c.mid.o.toDouble,
+          high = c.mid.h.toDouble,
+          low = c.mid.l.toDouble,
+          close = c.mid.c.toDouble,
+          volume = c.volume.toDouble,
+          time = Instant.parse(c.time)
+        )
+      }.reverse
+  }
 
   def make[F[_]: {Temporal, Logger, Clock}](
       config: OandaDataConfig,
