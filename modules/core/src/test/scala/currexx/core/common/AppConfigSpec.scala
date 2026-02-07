@@ -9,9 +9,9 @@ class AppConfigSpec extends IOWordSpec {
   System.setProperty("MONGO_HOST", "mongo")
   System.setProperty("MONGO_USER", "user")
   System.setProperty("MONGO_PASSWORD", "password")
+  System.setProperty("OANDA_DATA_API_KEY", "od-key")
   System.setProperty("ALPHA_VANTAGE_API_KEY", "av-key")
   System.setProperty("TWELVE_DATA_API_KEY", "td-key")
-  System.setProperty("OANDA_DATA_API_KEY`", "od-key")
 
   "An AppConfig" should {
 
