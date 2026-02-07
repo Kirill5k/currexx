@@ -1,6 +1,6 @@
 package currexx.clients.broker.oanda
 
-final case class OandaConfig(
+final case class OandaBrokerConfig(
     demoBaseUri: String,
     liveBaseUri: String
 )

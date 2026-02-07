@@ -16,7 +16,7 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
 
   given Logger[IO] = Slf4jLogger.getLogger[IO]
 
-  val config                         = OandaConfig("https://api-fxpractice.oanda.com", "https://api-fxtrade.oanda.com")
+  val config                         = OandaBrokerConfig("https://api-fxpractice.oanda.com", "https://api-fxtrade.oanda.com")
   val params: BrokerParameters.Oanda = BrokerParameters.Oanda("test-api-key", demo = true, "123-456-789")
   val eurUsdPair                     = CurrencyPair(EUR, USD)
   val gbpUsdPair                     = CurrencyPair(GBP, USD)

@@ -27,7 +27,7 @@ private[clients] trait OandaBrokerClient[F[_]] extends Fs2HttpClient[F]:
 
 final private class LiveOandaBrokerClient[F[_]](
     override protected val backend: WebSocketStreamBackend[F, Fs2Streams[F]],
-    private val config: OandaConfig
+    private val config: OandaBrokerConfig
 )(using
     F: Async[F],
     logger: Logger[F],
@@ -69,7 +69,11 @@ final private class LiveOandaBrokerClient[F[_]](
         case Left(err)  => handleError("get-positions", err)
     }
 
-  private def getPosition(accountId: String, params: BrokerParameters.Oanda, currencyPair: CurrencyPair): F[Option[OandaBrokerClient.Position]] =
+  private def getPosition(
+      accountId: String,
+      params: BrokerParameters.Oanda,
+      currencyPair: CurrencyPair
+  ): F[Option[OandaBrokerClient.Position]] =
     dispatch {
       basicRequest
         .get(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/positions/${currencyPair.toInstrument}")
@@ -143,7 +147,7 @@ final private class LiveOandaBrokerClient[F[_]](
 
   extension (cp: CurrencyPair) private def toInstrument: String = s"${cp.base}_${cp.quote}"
 
-  extension (c: OandaConfig)
+  extension (c: OandaBrokerConfig)
     private def baseUri(demo: Boolean): String =
       if (demo) c.demoBaseUri else c.liveBaseUri
 }
@@ -208,7 +212,8 @@ object OandaBrokerClient {
           currencyPair = CurrencyPair.fromUnsafe(instrument.replace("_", "")),
           position = if isBuy then TradeOrder.Position.Buy else TradeOrder.Position.Sell,
           openPrice = side.averagePrice.getOrElse(BigDecimal(0)),
-          currentPrice = side.averagePrice.getOrElse(BigDecimal(0)) + Option.when(side.units != 0)(side.unrealizedPL / side.units).getOrElse(BigDecimal(0)),
+          currentPrice = side.averagePrice
+            .getOrElse(BigDecimal(0)) + Option.when(side.units != 0)(side.unrealizedPL / side.units).getOrElse(BigDecimal(0)),
           volume = side.units.abs / LotSize,
           profit = side.trueUnrealizedPL
         )
@@ -224,7 +229,7 @@ object OandaBrokerClient {
   ) derives Codec.AsObject
 
   def make[F[_]: {Async, Logger, Clock}](
-      config: OandaConfig,
+      config: OandaBrokerConfig,
       backend: WebSocketStreamBackend[F, Fs2Streams[F]]
   ): F[OandaBrokerClient[F]] =
     Monad[F].pure(LiveOandaBrokerClient(backend, config))
