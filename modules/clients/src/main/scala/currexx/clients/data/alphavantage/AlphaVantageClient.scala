@@ -55,7 +55,7 @@ final private class LiveAlphaVantageClient[F[_]](
       "apikey"      -> config.apiKey
     )
     sendRequest(uri"${config.baseUri}/query?$params", ResponseMapper.mapDailyTimeSeriesData)
-      .map(prs => MarketTimeSeriesData(pair, Interval.D1, prs))
+      .map(prs => MarketTimeSeriesData(pair, Interval.D1, prs, name))
   }
 
   private def intradayTimeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] = {
@@ -73,7 +73,7 @@ final private class LiveAlphaVantageClient[F[_]](
         case _            => "")
     )
     sendRequest(uri"${config.baseUri}/query?$params", ResponseMapper.mapIntradayTimeSeriesData)
-      .map(prs => MarketTimeSeriesData(pair, interval, prs))
+      .map(prs => MarketTimeSeriesData(pair, interval, prs, name))
   }
 
   private def sendRequest(

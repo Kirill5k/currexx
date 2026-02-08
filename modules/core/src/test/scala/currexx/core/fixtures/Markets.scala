@@ -14,7 +14,7 @@ object Markets {
 
   lazy val ts: Instant                          = LocalDate.now().atStartOfDay().toInstant(ZoneOffset.UTC)
   lazy val priceRange: PriceRange               = PriceRange(2.0, 4.0, 1.0, 3.0, 1000d, ts)
-  lazy val timeSeriesData: MarketTimeSeriesData = MarketTimeSeriesData(gbpeur, Interval.H1, NonEmptyList.one(priceRange))
+  lazy val timeSeriesData: MarketTimeSeriesData = MarketTimeSeriesData(gbpeur, Interval.H1, NonEmptyList.one(priceRange), "test")
 
   lazy val positionState: PositionState = PositionState(TradeOrder.Position.Buy, ts)
 

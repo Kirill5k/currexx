@@ -30,7 +30,8 @@ final case class PriceRange(
 final case class MarketTimeSeriesData(
     currencyPair: CurrencyPair,
     interval: Interval,
-    prices: NonEmptyList[PriceRange]
+    prices: NonEmptyList[PriceRange],
+    source: String
 ) {
   def closings: List[Double] = prices.toList.map(_.close)
   def highs: List[Double]    = prices.toList.map(_.high)

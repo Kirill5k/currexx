@@ -85,6 +85,6 @@ object MarketDataProvider:
         )
       }
       .sliding(100)
-      .map(_.toNel.map(prices => MarketTimeSeriesData(cp, interval, prices.reverse)))
+      .map(_.toNel.map(prices => MarketTimeSeriesData(cp, interval, prices.reverse, "csv")))
       .unNone
   }

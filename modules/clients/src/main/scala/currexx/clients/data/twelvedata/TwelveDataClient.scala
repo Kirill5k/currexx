@@ -79,7 +79,7 @@ final private class LiveTwelveDataClient[F[_]](
         .flatMap { r =>
           r.body match
             case Right(res) =>
-              MarketTimeSeriesData(pair, interval, res.toPriceRanges(now)).pure[F]
+              MarketTimeSeriesData(pair, interval, res.toPriceRanges(now), name).pure[F]
             case Left(ResponseException.DeserializationException(b, _, _)) if b.matches(".*\"code\":( )?429.*") =>
               F.sleep(delayBetweenClientFailures) >> fetchTimeSeriesData(pair, interval, numOfTicks, now)
             case Left(ResponseException.DeserializationException(responseBody, error, _)) =>

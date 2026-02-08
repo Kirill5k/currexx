@@ -88,7 +88,7 @@ final private class LiveOandaDataClient[F[_]](
       }.flatMap { r =>
         r.body match
           case Right(res) =>
-            MarketTimeSeriesData(pair, interval, res.prices).pure[F]
+            MarketTimeSeriesData(pair, interval, res.prices, name).pure[F]
           case Left(ResponseException.DeserializationException(responseBody, error, _)) =>
             logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
               F.raiseError(AppError.JsonParsingFailure(responseBody, s"Failed to parse $name response: ${error.getMessage}"))
