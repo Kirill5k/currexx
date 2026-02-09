@@ -28,7 +28,7 @@ final private class PureSignalDetector extends SignalDetector {
       interval = data.interval,
       condition = cond,
       triggeredBy = indicator,
-      time = data.prices.head.time
+      time = data.latestTime
     )
 
   override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal] =
@@ -122,7 +122,7 @@ final private class PureSignalDetector extends SignalDetector {
         interval = data.interval,
         condition = Condition.ValueUpdated(indicator.role, latestValue),
         triggeredBy = indicator,
-        time = data.prices.head.time
+        time = data.latestTime
       )
     }
   }
@@ -144,7 +144,7 @@ final private class PureSignalDetector extends SignalDetector {
           interval = data.interval,
           condition = Condition.Composite(NonEmptyList.fromListUnsafe(childSignals.map(_.condition))),
           triggeredBy = composite,
-          time = data.prices.head.time
+          time = data.latestTime
         )
       }
 
@@ -179,7 +179,7 @@ final private class CachedSignalDetector(
   private val detector = new PureSignalDetector()
 
   private def cacheKey(data: MarketTimeSeriesData, indicator: Indicator): String =
-    s"${data.currencyPair}-${data.interval}-${data.prices.head.time}-$indicator"
+    s"${data.currencyPair}-${data.interval}-${data.latestTime}-$indicator"
 
   override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal] =
     synchronized {

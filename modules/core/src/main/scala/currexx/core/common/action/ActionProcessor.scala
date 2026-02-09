@@ -62,7 +62,7 @@ final private class LiveActionProcessor[F[_]](
       logger.info(s"fetching market data for $uid/${cps.toList.mkString("[", ",", "]")}") *>
         tradeService.fetchMarketData(uid, cps, interval)
     case Action.ProcessMarketData(uid, data) =>
-      logger.info(s"processing market data for $uid/${data.currencyPair} (time=${data.prices.head.time}, source=${data.source})") *>
+      logger.info(s"processing market data for $uid/${data.currencyPair} (time=${data.latestTime}, source=${data.source})") *>
         marketService.updateTimeState(uid, data) *>
         signalService.processMarketData(uid, data)
     case Action.ProcessSignals(uid, cp, signals) =>

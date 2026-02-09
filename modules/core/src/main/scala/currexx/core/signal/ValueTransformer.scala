@@ -64,13 +64,13 @@ final private class CachedValueTransformer(
   private val transformer = new PureValueTransformer()
 
   private def extractKey(data: MarketTimeSeriesData, vs: VS): String =
-    s"${data.currencyPair}-${data.interval}-${data.prices.head.time}-$vs"
+    s"${data.currencyPair}-${data.interval}-${data.latestTime}-$vs"
 
 //  private def transformKey(values: List[Double], data: MarketTimeSeriesData, vt: VT): String =
-//    s"${data.currencyPair}-${data.interval}-${data.prices.head.time}-$vt-${values.head}"
+//    s"${data.currencyPair}-${data.interval}-${data.latestTime}-$vt-${values.head}"
 //
 //  private def averageTrueRangeKey(values: List[Double], data: MarketTimeSeriesData, length: Int): String =
-//    s"${data.currencyPair}-${data.interval}-${data.prices.head.time}-atr-$length-${values.head}"
+//    s"${data.currencyPair}-${data.interval}-${data.latestTime}-atr-$length-${values.head}"
 
   override def extractFrom(data: MarketTimeSeriesData, vs: VS): List[Double] =
     cache.getOrElseUpdate(extractKey(data, vs), transformer.extractFrom(data, vs))

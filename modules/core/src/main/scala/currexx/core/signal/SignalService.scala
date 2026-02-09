@@ -32,7 +32,7 @@ final private class LiveSignalService[F[_]](
 
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData, detector: SignalDetector): F[Unit] =
     clock
-      .durationBetweenNowAnd(data.prices.head.time)
+      .durationBetweenNowAnd(data.latestTime)
       .flatMap { timeGap =>
         if (timeGap < data.interval.toDuration * 2) {
           for
@@ -41,7 +41,7 @@ final private class LiveSignalService[F[_]](
             _ <- F.whenA(signals.nonEmpty)(saveAndDispatchAction(uid, data.currencyPair, signals))
           yield ()
         } else {
-          logger.info(s"skipping market data processing because of the time gap (time=${data.prices.head.time}, gap=${timeGap.toHours}h)")
+          logger.info(s"skipping market data processing because of the time gap (time=${data.latestTime}, gap=${timeGap.toHours}h)")
         }
       }
 
