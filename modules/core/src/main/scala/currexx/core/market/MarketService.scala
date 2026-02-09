@@ -58,18 +58,19 @@ final private class LiveMarketService[F[_]](
         val cp      = data.currencyPair
         val timeGap = previousCandle.time.durationBetween(latestCandle.time)
         F.whenA(timeGap > (data.interval.toDuration * 2)) {
+          val marketClosureGap = timeGap - data.interval.toDuration
           stateRepo.find(uid, cp).flatMap {
             case Some(previousState) =>
               val shiftedProfile = previousState.profile.copy(
-                trend = previousState.profile.trend.map(s => s.copy(confirmedAt = s.confirmedAt.plus(timeGap))),
-                momentum = previousState.profile.momentum.map(s => s.copy(confirmedAt = s.confirmedAt.plus(timeGap))),
-                volatility = previousState.profile.volatility.map(s => s.copy(confirmedAt = s.confirmedAt.plus(timeGap))),
+                trend = previousState.profile.trend.map(s => s.copy(confirmedAt = s.confirmedAt.plus(marketClosureGap))),
+                momentum = previousState.profile.momentum.map(s => s.copy(confirmedAt = s.confirmedAt.plus(marketClosureGap))),
+                volatility = previousState.profile.volatility.map(s => s.copy(confirmedAt = s.confirmedAt.plus(marketClosureGap))),
                 crossover = None,
                 lastBandCrossing = None,
                 lastPriceLineCrossing = None
               )
-              val shiftedPosition = previousState.currentPosition.map(p => p.copy(openedAt = p.openedAt.plus(timeGap)))
-              logger.info(s"shifted state by ${timeGap.toHours}h to adjust for market close time for $uid/$cp") >>
+              val shiftedPosition = previousState.currentPosition.map(p => p.copy(openedAt = p.openedAt.plus(marketClosureGap)))
+              logger.info(s"shifted state by ${marketClosureGap.toHours}h to adjust for market close time for $uid/$cp") >>
                 stateRepo.update(uid, cp, shiftedProfile, shiftedPosition).void
             case None => F.unit
           }

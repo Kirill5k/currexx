@@ -172,8 +172,8 @@ class MarketServiceSpec extends IOWordSpec {
           verify(stateRepo).update(
             Users.uid,
             Markets.gbpeur,
-            MarketProfile(trend = Some(TrendState(Direction.Upward, Markets.ts.plus(1.day))), lastBandCrossing = None, lastPriceLineCrossing = None, crossover = None),
-            Some(PositionState(TradeOrder.Position.Buy, Markets.ts.plus(1.day)))
+            MarketProfile(trend = Some(TrendState(Direction.Upward, Markets.ts.plus(1.day - 1.hour))), lastBandCrossing = None, lastPriceLineCrossing = None, crossover = None),
+            Some(PositionState(TradeOrder.Position.Buy, Markets.ts.plus(1.day - 1.hour)))
           )
           disp.submittedActions mustBe empty
           res mustBe ()
