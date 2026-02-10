@@ -4,8 +4,6 @@ import currexx.calculations.{Filters, MomentumOscillators, MovingAverages, Stati
 import currexx.domain.market.MarketTimeSeriesData
 import currexx.domain.signal.{MovingAverage, ValueSource as VS, ValueTransformation as VT}
 
-import scala.collection.concurrent.TrieMap
-
 trait ValueTransformer:
   def extractFrom(data: MarketTimeSeriesData, vs: VS): List[Double]
   def transformTo(values: List[Double], data: MarketTimeSeriesData, vt: VT): List[Double]
