@@ -1,6 +1,7 @@
 package currexx.core.signal
 
 import cats.data.NonEmptyList
+import com.github.benmanes.caffeine.cache.{Cache, Caffeine}
 import currexx.calculations.{Statistics, Volatility}
 import currexx.domain.market.MarketTimeSeriesData
 import currexx.domain.signal.{CombinationLogic, Condition, Indicator}
@@ -173,8 +174,7 @@ final private class PureSignalDetector extends SignalDetector {
 }
 
 final private class CachedSignalDetector(
-    private val cache: collection.mutable.LinkedHashMap[String, Option[Signal]],
-    private val maxCacheSize: Int = 10000
+    private val cache: Cache[String, Option[Signal]]
 ) extends SignalDetector {
   private val detector = new PureSignalDetector()
 
@@ -182,19 +182,8 @@ final private class CachedSignalDetector(
     s"${data.currencyPair}-${data.interval}-${data.latestTime}-$indicator"
 
   override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal] =
-    synchronized {
-      val key = cacheKey(data, indicator)
-      cache.get(key) match {
-        case Some(result) => result.map(_.copy(userId = uid))
-        case None =>
-          val result = detector.detect(uid, data)(indicator)
-          if (cache.size >= maxCacheSize) {
-            cache.headOption.foreach { case (oldestKey, _) => cache.remove(oldestKey) }
-          }
-          val _ = cache.put(key, result)
-          result
-      }
-    }
+    val key = cacheKey(data, indicator)
+    cache.get(key, _ => detector.detect(uid, data)(indicator)).map(_.copy(userId = uid))
 
   def detectThresholdCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.ThresholdCrossing): Option[Signal] =
     detector.detectThresholdCrossing(uid, data, indicator)
@@ -229,5 +218,19 @@ final private class CachedSignalDetector(
 }
 
 object SignalDetector:
-  def pure: SignalDetector   = PureSignalDetector()
-  def cached: SignalDetector = CachedSignalDetector(collection.mutable.LinkedHashMap.empty)
+  def pure: SignalDetector = PureSignalDetector()
+
+  def cached: SignalDetector = cached(maxSizeMB = 1024)
+
+  def cached(maxSizeMB: Int): SignalDetector =
+    val cache = Caffeine
+      .newBuilder()
+      .maximumWeight(maxSizeMB * 1024L * 1024L)
+      .weigher[String, Option[Signal]]((key, value) => {
+        // Estimate memory: key size + signal size (if present)
+        val keySize = key.length * 2 // 2 bytes per char in Java
+        val signalSize = value.map(_ => 500).getOrElse(50) // rough estimate: ~500 bytes per Signal
+        keySize + signalSize
+      })
+      .build[String, Option[Signal]]()
+    CachedSignalDetector(cache)

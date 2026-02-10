@@ -19,16 +19,18 @@ object Dependencies {
     val cronUtils      = "9.2.1"
     val taggedAdtCodec = "0.11.0"
     val breeze         = "2.1.0"
+    val caffeine       = "3.2.3"
   }
 
   object Libraries {
-    val fs2            = "co.fs2"               %% "fs2-core"               % Versions.fs2
-    val catsFree       = "org.typelevel"        %% "cats-free"              % Versions.cats
-    val bcrypt         = "com.github.t3hnar"    %% "scala-bcrypt"           % Versions.bcrypt
-    val jwt            = "com.github.jwt-scala" %% "jwt-circe"              % Versions.jwt
-    val cronUtils      = "com.cronutils"         % "cron-utils"             % Versions.cronUtils
-    val taggedAdtCodec = "org.latestbit"        %% "circe-tagged-adt-codec" % Versions.taggedAdtCodec
-    val breeze         = "org.scalanlp"         %% "breeze"                 % Versions.breeze
+    val fs2            = "co.fs2"                       %% "fs2-core"               % Versions.fs2
+    val catsFree       = "org.typelevel"                %% "cats-free"              % Versions.cats
+    val bcrypt         = "com.github.t3hnar"            %% "scala-bcrypt"           % Versions.bcrypt
+    val jwt            = "com.github.jwt-scala"         %% "jwt-circe"              % Versions.jwt
+    val cronUtils      = "com.cronutils"                 % "cron-utils"             % Versions.cronUtils
+    val taggedAdtCodec = "org.latestbit"                %% "circe-tagged-adt-codec" % Versions.taggedAdtCodec
+    val breeze         = "org.scalanlp"                 %% "breeze"                 % Versions.breeze
+    val caffeine       = "com.github.ben-manes.caffeine" % "caffeine"               % Versions.caffeine
 
     object commonScala {
       val cats       = "io.github.kirill5k" %% "common-cats"        % Versions.commonScala
@@ -110,7 +112,8 @@ object Dependencies {
     Libraries.commonScala.http4s,
     Libraries.pureconfig.core,
     Libraries.jwt,
-    Libraries.bcrypt.cross(CrossVersion.for3Use2_13)
+    Libraries.bcrypt.cross(CrossVersion.for3Use2_13),
+    Libraries.caffeine
   )
 
   val test = Seq(
