@@ -185,7 +185,7 @@ final private class CachedSignalDetector(
     synchronized {
       val key = cacheKey(data, indicator)
       cache.get(key) match {
-        case Some(result) => result
+        case Some(result) => result.map(_.copy(userId = uid))
         case None =>
           val result = detector.detect(uid, data)(indicator)
           if (cache.size >= maxCacheSize) {
