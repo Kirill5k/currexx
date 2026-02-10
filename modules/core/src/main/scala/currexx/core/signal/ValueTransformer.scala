@@ -58,33 +58,5 @@ final private class PureValueTransformer() extends ValueTransformer {
     Volatility.averageTrueRange(values, data.highs, data.lows, length)
 }
 
-final private class CachedValueTransformer(
-    private val cache: collection.mutable.Map[String, List[Double]]
-) extends ValueTransformer {
-  private val transformer = new PureValueTransformer()
-
-  private def extractKey(data: MarketTimeSeriesData, vs: VS): String =
-    s"${data.currencyPair}-${data.interval}-${data.latestTime}-$vs"
-
-//  private def transformKey(values: List[Double], data: MarketTimeSeriesData, vt: VT): String =
-//    s"${data.currencyPair}-${data.interval}-${data.latestTime}-$vt-${values.head}"
-//
-//  private def averageTrueRangeKey(values: List[Double], data: MarketTimeSeriesData, length: Int): String =
-//    s"${data.currencyPair}-${data.interval}-${data.latestTime}-atr-$length-${values.head}"
-
-  override def extractFrom(data: MarketTimeSeriesData, vs: VS): List[Double] =
-    cache.getOrElseUpdate(extractKey(data, vs), transformer.extractFrom(data, vs))
-
-  override def transformTo(values: List[Double], data: MarketTimeSeriesData, vt: VT): List[Double] =
-    transformer.transformTo(values, data, vt)
-
-  override def averageTrueRange(values: List[Double], data: MarketTimeSeriesData, length: Int): List[Double] =
-    transformer.averageTrueRange(values, data, length)
-}
-
 object ValueTransformer:
-  def pure: ValueTransformer =
-    new PureValueTransformer()
-
-  def cached: ValueTransformer =
-    CachedValueTransformer(TrieMap.empty)
+  def pure: ValueTransformer = new PureValueTransformer()
