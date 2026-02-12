@@ -1,7 +1,6 @@
 package currexx.core.common.db
 
-import cats.{Functor, MonadError}
-import cats.syntax.functor.*
+import cats.MonadError
 import com.mongodb.client.result.{DeleteResult, UpdateResult}
 import currexx.core.common.http.SearchParams
 import currexx.domain.market.CurrencyPair

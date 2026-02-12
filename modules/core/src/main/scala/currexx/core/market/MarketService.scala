@@ -76,6 +76,7 @@ final private class LiveMarketService[F[_]](
           }
         }
       case _ => F.unit
+  }
 }
 
 object MarketService:
