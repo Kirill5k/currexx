@@ -11,6 +11,7 @@ import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.monitor.{Limits, Schedule}
 import currexx.domain.user.UserId
 import fs2.Stream
+import kirill5k.common.cats.syntax.applicative.*
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
 import mongo4cats.operations.{Filter, Index, Update}
@@ -41,11 +42,11 @@ final private class LiveMonitorRepository[F[_]](
     collection
       .find(idEq(id.value) && userIdEq(uid))
       .first
-      .mapOption(_.toDomain)
+      .mapOpt(_.toDomain)
       .flatMap(maybeMon => F.fromOption(maybeMon, AppError.EntityDoesNotExist("Monitor", id.value)))
 
   override def getAll(uid: UserId): F[List[Monitor]] =
-    collection.find(userIdEq(uid)).all.mapIterable(_.toDomain)
+    collection.find(userIdEq(uid)).all.mapList(_.toDomain)
 
   override def create(mon: CreateMonitor): F[Monitor] =
     val cps = mon.currencyPairs.toList
@@ -68,13 +69,13 @@ final private class LiveMonitorRepository[F[_]](
   private def runUpdate(uid: UserId, id: MonitorId)(update: Update): F[Monitor] =
     collection
       .findOneAndUpdate(idEq(id.value) && userIdEq(uid), update.currentDate(Field.LastUpdatedAt))
-      .mapOption(_.toDomain)
+      .mapOpt(_.toDomain)
       .flatMap(maybeMon => F.fromOption(maybeMon, AppError.EntityDoesNotExist("Monitor", id.value)))
 
   override def delete(uid: UserId, id: MonitorId): F[Monitor] =
     collection
       .findOneAndDelete(idEq(id.value) && userIdEq(uid))
-      .mapOption(_.toDomain)
+      .mapOpt(_.toDomain)
       .flatMap(maybeMon => F.fromOption(maybeMon, AppError.EntityDoesNotExist("Monitor", id.value)))
 
   override def update(mon: Monitor): F[Monitor] =

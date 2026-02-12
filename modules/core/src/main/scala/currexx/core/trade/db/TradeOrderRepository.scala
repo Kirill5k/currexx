@@ -9,6 +9,7 @@ import currexx.core.common.db.Repository.Field
 import currexx.core.common.http.SearchParams
 import currexx.domain.user.UserId
 import currexx.domain.market.CurrencyPair
+import kirill5k.common.cats.syntax.applicative.*
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
 import mongo4cats.operations.{Filter, Index}
@@ -41,14 +42,14 @@ final private class LiveTradeOrderRepository[F[_]: Async](
       .sortByDesc(Field.Time)
       .limit(sp.limit.getOrElse(Int.MaxValue))
       .all
-      .mapIterable(_.toDomain)
+      .mapList(_.toDomain)
 
   def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]] =
     collection
       .find(userIdEq(uid) && Filter.eq(Field.OrderCurrencyPair, cp))
       .sortByDesc(Field.Time)
       .first
-      .mapOption(_.toDomain)
+      .mapOpt(_.toDomain)
 
 object TradeOrderRepository extends MongoJsonCodecs:
   private val collectionName    = Repository.Collection.TradeOrders

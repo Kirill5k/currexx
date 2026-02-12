@@ -7,6 +7,7 @@ import currexx.core.common.db.Repository
 import currexx.core.common.db.Repository.Field
 import currexx.domain.session.{CreateSession, Session, SessionId, SessionStatus}
 import currexx.domain.user.UserId
+import kirill5k.common.cats.syntax.applicative.*
 import mongo4cats.database.MongoDatabase
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.operations.{Index, Update}
@@ -33,7 +34,7 @@ final private class LiveSessionRepository[F[_]: Async](
   override def find(sid: SessionId): F[Option[Session]] =
     collection
       .findOneAndUpdate(idEq(sid.value), Update.currentDate(Field.LastAccessedAt))
-      .mapOption(_.toDomain)
+      .mapOpt(_.toDomain)
 
   override def unauth(sid: SessionId): F[Unit] =
     collection.updateOne(idEq(sid.value), logoutUpdate).void

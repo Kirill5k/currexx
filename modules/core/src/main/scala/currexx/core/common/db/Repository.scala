@@ -32,9 +32,6 @@ trait Repository[F[_]] {
 
   protected def errorIfNoMatches(error: Throwable)(res: UpdateResult)(using F: MonadError[F, Throwable]): F[Unit] =
     F.raiseWhen(res.getMatchedCount == 0)(error)
-
-  extension [A](foa: F[Option[A]]) def mapOption[B](fab: A => B)(using F: Functor[F]): F[Option[B]]   = foa.map(_.map(fab))
-  extension [A](fia: F[Iterable[A]]) def mapIterable[B](fab: A => B)(using F: Functor[F]): F[List[B]] = fia.map(_.toList.map(fab))
 }
 
 object Repository {

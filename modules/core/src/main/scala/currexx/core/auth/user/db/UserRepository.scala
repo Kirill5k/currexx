@@ -8,6 +8,7 @@ import currexx.domain.user.*
 import currexx.domain.errors.AppError.{AccountAlreadyExists, EntityDoesNotExist}
 import currexx.core.common.db.Repository
 import currexx.core.common.db.Repository.Field
+import kirill5k.common.cats.syntax.applicative.*
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.operations.{Filter, Index, Update}
 import mongo4cats.collection.MongoCollection
@@ -30,7 +31,7 @@ final private class LiveUserRepository[F[_]](
     collection
       .find(Filter.eq(Field.Email, email.value))
       .first
-      .mapOption(_.toDomain)
+      .mapOpt(_.toDomain)
 
   override def create(details: UserDetails, password: PasswordHash): F[UserId] =
     collection
@@ -47,7 +48,7 @@ final private class LiveUserRepository[F[_]](
     collection
       .find(idEq(uid.value))
       .first
-      .mapOption(_.toDomain)
+      .mapOpt(_.toDomain)
       .flatMap(maybeUser => F.fromOption(maybeUser, EntityDoesNotExist("User", uid.value)))
 
   override def updatePassword(uid: UserId)(password: PasswordHash): F[Unit] =

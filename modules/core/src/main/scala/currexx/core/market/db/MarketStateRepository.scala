@@ -9,6 +9,7 @@ import currexx.domain.user.UserId
 import currexx.domain.errors.AppError
 import currexx.core.common.db.Repository
 import currexx.core.market.{MarketProfile, MarketState, PositionState}
+import kirill5k.common.cats.syntax.applicative.*
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.models.collection.{FindOneAndUpdateOptions, IndexOptions}
 import mongo4cats.collection.MongoCollection
@@ -91,13 +92,13 @@ final private class LiveMarketStateRepository[F[_]](
     collection
       .find(userIdEq(uid))
       .all
-      .mapIterable(_.toDomain)
+      .mapList(_.toDomain)
 
   override def find(uid: UserId, pair: CurrencyPair): F[Option[MarketState]] =
     collection
       .find(userIdAndCurrencyPairEq(uid, pair))
       .first
-      .mapOption(_.toDomain)
+      .mapOpt(_.toDomain)
 }
 
 object MarketStateRepository extends MongoJsonCodecs {

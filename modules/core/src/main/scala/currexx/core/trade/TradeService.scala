@@ -72,7 +72,7 @@ final private class LiveTradeService[F[_]](
   override def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit] =
     orderRepository
       .findLatestBy(uid, cp)
-      .flatMapOption(F.unit) { top =>
+      .flatmapOpt(F.unit) { top =>
         F.whenA(top.order.isEnter) {
           for
             time  <- clock.now

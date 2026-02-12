@@ -37,7 +37,7 @@ final private class LiveUserService[F[_]](
   override def login(login: Login): F[User] =
     repository
       .findBy(login.email)
-      .flatMapOption(F.pure(LoginResult.Fail)) { acc =>
+      .flatmapOpt(F.pure(LoginResult.Fail)) { acc =>
         encryptor.isValid(login.password, acc.password).map(if (_) LoginResult.Success(acc) else LoginResult.Fail)
       }
       .flatMap {

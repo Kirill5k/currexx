@@ -10,6 +10,7 @@ import currexx.core.signal.Signal
 import currexx.domain.market.CurrencyPair
 import currexx.domain.signal.Indicator
 import currexx.domain.user.UserId
+import kirill5k.common.cats.syntax.applicative.*
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
 import mongo4cats.database.MongoDatabase
@@ -32,7 +33,7 @@ final private class LiveSignalRepository[F[_]: Async](
       .find(searchBy(uid, sp, Field.CurrencyPair))
       .sortByDesc(Field.Time)
       .all
-      .mapIterable(_.toDomain)
+      .mapList(_.toDomain)
 }
 
 object SignalRepository extends MongoJsonCodecs:

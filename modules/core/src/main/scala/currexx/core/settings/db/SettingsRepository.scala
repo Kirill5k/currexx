@@ -8,6 +8,7 @@ import currexx.core.common.db.Repository.Field
 import currexx.core.settings.{GlobalSettings, SignalSettings, TradeSettings}
 import currexx.domain.errors.AppError
 import currexx.domain.user.UserId
+import kirill5k.common.cats.syntax.applicative.*
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
 import mongo4cats.database.MongoDatabase
@@ -40,7 +41,7 @@ final private class LiveSettingsRepository[F[_]](
     collection
       .find(userIdEq(uid))
       .first
-      .mapOption(_.toDomain)
+      .mapOpt(_.toDomain)
       .flatMap(settings => F.fromOption(settings, AppError.NotSetup("Global")))
 
   override def createFor(uid: UserId): F[Unit] =
