@@ -158,21 +158,18 @@ final private class LiveOandaBrokerClient[F[_]](
   private def formatFillInfo(fill: OandaBrokerClient.OrderFillTransaction): String =
     s"filled ${fill.units} units ${fill.fillPrice.fold("")(_.toString())} (P/L: ${fill.pl})"
 
-  private def logOrderPlacement(
-      position: TradeOrder.Enter,
-      response: OandaBrokerClient.OpenPositionResponse
-  ): F[Unit] =
-    val orderId    = response.orderCreateTransaction.id
-    val fillStatus = response.orderFillTransaction.map(formatFillInfo).getOrElse("pending")
-    val cancelFlag = response.orderCancelTransaction.map(c => s" [CANCELLED: ${c.`type`}]").getOrElse("")
-    val txIds      = response.relatedTransactionIDs.mkString(", ")
+  private def logOrderPlacement(pos: TradeOrder.Enter, res: OandaBrokerClient.OpenPositionResponse): F[Unit] =
+    val fillStatus = res.orderFillTransaction.map(formatFillInfo).getOrElse("pending")
+    val cancelFlag = res.orderCancelTransaction.map(c => s" [CANCELLED: ${c.`type`}]").getOrElse("")
+    val txIds      = res.relatedTransactionIDs.mkString(", ")
 
     logger.info(
-      s"$name-client/open-position-success: ${position.currencyPair} ${position.position} ${position.volume} lots - " +
-        s"$fillStatus$cancelFlag (orderID: $orderId, txID: ${response.lastTransactionID}, related: [$txIds])"
+      s"$name-client/open-position-success: ${pos.currencyPair} ${pos.position} ${pos.volume} lots - " +
+        s"$fillStatus$cancelFlag " +
+        s"(orderID: ${res.orderCreateTransaction.id}, txID: ${res.lastTransactionID}, related: [$txIds])"
     ) >>
-      F.whenA(response.isCancelled)(
-        logger.warn(s"$name-client/open-position: Order was immediately cancelled for ${position.currencyPair}")
+      F.whenA(res.isCancelled)(
+        logger.warn(s"$name-client/open-position: Order was immediately cancelled for ${pos.currencyPair}")
       )
 
   extension (cp: CurrencyPair) private def toInstrument: String = s"${cp.base}_${cp.quote}"
