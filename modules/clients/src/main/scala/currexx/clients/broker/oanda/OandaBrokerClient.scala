@@ -19,6 +19,7 @@ import sttp.client4.circe.asJson
 import sttp.client4.WebSocketStreamBackend
 import sttp.model.StatusCode
 
+import java.time.Instant
 import scala.concurrent.duration.*
 
 private[clients] trait OandaBrokerClient[F[_]] extends Fs2HttpClient[F]:
@@ -114,13 +115,41 @@ final private class LiveOandaBrokerClient[F[_]](
         .auth
         .bearer(params.apiKey)
         .body(asJson(OandaBrokerClient.OpenPositionRequest.from(position)))
-        .response(asStringAlways)
+        .response(asJson[OandaBrokerClient.OpenPositionResponse])
     }.flatMap { r =>
       r.code match
-        case StatusCode.Created   => F.unit
-        case StatusCode.Forbidden => clock.sleep(30.seconds) >> openPosition(accountId, params, position)
-        case status               =>
-          logger.error(s"$name-client/open-position-${status.code}\n${r.body}") >>
+        case StatusCode.Created =>
+          r.body match
+            case Right(res) =>
+              val orderId  = res.orderCreateTransaction.id
+              val fillInfo = res.orderFillTransaction
+                .map { fill =>
+                  val priceInfo = fill.tradeOpened.map(t => s"@ ${t.price}").orElse(
+                    fill.tradesClosed.flatMap(_.headOption).map(t => s"@ ${t.price}")
+                  ).orElse(
+                    fill.tradeReduced.map(t => s"@ ${t.price}")
+                  ).getOrElse("")
+                  s"filled ${fill.units} units $priceInfo (P/L: ${fill.pl})"
+                }
+                .getOrElse("pending")
+              val cancelInfo = res.orderCancelTransaction.map(c => s" [CANCELLED: ${c.`type`}]").getOrElse("")
+              val txIds      = res.relatedTransactionIDs.mkString(", ")
+
+              logger.info(
+                s"$name-client/open-position-success: ${position.currencyPair} ${position.position} ${position.volume} lots - " +
+                  s"$fillInfo$cancelInfo (orderID: $orderId, txID: ${res.lastTransactionID}, related: [$txIds])"
+              ) >> F.whenA(res.orderCancelTransaction.isDefined)(
+                logger.warn(s"$name-client/open-position: Order was immediately cancelled for ${position.currencyPair}")
+              )
+            case Left(err) =>
+              // Fallback: log raw response if parsing fails
+              logger.warn(s"$name-client/open-position: Created but couldn't parse response: $err") >> F.unit
+        case StatusCode.Forbidden =>
+          logger.warn(s"$name-client/open-position: Rate limited, retrying in 30s") >>
+            clock.sleep(30.seconds) >> openPosition(accountId, params, position)
+        case status =>
+          val errorBody = r.body.fold(identity, _ => "")
+          logger.error(s"$name-client/open-position-${status.code}\n$errorBody") >>
             F.raiseError(AppError.ClientFailure(name, s"Open position returned ${status.code}"))
     }
 
@@ -166,6 +195,68 @@ object OandaBrokerClient {
   final case class OpenPositionRequest(order: OpenPositionOrder) derives Codec.AsObject
 
   final case class ClosePositionResponse(lastTransactionID: String) derives Codec.AsObject
+
+  final case class OpenPositionResponse(
+      orderCreateTransaction: OrderTransaction,
+      orderFillTransaction: Option[OrderFillTransaction],
+      orderCancelTransaction: Option[OrderCancelTransaction],
+      relatedTransactionIDs: List[String],
+      lastTransactionID: String
+  ) derives Codec.AsObject
+
+  final case class OrderTransaction(
+      id: String,
+      time: Instant,
+      userID: Int,
+      accountID: String,
+      batchID: String,
+      requestID: String,
+  ) derives Codec.AsObject
+
+  final case class OrderFillTransaction(
+      id: String,
+      time: Instant,
+      userID: Int,
+      accountID: String,
+      batchID: String,
+      requestID: String,
+      `type`: String,
+      units: String,
+      pl: BigDecimal,
+      tradeOpened: Option[TradeOpened],
+      tradesClosed: Option[List[TradeClosed]],
+      tradeReduced: Option[TradeReduced]
+  ) derives Codec.AsObject
+
+  final case class TradeOpened(
+      tradeID: String,
+      units: String,
+      price: BigDecimal
+  ) derives Codec.AsObject
+
+  final case class TradeClosed(
+      tradeID: String,
+      units: String,
+      price: BigDecimal,
+      realizedPL: BigDecimal
+  ) derives Codec.AsObject
+
+  final case class TradeReduced(
+      tradeID: String,
+      units: String,
+      price: BigDecimal,
+      realizedPL: BigDecimal
+  ) derives Codec.AsObject
+
+  final case class OrderCancelTransaction(
+      id: String,
+      time: Instant,
+      userID: Int,
+      accountID: String,
+      batchID: String,
+      requestID: String,
+      `type`: String
+  ) derives Codec.AsObject
 
   object OpenPositionRequest:
     def from(order: TradeOrder.Enter): OpenPositionRequest =
