@@ -120,30 +120,8 @@ final private class LiveOandaBrokerClient[F[_]](
       r.code match
         case StatusCode.Created =>
           r.body match
-            case Right(res) =>
-              val orderId  = res.orderCreateTransaction.id
-              val fillInfo = res.orderFillTransaction
-                .map { fill =>
-                  val priceInfo = fill.tradeOpened.map(t => s"@ ${t.price}").orElse(
-                    fill.tradesClosed.flatMap(_.headOption).map(t => s"@ ${t.price}")
-                  ).orElse(
-                    fill.tradeReduced.map(t => s"@ ${t.price}")
-                  ).getOrElse("")
-                  s"filled ${fill.units} units $priceInfo (P/L: ${fill.pl})"
-                }
-                .getOrElse("pending")
-              val cancelInfo = res.orderCancelTransaction.map(c => s" [CANCELLED: ${c.`type`}]").getOrElse("")
-              val txIds      = res.relatedTransactionIDs.mkString(", ")
-
-              logger.info(
-                s"$name-client/open-position-success: ${position.currencyPair} ${position.position} ${position.volume} lots - " +
-                  s"$fillInfo$cancelInfo (orderID: $orderId, txID: ${res.lastTransactionID}, related: [$txIds])"
-              ) >> F.whenA(res.orderCancelTransaction.isDefined)(
-                logger.warn(s"$name-client/open-position: Order was immediately cancelled for ${position.currencyPair}")
-              )
-            case Left(err) =>
-              // Fallback: log raw response if parsing fails
-              logger.warn(s"$name-client/open-position: Created but couldn't parse response: $err") >> F.unit
+            case Right(res) => logOrderPlacement(position, res)
+            case Left(err)  => logger.warn(s"$name-client/open-position: Created but couldn't parse response: $err")
         case StatusCode.Forbidden =>
           logger.warn(s"$name-client/open-position: Rate limited, retrying in 30s") >>
             clock.sleep(30.seconds) >> openPosition(accountId, params, position)
@@ -177,11 +155,40 @@ final private class LiveOandaBrokerClient[F[_]](
         logger.error(s"$name-client/${meta.code.code}: $errorMessage") >>
           F.raiseError(AppError.ClientFailure(name, s"$endpoint returned ${meta.code}: $errorMessage"))
 
+  private def formatFillInfo(fill: OandaBrokerClient.OrderFillTransaction): String =
+    s"filled ${fill.units} units ${fill.fillPrice.fold("")(_.toString())} (P/L: ${fill.pl})"
+
+  private def logOrderPlacement(
+      position: TradeOrder.Enter,
+      response: OandaBrokerClient.OpenPositionResponse
+  ): F[Unit] =
+    val orderId    = response.orderCreateTransaction.id
+    val fillStatus = response.orderFillTransaction.map(formatFillInfo).getOrElse("pending")
+    val cancelFlag = response.orderCancelTransaction.map(c => s" [CANCELLED: ${c.`type`}]").getOrElse("")
+    val txIds      = response.relatedTransactionIDs.mkString(", ")
+
+    logger.info(
+      s"$name-client/open-position-success: ${position.currencyPair} ${position.position} ${position.volume} lots - " +
+        s"$fillStatus$cancelFlag (orderID: $orderId, txID: ${response.lastTransactionID}, related: [$txIds])"
+    ) >>
+      F.whenA(response.isCancelled)(
+        logger.warn(s"$name-client/open-position: Order was immediately cancelled for ${position.currencyPair}")
+      )
+
   extension (cp: CurrencyPair) private def toInstrument: String = s"${cp.base}_${cp.quote}"
 
   extension (c: OandaBrokerConfig)
     private def baseUri(demo: Boolean): String =
       if (demo) c.demoBaseUri else c.liveBaseUri
+
+  extension (fill: OandaBrokerClient.OrderFillTransaction)
+    private def fillPrice: Option[BigDecimal] =
+      fill.tradeOpened
+        .map(_.price)
+        .orElse(fill.tradesClosed.flatMap(_.headOption).map(_.price))
+        .orElse(fill.tradeReduced.map(_.price))
+
+  extension (res: OandaBrokerClient.OpenPositionResponse) def isCancelled: Boolean = res.orderCancelTransaction.isDefined
 }
 
 object OandaBrokerClient {
@@ -210,7 +217,7 @@ object OandaBrokerClient {
       userID: Int,
       accountID: String,
       batchID: String,
-      requestID: String,
+      requestID: String
   ) derives Codec.AsObject
 
   final case class OrderFillTransaction(
