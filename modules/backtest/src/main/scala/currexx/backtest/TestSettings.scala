@@ -30,5 +30,5 @@ object TestSettings:
       userId = userId,
       marketState = MarketState(userId, currencyPair, None, MarketProfile(), now, now),
       signal = SignalSettings(indicators),
-      trade = TradeSettings(strategy, BrokerParameters.Xtb("user1", "password", true), TradingParameters(BigDecimal(0.1)))
+      trade = TradeSettings(strategy, BrokerParameters.Oanda("key", true, "account"), TradingParameters(BigDecimal(0.1)))
     )

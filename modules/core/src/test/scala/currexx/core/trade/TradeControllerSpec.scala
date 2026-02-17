@@ -85,10 +85,10 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
              |    "currencyPair" : "GBPEUR"
              |  },
              |  "broker" : {
-             |    "userId" : "user1",
-             |    "password" : "password",
+             |    "apiKey" : "key",
+             |    "accountId" : "account",
              |    "demo" : true,
-             |    "broker" : "xtb"
+             |    "broker" : "oanda"
              |  },
              |  "time" : "${Trades.ts}"
              |}

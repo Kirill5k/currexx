@@ -5,7 +5,6 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.clients.broker.BrokerClient
 import currexx.clients.broker.oanda.{OandaBrokerClient, OandaBrokerConfig}
-import currexx.clients.broker.xtb.{XtbClient, XtbConfig}
 import currexx.clients.data.MarketDataClient
 import currexx.clients.data.alphavantage.AlphaVantageConfig
 import currexx.clients.data.twelvedata.{TwelveDataClient, TwelveDataConfig}
@@ -19,7 +18,6 @@ import scala.concurrent.duration.*
 final case class ClientsConfig(
     alphaVantage: AlphaVantageConfig,
     twelveData: TwelveDataConfig,
-    xtb: XtbConfig,
     oandaBroker: OandaBrokerConfig,
     oandaData: OandaDataConfig
 )
@@ -37,8 +35,7 @@ object Clients:
     for
       twelvedata  <- TwelveDataClient.make(config.twelveData, fs2Backend, delayBetweenClientFailures = 1.minute)
       oandadata   <- OandaDataClient.make[F](config.oandaData, fs2Backend)
-      xtb         <- XtbClient.make[F](config.xtb, fs2Backend)
       oandabroker <- OandaBrokerClient.make[F](config.oandaBroker, fs2Backend)
-      broker      <- BrokerClient.make[F](xtb, oandabroker)
+      broker      <- BrokerClient.make[F](oandabroker)
       data        <- MarketDataClient.make[F](twelvedata, oandadata)
     yield Clients[F](data, broker)

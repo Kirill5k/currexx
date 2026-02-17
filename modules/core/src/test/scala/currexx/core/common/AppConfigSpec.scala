@@ -22,7 +22,6 @@ class AppConfigSpec extends IOWordSpec {
         config.clients.alphaVantage.apiKey mustBe "av-key"
         config.clients.twelveData.apiKey mustBe "td-key"
         config.clients.oandaData.apiKey mustBe "od-key"
-        config.clients.xtb.baseUri mustBe "wss://ws.xtb.com"
       }
   }
 }

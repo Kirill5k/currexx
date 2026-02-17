@@ -10,7 +10,7 @@ object Settings {
 
   lazy val trade = TradeSettings(
     TradeStrategy(Nil, Nil),
-    BrokerParameters.Xtb("user1", "password", demo = true),
+    BrokerParameters.Oanda("key", true, "account"),
     TradingParameters(BigDecimal(0.1))
   )
 

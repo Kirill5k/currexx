@@ -10,7 +10,7 @@ import java.time.temporal.ChronoField
 object Trades {
   lazy val ts = Instant.now.`with`(ChronoField.MILLI_OF_SECOND, 0)
 
-  lazy val broker = BrokerParameters.Xtb("user1", "password", demo = true)
+  lazy val broker = BrokerParameters.Oanda("key", true, "account")
 
   lazy val order = TradeOrderPlacement(
     Users.uid,

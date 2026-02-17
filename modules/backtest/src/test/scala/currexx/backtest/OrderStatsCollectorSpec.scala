@@ -12,7 +12,7 @@ import java.time.Instant
 class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
 
   val uid = UserId("user-1")
-  val brokerParams = BrokerParameters.Xtb("u", "p", true)
+  val brokerParams = BrokerParameters.Oanda("key", true, "account")
   val cp = CurrencyPair(Currency.EUR, Currency.USD)
   val time = Instant.now()
 
