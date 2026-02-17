@@ -16,10 +16,13 @@ import currexx.domain.monitor.Limits
 import currexx.domain.signal.Direction
 import currexx.domain.user.UserId
 import kirill5k.common.cats.Clock
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import java.time.Instant
 
 class TradeServiceSpec extends IOWordSpec {
+  given Logger[IO] = Slf4jLogger.getLogger[IO]
 
   "A TradeService" when {
     val now         = Instant.now()
