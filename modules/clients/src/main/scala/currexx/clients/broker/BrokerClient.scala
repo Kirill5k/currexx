@@ -3,10 +3,10 @@ package currexx.clients.broker
 import cats.Monad
 import cats.data.NonEmptyList
 import currexx.clients.broker.oanda.OandaBrokerClient
-import currexx.domain.market.{CurrencyPair, OpenedTradeOrder, TradeOrder}
+import currexx.domain.market.{CurrencyPair, OpenedTradeOrder, OrderPlacementStatus, TradeOrder}
 
 trait BrokerClient[F[_]]:
-  def submit(parameters: BrokerParameters, order: TradeOrder): F[Unit]
+  def submit(parameters: BrokerParameters, order: TradeOrder): F[OrderPlacementStatus]
   def find(parameters: BrokerParameters, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]]
 
 final private class LiveBrokerClient[F[_]](
@@ -16,7 +16,7 @@ final private class LiveBrokerClient[F[_]](
     parameters match
       case params: BrokerParameters.Oanda => oandaClient.getCurrentOrders(params, cps)
 
-  override def submit(parameters: BrokerParameters, order: TradeOrder): F[Unit] =
+  override def submit(parameters: BrokerParameters, order: TradeOrder): F[OrderPlacementStatus] =
     parameters match
       case params: BrokerParameters.Oanda => oandaClient.submit(params, order)
 

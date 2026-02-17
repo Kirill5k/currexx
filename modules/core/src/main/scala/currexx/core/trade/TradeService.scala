@@ -16,11 +16,12 @@ import currexx.core.market.{MarketProfile, MarketState}
 import currexx.core.settings.TradeSettings
 import currexx.core.trade.TradeAction
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
-import currexx.domain.market.{CurrencyPair, Interval, TradeOrder}
+import currexx.domain.market.{CurrencyPair, Interval, OrderPlacementStatus, TradeOrder}
 import currexx.domain.monitor.Limits
 import kirill5k.common.cats.Clock
 import currexx.domain.user.UserId
 import fs2.Stream
+import org.typelevel.log4cats.Logger
 
 import java.time.Instant
 
@@ -41,7 +42,8 @@ final private class LiveTradeService[F[_]](
     private val dispatcher: ActionDispatcher[F]
 )(using
     F: Temporal[F],
-    clock: Clock[F]
+    clock: Clock[F],
+    logger: Logger[F]
 ) extends TradeService[F] {
   override def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]] =
     orderRepository.getAll(uid, sp)
@@ -152,13 +154,17 @@ final private class LiveTradeService[F[_]](
   }
 
   private def submitOrderPlacement(top: TradeOrderPlacement, skipEvent: Boolean = false): F[Unit] =
-    brokerClient.submit(top.broker, top.order) *>
-      orderRepository.save(top) *>
-      F.whenA(!skipEvent)(dispatcher.dispatch(Action.ProcessTradeOrderPlacement(top)))
+    brokerClient.submit(top.broker, top.order).flatMap {
+      case OrderPlacementStatus.Success | OrderPlacementStatus.Pending =>
+        orderRepository.save(top) *>
+          F.whenA(!skipEvent)(dispatcher.dispatch(Action.ProcessTradeOrderPlacement(top)))
+      case OrderPlacementStatus.Cancelled(reason) =>
+        logger.warn(s"Order was cancelled by broker: ${top.order} - Reason: $reason")
+    }
 }
 
 object TradeService:
-  def make[F[_]: {Temporal, Clock}](
+  def make[F[_]: {Temporal, Clock, Logger}](
       settingsRepo: TradeSettingsRepository[F],
       orderRepository: TradeOrderRepository[F],
       brokerClient: BrokerClient[F],

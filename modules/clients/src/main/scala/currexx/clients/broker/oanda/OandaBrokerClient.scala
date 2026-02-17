@@ -9,7 +9,7 @@ import currexx.clients.Fs2HttpClient
 import currexx.clients.broker.BrokerParameters
 import currexx.clients.broker.oanda.OandaBrokerClient.ClosePositionRequest
 import currexx.domain.errors.AppError
-import currexx.domain.market.{CurrencyPair, OpenedTradeOrder, TradeOrder}
+import currexx.domain.market.{CurrencyPair, OpenedTradeOrder, OrderPlacementStatus, TradeOrder}
 import io.circe.Codec
 import kirill5k.common.cats.Clock
 import org.typelevel.log4cats.Logger
@@ -23,7 +23,7 @@ import java.time.Instant
 import scala.concurrent.duration.*
 
 private[clients] trait OandaBrokerClient[F[_]] extends Fs2HttpClient[F]:
-  def submit(params: BrokerParameters.Oanda, order: TradeOrder): F[Unit]
+  def submit(params: BrokerParameters.Oanda, order: TradeOrder): F[OrderPlacementStatus]
   def getCurrentOrders(params: BrokerParameters.Oanda, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]]
 
 final private class LiveOandaBrokerClient[F[_]](
@@ -36,21 +36,22 @@ final private class LiveOandaBrokerClient[F[_]](
 ) extends OandaBrokerClient[F] {
   override protected val name: String = "oanda"
 
-  override def submit(params: BrokerParameters.Oanda, order: TradeOrder): F[Unit] = order match
+  override def submit(params: BrokerParameters.Oanda, order: TradeOrder): F[OrderPlacementStatus] = order match
     case enter: TradeOrder.Enter =>
       for
         accountId <- getAccountId(params)
-        _         <- openPosition(accountId, params, enter)
-      yield ()
+        status    <- openPosition(accountId, params, enter)
+      yield status
     case exit: TradeOrder.Exit =>
       for
         accountId <- getAccountId(params)
         position  <- getPosition(accountId, params, exit.currencyPair)
-        _         <- F.ifM(F.pure(position.exists(_.isOpen)))(
-          closePosition(accountId, params, position.get),
+        status    <- F.ifM(F.pure(position.exists(_.isOpen)))(
+          closePosition(accountId, params, position.get).as(OrderPlacementStatus.Success),
           logger.warn(s"$name-client: No open position for $accountId / ${exit.currencyPair}")
+            .as(OrderPlacementStatus.Success)
         )
-      yield ()
+      yield status
 
   override def getCurrentOrders(params: BrokerParameters.Oanda, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]] =
     for
@@ -108,7 +109,7 @@ final private class LiveOandaBrokerClient[F[_]](
         case Left(err) => handleError("close-position", err)
     }
 
-  private def openPosition(accountId: String, params: BrokerParameters.Oanda, position: TradeOrder.Enter): F[Unit] =
+  private def openPosition(accountId: String, params: BrokerParameters.Oanda, position: TradeOrder.Enter): F[OrderPlacementStatus] =
     dispatch {
       basicRequest
         .post(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/orders")
@@ -120,8 +121,18 @@ final private class LiveOandaBrokerClient[F[_]](
       r.code match
         case StatusCode.Created =>
           r.body match
-            case Right(res) => logOrderPlacement(position, res)
-            case Left(err)  => logger.warn(s"$name-client/open-position: Created but couldn't parse response: $err")
+            case Right(res) => 
+              logOrderPlacement(position, res) >> {
+                if res.isCancelled then
+                  F.pure(OrderPlacementStatus.Cancelled(res.orderCancelTransaction.get.reason))
+                else if res.orderFillTransaction.isDefined then
+                  F.pure(OrderPlacementStatus.Success)
+                else
+                  F.pure(OrderPlacementStatus.Pending)
+              }
+            case Left(err)  => 
+              logger.warn(s"$name-client/open-position: Created but couldn't parse response: $err")
+                .as(OrderPlacementStatus.Success)
         case StatusCode.Forbidden =>
           logger.warn(s"$name-client/open-position: Rate limited, retrying in 30s") >>
             clock.sleep(30.seconds) >> openPosition(accountId, params, position)
@@ -259,7 +270,8 @@ object OandaBrokerClient {
       accountID: String,
       batchID: String,
       requestID: String,
-      `type`: String
+      `type`: String,
+      reason: String
   ) derives Codec.AsObject
 
   object OpenPositionRequest:

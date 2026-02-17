@@ -5,7 +5,7 @@ import cats.effect.IO
 import currexx.clients.broker.BrokerParameters
 import currexx.domain.errors.AppError
 import currexx.domain.market.Currency.{EUR, GBP, USD}
-import currexx.domain.market.{CurrencyPair, TradeOrder}
+import currexx.domain.market.{CurrencyPair, OrderPlacementStatus, TradeOrder}
 import kirill5k.common.sttp.test.Sttp4WordSpec
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -34,10 +34,10 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
 
       val result = for
         client <- OandaBrokerClient.make[IO](config, testingBackend)
-        _      <- client.submit(params, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0")))
-      yield ()
+        status <- client.submit(params, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0")))
+      yield status
 
-      result.asserting(_ mustBe ())
+      result.asserting(_ mustBe OrderPlacementStatus.Success)
     }
 
     "submit enter sell order successfully" in {
@@ -201,10 +201,10 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
       val liveParams: BrokerParameters.Oanda = BrokerParameters.Oanda("test-api-key", demo = false, "123-456-789")
       val result                             = for
         client <- OandaBrokerClient.make[IO](config, testingBackend)
-        _      <- client.submit(liveParams, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0")))
-      yield ()
+        status <- client.submit(liveParams, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0")))
+      yield status
 
-      result.asserting(_ mustBe ())
+      result.asserting(_ mustBe OrderPlacementStatus.Success)
     }
 
     "handle invalid account id" in {

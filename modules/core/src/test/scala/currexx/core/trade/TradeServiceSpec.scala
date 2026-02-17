@@ -11,7 +11,7 @@ import currexx.core.fixtures.{Markets, Settings, Trades, Users}
 import currexx.core.market.{MarketProfile, TrendState}
 import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
 import kirill5k.common.cats.test.IOWordSpec
-import currexx.domain.market.{CurrencyPair, TradeOrder}
+import currexx.domain.market.{CurrencyPair, OrderPlacementStatus, TradeOrder}
 import currexx.domain.monitor.Limits
 import currexx.domain.signal.Direction
 import currexx.domain.user.UserId
@@ -48,7 +48,7 @@ class TradeServiceSpec extends IOWordSpec {
       "submit order placements" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
-        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(OrderPlacementStatus.Success)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
         val order  = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, 1.3, 0.1)
@@ -72,7 +72,7 @@ class TradeServiceSpec extends IOWordSpec {
       "close existing orders before submitting the actual placement" in {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
-        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(OrderPlacementStatus.Success)
         when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturnNone
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
@@ -135,7 +135,7 @@ class TradeServiceSpec extends IOWordSpec {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
         when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturnSome(Trades.order)
-        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(OrderPlacementStatus.Success)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
         val result = for
@@ -182,7 +182,7 @@ class TradeServiceSpec extends IOWordSpec {
         val (settRepo, orderRepo, brokerClient, dataClient, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
         when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]])).thenReturnIO(List(Trades.openedOrder))
-        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(OrderPlacementStatus.Success)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
         val cps    = NonEmptyList.of(Markets.gbpeur)
@@ -209,7 +209,7 @@ class TradeServiceSpec extends IOWordSpec {
         when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
         when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]]))
           .thenReturnIO(List(Trades.openedOrder.copy(profit = -100)))
-        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(OrderPlacementStatus.Success)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
         val cps    = NonEmptyList.of(Markets.gbpeur)
@@ -302,7 +302,7 @@ class TradeServiceSpec extends IOWordSpec {
         val settings                                              = Settings.trade.copy(strategy = TradeStrategy(List(openLongRule), Nil))
         when(settRepo.get(any[UserId])).thenReturnIO(settings)
         when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
-        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(OrderPlacementStatus.Success)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
         val tradeState = state.copy(currentPosition = None)
@@ -330,7 +330,7 @@ class TradeServiceSpec extends IOWordSpec {
         val settings  = Settings.trade.copy(strategy = TradeStrategy(Nil, List(closeRule)))
         when(settRepo.get(any[UserId])).thenReturnIO(settings)
         when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
-        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(OrderPlacementStatus.Success)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
         val result = for
@@ -357,7 +357,7 @@ class TradeServiceSpec extends IOWordSpec {
         val settings = Settings.trade.copy(strategy = TradeStrategy(openRules = List(openShortRule), closeRules = Nil))
         when(settRepo.get(any[UserId])).thenReturnIO(settings)
         when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
-        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnUnit
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(OrderPlacementStatus.Success)
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
         val result = for

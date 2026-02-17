@@ -50,3 +50,8 @@ final case class OpenedTradeOrder(
     volume: BigDecimal,
     profit: BigDecimal
 )
+
+enum OrderPlacementStatus:
+  case Success
+  case Pending
+  case Cancelled(reason: String)
