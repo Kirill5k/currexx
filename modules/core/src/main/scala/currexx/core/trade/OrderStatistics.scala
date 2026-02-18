@@ -3,17 +3,14 @@ package currexx.core.trade
 import currexx.domain.market.CurrencyPair
 import io.circe.Codec
 
-import java.time.Instant
-
 final case class OrderStatistics(
     totalOrders: Int,
     successfulOrders: Int,
     pendingOrders: Int,
     cancelledOrders: Int,
     enterOrders: EnterOrderStats,
-    exitOrders: ExitOrderStats,
-    currencyBreakdown: List[CurrencyStatistics],
-    timeRange: Option[TimeRange]
+    exitOrders: Int,
+    currencyBreakdown: List[CurrencyStatistics]
 ) derives Codec.AsObject
 
 final case class EnterOrderStats(
@@ -22,10 +19,6 @@ final case class EnterOrderStats(
     sellCount: Int,
     totalVolume: BigDecimal,
     averageVolume: Option[BigDecimal]
-) derives Codec.AsObject
-
-final case class ExitOrderStats(
-    total: Int
 ) derives Codec.AsObject
 
 final case class CurrencyStatistics(
@@ -39,9 +32,4 @@ final case class CurrencyStatistics(
     buyOrders: Int,
     sellOrders: Int,
     totalVolume: BigDecimal
-) derives Codec.AsObject
-
-final case class TimeRange(
-    from: Instant,
-    to: Instant
 ) derives Codec.AsObject

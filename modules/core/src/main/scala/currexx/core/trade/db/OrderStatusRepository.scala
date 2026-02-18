@@ -6,7 +6,7 @@ import cats.syntax.flatMap.*
 import currexx.core.common.db.Repository
 import currexx.core.common.db.Repository.Field
 import currexx.core.common.http.SearchParams
-import currexx.core.trade.{CurrencyStatistics, EnterOrderStats, ExitOrderStats, OrderStatistics, TimeRange, TradeOrderPlacement}
+import currexx.core.trade.{CurrencyStatistics, EnterOrderStats, OrderStatistics, TradeOrderPlacement}
 import currexx.domain.market.{CurrencyPair, OrderPlacementStatus, TradeOrder}
 import currexx.domain.user.UserId
 import mongo4cats.circe.MongoJsonCodecs
@@ -34,34 +34,10 @@ final private class LiveOrderStatusRepository[F[_]: Async](
       .map { entities =>
         val orders = entities.toList
 
-        // Overall stats
-        val totalOrders      = orders.size
-        val successfulOrders = orders.count(_.status == OrderPlacementStatus.Success)
-        val pendingOrders    = orders.count(_.status == OrderPlacementStatus.Pending)
-        val cancelledOrders  = orders.count(_.status.isInstanceOf[OrderPlacementStatus.Cancelled])
+        val enterOrders = orders.filter(_.orderKind == "enter")
+        val volumes     = enterOrders.flatMap(_.volume)
+        val totalVolume = volumes.sum
 
-        // Enter/Exit stats
-        val enterOrders    = orders.filter(_.orderKind == "enter")
-        val exitOrdersList = orders.filter(_.orderKind == "exit")
-        val buyOrders      = enterOrders.count(_.position.contains(TradeOrder.Position.Buy))
-        val sellOrders     = enterOrders.count(_.position.contains(TradeOrder.Position.Sell))
-        val volumes        = enterOrders.flatMap(_.volume)
-        val totalVolume    = volumes.sum
-        val avgVolume      = if (volumes.nonEmpty) Some(totalVolume / volumes.size) else None
-
-        val enterStats = EnterOrderStats(
-          total = enterOrders.size,
-          buyCount = buyOrders,
-          sellCount = sellOrders,
-          totalVolume = totalVolume,
-          averageVolume = avgVolume
-        )
-
-        val exitStats = ExitOrderStats(
-          total = exitOrdersList.size
-        )
-
-        // Currency pair breakdown
         val currencyBreakdown = orders
           .groupBy(_.currencyPair)
           .map { case (cp, cpOrders) =>
@@ -82,21 +58,20 @@ final private class LiveOrderStatusRepository[F[_]: Async](
           .toList
           .sortBy(-_.totalOrders) // Sort by most active pairs
 
-        // Time range
-        val timeRange = if (orders.nonEmpty) {
-          val times = orders.map(_.time)
-          Some(TimeRange(times.min, times.max))
-        } else None
-
         OrderStatistics(
-          totalOrders = totalOrders,
-          successfulOrders = successfulOrders,
-          pendingOrders = pendingOrders,
-          cancelledOrders = cancelledOrders,
-          enterOrders = enterStats,
-          exitOrders = exitStats,
-          currencyBreakdown = currencyBreakdown,
-          timeRange = timeRange
+          totalOrders = orders.size,
+          successfulOrders = orders.count(_.status == OrderPlacementStatus.Success),
+          pendingOrders = orders.count(_.status == OrderPlacementStatus.Pending),
+          cancelledOrders = orders.count(_.status.isInstanceOf[OrderPlacementStatus.Cancelled]),
+          enterOrders = EnterOrderStats(
+            total = enterOrders.size,
+            buyCount = enterOrders.count(_.position.contains(TradeOrder.Position.Buy)),
+            sellCount = enterOrders.count(_.position.contains(TradeOrder.Position.Sell)),
+            totalVolume = totalVolume,
+            averageVolume = Option.when(volumes.nonEmpty)(totalVolume / volumes.size)
+          ),
+          exitOrders = orders.count(_.orderKind == "exit"),
+          currencyBreakdown = currencyBreakdown
         )
       }
 
