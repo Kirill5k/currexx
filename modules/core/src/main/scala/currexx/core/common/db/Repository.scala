@@ -62,6 +62,6 @@ object Repository {
     val Settings    = "settings"
     val Signals     = "signals"
     val TradeOrders = "trade-orders"
-    val OrderStatus = "order-status"
+    val OrderStatus = "order-statuses"
   }
 }
