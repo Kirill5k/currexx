@@ -67,9 +67,36 @@ class TradeServiceSpec extends IOWordSpec {
           verifyNoInteractions(dataClient)
           verify(settRepo).get(Users.uid)
           verify(brokerClient).submit(Trades.broker, order)
+          verify(orderStatusRepo).save(placedOrder, OrderPlacementStatus.Success)
           verify(orderRepo, never).findLatestBy(any[UserId], any[CurrencyPair])
           verify(orderRepo).save(placedOrder)
           disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
+          res mustBe ()
+        }
+      }
+
+      "save cancelled order status when broker rejects order" in {
+        val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
+        val cancelReason = "Insufficient funds"
+        when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(OrderPlacementStatus.Cancelled(cancelReason))
+        when(orderStatusRepo.save(any[TradeOrderPlacement], any[OrderPlacementStatus])).thenReturnUnit
+
+        val order  = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, 1.3, 0.1)
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+          _   <- svc.placeOrder(Users.uid, order, false)
+        yield ()
+
+        result.asserting { res =>
+          val placedOrder = TradeOrderPlacement(Users.uid, order, Settings.trade.broker, now)
+          verifyNoInteractions(dataClient)
+          verify(settRepo).get(Users.uid)
+          verify(brokerClient).submit(Trades.broker, order)
+          verify(orderStatusRepo).save(placedOrder, OrderPlacementStatus.Cancelled(cancelReason))
+          verify(orderRepo, never).save(any[TradeOrderPlacement])
+          verify(orderRepo, never).findLatestBy(any[UserId], any[CurrencyPair])
+          disp.submittedActions mustBe empty
           res mustBe ()
         }
       }
@@ -159,6 +186,8 @@ class TradeServiceSpec extends IOWordSpec {
           verify(dataClient).latestPrice(Markets.gbpeur)
           verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
           verify(brokerClient).submit(Trades.broker, exitOrder)
+          verify(orderStatusRepo).save(placedOrder, OrderPlacementStatus.Success)
+          verify(orderStatusRepo).save(placedOrder, OrderPlacementStatus.Success)
           verify(orderRepo).save(placedOrder)
           disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
           res mustBe ()
@@ -209,6 +238,7 @@ class TradeServiceSpec extends IOWordSpec {
           verify(settRepo).get(Users.uid)
           verify(brokerClient).find(Trades.broker, cps)
           verify(brokerClient).submit(Trades.broker, exitOrder)
+          verify(orderStatusRepo).save(placedOrder, OrderPlacementStatus.Success)
           verify(orderRepo).save(placedOrder)
           disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
           res mustBe ()
@@ -238,6 +268,7 @@ class TradeServiceSpec extends IOWordSpec {
           verify(settRepo).get(Users.uid)
           verify(brokerClient).find(Trades.broker, cps)
           verify(brokerClient).submit(Trades.broker, exitOrder)
+          verify(orderStatusRepo).save(placedOrder, OrderPlacementStatus.Success)
           verify(orderRepo).save(placedOrder)
           disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
           res mustBe ()
@@ -332,6 +363,7 @@ class TradeServiceSpec extends IOWordSpec {
           verify(settRepo).get(state.userId)
           verify(dataClient).latestPrice(state.currencyPair)
           verify(brokerClient).submit(settings.broker, order)
+          verify(orderStatusRepo).save(placedOrder, OrderPlacementStatus.Success)
           verify(orderRepo).save(placedOrder)
           disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
           res mustBe ()
@@ -360,6 +392,7 @@ class TradeServiceSpec extends IOWordSpec {
           verify(settRepo).get(state.userId)
           verify(dataClient).latestPrice(state.currencyPair)
           verify(brokerClient).submit(settings.broker, order)
+          verify(orderStatusRepo).save(placedOrder, OrderPlacementStatus.Success)
           verify(orderRepo).save(placedOrder)
           disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
           res mustBe ()
@@ -390,7 +423,9 @@ class TradeServiceSpec extends IOWordSpec {
           verify(settRepo).get(state.userId)
           verify(dataClient).latestPrice(state.currencyPair)
           verify(brokerClient).submit(settings.broker, exitOrder)
+          verify(orderStatusRepo).save(placedExitOrder, OrderPlacementStatus.Success)
           verify(brokerClient).submit(settings.broker, openOrder)
+          verify(orderStatusRepo).save(placedOpenOrder, OrderPlacementStatus.Success)
           verify(orderRepo).save(placedExitOrder)
           verify(orderRepo).save(placedOpenOrder)
           disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOpenOrder))
