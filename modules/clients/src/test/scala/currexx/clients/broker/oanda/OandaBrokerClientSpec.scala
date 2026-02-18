@@ -22,7 +22,7 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
   val gbpUsdPair                     = CurrencyPair(GBP, USD)
 
   "An OandaBrokerClient" should {
-    "submit enter buy order successfully" in {
+    "submit enter buy order successfully without response" in {
       val testingBackend = fs2BackendStub
         .whenRequestMatchesPartial {
           case r if r.isGet && r.hasPath("/v3/accounts") =>
@@ -37,7 +37,7 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
         status <- client.submit(params, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0")))
       yield status
 
-      result.asserting(_ mustBe OrderPlacementStatus.Success)
+      result.asserting(_ mustBe OrderPlacementStatus.Pending)
     }
 
     "submit enter sell order successfully" in {
@@ -204,7 +204,7 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
         status <- client.submit(liveParams, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0")))
       yield status
 
-      result.asserting(_ mustBe OrderPlacementStatus.Success)
+      result.asserting(_ mustBe OrderPlacementStatus.Pending)
     }
 
     "handle invalid account id" in {
