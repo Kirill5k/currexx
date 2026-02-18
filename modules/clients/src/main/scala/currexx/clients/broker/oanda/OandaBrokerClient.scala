@@ -46,12 +46,11 @@ final private class LiveOandaBrokerClient[F[_]](
       for
         accountId <- getAccountId(params)
         position  <- getPosition(accountId, params, exit.currencyPair)
-        status    <- F.ifM(F.pure(position.exists(_.isOpen)))(
-          closePosition(accountId, params, position.get).as(OrderPlacementStatus.Success),
+        _         <- F.ifM(F.pure(position.exists(_.isOpen)))(
+          closePosition(accountId, params, position.get),
           logger.warn(s"$name-client: No open position for $accountId / ${exit.currencyPair}")
-            .as(OrderPlacementStatus.Success)
         )
-      yield status
+      yield OrderPlacementStatus.Success
 
   override def getCurrentOrders(params: BrokerParameters.Oanda, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]] =
     for
@@ -121,18 +120,12 @@ final private class LiveOandaBrokerClient[F[_]](
       r.code match
         case StatusCode.Created =>
           r.body match
-            case Right(res) => 
-              logOrderPlacement(position, res) >> {
-                if res.isCancelled then
-                  F.pure(OrderPlacementStatus.Cancelled(res.orderCancelTransaction.get.reason))
-                else if res.orderFillTransaction.isDefined then
-                  F.pure(OrderPlacementStatus.Success)
-                else
-                  F.pure(OrderPlacementStatus.Pending)
-              }
-            case Left(err)  => 
-              logger.warn(s"$name-client/open-position: Created but couldn't parse response: $err")
-                .as(OrderPlacementStatus.Success)
+            case Right(res) =>
+              if res.isCancelled then F.pure(OrderPlacementStatus.Cancelled(res.orderCancelTransaction.get.reason))
+              else if res.orderFillTransaction.isDefined then F.pure(OrderPlacementStatus.Success)
+              else F.pure(OrderPlacementStatus.Pending)
+            case Left(err) =>
+              logger.warn(s"$name-client/open-position: Created but couldn't parse response: $err").as(OrderPlacementStatus.Pending)
         case StatusCode.Forbidden =>
           logger.warn(s"$name-client/open-position: Rate limited, retrying in 30s") >>
             clock.sleep(30.seconds) >> openPosition(accountId, params, position)
@@ -166,37 +159,17 @@ final private class LiveOandaBrokerClient[F[_]](
         logger.error(s"$name-client/${meta.code.code}: $errorMessage") >>
           F.raiseError(AppError.ClientFailure(name, s"$endpoint returned ${meta.code}: $errorMessage"))
 
-  private def formatFillInfo(fill: OandaBrokerClient.OrderFillTransaction): String =
-    s"filled ${fill.units} units ${fill.fillPrice.fold("")(_.toString())} (P/L: ${fill.pl})"
-
-  private def logOrderPlacement(pos: TradeOrder.Enter, res: OandaBrokerClient.OpenPositionResponse): F[Unit] =
-    val fillStatus = res.orderFillTransaction.map(formatFillInfo).getOrElse("pending")
-    val cancelFlag = res.orderCancelTransaction.map(c => s" [CANCELLED: ${c.`type`}]").getOrElse("")
-    val txIds      = res.relatedTransactionIDs.mkString(", ")
-
-    logger.info(
-      s"$name-client/open-position-success: ${pos.currencyPair} ${pos.position} ${pos.volume} lots - " +
-        s"$fillStatus$cancelFlag " +
-        s"(orderID: ${res.orderCreateTransaction.id}, txID: ${res.lastTransactionID}, related: [$txIds])"
-    ) >>
-      F.whenA(res.isCancelled)(
-        logger.warn(s"$name-client/open-position: Order was immediately cancelled for ${pos.currencyPair}")
-      )
-
-  extension (cp: CurrencyPair) private def toInstrument: String = s"${cp.base}_${cp.quote}"
+  extension (cp: CurrencyPair)
+    private def toInstrument: String =
+      s"${cp.base}_${cp.quote}"
 
   extension (c: OandaBrokerConfig)
     private def baseUri(demo: Boolean): String =
       if (demo) c.demoBaseUri else c.liveBaseUri
 
-  extension (fill: OandaBrokerClient.OrderFillTransaction)
-    private def fillPrice: Option[BigDecimal] =
-      fill.tradeOpened
-        .map(_.price)
-        .orElse(fill.tradesClosed.flatMap(_.headOption).map(_.price))
-        .orElse(fill.tradeReduced.map(_.price))
-
-  extension (res: OandaBrokerClient.OpenPositionResponse) def isCancelled: Boolean = res.orderCancelTransaction.isDefined
+  extension (res: OandaBrokerClient.OpenPositionResponse)
+    private def isCancelled: Boolean =
+      res.orderCancelTransaction.isDefined
 }
 
 object OandaBrokerClient {
