@@ -12,6 +12,7 @@ import currexx.core.trade.{TradeOrderPlacement, TradeService}
 import currexx.domain.market.CurrencyPair
 import kirill5k.common.cats.Clock
 import currexx.domain.user.UserId
+import org.typelevel.log4cats.Logger
 
 import scala.collection.mutable.ListBuffer
 
@@ -29,7 +30,7 @@ final private class TestTradeOrderRepository[F[_]: Functor](
   override def findLatestBy(uid: UserId, cp: CurrencyPair): F[Option[TradeOrderPlacement]] = orders.get.map(_.lastOption)
 
 object TestTradeService:
-  def make[F[_]: {Temporal, Clock}](
+  def make[F[_]: {Temporal, Clock, Logger}](
       initialSettings: TradeSettings,
       clients: TestClients[F],
       dispatcher: ActionDispatcher[F]
