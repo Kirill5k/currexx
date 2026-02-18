@@ -3,6 +3,7 @@ package currexx.domain.market
 import currexx.domain.types.EnumType
 import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder, Json}
 import io.circe.syntax.*
+import org.latestbit.circe.adt.codec.*
 
 sealed trait TradeOrder(val kind: String):
   def isEnter: Boolean
@@ -51,7 +52,18 @@ final case class OpenedTradeOrder(
     profit: BigDecimal
 )
 
-enum OrderPlacementStatus:
+enum OrderPlacementStatus derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Success
   case Pending
   case Cancelled(reason: String)
+
+object OrderPlacementStatus:
+  given JsonTaggedAdt.Config[OrderPlacementStatus] = JsonTaggedAdt.Config.Values[OrderPlacementStatus](
+    mappings = Map(
+      "success"   -> JsonTaggedAdt.tagged[OrderPlacementStatus.Success.type],
+      "pending"   -> JsonTaggedAdt.tagged[OrderPlacementStatus.Pending.type],
+      "cancelled" -> JsonTaggedAdt.tagged[OrderPlacementStatus.Cancelled]
+    ),
+    strict = true,
+    typeFieldName = "kind"
+  )

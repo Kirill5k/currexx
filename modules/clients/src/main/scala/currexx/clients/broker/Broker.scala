@@ -1,7 +1,9 @@
 package currexx.clients.broker
 
+import currexx.domain.types.EnumType
 import org.latestbit.circe.adt.codec.*
 
+object Broker extends EnumType[Broker](() => Broker.values)
 enum Broker:
   case Oanda
 

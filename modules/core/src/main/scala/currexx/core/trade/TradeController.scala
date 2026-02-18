@@ -44,6 +44,15 @@ final private class TradeController[F[_]](
             .mapResponse(_.map(TradeOrderView.from))
       }
 
+  private def getOrderStats(using auth: Authenticator[F]) =
+    getOrderStatsEndpoint.withAuthenticatedSession
+      .serverLogic { session => sp =>
+        (sp.from, sp.to).mapN((f, t) => F.raiseWhen(f.isAfter(t))(AppError.InvalidDateRange)).getOrElse(F.unit) >>
+          service
+            .getOrderStatistics(session.userId, sp)
+            .mapResponse(identity)
+      }
+
   private def submitTradeOrderPlacement(using auth: Authenticator[F]) =
     submitTradeOrderPlacementEndpoint.withAuthenticatedSession
       .serverLogic { session => (order, closePendingOrders) =>
@@ -57,6 +66,7 @@ final private class TradeController[F[_]](
       List(
         closeCurrentPositions,
         getTradeOrders,
+        getOrderStats,
         submitTradeOrderPlacement
       )
     )
@@ -82,6 +92,12 @@ object TradeController extends TapirSchema with TapirJson with TapirCodecs {
     .in(Controller.searchParams)
     .out(jsonBody[List[TradeOrderView]])
     .description("Retrieve placed trade orders")
+
+  val getOrderStatsEndpoint = Controller.securedEndpoint.get
+    .in(ordersPath / "stats")
+    .in(Controller.searchParams)
+    .out(jsonBody[OrderStatistics])
+    .description("Get trade order statistics")
 
   val submitTradeOrderPlacementEndpoint = Controller.securedEndpoint.post
     .in(ordersPath)

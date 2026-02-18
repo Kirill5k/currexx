@@ -15,7 +15,7 @@ import currexx.core.common.effects.*
 import currexx.core.market.{MarketProfile, MarketState}
 import currexx.core.settings.TradeSettings
 import currexx.core.trade.TradeAction
-import currexx.core.trade.db.{TradeOrderRepository, TradeSettingsRepository}
+import currexx.core.trade.db.{OrderStatusRepository, TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.market.{CurrencyPair, Interval, OrderPlacementStatus, TradeOrder}
 import currexx.domain.monitor.Limits
 import kirill5k.common.cats.Clock
@@ -27,6 +27,7 @@ import java.time.Instant
 
 trait TradeService[F[_]]:
   def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]]
+  def getOrderStatistics(uid: UserId, sp: SearchParams): F[OrderStatistics]
   def processMarketStateUpdate(state: MarketState, previousProfile: MarketProfile): F[Unit]
   def placeOrder(uid: UserId, order: TradeOrder, closePendingOrders: Boolean): F[Unit]
   def closeOpenOrders(uid: UserId): F[Unit]
@@ -37,6 +38,7 @@ trait TradeService[F[_]]:
 final private class LiveTradeService[F[_]](
     private val settingsRepository: TradeSettingsRepository[F],
     private val orderRepository: TradeOrderRepository[F],
+    private val orderStatusRepository: OrderStatusRepository[F],
     private val brokerClient: BrokerClient[F],
     private val marketDataClient: MarketDataClient[F],
     private val dispatcher: ActionDispatcher[F]
@@ -47,6 +49,9 @@ final private class LiveTradeService[F[_]](
 ) extends TradeService[F] {
   override def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]] =
     orderRepository.getAll(uid, sp)
+
+  override def getOrderStatistics(uid: UserId, sp: SearchParams): F[OrderStatistics] =
+    orderStatusRepository.getStatistics(uid, sp)
 
   override def fetchMarketData(uid: UserId, cps: NonEmptyList[CurrencyPair], interval: Interval): F[Unit] =
     cps.traverse { cp =>
@@ -154,21 +159,25 @@ final private class LiveTradeService[F[_]](
   }
 
   private def submitOrderPlacement(top: TradeOrderPlacement, skipEvent: Boolean = false): F[Unit] =
-    brokerClient.submit(top.broker, top.order).flatMap {
-      case OrderPlacementStatus.Success | OrderPlacementStatus.Pending =>
-        orderRepository.save(top) *>
-          F.whenA(!skipEvent)(dispatcher.dispatch(Action.ProcessTradeOrderPlacement(top)))
-      case OrderPlacementStatus.Cancelled(reason) =>
-        logger.warn(s"Order was cancelled by broker: ${top.order} - Reason: $reason")
-    }
+    for
+      status <- brokerClient.submit(top.broker, top.order)
+      _      <- orderStatusRepository.save(top, status)
+      _      <- status match
+        case OrderPlacementStatus.Success | OrderPlacementStatus.Pending =>
+          orderRepository.save(top) *>
+            F.whenA(!skipEvent)(dispatcher.dispatch(Action.ProcessTradeOrderPlacement(top)))
+        case OrderPlacementStatus.Cancelled(reason) =>
+          logger.warn(s"Order was cancelled by broker: ${top.order} - Reason: $reason")
+    yield ()
 }
 
 object TradeService:
   def make[F[_]: {Temporal, Clock, Logger}](
       settingsRepo: TradeSettingsRepository[F],
       orderRepository: TradeOrderRepository[F],
+      orderStatusRepository: OrderStatusRepository[F],
       brokerClient: BrokerClient[F],
       marketDataClient: MarketDataClient[F],
       dispatcher: ActionDispatcher[F]
   ): F[TradeService[F]] =
-    Monad[F].pure(LiveTradeService[F](settingsRepo, orderRepository, brokerClient, marketDataClient, dispatcher))
+    Monad[F].pure(LiveTradeService[F](settingsRepo, orderRepository, orderStatusRepository, brokerClient, marketDataClient, dispatcher))
