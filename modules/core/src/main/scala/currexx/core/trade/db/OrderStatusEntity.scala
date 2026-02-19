@@ -21,7 +21,15 @@ final case class OrderStatusEntity(
     broker: Broker,
     status: OrderPlacementStatus,
     time: Instant
-)
+) {
+  val isEnter: Boolean     = orderKind == "enter"
+  val isExit: Boolean      = orderKind == "exit"
+  val isCancelled: Boolean = status.isInstanceOf[OrderPlacementStatus.Cancelled]
+  val isSuccess: Boolean   = status == OrderPlacementStatus.Success
+  val isPending: Boolean   = status == OrderPlacementStatus.Pending
+  val isBuy: Boolean       = position.contains(TradeOrder.Position.Buy)
+  val isSell: Boolean      = position.contains(TradeOrder.Position.Sell)
+}
 
 object OrderStatusEntity extends MongoJsonCodecs:
   given Codec[OrderStatusEntity]              = deriveCodec[OrderStatusEntity]

@@ -1,18 +1,18 @@
 package currexx.core.trade.db
 
 import cats.effect.Async
-import cats.syntax.functor.*
 import cats.syntax.flatMap.*
+import cats.syntax.functor.*
 import currexx.core.common.db.Repository
 import currexx.core.common.db.Repository.Field
 import currexx.core.common.http.SearchParams
 import currexx.core.trade.{CurrencyStatistics, EnterOrderStats, OrderStatistics, TradeOrderPlacement}
-import currexx.domain.market.{CurrencyPair, OrderPlacementStatus, TradeOrder}
+import currexx.domain.market.{CurrencyPair, OrderPlacementStatus}
 import currexx.domain.user.UserId
 import mongo4cats.circe.MongoJsonCodecs
 import mongo4cats.collection.MongoCollection
-import mongo4cats.operations.Index
 import mongo4cats.database.MongoDatabase
+import mongo4cats.operations.Index
 
 trait OrderStatusRepository[F[_]] extends Repository[F]:
   def save(top: TradeOrderPlacement, status: OrderPlacementStatus): F[Unit]
@@ -26,32 +26,30 @@ final private class LiveOrderStatusRepository[F[_]: Async](
     collection.insertOne(OrderStatusEntity.from(top, status)).void
 
   def getStatistics(uid: UserId, sp: SearchParams): F[OrderStatistics] =
-    // Fetch all matching orders and compute stats in application code
-    // (MongoDB aggregation pipeline would be more efficient but more complex)
     collection
       .find(searchBy(uid, sp, Field.CurrencyPair))
       .all
       .map { entities =>
         val orders = entities.toList
 
-        val enterOrders = orders.filter(_.orderKind == "enter")
+        val enterOrders = orders.filter(_.isEnter)
         val volumes     = enterOrders.flatMap(_.volume)
         val totalVolume = volumes.sum
 
         val currencyBreakdown = orders
           .groupBy(_.currencyPair)
           .map { case (cp, cpOrders) =>
-            val cpEnterOrders = cpOrders.filter(_.orderKind == "enter")
+            val cpEnterOrders = cpOrders.filter(_.isEnter)
             CurrencyStatistics(
               currencyPair = cp,
               totalOrders = cpOrders.size,
-              successfulOrders = cpOrders.count(_.status == OrderPlacementStatus.Success),
-              pendingOrders = cpOrders.count(_.status == OrderPlacementStatus.Pending),
-              cancelledOrders = cpOrders.count(_.status.isInstanceOf[OrderPlacementStatus.Cancelled]),
+              successfulOrders = cpOrders.count(_.isSuccess),
+              pendingOrders = cpOrders.count(_.isPending),
+              cancelledOrders = cpOrders.count(_.isCancelled),
               enterOrders = cpEnterOrders.size,
-              exitOrders = cpOrders.count(_.orderKind == "exit"),
-              buyOrders = cpEnterOrders.count(_.position.contains(TradeOrder.Position.Buy)),
-              sellOrders = cpEnterOrders.count(_.position.contains(TradeOrder.Position.Sell)),
+              exitOrders = cpOrders.count(_.isExit),
+              buyOrders = cpEnterOrders.count(_.isBuy),
+              sellOrders = cpEnterOrders.count(_.isSell),
               totalVolume = cpEnterOrders.flatMap(_.volume).sum
             )
           }
@@ -60,17 +58,17 @@ final private class LiveOrderStatusRepository[F[_]: Async](
 
         OrderStatistics(
           totalOrders = orders.size,
-          successfulOrders = orders.count(_.status == OrderPlacementStatus.Success),
-          pendingOrders = orders.count(_.status == OrderPlacementStatus.Pending),
-          cancelledOrders = orders.count(_.status.isInstanceOf[OrderPlacementStatus.Cancelled]),
+          successfulOrders = orders.count(_.isSuccess),
+          pendingOrders = orders.count(_.isPending),
+          cancelledOrders = orders.count(_.isCancelled),
           enterOrders = EnterOrderStats(
             total = enterOrders.size,
-            buyCount = enterOrders.count(_.position.contains(TradeOrder.Position.Buy)),
-            sellCount = enterOrders.count(_.position.contains(TradeOrder.Position.Sell)),
+            buyCount = enterOrders.count(_.isBuy),
+            sellCount = enterOrders.count(_.isSell),
             totalVolume = totalVolume,
             averageVolume = Option.when(volumes.nonEmpty)(totalVolume / volumes.size)
           ),
-          exitOrders = orders.count(_.orderKind == "exit"),
+          exitOrders = orders.count(_.isExit),
           currencyBreakdown = currencyBreakdown
         )
       }
