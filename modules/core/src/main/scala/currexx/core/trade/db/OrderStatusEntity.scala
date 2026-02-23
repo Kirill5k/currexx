@@ -24,11 +24,12 @@ final case class OrderStatusEntity(
 ) {
   val isEnter: Boolean     = orderKind == "enter"
   val isExit: Boolean      = orderKind == "exit"
-  val isCancelled: Boolean = status.isInstanceOf[OrderPlacementStatus.Cancelled]
-  val isSuccess: Boolean   = status == OrderPlacementStatus.Success
-  val isPending: Boolean   = status == OrderPlacementStatus.Pending
-  val isBuy: Boolean       = position.contains(TradeOrder.Position.Buy)
-  val isSell: Boolean      = position.contains(TradeOrder.Position.Sell)
+  val isCancelled: Boolean  = status.isInstanceOf[OrderPlacementStatus.Cancelled]
+  val isSuccess: Boolean    = status == OrderPlacementStatus.Success
+  val isPending: Boolean    = status == OrderPlacementStatus.Pending
+  val isNoPosition: Boolean = status == OrderPlacementStatus.NoPosition
+  val isBuy: Boolean        = position.contains(TradeOrder.Position.Buy)
+  val isSell: Boolean       = position.contains(TradeOrder.Position.Sell)
 }
 
 object OrderStatusEntity extends MongoJsonCodecs:

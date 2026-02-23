@@ -42,6 +42,7 @@ class OrderStatusRepositorySpec extends MongoSpec {
           stats.successfulOrders mustBe 0
           stats.pendingOrders mustBe 0
           stats.cancelledOrders mustBe 0
+          stats.noPositionOrders mustBe 0
           stats.enterOrders.total mustBe 0
           stats.exitOrders mustBe 0
           stats.currencyBreakdown mustBe Nil
@@ -83,6 +84,7 @@ class OrderStatusRepositorySpec extends MongoSpec {
             successfulOrders = 1,
             pendingOrders = 0,
             cancelledOrders = 0,
+            noPositionOrders = 0,
             enterOrders = EnterOrderStats(
               total = 1,
               buyCount = 1,
@@ -98,6 +100,7 @@ class OrderStatusRepositorySpec extends MongoSpec {
                 successfulOrders = 1,
                 pendingOrders = 0,
                 cancelledOrders = 0,
+                noPositionOrders = 0,
                 enterOrders = 1,
                 exitOrders = 0,
                 buyOrders = 1,
@@ -157,6 +160,7 @@ class OrderStatusRepositorySpec extends MongoSpec {
               successfulOrders = 1,
               pendingOrders = 0,
               cancelledOrders = 0,
+              noPositionOrders = 0,
               enterOrders = 1,
               exitOrders = 0,
               buyOrders = 1,
@@ -172,6 +176,7 @@ class OrderStatusRepositorySpec extends MongoSpec {
               successfulOrders = 0,
               pendingOrders = 1,
               cancelledOrders = 0,
+              noPositionOrders = 0,
               enterOrders = 1,
               exitOrders = 0,
               buyOrders = 0,

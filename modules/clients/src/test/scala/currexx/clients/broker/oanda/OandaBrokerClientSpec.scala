@@ -78,7 +78,7 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
       result.asserting(_ mustBe ())
     }
 
-    "skip closing position when no position exists" in {
+    "return no-position status when no position exists" in {
       val testingBackend = fs2BackendStub
         .whenRequestMatchesPartial {
           case r if r.isGet && r.hasPath("/v3/accounts") =>
@@ -90,10 +90,10 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
 
       val result = for
         client <- OandaBrokerClient.make[IO](config, testingBackend)
-        _      <- client.submit(params, TradeOrder.Exit(eurUsdPair, BigDecimal(1)))
-      yield ()
+        status <- client.submit(params, TradeOrder.Exit(eurUsdPair, BigDecimal(1)))
+      yield status
 
-      result.asserting(_ mustBe ())
+      result.asserting(_ mustBe OrderPlacementStatus.NoPosition)
     }
 
     "retrieve current orders successfully" in {

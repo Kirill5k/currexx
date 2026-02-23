@@ -168,6 +168,8 @@ final private class LiveTradeService[F[_]](
             F.whenA(!skipEvent)(dispatcher.dispatch(Action.ProcessTradeOrderPlacement(top)))
         case OrderPlacementStatus.Cancelled(reason) =>
           logger.warn(s"Order was cancelled by broker: ${top.order} - Reason: $reason")
+        case OrderPlacementStatus.NoPosition =>
+          logger.warn(s"Order skipped, no open position to close: ${top.order}")
     yield ()
 }
 

@@ -8,6 +8,7 @@ final case class OrderStatistics(
     successfulOrders: Int,
     pendingOrders: Int,
     cancelledOrders: Int,
+    noPositionOrders: Int,
     enterOrders: EnterOrderStats,
     exitOrders: Int,
     currencyBreakdown: List[CurrencyStatistics]
@@ -27,6 +28,7 @@ final case class CurrencyStatistics(
     successfulOrders: Int,
     pendingOrders: Int,
     cancelledOrders: Int,
+    noPositionOrders: Int,
     enterOrders: Int,
     exitOrders: Int,
     buyOrders: Int,

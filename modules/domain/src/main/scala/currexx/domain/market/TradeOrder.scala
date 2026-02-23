@@ -55,14 +55,16 @@ final case class OpenedTradeOrder(
 enum OrderPlacementStatus derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Success
   case Pending
+  case NoPosition
   case Cancelled(reason: String)
 
 object OrderPlacementStatus:
   given JsonTaggedAdt.Config[OrderPlacementStatus] = JsonTaggedAdt.Config.Values[OrderPlacementStatus](
     mappings = Map(
-      "success"   -> JsonTaggedAdt.tagged[OrderPlacementStatus.Success.type],
-      "pending"   -> JsonTaggedAdt.tagged[OrderPlacementStatus.Pending.type],
-      "cancelled" -> JsonTaggedAdt.tagged[OrderPlacementStatus.Cancelled]
+      "success"    -> JsonTaggedAdt.tagged[OrderPlacementStatus.Success.type],
+      "pending"    -> JsonTaggedAdt.tagged[OrderPlacementStatus.Pending.type],
+      "noPosition" -> JsonTaggedAdt.tagged[OrderPlacementStatus.NoPosition.type],
+      "cancelled"  -> JsonTaggedAdt.tagged[OrderPlacementStatus.Cancelled]
     ),
     strict = true,
     typeFieldName = "kind"

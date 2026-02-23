@@ -46,6 +46,7 @@ final private class LiveOrderStatusRepository[F[_]: Async](
               successfulOrders = cpOrders.count(_.isSuccess),
               pendingOrders = cpOrders.count(_.isPending),
               cancelledOrders = cpOrders.count(_.isCancelled),
+              noPositionOrders = cpOrders.count(_.isNoPosition),
               enterOrders = cpEnterOrders.size,
               exitOrders = cpOrders.count(_.isExit),
               buyOrders = cpEnterOrders.count(_.isBuy),
@@ -61,6 +62,7 @@ final private class LiveOrderStatusRepository[F[_]: Async](
           successfulOrders = orders.count(_.isSuccess),
           pendingOrders = orders.count(_.isPending),
           cancelledOrders = orders.count(_.isCancelled),
+          noPositionOrders = orders.count(_.isNoPosition),
           enterOrders = EnterOrderStats(
             total = enterOrders.size,
             buyCount = enterOrders.count(_.isBuy),
