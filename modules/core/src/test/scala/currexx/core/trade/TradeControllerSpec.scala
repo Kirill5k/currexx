@@ -106,6 +106,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
           successfulOrders = 7,
           pendingOrders = 2,
           cancelledOrders = 1,
+          noPositionOrders = 0,
           enterOrders = EnterOrderStats(
             total = 6,
             buyCount = 4,
@@ -121,6 +122,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
               successfulOrders = 7,
               pendingOrders = 2,
               cancelledOrders = 1,
+              noPositionOrders = 0,
               enterOrders = 6,
               exitOrders = 4,
               buyOrders = 4,
@@ -140,6 +142,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
             |  "successfulOrders" : 7,
             |  "pendingOrders" : 2,
             |  "cancelledOrders" : 1,
+            |  "noPositionOrders" : 0,
             |  "enterOrders" : {
             |    "total" : 6,
             |    "buyCount" : 4,
@@ -155,6 +158,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
             |      "successfulOrders" : 7,
             |      "pendingOrders" : 2,
             |      "cancelledOrders" : 1,
+            |      "noPositionOrders" : 0,
             |      "enterOrders" : 6,
             |      "exitOrders" : 4,
             |      "buyOrders" : 4,
@@ -182,6 +186,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
           successfulOrders = 4,
           pendingOrders = 1,
           cancelledOrders = 0,
+          noPositionOrders = 0,
           enterOrders = EnterOrderStats(
             total = 3,
             buyCount = 2,
@@ -203,6 +208,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
             |  "successfulOrders" : 4,
             |  "pendingOrders" : 1,
             |  "cancelledOrders" : 0,
+            |  "noPositionOrders" : 0,
             |  "enterOrders" : {
             |    "total" : 3,
             |    "buyCount" : 2,
