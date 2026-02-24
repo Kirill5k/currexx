@@ -5,6 +5,7 @@ import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder, Json}
 import io.circe.syntax.*
 import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId}
+import currexx.domain.JsonSyntax
 import currexx.domain.user.UserId
 import currexx.domain.monitor.{Limits, Schedule}
 import mongo4cats.bson.ObjectId
@@ -21,7 +22,7 @@ sealed trait MonitorEntity(val kind: String):
   def lastQueriedAt: Option[Instant]
   def toDomain: Monitor
 
-object MonitorEntity {
+object MonitorEntity extends JsonSyntax {
   final case class Profit(
       _id: ObjectId,
       userId: ObjectId,
@@ -78,7 +79,7 @@ object MonitorEntity {
   }
 
   inline given Encoder[MonitorEntity] = Encoder.instance {
-    case marketData: MarketData => marketData.asJsonObject.add("kind", Json.fromString(marketData.kind)).asJson
-    case profit: Profit         => profit.asJsonObject.add("kind", Json.fromString(profit.kind)).asJson
+    case marketData: MarketData => marketData.asJsonWithKind(marketData.kind)
+    case profit: Profit         => profit.asJsonWithKind(profit.kind)
   }
 }

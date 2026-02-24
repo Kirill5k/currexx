@@ -6,6 +6,7 @@ import cats.effect.Async
 import cats.syntax.flatMap.*
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
+import currexx.domain.JsonSyntax
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.monitor.{Limits, Schedule}
@@ -112,7 +113,7 @@ object MonitorController extends TapirSchema with TapirJson {
     def schedule: Schedule
     def toDomain(uid: UserId): CreateMonitor
 
-  object CreateMonitorRequest {
+  object CreateMonitorRequest extends JsonSyntax {
     final case class MarketData(
         currencyPairs: NonEmptySet[CurrencyPair],
         schedule: Schedule,
@@ -138,8 +139,8 @@ object MonitorController extends TapirSchema with TapirJson {
     }
 
     inline given Encoder[CreateMonitorRequest] = Encoder.instance {
-      case marketData: MarketData => marketData.asJsonObject.add("kind", Json.fromString(marketData.kind)).asJson
-      case profit: Profit         => profit.asJsonObject.add("kind", Json.fromString(profit.kind)).asJson
+      case marketData: MarketData => marketData.asJsonWithKind(marketData.kind)
+      case profit: Profit         => profit.asJsonWithKind(profit.kind)
     }
   }
 
@@ -153,7 +154,7 @@ object MonitorController extends TapirSchema with TapirJson {
     def lastQueriedAt: Option[Instant]
     def toDomain(uid: UserId): Monitor
 
-  object MonitorView {
+  object MonitorView extends JsonSyntax {
     final case class MarketData(
         id: String,
         active: Boolean,
@@ -192,8 +193,8 @@ object MonitorController extends TapirSchema with TapirJson {
     }
 
     inline given Encoder[MonitorView] = Encoder.instance {
-      case marketData: MarketData => marketData.asJsonObject.add("kind", Json.fromString(marketData.kind)).asJson
-      case profit: Profit         => profit.asJsonObject.add("kind", Json.fromString(profit.kind)).asJson
+      case marketData: MarketData => marketData.asJsonWithKind(marketData.kind)
+      case profit: Profit         => profit.asJsonWithKind(profit.kind)
     }
   }
 

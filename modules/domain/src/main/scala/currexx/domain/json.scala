@@ -1,7 +1,8 @@
 package currexx.domain
 
 import cats.syntax.either.*
-import io.circe.{Decoder, Encoder}
+import io.circe.{Decoder, Encoder, Json}
+import io.circe.syntax.*
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
@@ -16,4 +17,10 @@ transparent trait JsonCodecs {
       FiniteDuration(length.toLong, unit)
     }.toEither.leftMap(_ => s"$fdStr is not valid finite duration string. Expected format is '<length> <unit>'")
   }
+}
+
+transparent trait JsonSyntax {
+  extension [A](value: A)
+    def asJsonWithKind(kind: String)(using encoder: Encoder.AsObject[A]): Json =
+      value.asJsonObject.add("kind", Json.fromString(kind)).asJson
 }

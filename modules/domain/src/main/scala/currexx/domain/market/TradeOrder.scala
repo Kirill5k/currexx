@@ -1,8 +1,8 @@
 package currexx.domain.market
 
+import currexx.domain.JsonSyntax
 import currexx.domain.types.EnumType
-import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder, Json}
-import io.circe.syntax.*
+import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder}
 import org.latestbit.circe.adt.codec.*
 
 sealed trait TradeOrder(val kind: String):
@@ -10,7 +10,7 @@ sealed trait TradeOrder(val kind: String):
   def currencyPair: CurrencyPair
   def price: BigDecimal
 
-object TradeOrder {
+object TradeOrder extends JsonSyntax {
   object Position extends EnumType[Position](() => Position.values)
   enum Position:
     case Buy, Sell
@@ -38,8 +38,8 @@ object TradeOrder {
   }
 
   inline given Encoder[TradeOrder] = Encoder.instance {
-    case enter: Enter => enter.asJsonObject.add("kind", Json.fromString(enter.kind)).asJson
-    case exit: Exit   => exit.asJsonObject.add("kind", Json.fromString(exit.kind)).asJson
+    case enter: Enter => enter.asJsonWithKind(enter.kind)
+    case exit: Exit   => exit.asJsonWithKind(exit.kind)
   }
 }
 
