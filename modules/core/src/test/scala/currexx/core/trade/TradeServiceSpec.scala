@@ -101,6 +101,31 @@ class TradeServiceSpec extends IOWordSpec {
         }
       }
 
+      "dispatch market state update when broker returns no-position status" in {
+        val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
+        when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(OrderPlacementStatus.NoPosition)
+        when(orderStatusRepo.save(any[TradeOrderPlacement], any[OrderPlacementStatus])).thenReturnUnit
+
+        val order  = TradeOrder.Exit(Markets.gbpeur, 1.3)
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+          _   <- svc.placeOrder(Users.uid, order, false)
+        yield ()
+
+        result.asserting { res =>
+          val placedOrder = TradeOrderPlacement(Users.uid, order, Settings.trade.broker, now)
+          verifyNoInteractions(dataClient)
+          verify(settRepo).get(Users.uid)
+          verify(brokerClient).submit(Trades.broker, order)
+          verify(orderStatusRepo).save(placedOrder, OrderPlacementStatus.NoPosition)
+          verify(orderRepo, never).save(any[TradeOrderPlacement])
+          verify(orderRepo, never).findLatestBy(any[UserId], any[CurrencyPair])
+          disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
+          res mustBe ()
+        }
+      }
+
       "close existing orders before submitting the actual placement" in {
         val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
