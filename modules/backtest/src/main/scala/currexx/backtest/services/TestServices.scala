@@ -45,10 +45,10 @@ final class TestServices[F[_]] private (
         _      <- clients.data.setData(data)
         // Simulate live trading: process data with 1 interval delay + cron offset (3 minutes)
         // E.g., 12:00 candle is processed at 13:03, matching when incomplete 13:00 candle is filtered out
-        _      <- clock.setTime(data.latestTime.plus(data.interval.toDuration + 100.seconds))
-        _      <- marketService.updateTimeState(userId, data)
-        _      <- signalService.processMarketData(userId, data, signalDetector)
-        _      <- collectPendingActions { case Action.ProcessSignals(uid, cp, signals) =>
+        _ <- clock.setTime(data.latestTime.plus(data.interval.toDuration + 100.seconds))
+        _ <- marketService.updateTimeState(userId, data)
+        _ <- signalService.processMarketData(userId, data, signalDetector)
+        _ <- collectPendingActions { case Action.ProcessSignals(uid, cp, signals) =>
           marketService.processSignals(uid, cp, signals)
         }
         _ <- collectPendingActions { case Action.ProcessMarketStateUpdate(state, triggeredBy) =>
@@ -66,7 +66,7 @@ final class TestServices[F[_]] private (
 
 object TestServices:
   def make[F[_]: Temporal](settings: TestSettings): F[TestServices[F]] =
-    given logger: Logger[F] = Logger.noop[F]
+    given Logger[F] = Logger.noop[F]
     for
       appState   <- ApplicationState.make[F](settings)
       dispatcher <- ActionDispatcher.make[F](appState.dispatcherQueue)
@@ -78,7 +78,8 @@ object TestServices:
 
       tradeSettingsRepo = new TestTradeSettingsRepository[F](appState.tradeSettingsRef)
       tradeOrdersRepo   = new TestTradeOrderRepository[F](appState.tradeOrdersRef)
-      trade <- TradeService.make[F](tradeSettingsRepo, tradeOrdersRepo, clients.broker, clients.data, dispatcher)(using Temporal[F], clock)
+      orderStatusRepo   = new TestOrderStatusRepository[F]()
+      trade <- TradeService.make[F](tradeSettingsRepo, tradeOrdersRepo, orderStatusRepo, clients.broker, clients.data, dispatcher)(using Temporal[F], clock)
 
       signalSettingsRepo = new TestSignalSettingsRepository[F](appState.signalSettingsRef)
       signal <- SignalService.make[F](TestSignalRepository[F], signalSettingsRepo, dispatcher)(using Temporal[F], clock)
