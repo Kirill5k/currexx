@@ -281,7 +281,7 @@ object OandaBrokerClient {
       long: PositionSide,
       short: PositionSide
   ) derives Codec.AsObject {
-    def isOpen: Boolean                              = long.units > 0 || short.units > 0
+    def isOpen: Boolean                              = long.units != 0 || short.units != 0
     def toClosePositionRequest: ClosePositionRequest =
       ClosePositionRequest(
         longUnits = if (long.units == 0) "NONE" else "ALL",
