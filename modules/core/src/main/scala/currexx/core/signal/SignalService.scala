@@ -34,15 +34,13 @@ final private class LiveSignalService[F[_]](
     clock
       .durationBetweenNowAnd(data.latestTime)
       .flatMap { timeGap =>
-        if (timeGap < data.interval.toDuration * 2) {
-          for
-            settings <- settingsRepo.get(uid)
-            signals = settings.indicators.flatMap(detector.detect(uid, data))
-            _ <- F.whenA(signals.nonEmpty)(saveAndDispatchAction(uid, data.currencyPair, signals))
-          yield ()
-        } else {
+        if (timeGap < data.interval.toDuration * 2)
+          settingsRepo
+            .get(uid)
+            .map(_.indicators.flatMap(detector.detect(uid, data)))
+            .flatMap(signals => F.whenA(signals.nonEmpty)(saveAndDispatchAction(uid, data.currencyPair, signals)))
+        else
           logger.info(s"skipping market data processing because of the time gap (time=${data.latestTime}, gap=${timeGap.toHours}h)")
-        }
       }
 
   private def saveAndDispatchAction(uid: UserId, cp: CurrencyPair, signals: List[Signal]) =
