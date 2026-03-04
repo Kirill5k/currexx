@@ -89,7 +89,8 @@ final private class LiveOandaBrokerClient[F[_]](
         case Right(res) =>
           F.pure(Some(res.position))
         case Left(_) if r.code == StatusCode.NotFound =>
-          logger.warn(s"$name-client/get-position-404: No position for $accountId / ${currencyPair.toInstrument}").as(None)
+          logger.warn(s"$name-client/get-position-404: No position for $accountId / ${currencyPair.toInstrument}") >>
+            F.pure(None)
         case Left(err) =>
           handleError("get-position", err)
     }
