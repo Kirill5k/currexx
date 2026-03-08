@@ -54,14 +54,18 @@ final private class LiveOandaDataClient[F[_]](
     val firstCandle   = data.prices.head
     val candleEndTime = firstCandle.time.plus(interval.toDuration)
     val shouldExclude = candleEndTime.isAfter(now)
-
+    
     if (shouldExclude && data.prices.size > 1) {
-      F.pure(data.copy(prices = NonEmptyList.fromListUnsafe(data.prices.tail)))
+      F.pure(data.dropFirstPrice)
     } else if (shouldExclude && data.prices.size == 1) {
       logger.warn(s"Only incomplete candle available for ${data.currencyPair} at ${data.interval}") >> F.pure(data)
     } else {
       F.pure(data)
     }
+
+  extension (data: MarketTimeSeriesData)
+    private def dropFirstPrice: MarketTimeSeriesData =
+      data.copy(prices = NonEmptyList.fromListUnsafe(data.prices.tail))
 
   override def latestPrice(pair: CurrencyPair): F[PriceRange] =
     C.now.flatMap { now =>
