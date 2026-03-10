@@ -110,7 +110,6 @@ val backtest = project
       "-XX:MaxGCPauseMillis=200",                  // Target max GC pause
       "-XX:G1ReservePercent=10",                   // Reserve heap to reduce GC
       "-XX:InitiatingHeapOccupancyPercent=45",     // When to start GC
-      "-XX:+AggressiveOpts",                       // Enable aggressive optimizations
       "-Xss2m",                                    // Stack size
       "-XX:+TieredCompilation",                    // Use tiered compilation
       "-XX:TieredStopAtLevel=4"                    // Maximum optimization level
@@ -123,4 +122,4 @@ val root = project
   .settings(
     name := "currexx"
   )
-  .aggregate(core, algorithms, calculations, domain, clients)
+  .aggregate(core, algorithms, calculations, domain, clients, backtest)

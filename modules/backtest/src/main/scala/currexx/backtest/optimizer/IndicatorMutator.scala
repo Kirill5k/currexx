@@ -81,8 +81,8 @@ object IndicatorMutator {
             Indicator.KeltnerChannel(vs, mutVt(md), mutInt(atrL, 5, 50), mutDouble(atrM, 0.5, 5.0, 0.1))
           case Indicator.BollingerBands(vs, md, stdDevL, stdDevM) =>
             Indicator.BollingerBands(vs, mutVt(md), mutInt(stdDevL, 5, 50), mutDouble(stdDevM, 1.0, 4.0, 0.1))
-          case Indicator.VolatilityRegimeDetection(atrL, smoothing, smoothingL) =>
-            Indicator.VolatilityRegimeDetection(mutInt(atrL, 5, 50), mutVt(smoothing), mutInt(smoothingL, 5, 50))
+          case Indicator.VolatilityRegimeDetection(atrL, smoothing) =>
+            Indicator.VolatilityRegimeDetection(mutInt(atrL, 5, 50), mutVt(smoothing))
           case Indicator.ValueTracking(vr, vs, vt) =>
             Indicator.ValueTracking(vr, vs, mutVt(vt))
           case Indicator.PriceLineCrossing(vs, role, vt) =>

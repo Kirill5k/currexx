@@ -37,8 +37,8 @@ object IndicatorInitialiser:
           Indicator.KeltnerChannel(vs, randomiseVt(md), atrL, atrR)
         case Indicator.BollingerBands(vs, md, _, _) =>
           Indicator.BollingerBands(vs, randomiseVt(md), rand.nextInt(41) + 2, (rand.nextInt(20) + 10) / 10.0)
-        case Indicator.VolatilityRegimeDetection(_, vt, _) =>
-          Indicator.VolatilityRegimeDetection(rand.nextInt(49) + 1, randomiseVt(vt), rand.nextInt(49) + 1)
+        case Indicator.VolatilityRegimeDetection(_, vt) =>
+          Indicator.VolatilityRegimeDetection(rand.nextInt(49) + 1, randomiseVt(vt))
         case Indicator.Composite(is, combinator) =>
           Indicator.Composite(is.map(randomiseInd), combinator)
         case Indicator.ValueTracking(vr, vs, vt) =>

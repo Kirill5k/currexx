@@ -17,8 +17,6 @@ final private class MockActionDispatcher[F[_]](
     F.unit
   }
 
-  override def pendingActions: F[List[Action]] = F.pure(submittedActions.toList)
-
   override def actions: fs2.Stream[F, Action] =
     Stream.emits(submittedActions)
 

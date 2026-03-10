@@ -78,8 +78,8 @@ object IndicatorCrossover:
           case _ => Left(new IllegalArgumentException("both parents must be of the same type"))
 
         def crossInd(ind1: Indicator, ind2: Indicator): Either[Throwable, Indicator] = (ind1, ind2) match
-          case (Indicator.VolatilityRegimeDetection(atr1, vt1, sl1), Indicator.VolatilityRegimeDetection(atr2, vt2, sl2)) =>
-            crossVt(vt1, vt2).map(vt => Indicator.VolatilityRegimeDetection(crossInt(atr1, atr2, Some(1)), vt, crossInt(sl1, sl2, Some(1))))
+          case (Indicator.VolatilityRegimeDetection(atr1, vt1), Indicator.VolatilityRegimeDetection(atr2, vt2)) =>
+            crossVt(vt1, vt2).map(vt => Indicator.VolatilityRegimeDetection(crossInt(atr1, atr2, Some(1)), vt))
           case (Indicator.ValueTracking(vr1, vs1, vt1), Indicator.ValueTracking(vr2, vs2, vt2)) =>
             if (vr1 == vr2 && vs1 == vs2) {
               crossVt(vt1, vt2).map(vt => Indicator.ValueTracking(vr1, vs1, vt))

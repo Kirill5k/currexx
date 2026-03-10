@@ -46,17 +46,19 @@ object MovingAverages {
     val window       = MQueue.empty[Double]
     val resultBuffer = new ListBuffer[Double]
     val it           = values.reverseIterator
+    var runningSum   = 0.0
 
     while (it.hasNext) {
       val price = it.next()
       window.enqueue(price)
+      runningSum += price
       val valueToAppend = if (window.size < n) {
         price // Not enough data for a full SMA, use the price itself
       } else {
         if (window.size > n) {
-          val _ = window.dequeue()
+          runningSum -= window.dequeue()
         }
-        window.sum / n
+        runningSum / n
       }
       resultBuffer += valueToAppend
     }
@@ -116,9 +118,14 @@ object MovingAverages {
         if (window.size > n) {
           val _ = window.dequeue()
         }
-        window.zipWithIndex.foldLeft(0.0) { case (sum, (v, i)) =>
-          sum + v * (i + 1)
-        } / divider
+        var weightedSum = 0.0
+        var weight      = 1
+        val wit         = window.iterator
+        while (wit.hasNext) {
+          weightedSum += wit.next() * weight
+          weight += 1
+        }
+        weightedSum / divider
       }
       resultBuffer += valueToAppend
     }

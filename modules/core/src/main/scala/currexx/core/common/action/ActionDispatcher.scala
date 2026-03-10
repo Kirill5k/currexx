@@ -9,14 +9,10 @@ import fs2.Stream
 trait ActionDispatcher[F[_]]:
   def dispatch(action: Action): F[Unit]
   def actions: Stream[F, Action]
-  def pendingActions: F[List[Action]]
 
 final private class LiveActionDispatcher[F[_]: Monad](
     private val submittedActions: Queue[F, Action]
 ) extends ActionDispatcher[F] {
-
-  override def pendingActions: F[List[Action]] =
-    submittedActions.tryTakeN(None)
 
   override def dispatch(action: Action): F[Unit] =
     submittedActions.offer(action)

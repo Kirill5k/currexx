@@ -23,7 +23,6 @@ final class TestServices[F[_]] private (
     private val tradeService: TradeService[F],
     private val clients: TestClients[F],
     private val clock: TestClock[F],
-    private val dispatcher: ActionDispatcher[F],
     private val appState: ApplicationState[F]
 )(using
     F: Temporal[F]
@@ -34,7 +33,7 @@ final class TestServices[F[_]] private (
 
   private def collectPendingActions(pf: PartialFunction[Action, F[Unit]]): F[Unit] =
     for
-      actions <- dispatcher.pendingActions
+      actions <- appState.dispatcherQueue.tryTakeN(None)
       _       <- actions.collect(pf).sequence
     yield ()
 
@@ -83,4 +82,4 @@ object TestServices:
 
       signalSettingsRepo = new TestSignalSettingsRepository[F](appState.signalSettingsRef)
       signal <- SignalService.make[F](TestSignalRepository[F], signalSettingsRepo, dispatcher)(using Temporal[F], clock)
-    yield TestServices[F](signal, market, trade, clients, clock, dispatcher, appState)
+    yield TestServices[F](signal, market, trade, clients, clock, appState)
