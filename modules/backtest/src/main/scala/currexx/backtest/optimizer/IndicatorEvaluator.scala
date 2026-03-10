@@ -160,8 +160,8 @@ object IndicatorEvaluator {
         s"Composite-$combinator-${indicators.map(showInd).toList.mkString("-")}"
       case Indicator.VolatilityRegimeDetection(atrLength, smoothingType) =>
         s"VolatilityRegimeDetection-${atrLength}-${smoothingType}"
-      case Indicator.ValueTracking(vs, transformation, targetValue) =>
-        s"ValueTracking-${vs.print}-${transformation}-$targetValue"
+      case Indicator.ValueTracking(role, transformation, targetValue) =>
+        s"ValueTracking-${role.print}-${transformation}-$targetValue"
       case Indicator.PriceLineCrossing(vs, role, transformation) =>
         s"PriceLineCrossing-${vs.print}-$role-$transformation"
       case Indicator.BollingerBands(vs, mb, sdLength, sdMultiplier) =>
