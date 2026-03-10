@@ -158,8 +158,8 @@ object IndicatorEvaluator {
         s"KeltnerChannel-${vs.print}-$md-$atrLength-$atrMultiplier"
       case Indicator.Composite(indicators, combinator) =>
         s"Composite-$combinator-${indicators.map(showInd).toList.mkString("-")}"
-      case Indicator.VolatilityRegimeDetection(atrLength, smoothingType, smoothingLength) =>
-        s"VolatilityRegimeDetection-${atrLength}-${smoothingType}-$smoothingLength"
+      case Indicator.VolatilityRegimeDetection(atrLength, smoothingType) =>
+        s"VolatilityRegimeDetection-${atrLength}-${smoothingType}"
       case Indicator.ValueTracking(vs, transformation, targetValue) =>
         s"ValueTracking-${vs.print}-${transformation}-$targetValue"
       case Indicator.PriceLineCrossing(vs, role, transformation) =>

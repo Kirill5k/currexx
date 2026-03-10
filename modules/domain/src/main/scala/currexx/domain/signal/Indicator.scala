@@ -91,8 +91,7 @@ enum Indicator derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWit
   )
   case VolatilityRegimeDetection(
       atrLength: Int,
-      smoothingType: ValueTransformation,
-      smoothingLength: Int
+      smoothingType: ValueTransformation
   )
   case ValueTracking(
       role: ValueRole,

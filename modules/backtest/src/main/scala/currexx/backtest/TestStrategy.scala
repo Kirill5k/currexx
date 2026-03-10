@@ -34,8 +34,7 @@ object TestStrategy {
       ),
       Indicator.VolatilityRegimeDetection(
         atrLength = 10,
-        smoothingType = ValueTransformation.SMA(length = 20),
-        smoothingLength = 20
+        smoothingType = ValueTransformation.SMA(length = 20)
       )
     ),
     rules = TradeStrategy(
@@ -117,7 +116,6 @@ object TestStrategy {
       Indicator.VolatilityRegimeDetection(
         atrLength = 9,
         smoothingType = ValueTransformation.SMA(length = 5), // Compare ATR to its 20-period SMA
-        smoothingLength = 29
       )
     ),
     rules = TradeStrategy(
@@ -198,8 +196,7 @@ object TestStrategy {
       ),
       Indicator.VolatilityRegimeDetection(
         atrLength = 14,
-        smoothingType = ValueTransformation.SMA(length = 20),
-        smoothingLength = 20
+        smoothingType = ValueTransformation.SMA(length = 20)
       )
     ),
     rules = TradeStrategy(
@@ -275,7 +272,7 @@ object TestStrategy {
         lowerBoundary = 23.0
       ),
       Indicator.ValueTracking(role = ValueRole.Momentum, source = ValueSource.Close, transformation = ValueTransformation.STOCH(17)),
-      Indicator.VolatilityRegimeDetection(atrLength = 14, smoothingType = ValueTransformation.SMA(20), smoothingLength = 20)
+      Indicator.VolatilityRegimeDetection(atrLength = 14, smoothingType = ValueTransformation.SMA(20))
     ),
     rules = TradeStrategy(
       openRules = List(
@@ -355,8 +352,7 @@ object TestStrategy {
       // 4. Volatility
       Indicator.VolatilityRegimeDetection(
         atrLength = 14,
-        smoothingType = ValueTransformation.SMA(length = 20),
-        smoothingLength = 20
+        smoothingType = ValueTransformation.SMA(length = 20)
       )
     ),
     rules = TradeStrategy(
@@ -420,8 +416,7 @@ object TestStrategy {
       // 3. Volatility
       Indicator.VolatilityRegimeDetection(
         atrLength = 14,
-        smoothingType = ValueTransformation.SMA(length = 20),
-        smoothingLength = 20
+        smoothingType = ValueTransformation.SMA(length = 20)
       ),
       // 4. Momentum Signal (RSX)
       Indicator.ThresholdCrossing(
