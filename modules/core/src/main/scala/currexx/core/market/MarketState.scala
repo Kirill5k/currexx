@@ -149,8 +149,7 @@ object MarketProfile {
 
         case Condition.PriceCrossedLine(role, direction) =>
           profile.copy(lastPriceLineCrossing = Some(PriceLineCrossingState(role, direction, signal.time)))
-          
-        // ... other cases ...
+
         // --- Composite Signal ---
         case Condition.Composite(conditions) =>
           // A composite signal is just a bundle of other signals.
