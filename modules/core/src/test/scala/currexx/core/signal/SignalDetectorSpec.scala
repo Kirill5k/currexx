@@ -15,8 +15,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
 
       "create signal when trend direction changes" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
-        val tcdInd         = indicator.asInstanceOf[Indicator.TrendChangeDetection]
-        val signal         = SignalDetector.pure.detectTrendChange(Users.uid, timeSeriesData, tcdInd)
+        val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
         signal mustBe Some(
           Signal(
@@ -32,8 +31,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
 
       "not do anything when trend hasn't changed" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
-        val tcdInd         = indicator.asInstanceOf[Indicator.TrendChangeDetection]
-        val signal         = SignalDetector.pure.detectTrendChange(Users.uid, timeSeriesData, tcdInd)
+        val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
         signal mustBe None
       }
@@ -43,8 +41,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
       val indicator = Indicator.ThresholdCrossing(ValueSource.Close, VT.STOCH(14), 80d, 20d)
       "create signal when current value is below threshold" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
-        val tcInd          = indicator.asInstanceOf[Indicator.ThresholdCrossing]
-        val signal         = SignalDetector.pure.detectThresholdCrossing(Users.uid, timeSeriesData, tcInd)
+        val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
         signal mustBe Some(
           Signal(
@@ -60,25 +57,21 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
 
       "not do anything when current value is within limits" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(10))
-        val tcInd          = indicator.asInstanceOf[Indicator.ThresholdCrossing]
-        val signal         = SignalDetector.pure.detectThresholdCrossing(Users.uid, timeSeriesData, tcInd)
+        val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
         signal mustBe None
       }
     }
 
     "detectComposite with All combinator" should {
-      val indicator = Indicator
-        .compositeAllOf(
-          Indicator.ThresholdCrossing(ValueSource.Close, VT.STOCH(14), 80d, 20d),
-          Indicator.TrendChangeDetection(ValueSource.Close, VT.HMA(16))
-        )
-        .asInstanceOf[Indicator.Composite]
+      val indicator = Indicator.compositeAllOf(
+        Indicator.ThresholdCrossing(ValueSource.Close, VT.STOCH(14), 80d, 20d),
+        Indicator.TrendChangeDetection(ValueSource.Close, VT.HMA(16))
+      )
 
       "return composite condition when all indicators generate signals" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
-
-        val signal = SignalDetector.pure.detectComposite(Users.uid, timeSeriesData, indicator)
+        val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
         signal mustBe Some(
           Signal(
@@ -99,25 +92,21 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
 
       "not return anything when only one indicator generated signal" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
-
-        val signal = SignalDetector.pure.detectComposite(Users.uid, timeSeriesData, indicator)
+        val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
         signal mustBe None
       }
     }
 
     "detectComposite with Any combinator" should {
-      val indicator = Indicator
-        .compositeAnyOf(
-          Indicator.ThresholdCrossing(ValueSource.Close, VT.STOCH(14), 80d, 20d),
-          Indicator.TrendChangeDetection(ValueSource.Close, VT.HMA(16))
-        )
-        .asInstanceOf[Indicator.Composite]
+      val indicator = Indicator.compositeAnyOf(
+        Indicator.ThresholdCrossing(ValueSource.Close, VT.STOCH(14), 80d, 20d),
+        Indicator.TrendChangeDetection(ValueSource.Close, VT.HMA(16))
+      )
 
       "return composite condition when any of indicators generate signals" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(1))
-
-        val signal = SignalDetector.pure.detectComposite(Users.uid, timeSeriesData, indicator)
+        val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
         signal mustBe Some(
           Signal(

@@ -9,15 +9,6 @@ import currexx.domain.user.UserId
 
 trait SignalDetector:
   def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal]
-  def detectThresholdCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.ThresholdCrossing): Option[Signal]
-  def detectTrendChange(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.TrendChangeDetection): Option[Signal]
-  def detectLinesCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.LinesCrossing): Option[Signal]
-  def detectBarrierCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.KeltnerChannel): Option[Signal]
-  def detectBollingerBandsCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.BollingerBands): Option[Signal]
-  def detectVolatilityRegimeChange(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.VolatilityRegimeDetection): Option[Signal]
-  def detectValue(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.ValueTracking): Option[Signal]
-  def detectComposite(uid: UserId, data: MarketTimeSeriesData, composite: Indicator.Composite): Option[Signal]
-  def detectPriceLineCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.PriceLineCrossing): Option[Signal]
 
 final private class PureSignalDetector extends SignalDetector {
   private val transformer: ValueTransformer = ValueTransformer.pure
@@ -44,7 +35,7 @@ final private class PureSignalDetector extends SignalDetector {
       case plc: Indicator.PriceLineCrossing         => detectPriceLineCrossing(uid, data, plc)
       case bb: Indicator.BollingerBands             => detectBollingerBandsCrossing(uid, data, bb)
 
-  def detectThresholdCrossing(
+  private def detectThresholdCrossing(
       uid: UserId,
       data: MarketTimeSeriesData,
       indicator: Indicator.ThresholdCrossing
@@ -55,7 +46,7 @@ final private class PureSignalDetector extends SignalDetector {
       .thresholdCrossing(transformed, indicator.lowerBoundary, indicator.upperBoundary)
       .map(makeSignal(uid, data, indicator))
 
-  def detectTrendChange(
+  private def detectTrendChange(
       uid: UserId,
       data: MarketTimeSeriesData,
       indicator: Indicator.TrendChangeDetection
@@ -66,7 +57,7 @@ final private class PureSignalDetector extends SignalDetector {
       .trendDirectionChange(transformed)
       .map(makeSignal(uid, data, indicator))
 
-  def detectLinesCrossing(
+  private def detectLinesCrossing(
       uid: UserId,
       data: MarketTimeSeriesData,
       indicator: Indicator.LinesCrossing
@@ -78,7 +69,7 @@ final private class PureSignalDetector extends SignalDetector {
       .linesCrossing(line1, line2)
       .map(makeSignal(uid, data, indicator))
 
-  def detectBarrierCrossing(
+  private def detectBarrierCrossing(
       uid: UserId,
       data: MarketTimeSeriesData,
       indicator: Indicator.KeltnerChannel
@@ -98,7 +89,7 @@ final private class PureSignalDetector extends SignalDetector {
       .bandCrossing(priceLine, upperBand, lowerBand)
       .map(makeSignal(uid, data, indicator))
 
-  def detectVolatilityRegimeChange(
+  private def detectVolatilityRegimeChange(
       uid: UserId,
       data: MarketTimeSeriesData,
       indicator: Indicator.VolatilityRegimeDetection
@@ -109,7 +100,7 @@ final private class PureSignalDetector extends SignalDetector {
       .volatilityRegimeChange(atrLine, atrMaLine)
       .map(makeSignal(uid, data, indicator))
 
-  def detectValue(
+  private def detectValue(
       uid: UserId,
       data: MarketTimeSeriesData,
       indicator: Indicator.ValueTracking
@@ -128,7 +119,7 @@ final private class PureSignalDetector extends SignalDetector {
     }
   }
 
-  def detectComposite(
+  private def detectComposite(
       uid: UserId,
       data: MarketTimeSeriesData,
       composite: Indicator.Composite
@@ -149,7 +140,7 @@ final private class PureSignalDetector extends SignalDetector {
         )
       }
 
-  def detectPriceLineCrossing(
+  private def detectPriceLineCrossing(
       uid: UserId,
       data: MarketTimeSeriesData,
       plc: Indicator.PriceLineCrossing
@@ -158,7 +149,7 @@ final private class PureSignalDetector extends SignalDetector {
     val otherLine = transformer.transformTo(priceLine, data, plc.transformation)
     Condition.priceCrossedLine(priceLine, otherLine, plc.role).map(makeSignal(uid, data, plc))
 
-  def detectBollingerBandsCrossing(
+  private def detectBollingerBandsCrossing(
       uid: UserId,
       data: MarketTimeSeriesData,
       indicator: Indicator.BollingerBands
@@ -184,37 +175,6 @@ final private class CachedSignalDetector(
   override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal] =
     val key = cacheKey(data, indicator)
     cache.get(key, _ => detector.detect(uid, data)(indicator)).map(_.copy(userId = uid))
-
-  def detectThresholdCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.ThresholdCrossing): Option[Signal] =
-    detector.detectThresholdCrossing(uid, data, indicator)
-
-  def detectTrendChange(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.TrendChangeDetection): Option[Signal] =
-    detector.detectTrendChange(uid, data, indicator)
-
-  def detectLinesCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.LinesCrossing): Option[Signal] =
-    detector.detectLinesCrossing(uid, data, indicator)
-
-  def detectBarrierCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.KeltnerChannel): Option[Signal] =
-    detector.detectBarrierCrossing(uid, data, indicator)
-
-  def detectVolatilityRegimeChange(
-      uid: UserId,
-      data: MarketTimeSeriesData,
-      indicator: Indicator.VolatilityRegimeDetection
-  ): Option[Signal] =
-    detector.detectVolatilityRegimeChange(uid, data, indicator)
-
-  def detectValue(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.ValueTracking): Option[Signal] =
-    detector.detectValue(uid, data, indicator)
-
-  def detectComposite(uid: UserId, data: MarketTimeSeriesData, composite: Indicator.Composite): Option[Signal] =
-    detector.detectComposite(uid, data, composite)
-
-  def detectPriceLineCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.PriceLineCrossing): Option[Signal] =
-    detector.detectPriceLineCrossing(uid, data, indicator)
-
-  def detectBollingerBandsCrossing(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator.BollingerBands): Option[Signal] =
-    detector.detectBollingerBandsCrossing(uid, data, indicator)
 }
 
 object SignalDetector:
