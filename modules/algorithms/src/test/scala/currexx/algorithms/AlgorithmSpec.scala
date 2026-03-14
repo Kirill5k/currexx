@@ -17,7 +17,8 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
       val result    = optResult.foldMap(stateInterpreter).run(List.empty).value._1
 
       result.mkString mustBe
-        """Initialise population of size 5 with shuffle=true
+        """Starting GA
+          |Initialise population of size 5 with shuffle=true
           |Evaluate entire population
           |Sorting evaluated population by fitness
           |Select 1.25 elites from the current population
@@ -43,6 +44,8 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
 
   def stateInterpreter[G]: Op[*, G] ~> State[List[String], *] = new ~>[Op[*, G], State[List[String], *]] {
     def apply[A](fa: Op[A, G]): State[List[String], A] = fa match {
+      case Op.DisplayInitial(_, _) =>
+        State.modify[List[String]](_ :+ "Starting GA\n")
       case Op.InitPopulation(seed, size, shuffle) =>
         State.modify[List[String]](_ :+ s"Initialise population of size $size with shuffle=$shuffle\n") >>
           State.pure(Vector.fill(size)(seed))

@@ -1,6 +1,5 @@
 package currexx.backtest
 
-import cats.Show
 import cats.effect.{IO, IOApp}
 import currexx.algorithms.{Parameters, ProgressTracker}
 import currexx.algorithms.operators.{Elitism, Selector}
@@ -8,7 +7,6 @@ import currexx.domain.signal.Indicator
 import currexx.backtest.optimizer.*
 import currexx.backtest.optimizer.IndicatorEvaluator.ScoringFunction
 
-import java.time.Instant
 import scala.util.Random
 
 object Optimiser extends IOApp.Simple {
@@ -51,8 +49,6 @@ object Optimiser extends IOApp.Simple {
   // val scoringFunction = ScoringFunction.averageMedianProfitByMonth
 
   override def run: IO[Unit] = for
-    _       <- IO.println(s"Starting optimization of ${strategy.indicator}; starting time - ${Instant.now}")
-    startTs <- IO.monotonic
     init    <- IndicatorInitialiser.make[IO]
     cross   <- IndicatorCrossover.make[IO]
     mut     <- IndicatorMutator.make[IO]
@@ -69,7 +65,5 @@ object Optimiser extends IOApp.Simple {
     _ <- OptimisationAlgorithm
       .ga[IO, Indicator](init, cross, mut, eval, sel, elit, prog)
       .optimise(strategy.indicator, gaParameters)
-    endTs <- IO.monotonic
-    _     <- IO.println(s"Total duration ${(endTs - startTs).toMinutes}m")
   yield ()
 }

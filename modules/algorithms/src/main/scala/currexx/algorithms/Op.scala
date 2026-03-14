@@ -40,6 +40,7 @@ type EvaluatedPopulation[I]   = Vector[(I, Fitness)]
 type DistributedPopulation[I] = Vector[(I, I)]
 
 enum Op[A, I]:
+  case DisplayInitial[I](target: I, params: Parameters.GA)                                 extends Op[Unit, I]
   case DisplayProgress[I](iteration: Int, maxGen: Int, population: EvaluatedPopulation[I]) extends Op[Unit, I]
   case DisplayFinal[I](population: EvaluatedPopulation[I])                                 extends Op[Unit, I]
   case InitPopulation[I](seed: I, size: Int, shuffle: Boolean)                             extends Op[Population[I], I]
@@ -67,6 +68,8 @@ object Op:
       extends ~>[Op[*, I], F] {
     def apply[A](fa: Op[A, I]): F[A] =
       fa match
+        case Op.DisplayInitial(target, params) =>
+          progressTracker.displayInitial(target, params)
         case Op.DisplayProgress(iteration, maxGen, evPop) =>
           progressTracker.displayProgress(iteration, maxGen, evPop)
         case Op.DisplayFinal(population) =>
