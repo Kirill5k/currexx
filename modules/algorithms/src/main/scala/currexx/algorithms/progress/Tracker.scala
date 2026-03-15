@@ -15,7 +15,7 @@ trait Tracker[F[_], I]:
   protected def progressMsg(currentGen: Int, maxGen: Int): String =
     s"Generation $currentGen out of $maxGen"
 
-  protected def memberMsg(idx: Int, individual: I, fitness: Fitness): String =
+  private def memberMsg(idx: Int, individual: I, fitness: Fitness): String =
     s"#${idx + 1}: $fitness - $individual"
 
   protected def membersMsg(population: EvaluatedPopulation[I], topN: Int): String =
@@ -32,13 +32,9 @@ trait Tracker[F[_], I]:
     val worst     = population.last._2.value
     s"Stats: Best=$best, Avg=$avg, Worst=$worst"
 
-  protected def durationMsg(start: Option[Instant], end: Instant): String =
-    start
-      .map { s =>
-        val duration = (end.toEpochMilli - s.toEpochMilli).millis.toCoarsest
-        s"\nTotal duration: $duration"
-      }
-      .getOrElse("")
+  protected def durationMsg(start: Instant, end: Instant): String =
+    val duration = (end.toEpochMilli - start.toEpochMilli).millis.toCoarsest
+    s"\nTotal duration: $duration"
 
 object Tracker {
 

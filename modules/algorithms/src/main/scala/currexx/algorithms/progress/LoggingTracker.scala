@@ -36,11 +36,10 @@ final class LoggingTracker[F[_], I] private (
     for
       now       <- Async[F].realTimeInstant
       startTime <- startTimeRef.get
-      _         <- Async[F].delay(
-        println(
-          s"Final top $finalTopN members:\n${membersMsg(population, finalTopN)}\n${statsMsg(population)}${durationMsg(startTime, now)}"
-        )
-      )
+      duration = startTime.map(start => durationMsg(start, now)).getOrElse("")
+      stats    = statsMsg(population)
+      members  = membersMsg(population, finalTopN)
+      _ <- Async[F].delay(println(s"Final top $finalTopN members:\n$members\n$stats$duration"))
     yield ()
 
 object LoggingTracker:
