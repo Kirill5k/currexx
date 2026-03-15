@@ -4,6 +4,7 @@ import cats.~>
 import cats.effect.Async
 import cats.free.Free
 import currexx.algorithms.operators.*
+import currexx.algorithms.progress.Tracker
 import fs2.Stream
 
 import scala.util.{Random, Try}
@@ -63,7 +64,7 @@ object Op:
       evaluator: Evaluator[F, I],
       selector: Selector[F, I],
       elitism: Elitism[F, I],
-      progressTracker: ProgressTracker[F, I]
+      progressTracker: Tracker[F, I]
   )(using F: Async[F], rand: Random)
       extends ~>[Op[*, I], F] {
     def apply[A](fa: Op[A, I]): F[A] =
@@ -102,6 +103,6 @@ object Op:
       evaluator: Evaluator[F, I],
       selector: Selector[F, I],
       elitism: Elitism[F, I],
-      progressTracker: ProgressTracker[F, I]
+      progressTracker: Tracker[F, I]
   )(using F: Async[F], rand: Random): Op[*, I] ~> F =
     new OpInterpreter[F, I](initialiser, crossover, mutator, evaluator, selector, elitism, progressTracker)

@@ -1,7 +1,8 @@
 package currexx.backtest
 
 import cats.effect.{IO, IOApp}
-import currexx.algorithms.{Parameters, ProgressTracker}
+import currexx.algorithms.Parameters
+import currexx.algorithms.progress.Tracker
 import currexx.algorithms.operators.{Elitism, Selector}
 import currexx.domain.signal.Indicator
 import currexx.backtest.optimizer.*
@@ -49,13 +50,18 @@ object Optimiser extends IOApp.Simple {
   // val scoringFunction = ScoringFunction.averageMedianProfitByMonth
 
   override def run: IO[Unit] = for
-    init    <- IndicatorInitialiser.make[IO]
-    cross   <- IndicatorCrossover.make[IO]
-    mut     <- IndicatorMutator.make[IO]
-    eval    <- IndicatorEvaluator.make[IO](testDataSets, strategy.rules, poolSize = evaluatorPoolSize, scoringFunction = scoringFunction)
-    sel     <- Selector.tournament[IO, Indicator]
-    elit    <- Elitism.simple[IO, Indicator]
-    prog    <- ProgressTracker.make[IO, Indicator](
+    init  <- IndicatorInitialiser.make[IO]
+    cross <- IndicatorCrossover.make[IO]
+    mut   <- IndicatorMutator.make[IO]
+    sel   <- Selector.tournament[IO, Indicator]
+    elit  <- Elitism.simple[IO, Indicator]
+    eval  <- IndicatorEvaluator.make[IO](
+      testFilePaths = testDataSets,
+      strategy = strategy.rules,
+      poolSize = evaluatorPoolSize,
+      scoringFunction = scoringFunction
+    )
+    prog <- Tracker.make[IO, Indicator](
       logInterval = 10,
       showTopMember = true,
       showTopN = 3,

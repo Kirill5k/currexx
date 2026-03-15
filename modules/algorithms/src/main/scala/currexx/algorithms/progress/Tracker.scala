@@ -1,18 +1,19 @@
-package currexx.algorithms
+package currexx.algorithms.progress
 
 import cats.Monad
 import cats.effect.{Async, Ref}
 import cats.syntax.all.*
+import currexx.algorithms.{EvaluatedPopulation, Fitness, Parameters}
 
 import java.time.Instant
 import scala.concurrent.duration.*
 
-trait ProgressTracker[F[_], I]:
+trait Tracker[F[_], I]:
   def displayInitial(target: I, params: Parameters.GA): F[Unit]
   def displayProgress(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[I]): F[Unit]
   def displayFinal(population: EvaluatedPopulation[I]): F[Unit]
 
-object ProgressTracker {
+object Tracker {
 
   private def progressMsg(currentGen: Int, maxGen: Int): String =
     s"Generation $currentGen out of $maxGen"
@@ -34,9 +35,13 @@ object ProgressTracker {
     val worst     = population.last._2.value
     s"Stats: Best=$best, Avg=$avg, Worst=$worst"
 
-  private def durationMsg(start: Instant, end: Instant): String =
-    val duration = (end.toEpochMilli - start.toEpochMilli).millis.toCoarsest
-    s"\nTotal duration: $duration"
+  private def durationMsg(start: Option[Instant], end: Instant): String =
+    start
+      .map { s =>
+        val duration = (end.toEpochMilli - s.toEpochMilli).millis.toCoarsest
+        s"\nTotal duration: $duration"
+      }
+      .getOrElse("")
 
   def make[F[_]: Async, I](
       logInterval: Int = 10,
@@ -44,9 +49,9 @@ object ProgressTracker {
       showTopN: Int = 1,
       showStats: Boolean = false,
       finalTopN: Int = 25
-  ): F[ProgressTracker[F, I]] =
+  ): F[Tracker[F, I]] =
     Ref.of[F, Option[Instant]](None).map { startTimeRef =>
-      new ProgressTracker[F, I]:
+      new Tracker[F, I]:
         override def displayInitial(target: I, params: Parameters.GA): F[Unit] =
           for
             now <- Async[F].realTimeInstant
@@ -66,16 +71,15 @@ object ProgressTracker {
           for
             now       <- Async[F].realTimeInstant
             startTime <- startTimeRef.get
-            duration   = startTime.map(start => durationMsg(start, now)).getOrElse("")
-            topMembers = membersMsg(population, finalTopN)
-            stats      = statsMsg(population)
-            _ <- Async[F].delay(println(s"Final top $finalTopN members:\n$topMembers\n$stats$duration"))
+            _ <- Async[F].delay(
+              println(s"Final top $finalTopN members:\n${membersMsg(population, finalTopN)}\n${statsMsg(population)}${durationMsg(startTime, now)}")
+            )
           yield ()
     }
 
-  def noop[F[_]: Monad, I]: F[ProgressTracker[F, I]] =
+  def noop[F[_]: Monad, I]: F[Tracker[F, I]] =
     Monad[F].pure {
-      new ProgressTracker[F, I]:
+      new Tracker[F, I]:
         override def displayInitial(target: I, params: Parameters.GA): F[Unit]                                  = Monad[F].unit
         override def displayProgress(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[I]): F[Unit] = Monad[F].unit
         override def displayFinal(population: EvaluatedPopulation[I]): F[Unit]                                  = Monad[F].unit

@@ -9,7 +9,7 @@ import currexx.algorithms.Fitness
 import currexx.algorithms.operators.Evaluator
 import currexx.backtest.services.TestServicesPool
 import currexx.backtest.syntax.*
-import currexx.backtest.{MarketDataProvider, OrderStatsCollector, OrderStats, TestSettings}
+import currexx.backtest.{MarketDataProvider, OrderStats, OrderStatsCollector, TestSettings}
 import currexx.core.signal.SignalDetector
 import currexx.core.trade.TradeStrategy
 import currexx.domain.signal.Indicator
@@ -22,12 +22,12 @@ object IndicatorEvaluator {
   object ScoringFunction {
     val totalProfit: ScoringFunction = _.foldLeft(BigDecimal(0))(_ + _.totalProfit).roundTo(5)
 
-    def medianWinLossRatio(minOrders: Option[Int] = None, maxOrders: Option[Int] = None): ScoringFunction = stats => {
+    def medianWinLossRatio(minOrders: Option[Int] = None, maxOrders: Option[Int] = None): ScoringFunction = stats =>
       if (stats.isEmpty) BigDecimal(0)
       else {
         // Single-pass filtering and mapping - using List with prepend for O(1) operations
         val validRatios = stats.foldLeft(List.empty[BigDecimal]) { (acc, os) =>
-          val numOrders = os.total
+          val numOrders  = os.total
           val isBelowMin = minOrders.exists(numOrders < _)
           val isAboveMax = maxOrders.exists(numOrders > _)
 
@@ -35,25 +35,31 @@ object IndicatorEvaluator {
         }
         validRatios.median
       }
-    }
 
     val averageMedianProfitByMonth: ScoringFunction = stats =>
       if (stats.isEmpty) BigDecimal(0)
       else (stats.foldLeft(BigDecimal(0))(_ + _.medianProfitByMonth) / BigDecimal(stats.size)).roundTo(5)
 
     /** Balanced scoring function that combines multiple objectives:
-      * - Total profit (absolute returns)
-      * - Win/loss ratio (trade quality)
-      * - Median profit by month (consistency)
-      * - Penalizes strategies with too few or too many trades
+      *   - Total profit (absolute returns)
+      *   - Win/loss ratio (trade quality)
+      *   - Median profit by month (consistency)
+      *   - Penalizes strategies with too few or too many trades
       *
-      * @param profitWeight Weight for total profit component (default: 0.4)
-      * @param ratioWeight Weight for win/loss ratio component (default: 0.3)
-      * @param consistencyWeight Weight for consistency component (default: 0.3)
-      * @param minOrders Minimum number of orders per dataset (penalize if below)
-      * @param maxOrders Maximum number of orders per dataset (penalize if above)
-      * @param targetRatio Target win/loss ratio for normalization (default: 2.0)
-      * @return Weighted composite score
+      * @param profitWeight
+      *   Weight for total profit component (default: 0.4)
+      * @param ratioWeight
+      *   Weight for win/loss ratio component (default: 0.3)
+      * @param consistencyWeight
+      *   Weight for consistency component (default: 0.3)
+      * @param minOrders
+      *   Minimum number of orders per dataset (penalize if below)
+      * @param maxOrders
+      *   Maximum number of orders per dataset (penalize if above)
+      * @param targetRatio
+      *   Target win/loss ratio for normalization (default: 2.0)
+      * @return
+      *   Weighted composite score
       */
     def balanced(
         profitWeight: Double = 0.4,
@@ -62,16 +68,16 @@ object IndicatorEvaluator {
         minOrders: Option[Int] = Some(30),
         maxOrders: Option[Int] = Some(500),
         targetRatio: Double = 2.0
-    ): ScoringFunction = stats => {
+    ): ScoringFunction = stats =>
       if (stats.isEmpty) BigDecimal(0)
       else {
         // Single-pass calculation of all metrics
-        val (validCount, totalProfit, totalWinLossRatio, totalConsistency) = stats.foldLeft((0, BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
-          case ((count, profit, ratio, consistency), os) =>
-            val numOrders = os.total
+        val (validCount, totalProfit, totalWinLossRatio, totalConsistency) =
+          stats.foldLeft((0, BigDecimal(0), BigDecimal(0), BigDecimal(0))) { case ((count, profit, ratio, consistency), os) =>
+            val numOrders  = os.total
             val isBelowMin = minOrders.exists(numOrders < _)
             val isAboveMax = maxOrders.exists(numOrders > _)
-            val isValid = !isBelowMin && !isAboveMax
+            val isValid    = !isBelowMin && !isAboveMax
 
             (
               if (isValid) count + 1 else count,
@@ -79,7 +85,7 @@ object IndicatorEvaluator {
               ratio + os.winLossRatio,
               consistency + os.medianProfitByMonth
             )
-        }
+          }
 
         val orderCountPenalty = validCount.toDouble / stats.size.toDouble
 
@@ -96,35 +102,37 @@ object IndicatorEvaluator {
           // Combine with weights
           val compositeScore =
             (totalProfit * BigDecimal(profitWeight)) +
-            (normalizedRatio * BigDecimal(ratioWeight)) +
-            (avgConsistency * BigDecimal(consistencyWeight))
+              (normalizedRatio * BigDecimal(ratioWeight)) +
+              (avgConsistency * BigDecimal(consistencyWeight))
 
           // Apply order count penalty
           (compositeScore * BigDecimal(orderCountPenalty)).roundTo(5)
         }
       }
-    }
 
-    /** Risk-adjusted return scoring that prioritizes profitability while controlling drawdown
-      * Uses Sharpe-like ratio: (total profit / risk measure)
+    /** Risk-adjusted return scoring that prioritizes profitability while controlling drawdown Uses Sharpe-like ratio: (total profit / risk
+      * measure)
       *
-      * @param minOrders Minimum number of orders per dataset
-      * @param maxOrders Maximum number of orders per dataset
-      * @return Score based on risk-adjusted returns
+      * @param minOrders
+      *   Minimum number of orders per dataset
+      * @param maxOrders
+      *   Maximum number of orders per dataset
+      * @return
+      *   Score based on risk-adjusted returns
       */
     def riskAdjusted(
         minOrders: Option[Int] = Some(30),
         maxOrders: Option[Int] = Some(500)
-    ): ScoringFunction = stats => {
+    ): ScoringFunction = stats =>
       if (stats.isEmpty) BigDecimal(0)
       else {
         // Single-pass calculation with filtering
         val (validCount, totalProfit, totalBiggestLoss) = stats.foldLeft((0, BigDecimal(0), BigDecimal(0))) {
           case ((count, profit, loss), os) =>
-            val numOrders = os.total
+            val numOrders  = os.total
             val isBelowMin = minOrders.exists(numOrders < _)
             val isAboveMax = maxOrders.exists(numOrders > _)
-            val isValid = !isBelowMin && !isAboveMax
+            val isValid    = !isBelowMin && !isAboveMax
 
             if (isValid) {
               (count + 1, profit + os.totalProfit, loss + os.biggestLoss.abs)
@@ -143,7 +151,6 @@ object IndicatorEvaluator {
           (totalProfit / (avgBiggestLoss + epsilon)).roundTo(5)
         }
       }
-    }
   }
 
   given Show[Indicator] = (ind: Indicator) => {
@@ -171,7 +178,7 @@ object IndicatorEvaluator {
 
   def make[F[_]: {Async, Parallel}](
       testFilePaths: List[String],
-      ts: TradeStrategy,
+      strategy: TradeStrategy,
       poolSize: Int,
       otherIndicators: List[Indicator] = Nil,
       signalDetector: SignalDetector = SignalDetector.pure,
@@ -179,12 +186,12 @@ object IndicatorEvaluator {
   ): F[Evaluator[F, Indicator]] =
     for
       testDataSets <- testFilePaths.parTraverse(MarketDataProvider.read[F](_).compile.toList)
-      initialSettings = TestSettings.make(testDataSets.head.head.currencyPair, ts, otherIndicators)
+      initialSettings = TestSettings.make(testDataSets.head.head.currencyPair, strategy, otherIndicators)
       pool <- TestServicesPool.make[F](initialSettings, poolSize)
       eval <- Evaluator.cached[F, Indicator] { ind =>
         testDataSets
           .parTraverse { testData =>
-            pool.use(TestSettings.make(testData.head.currencyPair, ts, ind :: otherIndicators)) { services =>
+            pool.use(TestSettings.make(testData.head.currencyPair, strategy, ind :: otherIndicators)) { services =>
               for
                 _ <- Stream
                   .emits(testData)

@@ -2,6 +2,7 @@ package currexx.backtest.optimizer
 
 import cats.effect.Async
 import currexx.algorithms.operators.*
+import currexx.algorithms.progress.Tracker
 import currexx.algorithms.*
 
 import scala.util.Random
@@ -17,7 +18,7 @@ object OptimisationAlgorithm:
       evaluator: Evaluator[F, T],
       selector: Selector[F, T],
       elitism: Elitism[F, T],
-      progressTracker: ProgressTracker[F, T]
+      progressTracker: Tracker[F, T]
   ): OptimisationAlgorithm[F, Alg.GA, Parameters.GA, T] = new OptimisationAlgorithm[F, Alg.GA, Parameters.GA, T]:
     override def optimise(target: T, params: Parameters.GA)(using rand: Random): F[EvaluatedPopulation[T]] =
       Algorithm.GA
