@@ -34,13 +34,9 @@ object ProgressTracker {
     val worst     = population.last._2.value
     s"Stats: Best=$best, Avg=$avg, Worst=$worst"
 
-  private def durationMsg(start: Option[Instant], end: Instant): String =
-    start
-      .map { s =>
-        val duration = (end.toEpochMilli - s.toEpochMilli).millis.toCoarsest
-        s"\nTotal duration: $duration"
-      }
-      .getOrElse("")
+  private def durationMsg(start: Instant, end: Instant): String =
+    val duration = (end.toEpochMilli - start.toEpochMilli).millis.toCoarsest
+    s"\nTotal duration: $duration"
 
   def make[F[_]: Async, I](
       logInterval: Int = 10,
@@ -70,9 +66,10 @@ object ProgressTracker {
           for
             now       <- Async[F].realTimeInstant
             startTime <- startTimeRef.get
-            _ <- Async[F].delay(
-              println(s"Final top $finalTopN members:\n${membersMsg(population, finalTopN)}\n${statsMsg(population)}\n${durationMsg(startTime, now)}")
-            )
+            duration   = startTime.map(start => durationMsg(start, now)).getOrElse("")
+            topMembers = membersMsg(population, finalTopN)
+            stats      = statsMsg(population)
+            _ <- Async[F].delay(println(s"Final top $finalTopN members:\n$topMembers\n$stats$duration"))
           yield ()
     }
 
