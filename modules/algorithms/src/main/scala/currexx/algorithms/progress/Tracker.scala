@@ -47,6 +47,15 @@ object Tracker {
   ): F[Tracker[F, I]] =
     LoggingTracker.make(logInterval, showTopMember, showTopN, showStats, finalTopN)
 
+  def markdown[F[_]: Async, I](
+      logInterval: Int = 10,
+      showTopMember: Boolean = true,
+      showTopN: Int = 1,
+      showStats: Boolean = false,
+      finalTopN: Int = 25
+  ): F[Tracker[F, I]] =
+    MarkdownTracker.make(logInterval, showTopMember, showTopN, showStats, finalTopN)
+
   def noop[F[_]: Monad, I]: F[Tracker[F, I]] =
     Monad[F].pure {
       new Tracker[F, I]:

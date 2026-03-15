@@ -125,6 +125,8 @@ gc.log*
 *.sln
 *.sw?
 
+optimisation-results/
+
 # Cordova
 /src-cordova/platforms
 /src-cordova/plugins

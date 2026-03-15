@@ -24,6 +24,7 @@ object Dependencies {
 
   object Libraries {
     val fs2            = "co.fs2"                       %% "fs2-core"               % Versions.fs2
+    val fs2Io          = "co.fs2"                       %% "fs2-io"                 % Versions.fs2
     val catsFree       = "org.typelevel"                %% "cats-free"              % Versions.cats
     val bcrypt         = "com.github.t3hnar"            %% "scala-bcrypt"           % Versions.bcrypt
     val jwt            = "com.github.jwt-scala"         %% "jwt-circe"              % Versions.jwt
@@ -99,7 +100,8 @@ object Dependencies {
 
   val algorithms = Seq(
     Libraries.catsFree,
-    Libraries.fs2
+    Libraries.fs2,
+    Libraries.fs2Io
   )
 
   val calculations = Seq(
