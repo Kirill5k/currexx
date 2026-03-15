@@ -61,7 +61,7 @@ object Optimiser extends IOApp.Simple {
       poolSize = evaluatorPoolSize,
       scoringFunction = scoringFunction
     )
-    prog <- Tracker.make[IO, Indicator](
+    prog <- Tracker.logging[IO, Indicator](
       logInterval = 10,
       showTopMember = true,
       showTopN = 3,
