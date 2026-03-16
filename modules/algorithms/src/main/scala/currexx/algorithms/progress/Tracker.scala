@@ -56,6 +56,9 @@ object Tracker {
   ): F[Tracker[F, I]] =
     MarkdownTracker.make(logInterval, showTopMember, showTopN, showStats, finalTopN)
 
+  def composite[F[_]: Monad, I](trackers: Tracker[F, I]*): Tracker[F, I] =
+    CompositeTracker.make(trackers*)
+
   def noop[F[_]: Monad, I]: F[Tracker[F, I]] =
     Monad[F].pure {
       new Tracker[F, I]:
