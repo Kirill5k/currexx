@@ -55,31 +55,30 @@ object Optimiser extends IOApp.Simple {
   // val scoringFunction = ScoringFunction.averageMedianProfitByMonth
 
   override def run: IO[Unit] =
-    rounds.traverse_(runRound)
-
-  private def runRound(round: OptimisationRound): IO[Unit] =
-    for
-      init  <- IndicatorInitialiser.make[IO]
-      cross <- IndicatorCrossover.make[IO]
-      mut   <- IndicatorMutator.make[IO]
-      sel   <- Selector.tournament[IO, Indicator]
-      elit  <- Elitism.simple[IO, Indicator]
-      eval  <- IndicatorEvaluator.make[IO](
-                 testFilePaths = round.testDataSets,
-                 strategy = round.strategy.rules,
-                 poolSize = evaluatorPoolSize,
-                 scoringFunction = round.scoringFunction
-               )
-      prog <- Tracker.markdown[IO, Indicator](
-                label = round.name,
-                logInterval = 10,
-                showTopMember = true,
-                showTopN = 3,
-                showStats = false,
-                finalTopN = 25
-              )
-      _ <- OptimisationAlgorithm
-             .ga[IO, Indicator](init, cross, mut, eval, sel, elit, prog)
-             .optimise(round.strategy.indicator, round.gaParameters)
-    yield ()
+    rounds.traverse_ { round =>
+      for
+        init  <- IndicatorInitialiser.make[IO]
+        cross <- IndicatorCrossover.make[IO]
+        mut   <- IndicatorMutator.make[IO]
+        sel   <- Selector.tournament[IO, Indicator]
+        elit  <- Elitism.simple[IO, Indicator]
+        eval  <- IndicatorEvaluator.make[IO](
+          testFilePaths = round.testDataSets,
+          strategy = round.strategy.rules,
+          poolSize = evaluatorPoolSize,
+          scoringFunction = round.scoringFunction
+        )
+        prog <- Tracker.markdown[IO, Indicator](
+          label = round.name,
+          logInterval = 10,
+          showTopMember = true,
+          showTopN = 3,
+          showStats = false,
+          finalTopN = 25
+        )
+        _ <- OptimisationAlgorithm
+          .ga[IO, Indicator](init, cross, mut, eval, sel, elit, prog)
+          .optimise(round.strategy.indicator, round.gaParameters)
+      yield ()
+    }
 }
