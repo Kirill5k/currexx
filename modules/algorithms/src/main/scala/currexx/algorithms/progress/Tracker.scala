@@ -48,13 +48,14 @@ object Tracker {
     LoggingTracker.make(logInterval, showTopMember, showTopN, showStats, finalTopN)
 
   def markdown[F[_]: Async, I](
+      label: String = "",
       logInterval: Int = 10,
       showTopMember: Boolean = true,
       showTopN: Int = 1,
       showStats: Boolean = false,
       finalTopN: Int = 25
   ): F[Tracker[F, I]] =
-    MarkdownTracker.make(logInterval, showTopMember, showTopN, showStats, finalTopN)
+    MarkdownTracker.make(label, logInterval, showTopMember, showTopN, showStats, finalTopN)
 
   def composite[F[_]: Monad, I](trackers: Tracker[F, I]*): Tracker[F, I] =
     CompositeTracker.make(trackers*)

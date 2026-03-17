@@ -11,6 +11,7 @@ import java.time.format.DateTimeFormatter
 import java.time.Instant
 
 final class MarkdownTracker[F[_], I] private (
+    label: String,
     path: Path,
     startTimeRef: Ref[F, Option[Instant]],
     logInterval: Int,
@@ -27,7 +28,7 @@ final class MarkdownTracker[F[_], I] private (
       now <- F.realTimeInstant
       _   <- startTimeRef.set(Some(now))
       content =
-        s"""# Genetic Algorithm Run
+        s"""# Genetic Algorithm Run${if (label.nonEmpty) s": $label" else ""}
            |
            |**Started at:** $now
            |**Target:** $target
@@ -92,6 +93,7 @@ object MarkdownTracker:
   private val Formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmm").withZone(ZoneId.systemDefault())
 
   def make[F[_]: Async, I](
+      label: String = "",
       logInterval: Int = 10,
       showTopMember: Boolean = true,
       showTopN: Int = 1,
@@ -101,6 +103,7 @@ object MarkdownTracker:
     for
       now          <- Async[F].realTimeInstant
       startTimeRef <- Ref.of[F, Option[Instant]](None)
-      fileName = s"ga-optimisation-${Formatter.format(now)}.md"
-      path     = Path("optimisation-results") / fileName
-    yield new MarkdownTracker[F, I](path, startTimeRef, logInterval, showTopMember, showTopN, showStats, finalTopN)
+      labelSuffix = if (label.nonEmpty) s"-$label" else ""
+      fileName    = s"ga-optimisation-${Formatter.format(now)}$labelSuffix.md"
+      path        = Path("optimisation-results") / fileName
+    yield new MarkdownTracker[F, I](label, path, startTimeRef, logInterval, showTopMember, showTopN, showStats, finalTopN)
