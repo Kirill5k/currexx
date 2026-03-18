@@ -61,5 +61,5 @@ object Tracker {
     CompositeTracker.make(trackers*)
 
   def noop[F[_]: Monad, I]: F[Tracker[F, I]] =
-    Monad[F].pure(new NoopTracker[F, I])
+    NoopTracker.make
 }

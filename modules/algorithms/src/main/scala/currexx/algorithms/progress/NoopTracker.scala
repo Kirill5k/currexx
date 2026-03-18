@@ -11,3 +11,6 @@ final class NoopTracker[F[_], I](using
   override def displayProgress(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[I]): F[Unit] = F.unit
   override def displayFinal(population: EvaluatedPopulation[I]): F[Unit]                                  = F.unit
 }
+
+object NoopTracker:
+  def make[F[_]: Monad, I]: F[Tracker[F, I]] = Monad[F].pure(new NoopTracker[F, I])
