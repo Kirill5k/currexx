@@ -61,10 +61,5 @@ object Tracker {
     CompositeTracker.make(trackers*)
 
   def noop[F[_]: Monad, I]: F[Tracker[F, I]] =
-    Monad[F].pure {
-      new Tracker[F, I]:
-        override def displayInitial(target: I, params: Parameters.GA): F[Unit]                                  = Monad[F].unit
-        override def displayProgress(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[I]): F[Unit] = Monad[F].unit
-        override def displayFinal(population: EvaluatedPopulation[I]): F[Unit]                                  = Monad[F].unit
-    }
+    Monad[F].pure(new NoopTracker[F, I])
 }
