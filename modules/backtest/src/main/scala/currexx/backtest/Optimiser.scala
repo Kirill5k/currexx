@@ -68,7 +68,7 @@ object Optimiser extends IOApp.Simple {
           poolSize = evaluatorPoolSize,
           scoringFunction = round.scoringFunction
         )
-        prog <- Tracker.markdown[IO, Indicator](
+        markDownProg <- Tracker.markdown[IO, Indicator](
           label = round.name,
           logInterval = 10,
           showTopMember = true,
@@ -76,6 +76,14 @@ object Optimiser extends IOApp.Simple {
           showStats = false,
           finalTopN = 25
         )
+        loggingProg <- Tracker.logging[IO, Indicator](
+          logInterval = 10,
+          showTopMember = true,
+          showTopN = 3,
+          showStats = false,
+          finalTopN = 25
+        )
+        prog = Tracker.composite(markDownProg, loggingProg)
         _ <- OptimisationAlgorithm
           .ga[IO, Indicator](init, cross, mut, eval, sel, elit, prog)
           .optimise(round.strategy.indicator, round.gaParameters)
