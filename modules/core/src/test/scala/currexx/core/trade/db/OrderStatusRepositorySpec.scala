@@ -87,6 +87,7 @@ class OrderStatusRepositorySpec extends MongoSpec {
             noPositionOrders = 0,
             enterOrders = EnterOrderStats(
               total = 1,
+              successCount = 1,
               buyCount = 1,
               sellCount = 0,
               totalVolume = BigDecimal(0.1),

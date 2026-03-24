@@ -40,6 +40,7 @@ final private class TestOrderStatusRepository[F[_]](using F: Monad[F]) extends O
       noPositionOrders = 0,
       enterOrders = EnterOrderStats(
         total = 0,
+        successCount = 0,
         buyCount = 0,
         sellCount = 0,
         totalVolume = 0.0,

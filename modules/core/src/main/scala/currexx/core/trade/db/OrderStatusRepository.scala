@@ -33,7 +33,7 @@ final private class LiveOrderStatusRepository[F[_]: Async](
         val orders = entities.toList
 
         val enterOrders = orders.filter(_.isEnter)
-        val volumes     = enterOrders.flatMap(_.volume)
+        val volumes     = enterOrders.filter(_.isSuccess).flatMap(_.volume)
         val totalVolume = volumes.sum
 
         val currencyBreakdown = orders
@@ -65,6 +65,7 @@ final private class LiveOrderStatusRepository[F[_]: Async](
           noPositionOrders = orders.count(_.isNoPosition),
           enterOrders = EnterOrderStats(
             total = enterOrders.size,
+            successCount = enterOrders.count(_.isSuccess),
             buyCount = enterOrders.count(_.isBuy),
             sellCount = enterOrders.count(_.isSell),
             totalVolume = totalVolume,

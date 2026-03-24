@@ -109,6 +109,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
           noPositionOrders = 0,
           enterOrders = EnterOrderStats(
             total = 6,
+            successCount = 6,
             buyCount = 4,
             sellCount = 2,
             totalVolume = BigDecimal(0.6),
@@ -145,6 +146,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
             |  "noPositionOrders" : 0,
             |  "enterOrders" : {
             |    "total" : 6,
+            |    "successCount" : 6,
             |    "buyCount" : 4,
             |    "sellCount" : 2,
             |    "totalVolume" : 0.6,
@@ -189,6 +191,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
           noPositionOrders = 0,
           enterOrders = EnterOrderStats(
             total = 3,
+            successCount = 3,
             buyCount = 2,
             sellCount = 1,
             totalVolume = BigDecimal(0.3),
@@ -211,6 +214,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
             |  "noPositionOrders" : 0,
             |  "enterOrders" : {
             |    "total" : 3,
+            |    "successCount" : 3,
             |    "buyCount" : 2,
             |    "sellCount" : 1,
             |    "totalVolume" : 0.3,

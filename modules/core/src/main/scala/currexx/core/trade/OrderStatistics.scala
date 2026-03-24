@@ -16,6 +16,7 @@ final case class OrderStatistics(
 
 final case class EnterOrderStats(
     total: Int,
+    successCount: Int,
     buyCount: Int,
     sellCount: Int,
     totalVolume: BigDecimal,
