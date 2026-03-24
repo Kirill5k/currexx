@@ -89,8 +89,7 @@ class OrderStatusRepositorySpec extends MongoSpec {
               total = 1,
               buyCount = 1,
               sellCount = 0,
-              totalVolume = BigDecimal(0.1),
-              averageVolume = Some(BigDecimal(0.1))
+              totalVolume = BigDecimal(0.1)
             ),
             exitOrders = 0,
             currencyBreakdown = List(
@@ -133,7 +132,6 @@ class OrderStatusRepositorySpec extends MongoSpec {
           stats.enterOrders.buyCount mustBe 1
           stats.enterOrders.sellCount mustBe 1
           stats.enterOrders.totalVolume mustBe BigDecimal(0.1) + BigDecimal(0.2)
-          stats.enterOrders.averageVolume mustBe Some((BigDecimal(0.1) + BigDecimal(0.2)) / 2)
           stats.exitOrders mustBe 1
           stats.currencyBreakdown.size mustBe 2
         }

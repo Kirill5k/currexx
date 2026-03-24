@@ -18,8 +18,7 @@ final case class EnterOrderStats(
     total: Int,
     buyCount: Int,
     sellCount: Int,
-    totalVolume: BigDecimal,
-    averageVolume: Option[BigDecimal]
+    totalVolume: BigDecimal
 ) derives Codec.AsObject
 
 final case class CurrencyStatistics(

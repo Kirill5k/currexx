@@ -111,8 +111,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
             total = 6,
             buyCount = 4,
             sellCount = 2,
-            totalVolume = BigDecimal(0.6),
-            averageVolume = Some(BigDecimal(0.1))
+            totalVolume = BigDecimal(0.6)
           ),
           exitOrders = 4,
           currencyBreakdown = List(
@@ -147,8 +146,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
             |    "total" : 6,
             |    "buyCount" : 4,
             |    "sellCount" : 2,
-            |    "totalVolume" : 0.6,
-            |    "averageVolume" : 0.1
+            |    "totalVolume" : 0.6
             |  },
             |  "exitOrders" : 4,
             |  "currencyBreakdown" : [
@@ -191,8 +189,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
             total = 3,
             buyCount = 2,
             sellCount = 1,
-            totalVolume = BigDecimal(0.3),
-            averageVolume = Some(BigDecimal(0.1))
+            totalVolume = BigDecimal(0.3)
           ),
           exitOrders = 2,
           currencyBreakdown = List.empty
@@ -213,8 +210,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
             |    "total" : 3,
             |    "buyCount" : 2,
             |    "sellCount" : 1,
-            |    "totalVolume" : 0.3,
-            |    "averageVolume" : 0.1
+            |    "totalVolume" : 0.3
             |  },
             |  "exitOrders" : 2,
             |  "currencyBreakdown" : [

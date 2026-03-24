@@ -33,8 +33,7 @@ final private class LiveOrderStatusRepository[F[_]: Async](
         val orders = entities.toList
 
         val enterOrders = orders.filter(_.isEnter)
-        val volumes     = enterOrders.flatMap(_.volume)
-        val totalVolume = volumes.sum
+        val totalVolume = enterOrders.flatMap(_.volume).sum
 
         val currencyBreakdown = orders
           .groupBy(_.currencyPair)
@@ -67,8 +66,7 @@ final private class LiveOrderStatusRepository[F[_]: Async](
             total = enterOrders.size,
             buyCount = enterOrders.count(_.isBuy),
             sellCount = enterOrders.count(_.isSell),
-            totalVolume = totalVolume,
-            averageVolume = Option.when(volumes.nonEmpty)(totalVolume / volumes.size)
+            totalVolume = totalVolume
           ),
           exitOrders = orders.count(_.isExit),
           currencyBreakdown = currencyBreakdown
