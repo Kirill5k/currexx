@@ -42,7 +42,8 @@ final private class TestOrderStatusRepository[F[_]](using F: Monad[F]) extends O
         total = 0,
         buyCount = 0,
         sellCount = 0,
-        totalVolume = 0.0
+        totalVolume = 0.0,
+        averageVolume = None
       ),
       exitOrders = 0,
       currencyBreakdown = Nil
