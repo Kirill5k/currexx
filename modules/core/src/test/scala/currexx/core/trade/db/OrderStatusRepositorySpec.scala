@@ -120,20 +120,20 @@ class OrderStatusRepositorySpec extends MongoSpec {
         val result = for
           repo <- OrderStatusRepository.make(db)
           _    <- repo.save(Trades.order, OrderPlacementStatus.Success)
-          _    <- repo.save(sellOrder, OrderPlacementStatus.Pending)
+          _    <- repo.save(sellOrder, OrderPlacementStatus.Success)
           _    <- repo.save(exitOrder, OrderPlacementStatus.Cancelled("timeout"))
           res  <- repo.getStatistics(Users.uid, emptySearchParams)
         yield res
 
         result.map { stats =>
           stats.totalOrders mustBe 3
-          stats.successfulOrders mustBe 1
-          stats.pendingOrders mustBe 1
+          stats.successfulOrders mustBe 2
+          stats.pendingOrders mustBe 0
           stats.cancelledOrders mustBe 1
           stats.enterOrders.total mustBe 2
           stats.enterOrders.buyCount mustBe 1
           stats.enterOrders.sellCount mustBe 1
-          stats.enterOrders.totalVolume mustBe BigDecimal(0.1) + BigDecimal(0.2)
+          stats.enterOrders.totalVolume mustBe BigDecimal(0.3)
           stats.enterOrders.averageVolume mustBe Some((BigDecimal(0.1) + BigDecimal(0.2)) / 2)
           stats.exitOrders mustBe 1
           stats.currencyBreakdown.size mustBe 2
