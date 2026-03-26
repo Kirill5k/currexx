@@ -12,7 +12,8 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
   def mkStats(
       total: Int = 100,
       profit: BigDecimal = BigDecimal(100),
-      losses: List[BigDecimal] = List.fill(25)(BigDecimal(-1)),
+      lossCount: Int = 25,
+      lossTotal: Double = -25.0,
       biggestWin: BigDecimal = BigDecimal(10),
       biggestLoss: BigDecimal = BigDecimal(-5),
       profitByMonth: Map[String, BigDecimal] = ListMap(
@@ -25,7 +26,8 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       total = total,
       buys = total / 2,
       sells = total / 2,
-      losses = losses,
+      lossCount = lossCount,
+      lossTotal = lossTotal,
       totalProfit = profit,
       biggestWin = biggestWin,
       biggestLoss = biggestLoss,
@@ -51,8 +53,8 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
 
     "calculate score for valid stats with default weights" in {
       val stats = List(
-        mkStats(total = 100, profit = BigDecimal(50), losses = List.fill(20)(BigDecimal(-1))),
-        mkStats(total = 150, profit = BigDecimal(75), losses = List.fill(30)(BigDecimal(-1)))
+        mkStats(total = 100, profit = BigDecimal(50), lossCount = 20, lossTotal = -20.0),
+        mkStats(total = 150, profit = BigDecimal(75), lossCount = 30, lossTotal = -30.0)
       )
       val result = ScoringFunction.balanced()(stats)
 
@@ -61,7 +63,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
     }
 
     "prioritize profit when profitWeight is high" in {
-      val stats = List(mkStats(total = 100, profit = BigDecimal(100), losses = List.fill(40)(BigDecimal(-1))))
+      val stats = List(mkStats(total = 100, profit = BigDecimal(100), lossCount = 40, lossTotal = -40.0))
 
       val highProfitWeight = ScoringFunction.balanced(profitWeight = 0.8, ratioWeight = 0.1, consistencyWeight = 0.1)(stats)
       val lowProfitWeight = ScoringFunction.balanced(profitWeight = 0.2, ratioWeight = 0.4, consistencyWeight = 0.4)(stats)
@@ -70,8 +72,8 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
     }
 
     "prioritize win/loss ratio when ratioWeight is high" in {
-      val highRatioStats = List(mkStats(total = 100, profit = BigDecimal(50), losses = List.fill(10)(BigDecimal(-1))))
-      val lowRatioStats = List(mkStats(total = 100, profit = BigDecimal(50), losses = List.fill(40)(BigDecimal(-1))))
+      val highRatioStats = List(mkStats(total = 100, profit = BigDecimal(50), lossCount = 10, lossTotal = -10.0))
+      val lowRatioStats = List(mkStats(total = 100, profit = BigDecimal(50), lossCount = 40, lossTotal = -40.0))
 
       val scoring = ScoringFunction.balanced(profitWeight = 0.2, ratioWeight = 0.6, consistencyWeight = 0.2)
 
@@ -115,7 +117,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
     }
 
     "normalize win/loss ratio using targetRatio" in {
-      val stats = List(mkStats(total = 100, profit = BigDecimal(50), losses = List.fill(25)(BigDecimal(-1))))
+      val stats = List(mkStats(total = 100, profit = BigDecimal(50), lossCount = 25, lossTotal = -25.0))
 
       // With lower targetRatio, the normalized ratio will be higher (capped at 1.0)
       val lowTarget = ScoringFunction.balanced(targetRatio = 1.5, ratioWeight = 1.0, profitWeight = 0, consistencyWeight = 0)(stats)
@@ -125,7 +127,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
     }
 
     "handle edge case with no losses (perfect win ratio)" in {
-      val perfectStats = List(mkStats(total = 100, profit = BigDecimal(100), losses = List.empty))
+      val perfectStats = List(mkStats(total = 100, profit = BigDecimal(100), lossCount = 0, lossTotal = 0.0))
       val result = ScoringFunction.balanced()(perfectStats)
 
       result must be > 0.0
@@ -300,8 +302,8 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
 
     "calculate median win/loss ratio correctly" in {
       val stats = List(
-        mkStats(total = 100, losses = List.fill(25)(BigDecimal(-1))),  // Ratio: 75/25 = 3
-        mkStats(total = 100, losses = List.fill(50)(BigDecimal(-1)))   // Ratio: 50/50 = 1
+        mkStats(total = 100, lossCount = 25, lossTotal = -25.0),  // Ratio: 75/25 = 3
+        mkStats(total = 100, lossCount = 50, lossTotal = -50.0)   // Ratio: 50/50 = 1
       )
       val result = ScoringFunction.medianWinLossRatio()(stats)
       result mustBe 2.0 // Median of [3, 1] = 2

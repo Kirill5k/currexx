@@ -11,7 +11,8 @@ final case class OrderStats(
     total: Int = 0,
     buys: Int = 0,
     sells: Int = 0,
-    losses: List[BigDecimal] = List.empty,
+    lossCount: Int = 0,
+    lossTotal: Double = 0.0,
     totalProfit: BigDecimal = BigDecimal(0),
     biggestWin: BigDecimal = BigDecimal(0),
     biggestLoss: BigDecimal = BigDecimal(0),
@@ -19,12 +20,13 @@ final case class OrderStats(
 ):
   def medianProfitByMonth: BigDecimal          = profitByMonth.values.toList.median.roundTo(5)
   def meanProfitByMonth: BigDecimal            = profitByMonth.values.toList.mean.roundTo(5)
-  def meanLoss: BigDecimal                     = losses.mean.roundTo(5)
+  def meanLoss: BigDecimal                     = if (lossCount == 0) BigDecimal(0) else BigDecimal(lossTotal / lossCount)
   def incBuy: OrderStats                       = copy(total = total + 1, buys = buys + 1)
   def incSell: OrderStats                      = copy(total = total + 1, sells = sells + 1)
   def close(profit: BigDecimal, time: Instant) =
     copy(
-      losses = if (profit < BigDecimal(0)) profit :: losses else losses,
+      lossCount = if (profit < BigDecimal(0)) lossCount + 1 else lossCount,
+      lossTotal = if (profit < BigDecimal(0)) lossTotal + profit.toDouble else lossTotal,
       totalProfit = totalProfit + profit,
       biggestWin = profit.max(biggestWin),
       biggestLoss = profit.min(biggestLoss),
@@ -34,8 +36,8 @@ final case class OrderStats(
       }
     )
   def winLossRatio: BigDecimal =
-    if (losses.isEmpty) if (total == 0) BigDecimal(0) else BigDecimal(total)
-    else (BigDecimal(total - losses.size) / BigDecimal(losses.size)).roundTo(5)
+    if (lossCount == 0) if (total == 0) BigDecimal(0) else BigDecimal(total)
+    else (BigDecimal(total - lossCount) / BigDecimal(lossCount)).roundTo(5)
 
   override def toString: String =
     s"""OrderStats(
@@ -49,7 +51,7 @@ final case class OrderStats(
        |meanLoss=$meanLoss,
        |buys=$buys,
        |sells=$sells,
-       |losses=${losses.size}
+       |losses=$lossCount
        |)""".stripMargin.replaceAll("\n", "")
 
 object OrderStatsCollector:

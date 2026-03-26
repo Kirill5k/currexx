@@ -71,8 +71,8 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
       stats.buys mustBe 1
       stats.sells mustBe 1
       stats.totalProfit mustBe BigDecimal(-10)
-      stats.losses.size mustBe 1
-      stats.losses.head mustBe BigDecimal(-10)
+      stats.lossCount mustBe 1
+      stats.lossTotal mustBe -10.0
     }
 
     "handle winLossRatio correctly" in {
