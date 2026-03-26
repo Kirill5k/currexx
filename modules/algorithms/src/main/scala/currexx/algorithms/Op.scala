@@ -1,5 +1,6 @@
 package currexx.algorithms
 
+import cats.syntax.traverse.*
 import cats.~>
 import cats.effect.Async
 import cats.free.Free
@@ -84,7 +85,8 @@ object Op:
         case Op.EvaluateOne(ind) =>
           evaluator.evaluateIndividual(ind)
         case Op.EvaluatePopulation(population) =>
-          apply(Op.ApplyToAll(population, i => Op.EvaluateOne(i)))
+          val parallelism = Math.max(1, Runtime.getRuntime.availableProcessors())
+          Stream.emits(population).mapAsync(parallelism)(evaluator.evaluateIndividual).compile.toVector
         case Op.SelectElites(population, popSize, ratio) =>
           elitism.select(population, popSize * ratio)
         case Op.SelectPairs(population, limit) =>
@@ -92,8 +94,7 @@ object Op:
         case Op.SortByFitness(population) =>
           F.delay(population.sortBy(_._2)(using Ordering[Fitness].reverse))
         case Op.ApplyToAll(population, op) =>
-          val parallelism = Math.max(1, Runtime.getRuntime.availableProcessors())
-          Stream.emits(population).mapAsync(parallelism)(i => apply(op(i))).compile.toVector
+          population.traverse(i => apply(op(i)))
   }
 
   inline def ioInterpreter[F[_], I](
