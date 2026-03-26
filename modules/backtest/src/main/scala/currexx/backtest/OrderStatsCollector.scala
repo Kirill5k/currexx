@@ -4,7 +4,8 @@ import currexx.backtest.syntax.*
 import currexx.core.trade.TradeOrderPlacement
 import currexx.domain.market.TradeOrder as TO
 
-import java.time.Instant
+import java.time.{Instant, ZoneOffset}
+import java.time.format.DateTimeFormatter
 import scala.collection.immutable.ListMap
 
 final case class OrderStats(
@@ -31,7 +32,7 @@ final case class OrderStats(
       biggestWin = profit.max(biggestWin),
       biggestLoss = profit.min(biggestLoss),
       profitByMonth = {
-        val date = time.toString.slice(0, 7)
+        val date = OrderStats.monthFormatter.format(time)
         profitByMonth + (date -> (profitByMonth.getOrElse(date, BigDecimal(0)) + profit))
       }
     )
@@ -53,6 +54,10 @@ final case class OrderStats(
        |sells=$sells,
        |losses=$lossCount
        |)""".stripMargin.replaceAll("\n", "")
+
+object OrderStats:
+  private[backtest] val monthFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyy-MM").withZone(ZoneOffset.UTC)
 
 object OrderStatsCollector:
   def collect(orders: List[TradeOrderPlacement]): OrderStats =
