@@ -5,7 +5,6 @@ import currexx.backtest.optimizer.IndicatorEvaluator.ScoringFunction
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.collection.immutable.ListMap
 
 class ScoringFunctionSpec extends AnyWordSpec with Matchers {
 
@@ -16,7 +15,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       lossTotal: Double = -25.0,
       biggestWin: BigDecimal = BigDecimal(10),
       biggestLoss: BigDecimal = BigDecimal(-5),
-      profitByMonth: Map[String, BigDecimal] = ListMap(
+      profitByMonth: Map[String, BigDecimal] = Map(
         "2025-01" -> BigDecimal(10),
         "2025-02" -> BigDecimal(15),
         "2025-03" -> BigDecimal(20)
@@ -87,13 +86,13 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       val consistentStats = List(mkStats(
         total = 100,
         profit = BigDecimal(60),
-        profitByMonth = ListMap("2025-01" -> BigDecimal(20), "2025-02" -> BigDecimal(20), "2025-03" -> BigDecimal(20))
+        profitByMonth = Map("2025-01" -> BigDecimal(20), "2025-02" -> BigDecimal(20), "2025-03" -> BigDecimal(20))
       ))
 
       val inconsistentStats = List(mkStats(
         total = 100,
         profit = BigDecimal(60),
-        profitByMonth = ListMap("2025-01" -> BigDecimal(50), "2025-02" -> BigDecimal(5), "2025-03" -> BigDecimal(5))
+        profitByMonth = Map("2025-01" -> BigDecimal(50), "2025-02" -> BigDecimal(5), "2025-03" -> BigDecimal(5))
       ))
 
       val scoring = ScoringFunction.balanced(profitWeight = 0.2, ratioWeight = 0.2, consistencyWeight = 0.6)
@@ -317,8 +316,8 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
 
     "calculate average of median monthly profits" in {
       val stats = List(
-        mkStats(profitByMonth = ListMap("2025-01" -> BigDecimal(10), "2025-02" -> BigDecimal(20), "2025-03" -> BigDecimal(30))),
-        mkStats(profitByMonth = ListMap("2025-01" -> BigDecimal(15), "2025-02" -> BigDecimal(25), "2025-03" -> BigDecimal(35)))
+        mkStats(profitByMonth = Map("2025-01" -> BigDecimal(10), "2025-02" -> BigDecimal(20), "2025-03" -> BigDecimal(30))),
+        mkStats(profitByMonth = Map("2025-01" -> BigDecimal(15), "2025-02" -> BigDecimal(25), "2025-03" -> BigDecimal(35)))
       )
       val result = ScoringFunction.averageMedianProfitByMonth(stats)
 

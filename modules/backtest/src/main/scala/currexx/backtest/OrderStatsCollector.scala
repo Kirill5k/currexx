@@ -6,7 +6,6 @@ import currexx.domain.market.TradeOrder as TO
 
 import java.time.{Instant, ZoneOffset}
 import java.time.format.DateTimeFormatter
-import scala.collection.immutable.ListMap
 
 final case class OrderStats(
     total: Int = 0,
@@ -17,7 +16,7 @@ final case class OrderStats(
     totalProfit: BigDecimal = BigDecimal(0),
     biggestWin: BigDecimal = BigDecimal(0),
     biggestLoss: BigDecimal = BigDecimal(0),
-    profitByMonth: Map[String, BigDecimal] = ListMap.empty
+    profitByMonth: Map[String, BigDecimal] = Map.empty
 ):
   def medianProfitByMonth: BigDecimal          = profitByMonth.values.toList.median.roundTo(5)
   def meanProfitByMonth: BigDecimal            = profitByMonth.values.toList.mean.roundTo(5)
