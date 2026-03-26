@@ -1,6 +1,5 @@
 package currexx.algorithms.operators
 
-import cats.Show
 import cats.effect.{IO, Ref}
 import currexx.algorithms.Fitness
 import kirill5k.common.cats.test.IOWordSpec
@@ -22,20 +21,16 @@ class EvaluatorSpec extends IOWordSpec {
       }
     }
 
-    "work with arrays" in {
-      given showArray[A](using S: Show[A]): Show[Array[A]] = new Show[Array[A]]:
-        override def show(t: Array[A]): String = t.map(S.show).mkString(",")
-
+    "evaluate each unique individual only once under concurrent access" in {
       val result = for
         attempts  <- Ref.of[IO, Int](0)
-        evaluator <- Evaluator.cached[IO, Array[Int]](evaluate(attempts))
-        _         <- evaluator.evaluateIndividual(Array(0, 1, 2, 3))
-        res       <- evaluator.evaluateIndividual(Array(0, 1, 2, 3))
-      yield res
+        evaluator <- Evaluator.cached[IO, String](evaluate(attempts))
+        (r1, r2)  <- IO.both(evaluator.evaluateIndividual("foo"), evaluator.evaluateIndividual("foo"))
+      yield (r1, r2)
 
-      result.asserting { (ind, fitness) =>
-        ind mustBe Array(0, 1, 2, 3)
-        fitness mustBe Fitness(1.0)
+      result.asserting { (r1, r2) =>
+        r1._2 mustBe Fitness(1.0)
+        r2._2 mustBe Fitness(1.0)
       }
     }
   }

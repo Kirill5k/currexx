@@ -1,6 +1,6 @@
 package currexx.backtest.optimizer
 
-import cats.{Parallel, Show}
+import cats.Parallel
 import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -151,29 +151,6 @@ object IndicatorEvaluator {
           (totalProfit / (avgBiggestLoss + epsilon)).toDouble
         }
       }
-  }
-
-  given Show[Indicator] = (ind: Indicator) => {
-    def showInd(i: Indicator): String = i match
-      case Indicator.TrendChangeDetection(vs, transformation) =>
-        s"TrendChangeDetection-${vs.print}-${transformation}"
-      case Indicator.ThresholdCrossing(vs, transformation, upperBoundary, lowerBoundary) =>
-        s"ThresholdCrossing-${vs.print}-${transformation}-lb$lowerBoundary-up$upperBoundary"
-      case Indicator.LinesCrossing(vs, slowTransformation, fastTransformation) =>
-        s"LinesCrossing-${vs.print}-${slowTransformation}-${fastTransformation}"
-      case Indicator.KeltnerChannel(vs, md, atrLength, atrMultiplier) =>
-        s"KeltnerChannel-${vs.print}-$md-$atrLength-$atrMultiplier"
-      case Indicator.Composite(indicators, combinator) =>
-        s"Composite-$combinator-${indicators.map(showInd).toList.mkString("-")}"
-      case Indicator.VolatilityRegimeDetection(atrLength, smoothingType) =>
-        s"VolatilityRegimeDetection-${atrLength}-${smoothingType}"
-      case Indicator.ValueTracking(role, transformation, targetValue) =>
-        s"ValueTracking-${role.print}-${transformation}-$targetValue"
-      case Indicator.PriceLineCrossing(vs, role, transformation) =>
-        s"PriceLineCrossing-${vs.print}-$role-$transformation"
-      case Indicator.BollingerBands(vs, mb, sdLength, sdMultiplier) =>
-        s"BollingerBands-${vs.print}-$mb-$sdLength-$sdMultiplier"
-    showInd(ind)
   }
 
   def make[F[_]: {Async, Parallel}](
