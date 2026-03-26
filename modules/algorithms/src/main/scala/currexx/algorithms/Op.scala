@@ -9,32 +9,32 @@ import fs2.Stream
 
 import scala.util.{Random, Try}
 
-opaque type Fitness = BigDecimal
+opaque type Fitness = Double
 object Fitness:
-  def apply(value: BigDecimal): Fitness = value
+  def apply(value: Double): Fitness = value
   extension (fitness: Fitness)
-    def isZero: Boolean            = fitness == BigDecimal(0)
+    def isZero: Boolean            = fitness == 0.0
     def -(other: Fitness): Fitness = fitness - other
     def +(other: Fitness): Fitness = fitness + other
     def /(other: Fitness): Fitness = fitness / other
     def >(other: Fitness): Boolean = fitness > other
     def <(other: Fitness): Boolean = fitness < other
-    def value: BigDecimal          = fitness
+    def value: Double              = fitness
   given ordering: Ordering[Fitness] with
-    def compare(f1: Fitness, f2: Fitness): Int = f1.compare(f2)
+    def compare(f1: Fitness, f2: Fitness): Int = java.lang.Double.compare(f1, f2)
 
   given numeric: Numeric[Fitness] with
     def plus(x: Fitness, y: Fitness): Fitness     = x + y
     def minus(x: Fitness, y: Fitness): Fitness    = x - y
-    def times(x: Fitness, y: Fitness): Fitness    = Fitness(x.value * y.value)
-    def negate(x: Fitness): Fitness               = Fitness(-x.value)
-    def fromInt(x: Int): Fitness                  = Fitness(BigDecimal(x))
-    def parseString(str: String): Option[Fitness] = Try(Fitness(BigDecimal(str))).toOption
-    def toInt(x: Fitness): Int                    = x.value.toInt
-    def toLong(x: Fitness): Long                  = x.value.toLong
-    def toFloat(x: Fitness): Float                = x.value.toFloat
-    def toDouble(x: Fitness): Double              = x.value.toDouble
-    def compare(x: Fitness, y: Fitness): Int      = x.value.compare(y.value)
+    def times(x: Fitness, y: Fitness): Fitness    = x * y
+    def negate(x: Fitness): Fitness               = -x
+    def fromInt(x: Int): Fitness                  = x.toDouble
+    def parseString(str: String): Option[Fitness] = Try(str.toDouble).toOption
+    def toInt(x: Fitness): Int                    = x.toInt
+    def toLong(x: Fitness): Long                  = x.toLong
+    def toFloat(x: Fitness): Float                = x.toFloat
+    def toDouble(x: Fitness): Double              = x
+    def compare(x: Fitness, y: Fitness): Int      = java.lang.Double.compare(x, y)
 
 type Population[I]            = Vector[I]
 type EvaluatedPopulation[I]   = Vector[(I, Fitness)]

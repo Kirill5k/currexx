@@ -40,7 +40,7 @@ object Selector:
           newPop.addOne(individual)
         } else {
           val random        = r.nextDouble() * fitnessSum.value
-          var cumulative    = BigDecimal(0.0)
+          var cumulative    = 0.0
           var selectedIndex = -1
           val it            = popByFitness.iterator.zipWithIndex
           while (it.hasNext && selectedIndex == -1) {

@@ -61,10 +61,10 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
           State.pure(ind)
       case Op.EvaluateOne(ind) =>
         State.modify[List[String]](_ :+ "Evaluate single individual\n") >>
-          State.pure((ind, Fitness(1)))
+          State.pure((ind, Fitness(1.0)))
       case Op.EvaluatePopulation(population) =>
         State.modify[List[String]](_ :+ "Evaluate entire population\n") >>
-          State.pure(population.map(i => (i, Fitness(1))))
+          State.pure(population.map(i => (i, Fitness(1.0))))
       case Op.SelectElites(population, popSize, ratio) =>
         State.modify[List[String]](_ :+ s"Select ${popSize * ratio} elites from the current population\n") >>
           State.pure(population.map((i, _) => i))

@@ -18,7 +18,7 @@ class EvaluatorSpec extends IOWordSpec {
 
       result.asserting { (ind, fitness) =>
         ind mustBe "foo"
-        fitness mustBe Fitness(BigDecimal(1))
+        fitness mustBe Fitness(1.0)
       }
     }
 
@@ -35,14 +35,14 @@ class EvaluatorSpec extends IOWordSpec {
 
       result.asserting { (ind, fitness) =>
         ind mustBe Array(0, 1, 2, 3)
-        fitness mustBe Fitness(BigDecimal(1))
+        fitness mustBe Fitness(1.0)
       }
     }
   }
 
   def evaluate[A](attempts: Ref[IO, Int])(individual: A): IO[(A, Fitness)] =
     attempts.get.flatMap {
-      case 0 => IO.pure((individual, Fitness(BigDecimal(1)))).flatTap(_ => attempts.update(_ + 1))
+      case 0 => IO.pure((individual, Fitness(1.0))).flatTap(_ => attempts.update(_ + 1))
       case _ => IO.raiseError(new RuntimeException("should not happen"))
     }
 }

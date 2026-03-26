@@ -17,13 +17,13 @@ import fs2.Stream
 
 object IndicatorEvaluator {
 
-  type ScoringFunction = List[OrderStats] => BigDecimal
+  type ScoringFunction = List[OrderStats] => Double
 
   object ScoringFunction {
-    val totalProfit: ScoringFunction = _.foldLeft(BigDecimal(0))(_ + _.totalProfit).roundTo(5)
+    val totalProfit: ScoringFunction = _.foldLeft(BigDecimal(0))(_ + _.totalProfit).toDouble
 
     def medianWinLossRatio(minOrders: Option[Int] = None, maxOrders: Option[Int] = None): ScoringFunction = stats =>
-      if (stats.isEmpty) BigDecimal(0)
+      if (stats.isEmpty) 0.0
       else {
         // Single-pass filtering and mapping - using List with prepend for O(1) operations
         val validRatios = stats.foldLeft(List.empty[BigDecimal]) { (acc, os) =>
@@ -33,12 +33,12 @@ object IndicatorEvaluator {
 
           if (isBelowMin || isAboveMax) BigDecimal(0) :: acc else os.winLossRatio :: acc
         }
-        validRatios.median
+        validRatios.median.toDouble
       }
 
     val averageMedianProfitByMonth: ScoringFunction = stats =>
-      if (stats.isEmpty) BigDecimal(0)
-      else (stats.foldLeft(BigDecimal(0))(_ + _.medianProfitByMonth) / BigDecimal(stats.size)).roundTo(5)
+      if (stats.isEmpty) 0.0
+      else (stats.foldLeft(BigDecimal(0))(_ + _.medianProfitByMonth) / BigDecimal(stats.size)).toDouble
 
     /** Balanced scoring function that combines multiple objectives:
       *   - Total profit (absolute returns)
@@ -69,7 +69,7 @@ object IndicatorEvaluator {
         maxOrders: Option[Int] = Some(500),
         targetRatio: Double = 2.0
     ): ScoringFunction = stats =>
-      if (stats.isEmpty) BigDecimal(0)
+      if (stats.isEmpty) 0.0
       else {
         // Single-pass calculation of all metrics
         val (validCount, totalProfit, totalWinLossRatio, totalConsistency) =
@@ -90,7 +90,7 @@ object IndicatorEvaluator {
         val orderCountPenalty = validCount.toDouble / stats.size.toDouble
 
         // If most strategies violate order constraints, heavily penalize
-        if (orderCountPenalty < 0.5) BigDecimal(0)
+        if (orderCountPenalty < 0.5) 0.0
         else {
           // Component 2: Win/Loss Ratio (normalized and capped)
           val avgWinLossRatio = totalWinLossRatio / BigDecimal(stats.size)
@@ -106,7 +106,7 @@ object IndicatorEvaluator {
               (avgConsistency * BigDecimal(consistencyWeight))
 
           // Apply order count penalty
-          (compositeScore * BigDecimal(orderCountPenalty)).roundTo(5)
+          (compositeScore * BigDecimal(orderCountPenalty)).toDouble
         }
       }
 
@@ -124,7 +124,7 @@ object IndicatorEvaluator {
         minOrders: Option[Int] = Some(30),
         maxOrders: Option[Int] = Some(500)
     ): ScoringFunction = stats =>
-      if (stats.isEmpty) BigDecimal(0)
+      if (stats.isEmpty) 0.0
       else {
         // Single-pass calculation with filtering
         val (validCount, totalProfit, totalBiggestLoss) = stats.foldLeft((0, BigDecimal(0), BigDecimal(0))) {
@@ -141,14 +141,14 @@ object IndicatorEvaluator {
             }
         }
 
-        if (validCount == 0) BigDecimal(0)
+        if (validCount == 0) 0.0
         else {
           val avgBiggestLoss = totalBiggestLoss / BigDecimal(validCount)
 
           // Risk-adjusted return: profit / max drawdown
           // Add small epsilon to avoid division by zero
           val epsilon = BigDecimal(0.001)
-          (totalProfit / (avgBiggestLoss + epsilon)).roundTo(5)
+          (totalProfit / (avgBiggestLoss + epsilon)).toDouble
         }
       }
   }

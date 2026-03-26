@@ -36,7 +36,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
   "ScoringFunction.balanced" should {
     "return 0 for empty stats list" in {
       val result = ScoringFunction.balanced()(List.empty)
-      result mustBe BigDecimal(0)
+      result mustBe 0.0
     }
 
     "return 0 when more than 50% of datasets violate order constraints" in {
@@ -46,7 +46,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
         mkStats(total = 100)  // Valid
       )
       val result = ScoringFunction.balanced(minOrders = Some(50))(stats)
-      result mustBe BigDecimal(0)
+      result mustBe 0.0
     }
 
     "calculate score for valid stats with default weights" in {
@@ -57,7 +57,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       val result = ScoringFunction.balanced()(stats)
 
       // Should be positive and reasonable
-      result must (be > BigDecimal(0) and be < BigDecimal(200)) // Less than total profit due to weighted components
+      result must (be > 0.0 and be < 200.0) // Less than total profit due to weighted components
     }
 
     "prioritize profit when profitWeight is high" in {
@@ -105,13 +105,13 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
     "penalize strategies with too few orders" in {
       val tooFewOrders = List(mkStats(total = 20, profit = BigDecimal(100)))
       val result = ScoringFunction.balanced(minOrders = Some(50))(tooFewOrders)
-      result mustBe BigDecimal(0)
+      result mustBe 0.0
     }
 
     "penalize strategies with too many orders" in {
       val tooManyOrders = List(mkStats(total = 1000, profit = BigDecimal(100)))
       val result = ScoringFunction.balanced(maxOrders = Some(700))(tooManyOrders)
-      result mustBe BigDecimal(0)
+      result mustBe 0.0
     }
 
     "normalize win/loss ratio using targetRatio" in {
@@ -128,7 +128,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       val perfectStats = List(mkStats(total = 100, profit = BigDecimal(100), losses = List.empty))
       val result = ScoringFunction.balanced()(perfectStats)
 
-      result must be > BigDecimal(0)
+      result must be > 0.0
     }
 
     "combine multiple datasets correctly" in {
@@ -140,7 +140,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       val result = ScoringFunction.balanced()(stats)
 
       // Total profit is 150, should contribute significantly to score
-      result must (be > BigDecimal(0) and be < BigDecimal(200)) // But less than raw profit due to other components
+      result must (be > 0.0 and be < 200.0) // But less than raw profit due to other components
     }
 
     "apply order count penalty proportionally" in {
@@ -161,15 +161,15 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       val twoInvalidScore = scoring(twoInvalid)
 
       // With 2/3 invalid, should get penalized more (actually returns 0)
-      twoInvalidScore mustBe BigDecimal(0)
-      oneInvalidScore must be > BigDecimal(0) // 1/3 invalid is < 50%
+      twoInvalidScore mustBe 0.0
+      oneInvalidScore must be > 0.0 // 1/3 invalid is < 50%
     }
   }
 
   "ScoringFunction.riskAdjusted" should {
     "return 0 for empty stats list" in {
       val result = ScoringFunction.riskAdjusted()(List.empty)
-      result mustBe BigDecimal(0)
+      result mustBe 0.0
     }
 
     "return 0 when all datasets violate order constraints" in {
@@ -178,7 +178,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
         mkStats(total = 15)
       )
       val result = ScoringFunction.riskAdjusted(minOrders = Some(50))(stats)
-      result mustBe BigDecimal(0)
+      result mustBe 0.0
     }
 
     "calculate risk-adjusted return correctly" in {
@@ -188,7 +188,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       val result = ScoringFunction.riskAdjusted()(stats)
 
       // Score should be approximately profit / loss = 100 / 10 = 10
-      result must (be > BigDecimal(9) and be < BigDecimal(11))
+      result must (be > 9.0 and be < 11.0)
     }
 
     "favor strategies with lower drawdown for same profit" in {
@@ -220,7 +220,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       val result = ScoringFunction.riskAdjusted()(noLossStats)
 
       // Should not divide by zero, epsilon prevents this
-      result must be > BigDecimal(0)
+      result must be > 0.0
     }
 
     "filter out datasets violating order constraints" in {
@@ -231,7 +231,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       val result = ScoringFunction.riskAdjusted(minOrders = Some(50))(stats)
 
       // Should only use first dataset: 100 / 10 ≈ 10
-      result must (be > BigDecimal(9) and be < BigDecimal(11))
+      result must (be > 9.0 and be < 11.0)
     }
 
     "combine multiple valid datasets" in {
@@ -244,7 +244,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
 
       // Total profit = 240, avg biggest loss = (10+8+6)/3 = 8
       // Score ≈ 240 / 8 = 30
-      result must (be > BigDecimal(25) and be < BigDecimal(35))
+      result must (be > 25.0 and be < 35.0)
     }
 
     "penalize high drawdowns even with good profits" in {
@@ -262,7 +262,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
 
   "ScoringFunction.totalProfit" should {
     "return 0 for empty list" in {
-      ScoringFunction.totalProfit(List.empty) mustBe BigDecimal(0)
+      ScoringFunction.totalProfit(List.empty) mustBe 0.0
     }
 
     "sum total profit across all datasets" in {
@@ -271,7 +271,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
         mkStats(profit = BigDecimal(75)),
         mkStats(profit = BigDecimal(25))
       )
-      ScoringFunction.totalProfit(stats) mustBe BigDecimal(150)
+      ScoringFunction.totalProfit(stats) mustBe 150.0
     }
 
     "handle negative profits" in {
@@ -279,23 +279,23 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
         mkStats(profit = BigDecimal(50)),
         mkStats(profit = BigDecimal(-30))
       )
-      ScoringFunction.totalProfit(stats) mustBe BigDecimal(20)
+      ScoringFunction.totalProfit(stats) mustBe 20.0
     }
   }
 
   "ScoringFunction.medianWinLossRatio" should {
     "return 0 for empty list" in {
-      ScoringFunction.medianWinLossRatio()(List.empty) mustBe BigDecimal(0)
+      ScoringFunction.medianWinLossRatio()(List.empty) mustBe 0.0
     }
 
     "penalize strategies with too few orders" in {
       val stats = List(mkStats(total = 20))
-      ScoringFunction.medianWinLossRatio(minOrders = Some(50))(stats) mustBe BigDecimal(0)
+      ScoringFunction.medianWinLossRatio(minOrders = Some(50))(stats) mustBe 0.0
     }
 
     "penalize strategies with too many orders" in {
       val stats = List(mkStats(total = 1000))
-      ScoringFunction.medianWinLossRatio(maxOrders = Some(700))(stats) mustBe BigDecimal(0)
+      ScoringFunction.medianWinLossRatio(maxOrders = Some(700))(stats) mustBe 0.0
     }
 
     "calculate median win/loss ratio correctly" in {
@@ -304,13 +304,13 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
         mkStats(total = 100, losses = List.fill(50)(BigDecimal(-1)))   // Ratio: 50/50 = 1
       )
       val result = ScoringFunction.medianWinLossRatio()(stats)
-      result mustBe BigDecimal(2.0) // Median of [3, 1] = 2
+      result mustBe 2.0 // Median of [3, 1] = 2
     }
   }
 
   "ScoringFunction.averageMedianProfitByMonth" should {
     "return 0 for empty list" in {
-      ScoringFunction.averageMedianProfitByMonth(List.empty) mustBe BigDecimal(0)
+      ScoringFunction.averageMedianProfitByMonth(List.empty) mustBe 0.0
     }
 
     "calculate average of median monthly profits" in {
@@ -322,7 +322,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
 
       // First dataset median: 20, Second dataset median: 25
       // Average: (20 + 25) / 2 = 22.5
-      result mustBe BigDecimal(22.5)
+      result mustBe 22.5
     }
   }
 }
