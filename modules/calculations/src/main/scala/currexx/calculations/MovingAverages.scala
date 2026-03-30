@@ -1,7 +1,5 @@
 package currexx.calculations
 
-import scala.collection.mutable.{ListBuffer, Queue as MQueue}
-
 object MovingAverages {
 
   private val EmaSmoothing: Double = 2.0d
@@ -17,21 +15,21 @@ object MovingAverages {
   def exponential(values: List[Double], n: Int, smoothing: Double = EmaSmoothing): List[Double] =
     if (values.isEmpty) Nil
     else {
-      val k            = smoothing / (1 + n)
-      val it           = values.reverseIterator
-      val resultBuffer = new ListBuffer[Double]
+      val k      = smoothing / (1 + n)
+      val arr    = values.toArray
+      val result = new Array[Double](arr.length)
+      val last   = arr.length - 1
 
-      // Seed the first EMA with the first (oldest) price
-      var prevEma = it.next()
-      resultBuffer += prevEma
-
-      while (it.hasNext) {
-        val price = it.next()
-        val ema   = price * k + prevEma * (1 - k)
-        resultBuffer += ema
+      var prevEma = arr(last)
+      result(last) = prevEma
+      var i = last - 1
+      while (i >= 0) {
+        val ema = arr(i) * k + prevEma * (1 - k)
+        result(i) = ema
         prevEma = ema
+        i -= 1
       }
-      resultBuffer.toList.reverse
+      result.toList
     }
 
   /** Calculates the Simple Moving Average (SMA). For initial elements where a full window is not available, the original price is used.
@@ -43,26 +41,30 @@ object MovingAverages {
     *   A list of SMA values, sorted from latest to earliest, same size as input.
     */
   def simple(values: List[Double], n: Int): List[Double] = {
-    val window       = MQueue.empty[Double]
-    val resultBuffer = new ListBuffer[Double]
-    val it           = values.reverseIterator
-    var runningSum   = 0.0
+    val arr        = values.toArray
+    val result     = new Array[Double](arr.length)
+    val window     = new Array[Double](n) // circular buffer
+    var wStart     = 0
+    var wSize      = 0
+    var runningSum = 0.0
+    var i          = arr.length - 1
 
-    while (it.hasNext) {
-      val price = it.next()
-      window.enqueue(price)
-      runningSum += price
-      val valueToAppend = if (window.size < n) {
-        price // Not enough data for a full SMA, use the price itself
+    while (i >= 0) {
+      val price = arr(i)
+      if (wSize < n) {
+        window(wSize) = price
+        wSize += 1
+        runningSum += price
+        result(i) = if (wSize < n) price else runningSum / n
       } else {
-        if (window.size > n) {
-          runningSum -= window.dequeue()
-        }
-        runningSum / n
+        runningSum += price - window(wStart)
+        window(wStart) = price
+        wStart = (wStart + 1) % n
+        result(i) = runningSum / n
       }
-      resultBuffer += valueToAppend
+      i -= 1
     }
-    resultBuffer.toList.reverse
+    result.toList
   }
 
   /** Calculates the Moving Average Convergence Divergence (MACD) line.
@@ -104,32 +106,39 @@ object MovingAverages {
     *   A list of WMA values, sorted from latest to earliest, same size as input.
     */
   def weighted(values: List[Double], n: Int): List[Double] = {
-    val window       = MQueue.empty[Double]
-    val divider      = (n * (n + 1)) / 2.0
-    val resultBuffer = new ListBuffer[Double]
-    val it           = values.reverseIterator
+    val arr     = values.toArray
+    val result  = new Array[Double](arr.length)
+    val window  = new Array[Double](n) // circular buffer, oldest at wStart
+    val divider = (n * (n + 1)) / 2.0
+    var wStart  = 0
+    var wSize   = 0
+    var i       = arr.length - 1
 
-    while (it.hasNext) {
-      val price = it.next()
-      window.enqueue(price)
-      val valueToAppend = if (window.size < n) {
+    while (i >= 0) {
+      val price = arr(i)
+      if (wSize < n) {
+        window(wSize) = price
+        wSize += 1
+      } else {
+        window(wStart) = price
+        wStart = (wStart + 1) % n
+      }
+      result(i) = if (wSize < n) {
         price
       } else {
-        if (window.size > n) {
-          val _ = window.dequeue()
-        }
         var weightedSum = 0.0
         var weight      = 1
-        val wit         = window.iterator
-        while (wit.hasNext) {
-          weightedSum += wit.next() * weight
+        var j           = 0
+        while (j < n) {
+          weightedSum += window((wStart + j) % n) * weight
           weight += 1
+          j += 1
         }
         weightedSum / divider
       }
-      resultBuffer += valueToAppend
+      i -= 1
     }
-    resultBuffer.toList.reverse
+    result.toList
   }
 
   /** Calculates the Hull Moving Average (HMA).
@@ -198,29 +207,31 @@ object MovingAverages {
   ): List[Double] =
     if (values.isEmpty) Nil
     else {
-      val beta         = 0.45 * (length - 1) / (0.45 * (length - 1) + 2)
-      val pr           = if (phase < -100) 0.5 else if (phase > 100) 2.5 else phase / 100.0 + 1.5
-      val alpha        = math.pow(beta, power)
-      val it           = values.reverseIterator
-      val resultBuffer = new ListBuffer[Double]
+      val beta   = 0.45 * (length - 1) / (0.45 * (length - 1) + 2)
+      val pr     = if (phase < -100) 0.5 else if (phase > 100) 2.5 else phase / 100.0 + 1.5
+      val alpha  = math.pow(beta, power)
+      val arr    = values.toArray
+      val result = new Array[Double](arr.length)
+      val last   = arr.length - 1
 
-      val firstPrice = it.next()
-      var ma1        = firstPrice
-      var det0       = 0.0
-      var det1       = 0.0
-      var jma        = firstPrice
-      resultBuffer += jma
+      var ma1  = arr(last)
+      var det0 = 0.0
+      var det1 = 0.0
+      var jma  = arr(last)
+      result(last) = jma
+      var i = last - 1
 
-      while (it.hasNext) {
-        val price   = it.next()
+      while (i >= 0) {
+        val price   = arr(i)
         val prevJma = jma
-        ma1 = (1 - alpha) * price + alpha * ma1
+        ma1  = (1 - alpha) * price + alpha * ma1
         det0 = (price - ma1) * (1 - beta) + beta * det0
         val ma2 = ma1 + pr * det0
         det1 = (ma2 - prevJma) * math.pow(1 - alpha, 2) + math.pow(alpha, 2) * det1
-        jma = prevJma + det1
-        resultBuffer += jma
+        jma  = prevJma + det1
+        result(i) = jma
+        i -= 1
       }
-      resultBuffer.toList.reverse
+      result.toList
     }
 }
