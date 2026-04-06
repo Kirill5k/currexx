@@ -22,20 +22,23 @@ object Filters {
   private def runKalman(values: List[Double], processNoise: Double, measurementNoise: Double)(extract: (Double, Double) => Double): List[Double] =
     if (values.isEmpty) Nil
     else {
-      val q00 = processNoise * 0.25
-      val q01 = processNoise * 0.5
+      val q00    = processNoise * 0.25
+      val q01    = processNoise * 0.5
+      val arr    = values.toArray
+      val result = new Array[Double](arr.length)
+      val last   = arr.length - 1
 
-      val it  = values.reverseIterator
-      var x0  = it.next()
+      var x0  = arr(last)
       var x1  = 0.0
       var p00 = 500.0
       var p01 = 0.0
       var p11 = 500.0
 
-      var result: List[Double] = List(extract(x0, x1))
+      result(last) = extract(x0, x1)
+      var i = last - 1
 
-      while (it.hasNext) {
-        val z = it.next()
+      while (i >= 0) {
+        val z = arr(i)
 
         // Predict (dt = 1.0)
         val x0p  = x0 + x1
@@ -55,10 +58,11 @@ object Filters {
         p01 = (1.0 - k0) * p01p
         p11 = p11p - k1 * p01p
 
-        result = extract(x0, x1) :: result
+        result(i) = extract(x0, x1)
+        i -= 1
       }
 
-      result
+      result.toList
     }
 
   /** Represents the state of the Kalman filter at a single point in time.
