@@ -22,7 +22,7 @@ object Optimiser extends IOApp.Simple {
 
   val gaParameters = Parameters.GA(
     populationSize = 250,
-    maxGen = 250,
+    maxGen = 350,
     crossoverProbability = 0.7,
     mutationProbability = 0.2,
     elitismRatio = 0.025,
@@ -31,7 +31,7 @@ object Optimiser extends IOApp.Simple {
 
   val rounds: List[OptimisationRound] = List(
     OptimisationRound(
-      name = "s1-balanced",
+      name = "s1a-balanced",
       strategy = TestStrategy.s1,
       gaParameters = gaParameters,
       // Scoring function selection - see SCORING_GUIDE.md for detailed guide
@@ -44,6 +44,36 @@ object Optimiser extends IOApp.Simple {
         maxOrders = Some(700),   // Maximum orders per dataset
         targetRatio = 2.0        // Target win/loss ratio for normalization
       ),
+      testDataSets = MarketDataProvider.majors1h
+    ),
+    OptimisationRound(
+      name = "s1b-balanced",
+      strategy = TestStrategy.s1,
+      gaParameters = gaParameters,
+      // Scoring function selection - see SCORING_GUIDE.md for detailed guide
+      // Recommended: Balanced scoring (combines profit, win/loss ratio, and consistency)
+      scoringFunction = ScoringFunction.balanced(
+        profitWeight = 0.4,      // 40% weight on total profit
+        ratioWeight = 0.3,       // 30% weight on win/loss ratio
+        consistencyWeight = 0.3, // 30% weight on monthly consistency
+        minOrders = Some(50),    // Minimum orders per dataset
+        maxOrders = Some(700),   // Maximum orders per dataset
+        targetRatio = 2.0        // Target win/loss ratio for normalization
+      ),
+      testDataSets = MarketDataProvider.majors1h
+    ),
+    OptimisationRound(
+      name = "s2-balanced",
+      strategy = TestStrategy.s2,
+      gaParameters = gaParameters,
+      scoringFunction = ScoringFunction.balanced(minOrders = Some(50), maxOrders = Some(700)),
+      testDataSets = MarketDataProvider.majors1h
+    ),
+    OptimisationRound(
+      name = "s3-balanced",
+      strategy = TestStrategy.s3,
+      gaParameters = gaParameters,
+      scoringFunction = ScoringFunction.balanced(minOrders = Some(50), maxOrders = Some(700)),
       testDataSets = MarketDataProvider.majors1h
     )
   )
