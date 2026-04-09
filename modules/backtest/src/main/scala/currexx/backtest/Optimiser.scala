@@ -15,10 +15,10 @@ object Optimiser extends IOApp.Simple {
 
   given Random = Random()
 
-  // Pool size for parallel evaluation
-  // Using 3x CPU cores since backtesting is I/O-bound (reading data, processing streams)
-  // rather than CPU-bound. Adjust based on available memory.
-  val evaluatorPoolSize = Runtime.getRuntime.availableProcessors() * 3
+  // Pool size for parallel evaluation.
+  // Backtesting replays in-memory market data through pure indicator calculations — CPU-bound,
+  // not I/O-bound. Optimal pool size equals available CPU cores to avoid context-switching overhead.
+  val evaluatorPoolSize = Runtime.getRuntime.availableProcessors()
 
   val gaParameters = Parameters.GA(
     populationSize = 250,
