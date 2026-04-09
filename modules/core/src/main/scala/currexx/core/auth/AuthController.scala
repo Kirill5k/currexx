@@ -1,6 +1,5 @@
 package currexx.core.auth
 
-import cats.syntax.applicative.*
 import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.applicative.*
