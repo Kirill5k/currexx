@@ -18,7 +18,6 @@ object Dependencies {
     val jwt            = "11.0.3"
     val cronUtils      = "9.2.1"
     val taggedAdtCodec = "0.11.0"
-    val breeze         = "2.1.0"
     val caffeine       = "3.2.3"
   }
 
@@ -30,7 +29,6 @@ object Dependencies {
     val jwt            = "com.github.jwt-scala"         %% "jwt-circe"              % Versions.jwt
     val cronUtils      = "com.cronutils"                 % "cron-utils"             % Versions.cronUtils
     val taggedAdtCodec = "org.latestbit"                %% "circe-tagged-adt-codec" % Versions.taggedAdtCodec
-    val breeze         = "org.scalanlp"                 %% "breeze"                 % Versions.breeze
     val caffeine       = "com.github.ben-manes.caffeine" % "caffeine"               % Versions.caffeine
 
     object commonScala {
@@ -102,10 +100,6 @@ object Dependencies {
     Libraries.catsFree,
     Libraries.fs2,
     Libraries.fs2Io
-  )
-
-  val calculations = Seq(
-    Libraries.breeze
   )
 
   val clients = Libraries.sttp4.all
