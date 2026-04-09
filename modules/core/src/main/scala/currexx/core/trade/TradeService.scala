@@ -6,6 +6,7 @@ import cats.effect.kernel.Temporal
 import cats.syntax.apply.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
+import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import currexx.clients.broker.BrokerClient
 import currexx.clients.data.MarketDataClient
@@ -124,7 +125,7 @@ final private class LiveTradeService[F[_]](
         // --- Default Case: No action to be taken ---
         case _ => None
       }
-      _ <- F.whenA(finalAction.isDefined)(executeAction(finalAction.get, state, settings))
+      _ <- finalAction.traverse_(executeAction(_, state, settings))
     yield ()
 
   private def executeAction(action: TradeAction, state: MarketState, settings: TradeSettings): F[Unit] = {
