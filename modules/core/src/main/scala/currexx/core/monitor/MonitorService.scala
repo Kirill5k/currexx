@@ -1,6 +1,6 @@
 package currexx.core.monitor
 
-import cats.Monad
+import cats.syntax.applicative.*
 import cats.effect.Temporal
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -72,4 +72,4 @@ object MonitorService:
       repository: MonitorRepository[F],
       actionDispatcher: ActionDispatcher[F]
   ): F[MonitorService[F]] =
-    Monad[F].pure(LiveMonitorService(repository, actionDispatcher))
+    LiveMonitorService(repository, actionDispatcher).pure[F]

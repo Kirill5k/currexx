@@ -1,7 +1,7 @@
 package currexx.clients.broker.oanda
 
-import cats.Monad
 import cats.data.NonEmptyList
+import cats.syntax.applicative.*
 import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -316,5 +316,5 @@ object OandaBrokerClient {
       config: OandaBrokerConfig,
       backend: WebSocketStreamBackend[F, Fs2Streams[F]]
   ): F[OandaBrokerClient[F]] =
-    Monad[F].pure(LiveOandaBrokerClient(backend, config))
+    LiveOandaBrokerClient(backend, config).pure[F]
 }

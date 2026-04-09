@@ -1,8 +1,8 @@
 package currexx.core.common.http
 
-import cats.Monad
 import cats.effect.Async
-import cats.implicits.*
+import cats.syntax.applicative.*
+import cats.syntax.semigroupk.*
 import currexx.core.auth.{Auth, Authenticator}
 import currexx.core.health.Health
 import currexx.core.market.Markets
@@ -61,4 +61,4 @@ object Http:
       markets: Markets[F],
       trades: Trades[F],
       settings: Settings[F]
-  ): F[Http[F]] = Monad[F].pure(new Http[F](health, auth, signals, monitors, markets, trades, settings))
+  ): F[Http[F]] = new Http[F](health, auth, signals, monitors, markets, trades, settings).pure[F]

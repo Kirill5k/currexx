@@ -1,6 +1,6 @@
 package currexx.core.market
 
-import cats.Monad
+import cats.syntax.applicative.*
 import cats.effect.Async
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema}
@@ -86,5 +86,5 @@ object MarketController extends TapirSchema with TapirJson with TapirCodecs {
     .description("Clear all states of traded currencies")
 
   def make[F[_]: Async](service: MarketService[F]): F[Controller[F]] =
-    Monad[F].pure(MarketController[F](service))
+    MarketController[F](service).pure[F]
 }

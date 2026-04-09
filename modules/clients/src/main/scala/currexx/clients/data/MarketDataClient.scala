@@ -1,6 +1,7 @@
 package currexx.clients.data
 
-import cats.{Monad, MonadThrow}
+import cats.MonadThrow
+import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import currexx.clients.data.twelvedata.TwelveDataClient
 import currexx.clients.data.oanda.OandaDataClient
@@ -28,4 +29,4 @@ object MarketDataClient:
       twelveDataClient: TwelveDataClient[F],
       oandaDataClient: OandaDataClient[F],
   ): F[MarketDataClient[F]] =
-    Monad[F].pure(LiveMarketDataClient[F](twelveDataClient, oandaDataClient))
+    LiveMarketDataClient[F](twelveDataClient, oandaDataClient).pure[F]

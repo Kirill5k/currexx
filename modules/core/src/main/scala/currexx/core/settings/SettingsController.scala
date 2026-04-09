@@ -1,6 +1,6 @@
 package currexx.core.settings
 
-import cats.Monad
+import cats.syntax.applicative.*
 import cats.effect.Async
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
@@ -59,5 +59,5 @@ object SettingsController extends TapirSchema with TapirJson {
     .description("Update global settings")
 
   def make[F[_]: Async](monitorService: SettingsService[F]): F[Controller[F]] =
-    Monad[F].pure(SettingsController[F](monitorService))
+    SettingsController[F](monitorService).pure[F]
 }

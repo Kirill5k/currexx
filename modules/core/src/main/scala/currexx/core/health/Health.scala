@@ -1,7 +1,7 @@
 package currexx.core.health
 
 import cats.effect.Async
-import cats.implicits.*
+import cats.syntax.functor.*
 import currexx.core.common.http.Controller
 
 final class Health[F[_]] private (

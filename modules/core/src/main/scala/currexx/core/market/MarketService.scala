@@ -1,6 +1,7 @@
 package currexx.core.market
 
 import cats.Monad
+import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.common.action.{Action, ActionDispatcher}
@@ -83,4 +84,4 @@ object MarketService:
       stateRepo: MarketStateRepository[F],
       dispatcher: ActionDispatcher[F]
   ): F[MarketService[F]] =
-    Monad[F].pure(LiveMarketService[F](stateRepo, dispatcher))
+    LiveMarketService[F](stateRepo, dispatcher).pure[F]

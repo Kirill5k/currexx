@@ -1,6 +1,6 @@
 package currexx.core.signal
 
-import cats.Monad
+import cats.syntax.applicative.*
 import cats.effect.Concurrent
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
@@ -54,4 +54,4 @@ object SignalService:
       settingsRepo: SignalSettingsRepository[F],
       dispatcher: ActionDispatcher[F]
   ): F[SignalService[F]] =
-    Monad[F].pure(LiveSignalService[F](signalRepo, settingsRepo, dispatcher))
+    LiveSignalService[F](signalRepo, settingsRepo, dispatcher).pure[F]

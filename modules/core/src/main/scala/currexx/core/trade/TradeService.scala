@@ -1,6 +1,6 @@
 package currexx.core.trade
 
-import cats.Monad
+import cats.syntax.applicative.*
 import cats.data.NonEmptyList
 import cats.effect.kernel.Temporal
 import cats.syntax.apply.*
@@ -184,4 +184,4 @@ object TradeService:
       marketDataClient: MarketDataClient[F],
       dispatcher: ActionDispatcher[F]
   ): F[TradeService[F]] =
-    Monad[F].pure(LiveTradeService[F](settingsRepo, orderRepository, orderStatusRepository, brokerClient, marketDataClient, dispatcher))
+    LiveTradeService[F](settingsRepo, orderRepository, orderStatusRepository, brokerClient, marketDataClient, dispatcher).pure[F]

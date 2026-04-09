@@ -2,7 +2,8 @@ package currexx.core.auth.session
 
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import cats.{Monad, MonadThrow}
+import cats.MonadThrow
+import cats.syntax.applicative.*
 import currexx.core.auth.jwt.{BearerToken, JwtEncoder, JwtToken}
 import currexx.core.auth.session.db.SessionRepository
 import currexx.domain.user.UserId
@@ -49,4 +50,4 @@ final private class LiveSessionService[F[_]](
 
 object SessionService:
   def make[F[_]: MonadThrow](jwtEncoder: JwtEncoder[F], repo: SessionRepository[F]): F[SessionService[F]] =
-    Monad[F].pure(LiveSessionService[F](jwtEncoder, repo))
+    LiveSessionService[F](jwtEncoder, repo).pure[F]

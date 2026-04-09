@@ -1,6 +1,7 @@
 package currexx.algorithms.progress
 
 import cats.Monad
+import cats.syntax.applicative.*
 import currexx.algorithms.{EvaluatedPopulation, Parameters}
 
 final class NoopTracker[F[_], I](using
@@ -13,4 +14,4 @@ final class NoopTracker[F[_], I](using
 }
 
 object NoopTracker:
-  def make[F[_]: Monad, I]: F[Tracker[F, I]] = Monad[F].pure(new NoopTracker[F, I])
+  def make[F[_]: Monad, I]: F[Tracker[F, I]] = new NoopTracker[F, I].pure[F]

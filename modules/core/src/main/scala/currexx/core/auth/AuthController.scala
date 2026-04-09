@@ -1,6 +1,6 @@
 package currexx.core.auth
 
-import cats.Monad
+import cats.syntax.applicative.*
 import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.applicative.*
@@ -179,5 +179,5 @@ object AuthController extends TapirSchema with TapirJson {
       userService: UserService[F],
       sessionService: SessionService[F]
   ): F[Controller[F]] =
-    Monad[F].pure(AuthController[F](userService, sessionService))
+    AuthController[F](userService, sessionService).pure[F]
 }

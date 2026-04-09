@@ -1,6 +1,6 @@
 package currexx.core.signal
 
-import cats.Monad
+import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -104,5 +104,5 @@ object SignalController extends TapirSchema with TapirJson {
     .description("Retrieve all submitted signals")
 
   def make[F[_]: Async: Clock](service: SignalService[F]): F[Controller[F]] =
-    Monad[F].pure(SignalController[F](service))
+    SignalController[F](service).pure[F]
 }

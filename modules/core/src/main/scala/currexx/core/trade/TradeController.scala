@@ -1,6 +1,6 @@
 package currexx.core.trade
 
-import cats.Monad
+import cats.syntax.applicative.*
 import cats.effect.Async
 import cats.effect.syntax.spawn.*
 import cats.syntax.apply.*
@@ -113,5 +113,5 @@ object TradeController extends TapirSchema with TapirJson with TapirCodecs {
     .description("Close all current positions")
 
   def make[F[_]: Async](service: TradeService[F]): F[Controller[F]] =
-    Monad[F].pure(TradeController[F](service))
+    TradeController[F](service).pure[F]
 }

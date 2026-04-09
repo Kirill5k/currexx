@@ -2,6 +2,7 @@ package currexx.core.common.action
 
 import cats.Monad
 import cats.effect.Concurrent
+import cats.syntax.applicative.*
 import cats.effect.std.Queue
 import cats.syntax.functor.*
 import fs2.Stream
@@ -25,4 +26,4 @@ object ActionDispatcher:
   def make[F[_]: Concurrent]: F[ActionDispatcher[F]] =
     Queue.bounded[F, Action](1024).map(LiveActionDispatcher[F](_))
   def make[F[_]: Monad](submittedActions: Queue[F, Action]): F[ActionDispatcher[F]] =
-    Monad[F].pure(LiveActionDispatcher[F](submittedActions))
+    LiveActionDispatcher[F](submittedActions).pure[F]

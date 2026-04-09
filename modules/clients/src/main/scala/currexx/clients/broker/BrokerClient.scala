@@ -2,6 +2,7 @@ package currexx.clients.broker
 
 import cats.Monad
 import cats.data.NonEmptyList
+import cats.syntax.applicative.*
 import currexx.clients.broker.oanda.OandaBrokerClient
 import currexx.domain.market.{CurrencyPair, OpenedTradeOrder, OrderPlacementStatus, TradeOrder}
 
@@ -24,4 +25,4 @@ object BrokerClient:
   def make[F[_]: Monad](
       oandaClient: OandaBrokerClient[F]
   ): F[BrokerClient[F]] =
-    Monad[F].pure(LiveBrokerClient[F](oandaClient))
+    LiveBrokerClient[F](oandaClient).pure[F]

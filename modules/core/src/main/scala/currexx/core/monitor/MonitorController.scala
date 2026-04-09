@@ -1,6 +1,6 @@
 package currexx.core.monitor
 
-import cats.Monad
+import cats.syntax.applicative.*
 import cats.data.NonEmptySet
 import cats.effect.Async
 import cats.syntax.flatMap.*
@@ -247,5 +247,5 @@ object MonitorController extends TapirSchema with TapirJson {
     .description("Update monitor")
 
   def make[F[_]: Async](monitorService: MonitorService[F]): F[Controller[F]] =
-    Monad[F].pure(MonitorController[F](monitorService))
+    MonitorController[F](monitorService).pure[F]
 }

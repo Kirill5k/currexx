@@ -1,7 +1,7 @@
 package currexx.core.common.action
 
-import cats.Monad
 import cats.effect.Temporal
+import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.applicativeError.*
 import currexx.core.monitor.MonitorService
@@ -98,4 +98,4 @@ object ActionProcessor:
       tradeService: TradeService[F],
       settingsService: SettingsService[F]
   ): F[ActionProcessor[F]] =
-    Monad[F].pure(LiveActionProcessor[F](dispatcher, monitorService, signalService, marketService, tradeService, settingsService))
+    LiveActionProcessor[F](dispatcher, monitorService, signalService, marketService, tradeService, settingsService).pure[F]
