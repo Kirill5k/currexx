@@ -44,7 +44,7 @@ final private class LiveMarketService[F[_]](
   override def processSignals(uid: UserId, cp: CurrencyPair, signals: List[Signal]): F[Unit] =
     stateRepo.find(uid, cp).flatMap { maybeState =>
       val currentProfile = maybeState.fold(MarketProfile())(_.profile)
-      val updatedProfile = signals.foldLeft(currentProfile)(_.update(_))
+      val updatedProfile = signals.foldLeft(currentProfile)(MarketProfileUpdater.update)
       F.whenA(updatedProfile != currentProfile) {
         stateRepo
           .update(uid, cp, updatedProfile)
