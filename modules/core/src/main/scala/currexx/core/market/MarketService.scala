@@ -57,7 +57,7 @@ final private class LiveMarketService[F[_]](
     val latestCandle = data.prices.head
     val prevCandle = data.prices.tail.headOption
     val timeGap = prevCandle.map(_.time.durationBetween(latestCandle.time))
-    F.whenA(timeGap.isDefined && timeGap.get > (data.interval.toDuration * 2)) {
+    F.whenA(timeGap.exists(_ > (data.interval.toDuration * 2))) {
       val marketClosureGap = timeGap.get - data.interval.toDuration
       val cp = data.currencyPair
       stateRepo.find(uid, cp).flatMap {
