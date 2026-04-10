@@ -189,11 +189,16 @@ object SignalDetector:
   def cached: SignalDetector = cached(maxSizeMB = 1024)
 
   def cached(maxSizeMB: Int): SignalDetector =
+    // Use entry-count eviction: accurately sizing an Indicator/Signal object graph
+    // requires a heap-walking tool. A flat byte estimate ignores the key (which contains
+    // a deep Indicator ADT) and the Signal's own Indicator + Condition fields, so
+    // maximumWeight would give a false bound. Instead, cap by entry count.
+    // Each entry is (CurrencyPair, Interval, Instant, Indicator) → Option[Signal].
+    // In practice there are O(monitors × indicators) distinct keys per time tick,
+    // so 100 000 entries comfortably covers real-world loads within a few hundred MB.
+    val maxEntries = (maxSizeMB * 1024L * 1024L) / 1024 // ~1 KB per entry as a rough heuristic
     val cache = Caffeine
       .newBuilder()
-      .maximumWeight(maxSizeMB * 1024L * 1024L)
-      .weigher[CacheKey, Option[Signal]]((_, value) =>
-        value.map(_ => 600).getOrElse(100) // rough estimate: ~600 bytes per Signal, ~100 for empty
-      )
+      .maximumSize(maxEntries)
       .build[CacheKey, Option[Signal]]()
     CachedSignalDetector(cache)
