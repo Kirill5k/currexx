@@ -3,8 +3,10 @@ package currexx.core.signal
 import cats.data.NonEmptyList
 import com.github.benmanes.caffeine.cache.{Cache, Caffeine}
 import currexx.calculations.{Statistics, Volatility}
-import currexx.domain.market.MarketTimeSeriesData
+import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData}
 import currexx.domain.signal.{CombinationLogic, Condition, Indicator}
+
+import java.time.Instant
 import currexx.domain.user.UserId
 
 trait SignalDetector:
@@ -164,16 +166,20 @@ final private class PureSignalDetector extends SignalDetector {
       .map(makeSignal(uid, data, indicator))
 }
 
+final private case class CacheKey(
+    currencyPair: CurrencyPair,
+    interval: Interval,
+    latestTime: Instant,
+    indicator: Indicator
+)
+
 final private class CachedSignalDetector(
-    private val cache: Cache[String, Option[Signal]]
+    private val cache: Cache[CacheKey, Option[Signal]]
 ) extends SignalDetector {
   private val detector = new PureSignalDetector()
 
-  private def cacheKey(data: MarketTimeSeriesData, indicator: Indicator): String =
-    s"${data.currencyPair}-${data.interval}-${data.latestTime}-$indicator"
-
   override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal] =
-    val key = cacheKey(data, indicator)
+    val key = CacheKey(data.currencyPair, data.interval, data.latestTime, indicator)
     cache.get(key, _ => detector.detect(uid, data)(indicator)).map(_.copy(userId = uid))
 }
 
@@ -186,11 +192,8 @@ object SignalDetector:
     val cache = Caffeine
       .newBuilder()
       .maximumWeight(maxSizeMB * 1024L * 1024L)
-      .weigher[String, Option[Signal]]((key, value) => {
-        // Estimate memory: key size + signal size (if present)
-        val keySize = key.length * 2 // 2 bytes per char in Java
-        val signalSize = value.map(_ => 500).getOrElse(50) // rough estimate: ~500 bytes per Signal
-        keySize + signalSize
-      })
-      .build[String, Option[Signal]]()
+      .weigher[CacheKey, Option[Signal]]((_, value) =>
+        value.map(_ => 600).getOrElse(100) // rough estimate: ~600 bytes per Signal, ~100 for empty
+      )
+      .build[CacheKey, Option[Signal]]()
     CachedSignalDetector(cache)
