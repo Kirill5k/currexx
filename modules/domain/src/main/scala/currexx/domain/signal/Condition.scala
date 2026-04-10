@@ -152,13 +152,13 @@ object Condition {
       case current :: previous :: _ =>
         (current, previous) match {
           case (c, p) if c >= upperBoundary && p < upperBoundary =>
-            Some(Condition.ThresholdCrossing(upperBoundary, c, Direction.Upward, Boundary.Upper))
+            Some(Condition.ThresholdCrossing(BigDecimal.valueOf(upperBoundary), BigDecimal.valueOf(c), Direction.Upward, Boundary.Upper))
           case (c, p) if c < upperBoundary && p >= upperBoundary =>
-            Some(Condition.ThresholdCrossing(upperBoundary, c, Direction.Downward, Boundary.Upper))
+            Some(Condition.ThresholdCrossing(BigDecimal.valueOf(upperBoundary), BigDecimal.valueOf(c), Direction.Downward, Boundary.Upper))
           case (c, p) if c <= lowerBoundary && p > lowerBoundary =>
-            Some(Condition.ThresholdCrossing(lowerBoundary, c, Direction.Downward, Boundary.Lower))
+            Some(Condition.ThresholdCrossing(BigDecimal.valueOf(lowerBoundary), BigDecimal.valueOf(c), Direction.Downward, Boundary.Lower))
           case (c, p) if c > lowerBoundary && p <= lowerBoundary =>
-            Some(Condition.ThresholdCrossing(lowerBoundary, c, Direction.Upward, Boundary.Lower))
+            Some(Condition.ThresholdCrossing(BigDecimal.valueOf(lowerBoundary), BigDecimal.valueOf(c), Direction.Upward, Boundary.Lower))
           case _ => None
         }
       case _ => None

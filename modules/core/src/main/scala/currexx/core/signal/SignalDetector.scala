@@ -114,7 +114,7 @@ final private class PureSignalDetector extends SignalDetector {
         userId = uid,
         currencyPair = data.currencyPair,
         interval = data.interval,
-        condition = Condition.ValueUpdated(indicator.role, latestValue),
+        condition = Condition.ValueUpdated(indicator.role, BigDecimal.valueOf(latestValue)),
         triggeredBy = indicator,
         time = data.latestTime
       )

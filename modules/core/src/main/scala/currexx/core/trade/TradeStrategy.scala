@@ -149,10 +149,11 @@ object Rule extends JsonCodecs {
           case ValueRole.Velocity          => currentProfile.lastVelocityValue
           case ValueRole.ChannelMiddleBand => currentProfile.lastChannelMiddleBandValue
         valueToTest.exists { value =>
+          val bdLevel = BigDecimal.valueOf(level)
           operator match
-            case Operator.GreaterThan => value > level
-            case Operator.LessThan    => value < level
-            case Operator.EqualTo     => value == level
+            case Operator.GreaterThan => value > bdLevel
+            case Operator.LessThan    => value < bdLevel
+            case Operator.EqualTo     => value == bdLevel
         }
 
       case Condition.TrendChangedTo(direction) =>
