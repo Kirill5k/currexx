@@ -105,8 +105,11 @@ object MovingAverages {
     * @return
     *   A list of WMA values, sorted from latest to earliest, same size as input.
     */
-  def weighted(values: List[Double], n: Int): List[Double] = {
-    val arr     = values.toArray
+  def weighted(values: List[Double], n: Int): List[Double] =
+    weightedArr(values.toArray, n).toList
+
+  /** Array-level WMA kernel — avoids List↔Array round-trips on hot paths like hull(). */
+  private def weightedArr(arr: Array[Double], n: Int): Array[Double] = {
     val result  = new Array[Double](arr.length)
     val window  = new Array[Double](n) // circular buffer, oldest at wStart
     val divider = (n * (n + 1)) / 2.0
@@ -138,7 +141,7 @@ object MovingAverages {
       }
       i -= 1
     }
-    result.toList
+    result
   }
 
   /** Calculates the Hull Moving Average (HMA).
@@ -150,11 +153,18 @@ object MovingAverages {
   def hull(values: List[Double], n: Int): List[Double] = {
     val n2    = math.round(n.toDouble / 2).toInt
     val sqrtn = math.round(math.sqrt(n.toDouble)).toInt
-    val wmaN  = weighted(values, n)
-    val wmaN2 = weighted(values, n2)
-    val diff  = wmaN2.lazyZip(wmaN).map { case (w2, w1) => 2 * w2 - w1 }
-    // `diff` is latest->earliest, which is the correct input format for `weighted`.
-    weighted(diff, sqrtn)
+    // Convert once; all intermediate steps stay on arrays to avoid List↔Array round-trips.
+    val arr   = values.toArray
+    val wmaN  = weightedArr(arr, n)
+    val wmaN2 = weightedArr(arr, n2)
+    val len   = arr.length
+    val diff  = new Array[Double](len)
+    var i     = 0
+    while (i < len) {
+      diff(i) = 2.0 * wmaN2(i) - wmaN(i)
+      i += 1
+    }
+    weightedArr(diff, sqrtn).toList
   }
 
   /** Calculates the Triple Exponential Moving Average (TEMA).
