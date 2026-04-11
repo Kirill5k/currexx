@@ -39,9 +39,9 @@ final private class PureValueTransformer() extends ValueTransformer {
         case VT.NMA(length, signalLength, lambda, ma)  => MovingAverages.nyquist(data, length, signalLength, lambda, ma.calculation)
 
   extension (ma: MovingAverage)
-    private def calculation: (List[Double], Int) => List[Double] =
+    private def calculation: (Array[Double], Int) => Array[Double] =
       ma match
-        case MovingAverage.Exponential => (values, length) => MovingAverages.exponential(values, length)
+        case MovingAverage.Exponential => MovingAverages.exponential
         case MovingAverage.Simple      => MovingAverages.simple
         case MovingAverage.Weighted    => MovingAverages.weighted
         case MovingAverage.Hull        => MovingAverages.hull

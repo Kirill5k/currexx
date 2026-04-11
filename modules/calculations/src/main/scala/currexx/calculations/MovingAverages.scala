@@ -14,23 +14,27 @@ object MovingAverages {
     */
   def exponential(values: List[Double], n: Int, smoothing: Double = EmaSmoothing): List[Double] =
     if (values.isEmpty) Nil
-    else {
-      val k      = smoothing / (1 + n)
-      val arr    = values.toArray
-      val result = new Array[Double](arr.length)
-      val last   = arr.length - 1
+    else exponentialKernel(values.toArray, n, smoothing).toList
 
-      var prevEma = arr(last)
-      result(last) = prevEma
-      var i = last - 1
-      while (i >= 0) {
-        val ema = arr(i) * k + prevEma * (1 - k)
-        result(i) = ema
-        prevEma = ema
-        i -= 1
-      }
-      result.toList
+  /** Array-level EMA kernel — for use as maCalc in triple/nyquist. Uses standard smoothing. */
+  def exponential(arr: Array[Double], n: Int): Array[Double] =
+    if (arr.isEmpty) Array.empty else exponentialKernel(arr, n, EmaSmoothing)
+
+  private def exponentialKernel(arr: Array[Double], n: Int, smoothing: Double): Array[Double] = {
+    val k      = smoothing / (1 + n)
+    val result = new Array[Double](arr.length)
+    val last   = arr.length - 1
+    var prevEma = arr(last)
+    result(last) = prevEma
+    var i = last - 1
+    while (i >= 0) {
+      val ema = arr(i) * k + prevEma * (1 - k)
+      result(i) = ema
+      prevEma = ema
+      i -= 1
     }
+    result
+  }
 
   /** Calculates the Simple Moving Average (SMA). For initial elements where a full window is not available, the original price is used.
     * @param values
@@ -40,8 +44,10 @@ object MovingAverages {
     * @return
     *   A list of SMA values, sorted from latest to earliest, same size as input.
     */
-  def simple(values: List[Double], n: Int): List[Double] = {
-    val arr        = values.toArray
+  def simple(values: List[Double], n: Int): List[Double] = simple(values.toArray, n).toList
+
+  /** Array-level SMA kernel — for use as maCalc in triple/nyquist. */
+  def simple(arr: Array[Double], n: Int): Array[Double] = {
     val result     = new Array[Double](arr.length)
     val window     = new Array[Double](n) // circular buffer
     var wStart     = 0
@@ -64,7 +70,7 @@ object MovingAverages {
       }
       i -= 1
     }
-    result.toList
+    result
   }
 
   /** Calculates the Moving Average Convergence Divergence (MACD) line.
@@ -105,10 +111,11 @@ object MovingAverages {
     * @return
     *   A list of WMA values, sorted from latest to earliest, same size as input.
     */
-  def weighted(values: List[Double], n: Int): List[Double] =
-    weightedArr(values.toArray, n).toList
+  def weighted(values: List[Double], n: Int): List[Double] = weightedArr(values.toArray, n).toList
 
-  /** Array-level WMA kernel — avoids List↔Array round-trips on hot paths like hull(). */
+  /** Array-level WMA kernel — for use as maCalc in triple/nyquist. */
+  def weighted(arr: Array[Double], n: Int): Array[Double] = weightedArr(arr, n)
+
   private def weightedArr(arr: Array[Double], n: Int): Array[Double] = {
     val result  = new Array[Double](arr.length)
     val window  = new Array[Double](n) // circular buffer, oldest at wStart
@@ -150,11 +157,12 @@ object MovingAverages {
     * @return
     *   A list of HMA values, sorted from latest to earliest.
     */
-  def hull(values: List[Double], n: Int): List[Double] = {
+  def hull(values: List[Double], n: Int): List[Double] = hull(values.toArray, n).toList
+
+  /** Array-level HMA kernel — for use as maCalc in triple/nyquist. */
+  def hull(arr: Array[Double], n: Int): Array[Double] = {
     val n2    = math.round(n.toDouble / 2).toInt
     val sqrtn = math.round(math.sqrt(n.toDouble)).toInt
-    // Convert once; all intermediate steps stay on arrays to avoid List↔Array round-trips.
-    val arr   = values.toArray
     val wmaN  = weightedArr(arr, n)
     val wmaN2 = weightedArr(arr, n2)
     val len   = arr.length
@@ -164,7 +172,7 @@ object MovingAverages {
       diff(i) = 2.0 * wmaN2(i) - wmaN(i)
       i += 1
     }
-    weightedArr(diff, sqrtn).toList
+    weightedArr(diff, sqrtn)
   }
 
   /** Calculates the Triple Exponential Moving Average (TEMA).
@@ -176,12 +184,19 @@ object MovingAverages {
   def triple(
       values: List[Double],
       n: Int,
-      maCalc: (List[Double], Int) => List[Double] = (values, n) => exponential(values, n)
+      maCalc: (Array[Double], Int) => Array[Double] = exponential
   ): List[Double] = {
-    val ma1 = maCalc(values, n)
+    val arr = values.toArray
+    val ma1 = maCalc(arr, n)
     val ma2 = maCalc(ma1, n)
     val ma3 = maCalc(ma2, n)
-    ma1.lazyZip(ma2).lazyZip(ma3).map { case (v1, v2, v3) => (3 * v1) - (3 * v2) + v3 }
+    val result = new Array[Double](arr.length)
+    var i = 0
+    while (i < arr.length) {
+      result(i) = 3 * ma1(i) - 3 * ma2(i) + ma3(i)
+      i += 1
+    }
+    result.toList
   }
 
   /** Calculates the Nyquist Moving Average.
@@ -195,12 +210,19 @@ object MovingAverages {
       n1: Int,
       n2: Int,
       lambda: Double,
-      maCalc: (List[Double], Int) => List[Double] = weighted
+      maCalc: (Array[Double], Int) => Array[Double] = weighted
   ): List[Double] = {
-    val alpha = lambda * (n1 - 1) / (n1 - lambda)
-    val nwma1 = maCalc(values, n1)
-    val nwma2 = maCalc(nwma1, n2)
-    nwma1.lazyZip(nwma2).map { case (v1, v2) => (1 + alpha) * v1 - alpha * v2 }
+    val alpha  = lambda * (n1 - 1) / (n1 - lambda)
+    val arr    = values.toArray
+    val nwma1  = maCalc(arr, n1)
+    val nwma2  = maCalc(nwma1, n2)
+    val result = new Array[Double](arr.length)
+    var i      = 0
+    while (i < arr.length) {
+      result(i) = (1 + alpha) * nwma1(i) - alpha * nwma2(i)
+      i += 1
+    }
+    result.toList
   }
 
   /** Calculates a simplified Jurik Moving Average (JMA).
