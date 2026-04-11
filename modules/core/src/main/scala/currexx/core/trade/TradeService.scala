@@ -2,12 +2,14 @@ package currexx.core.trade
 
 import cats.syntax.applicative.*
 import cats.data.NonEmptyList
+import cats.effect.implicits.parallelForGenSpawn
 import cats.effect.kernel.Temporal
 import cats.syntax.apply.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
+import cats.syntax.parallel.*
 import currexx.clients.broker.BrokerClient
 import currexx.clients.data.MarketDataClient
 import currexx.core.common.action.{Action, ActionDispatcher}
@@ -55,12 +57,12 @@ final private class LiveTradeService[F[_]](
     orderStatusRepository.getStatistics(uid, sp)
 
   override def fetchMarketData(uid: UserId, cps: NonEmptyList[CurrencyPair], interval: Interval): F[Unit] =
-    cps.traverse { cp =>
+    cps.parTraverse_ { cp =>
       marketDataClient
         .timeSeriesData(cp, interval)
         .map(Action.ProcessMarketData(uid, _))
         .flatMap(dispatcher.dispatch)
-    }.void
+    }
 
   override def placeOrder(uid: UserId, order: TradeOrder, closePendingOrders: Boolean): F[Unit] =
     for
