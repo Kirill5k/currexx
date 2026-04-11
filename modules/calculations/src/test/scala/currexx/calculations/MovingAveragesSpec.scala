@@ -37,6 +37,31 @@ class MovingAveragesSpec extends AnyWordSpec with Matchers {
       hma.take(6).map(rounded(4)) mustBe List(1.1224, 1.1154, 1.114, 1.1193, 1.1274, 1.1361)
     }
 
+    "calculate Triple Exponential Moving Average (TEMA) with default EMA basis" in {
+      val tema = MovingAverages.triple(values, 9)
+      tema.take(6).map(rounded(4)) mustBe List(1.1282, 1.1209, 1.1143, 1.1159, 1.1191, 1.1302)
+    }
+
+    "calculate Triple Exponential Moving Average (TEMA) with WMA basis" in {
+      val tema = MovingAverages.triple(values, 9, MovingAverages.weighted)
+      tema.take(6).map(rounded(4)) mustBe List(1.1275, 1.1194, 1.1125, 1.1142, 1.1182, 1.1297)
+    }
+
+    "calculate Nyquist Moving Average with default WMA basis" in {
+      val nma = MovingAverages.nyquist(values, 9, 3, 0.5)
+      nma.take(6).map(rounded(4)) mustBe List(1.1277, 1.1255, 1.1242, 1.127, 1.1305, 1.1374)
+    }
+
+    "calculate Nyquist Moving Average with higher period and lambda" in {
+      val nma = MovingAverages.nyquist(values, 14, 5, 0.8)
+      nma.take(6).map(rounded(4)) mustBe List(1.1298, 1.1284, 1.1277, 1.1304, 1.1337, 1.1398)
+    }
+
+    "calculate Nyquist Moving Average with EMA basis" in {
+      val nma = MovingAverages.nyquist(values, 9, 3, 0.5, (v, n) => MovingAverages.exponential(v, n))
+      nma.take(6).map(rounded(4)) mustBe List(1.1313, 1.1289, 1.1272, 1.1297, 1.1328, 1.1394)
+    }
+
     "calculate Jurik Moving Average (simplified)" in {
       val jma = MovingAverages.jurikSimplified(values, 9, 50, 2)
 
