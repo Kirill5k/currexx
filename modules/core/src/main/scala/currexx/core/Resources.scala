@@ -23,6 +23,8 @@ object Resources:
   private def mongoDb[F[_]: Async](config: MongoConfig): Resource[F, MongoDatabase[F]] =
     val settings = MongoClientSettings
       .builder()
+      .retryReads(true)
+      .retryWrites(true)
       .applyConnectionString(ConnectionString(config.connectionUri))
       .applyToSocketSettings { builder =>
         val _ = builder
