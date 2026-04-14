@@ -2,7 +2,7 @@ package currexx.core.signal
 
 import cats.data.NonEmptyList
 import currexx.core.fixtures.{Markets, Users}
-import currexx.domain.signal.{Boundary, Condition, Direction, Indicator, ValueSource, ValueTransformation as VT}
+import currexx.domain.signal.{Boundary, Condition, Direction, Indicator, ValueRole, ValueSource, ValueTransformation as VT, VolatilityRegime}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -125,6 +125,141 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
       }
     }
   }
+
+    "detectLinesCrossing" should {
+      val indicator = Indicator.LinesCrossing(ValueSource.Close, VT.SMA(5), VT.SMA(2))
+
+      "create signal when lines cross" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(1))
+        val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
+
+        signal mustBe Some(
+          Signal(
+            userId = Users.uid,
+            interval = Markets.timeSeriesData.interval,
+            currencyPair = Markets.gbpeur,
+            condition = Condition.LinesCrossing(Direction.Downward),
+            triggeredBy = indicator,
+            time = timeSeriesData.prices.head.time
+          )
+        )
+      }
+
+      "not create signal when lines have not crossed" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(4))
+        val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
+
+        signal mustBe None
+      }
+    }
+
+    "detectKeltnerChannel" should {
+      val indicator = Indicator.KeltnerChannel(ValueSource.Close, VT.EMA(20), 14, 1.0)
+
+      "create signal when price crosses a channel band" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(9))
+        val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
+
+        signal mustBe Some(
+          Signal(
+            userId = Users.uid,
+            interval = Markets.timeSeriesData.interval,
+            currencyPair = Markets.gbpeur,
+            condition = Condition.LowerBandCrossing(Direction.Downward),
+            triggeredBy = indicator,
+            time = timeSeriesData.prices.head.time
+          )
+        )
+      }
+
+      "not create signal when price is within the channel" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(10))
+        val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
+
+        signal mustBe None
+      }
+    }
+
+    "detectVolatilityRegimeDetection" should {
+      val indicator = Indicator.VolatilityRegimeDetection(5, VT.SMA(5))
+
+      "create signal when volatility regime changes" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
+        val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
+
+        signal mustBe Some(
+          Signal(
+            userId = Users.uid,
+            interval = Markets.timeSeriesData.interval,
+            currencyPair = Markets.gbpeur,
+            condition = Condition.VolatilityRegimeChange(Some(VolatilityRegime.High), VolatilityRegime.Low),
+            triggeredBy = indicator,
+            time = timeSeriesData.prices.head.time
+          )
+        )
+      }
+
+      "not create signal when volatility regime has not changed" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(3))
+        val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
+
+        signal mustBe None
+      }
+    }
+
+    "detectPriceLineCrossing" should {
+      val indicator = Indicator.PriceLineCrossing(ValueSource.Close, ValueRole.Momentum, VT.SMA(5))
+
+      "create signal when price crosses the line" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
+        val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
+
+        signal mustBe Some(
+          Signal(
+            userId = Users.uid,
+            interval = Markets.timeSeriesData.interval,
+            currencyPair = Markets.gbpeur,
+            condition = Condition.PriceCrossedLine(ValueRole.Momentum, Direction.Downward),
+            triggeredBy = indicator,
+            time = timeSeriesData.prices.head.time
+          )
+        )
+      }
+
+      "not create signal when price has not crossed the line" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
+        val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
+
+        signal mustBe None
+      }
+    }
+
+    "detectBollingerBands" should {
+      val indicator = Indicator.BollingerBands(ValueSource.Close, VT.SMA(20), 20, 1.0)
+
+      "create signal when price crosses a Bollinger band" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
+        val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
+
+        signal mustBe Some(
+          Signal(
+            userId = Users.uid,
+            interval = Markets.timeSeriesData.interval,
+            currencyPair = Markets.gbpeur,
+            condition = Condition.LowerBandCrossing(Direction.Downward),
+            triggeredBy = indicator,
+            time = timeSeriesData.prices.head.time
+          )
+        )
+      }
+
+      "not create signal when price is within the Bollinger bands" in {
+        val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
+        val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
+
+        signal mustBe None
+      }
+    }
 
   extension [A](nel: NonEmptyList[A])
     def drop(n: Int): NonEmptyList[A] =
