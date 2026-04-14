@@ -18,14 +18,14 @@ import kirill5k.common.cats.Clock
 import kirill5k.common.http4s.Server
 import fs2.Stream
 
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration.*
 
 object Application extends IOApp.Simple:
   given Conversion[ServerConfig, Server.Config] =
     (sc: ServerConfig) => Server.Config(sc.host, sc.port)
 
   override def runtimeConfig: IORuntimeConfig =
-    super.runtimeConfig.copy(cpuStarvationCheckInitialDelay = Duration.Inf)
+    super.runtimeConfig.copy(cpuStarvationCheckInitialDelay = 2.minute)
   
   override val run: IO[Unit] =
     Logger.make[IO].flatMap { implicit logger =>
