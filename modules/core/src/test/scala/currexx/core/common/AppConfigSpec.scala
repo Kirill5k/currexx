@@ -22,6 +22,11 @@ class AppConfigSpec extends IOWordSpec {
         config.clients.alphaVantage.apiKey mustBe "av-key"
         config.clients.twelveData.apiKey mustBe "td-key"
         config.clients.oandaData.apiKey mustBe "od-key"
+        config.auth.passwordSalt.value mustBe "$2a$10$8K1p/a0dL1LXMIgoEDFrwO"
+        config.auth.passwordSalt.toString mustBe "<SECRET>"
+        config.auth.jwt.alg mustBe "HS256"
+        config.auth.jwt.secret.value mustBe "secret-key"
+        config.auth.jwt.secret.toString mustBe "<SECRET>"
       }
   }
 }

@@ -7,13 +7,21 @@ import pureconfig.{ConfigReader, ConfigSource}
 import scala.concurrent.duration.FiniteDuration
 
 object config {
+
+  /** Wraps a sensitive value so it is never leaked via [[toString]] (e.g. in log output). */
+  final case class Secret[A](value: A):
+    override def toString: String = "<SECRET>"
+
+  object Secret:
+    given [A: ConfigReader]: ConfigReader[Secret[A]] = ConfigReader[A].map(Secret(_))
+
   final case class JwtConfig(
       alg: String,
-      secret: String
+      secret: Secret[String]
   ) derives ConfigReader
 
   final case class AuthConfig(
-      passwordSalt: String,
+      passwordSalt: Secret[String],
       jwt: JwtConfig
   ) derives ConfigReader
 

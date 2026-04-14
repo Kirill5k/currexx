@@ -1,13 +1,13 @@
 package currexx.core.auth.user
 
 import cats.effect.IO
-import currexx.core.common.config.{AuthConfig, JwtConfig}
+import currexx.core.common.config.{AuthConfig, JwtConfig, Secret}
 import currexx.domain.user.*
 import kirill5k.common.cats.test.IOWordSpec
 
 class PasswordEncryptorSpec extends IOWordSpec {
 
-  val authConfig = AuthConfig("$2a$10$8K1p/a0dL1LXMIgoEDFrwO", JwtConfig("ALG", "SECRET"))
+  val authConfig = AuthConfig(Secret("$2a$10$8K1p/a0dL1LXMIgoEDFrwO"), JwtConfig("ALG", Secret("SECRET")))
 
   "A PasswordEncryptor" should {
 

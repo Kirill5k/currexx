@@ -15,7 +15,7 @@ object PasswordEncryptor:
     F.pure {
       new PasswordEncryptor[F] {
         override def hash(password: Password): F[PasswordHash] =
-          F.delay(password.value.bcryptBounded(config.passwordSalt)).map(s => PasswordHash(s))
+          F.delay(password.value.bcryptBounded(config.passwordSalt.value)).map(s => PasswordHash(s))
 
         override def isValid(password: Password, passwordHash: PasswordHash): F[Boolean] =
           F.fromTry(password.value.isBcryptedSafeBounded(passwordHash.value))

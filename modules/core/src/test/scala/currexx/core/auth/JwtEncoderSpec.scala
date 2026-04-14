@@ -2,7 +2,7 @@ package currexx.core.auth
 
 import cats.effect.IO
 import jwt.*
-import currexx.core.common.config.JwtConfig
+import currexx.core.common.config.{JwtConfig, Secret}
 import currexx.core.auth.jwt.JwtEncoder
 import currexx.domain.session.SessionId
 import currexx.domain.user.UserId
@@ -14,7 +14,7 @@ import pdi.jwt.algorithms.JwtUnknownAlgorithm
 
 class JwtEncoderSpec extends IOWordSpec with JsonCodecs {
 
-  val config   = JwtConfig("HS256", "secret-key")
+  val config   = JwtConfig("HS256", Secret("secret-key"))
   val session  = JwtToken(SessionId("s1"), UserId("u1"))
   val jwtToken = BearerToken(
     "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzZXNzaW9uSWQiOiJzMSIsInVzZXJJZCI6InUxIn0.6mnaHsD11IgZqficW13C9GVOxc9U7ureb8V42EJqlIU"

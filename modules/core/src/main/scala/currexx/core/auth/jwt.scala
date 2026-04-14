@@ -52,7 +52,7 @@ object jwt {
     def circeJwtEncoder[F[_]](config: JwtConfig)(using F: Sync[F]): F[JwtEncoder[F]] =
       JwtAlgorithm.fromString(config.alg.toUpperCase) match
         case alg if JwtAlgorithm.allHmac().contains(alg) | JwtAlgorithm.allAsymmetric().contains(alg) =>
-          F.pure(new CirceJwtEncoder(config.secret, alg))
+          F.pure(new CirceJwtEncoder(config.secret.value, alg))
         case alg =>
           F.raiseError(AppError.InvalidJwtEncryptionAlgorithm(alg.fullName))
 
