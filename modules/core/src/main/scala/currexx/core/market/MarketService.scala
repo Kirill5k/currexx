@@ -1,6 +1,6 @@
 package currexx.core.market
 
-import cats.Monad
+import cats.MonadThrow
 import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -8,6 +8,7 @@ import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.signal.Signal
 import currexx.core.market.db.MarketStateRepository
 import currexx.core.trade.TradeOrderPlacement
+import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, MarketTimeSeriesData, TradeOrder}
 import currexx.domain.user.UserId
 import kirill5k.common.syntax.time.*
@@ -15,6 +16,7 @@ import org.typelevel.log4cats.Logger
 
 trait MarketService[F[_]]:
   def getState(uid: UserId): F[List[MarketState]]
+  def getState(uid: UserId, cp: CurrencyPair): F[MarketState]
   def clearState(uid: UserId, closePendingOrders: Boolean): F[Unit]
   def clearState(uid: UserId, cp: CurrencyPair, closePendingOrders: Boolean): F[Unit]
   def processSignals(uid: UserId, cp: CurrencyPair, signals: List[Signal]): F[Unit]
@@ -25,10 +27,12 @@ final private class LiveMarketService[F[_]](
     private val stateRepo: MarketStateRepository[F],
     private val dispatcher: ActionDispatcher[F]
 )(using
-    F: Monad[F],
+    F: MonadThrow[F],
     logger: Logger[F]
 ) extends MarketService[F] {
   override def getState(uid: UserId): F[List[MarketState]]                   = stateRepo.getAll(uid)
+  override def getState(uid: UserId, cp: CurrencyPair): F[MarketState] =
+    stateRepo.find(uid, cp).flatMap(F.fromOption(_, AppError.MissingMarketState(cp)))
   override def clearState(uid: UserId, closePendingOrders: Boolean): F[Unit] =
     stateRepo.deleteAll(uid) >> F.whenA(closePendingOrders)(dispatcher.dispatch(Action.CloseAllOpenOrders(uid)))
 
@@ -48,8 +52,8 @@ final private class LiveMarketService[F[_]](
       val updatedProfile = signals.foldLeft(currentProfile)(MarketProfileUpdater.update)
       F.whenA(updatedProfile != currentProfile) {
         stateRepo
-          .update(uid, cp, updatedProfile)
-          .flatMap(state => dispatcher.dispatch(Action.ProcessMarketStateUpdate(state, currentProfile)))
+          .update(uid, cp, updatedProfile, currentProfile)
+          .flatMap(_ => dispatcher.dispatch(Action.ProcessMarketStateUpdate(uid, cp)))
       }
     }
 
@@ -80,7 +84,7 @@ final private class LiveMarketService[F[_]](
 }
 
 object MarketService:
-  def make[F[_]: {Monad, Logger}](
+  def make[F[_]: {MonadThrow, Logger}](
       stateRepo: MarketStateRepository[F],
       dispatcher: ActionDispatcher[F]
   ): F[MarketService[F]] =

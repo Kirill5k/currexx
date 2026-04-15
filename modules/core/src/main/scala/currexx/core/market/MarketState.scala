@@ -69,5 +69,6 @@ final case class MarketState(
     currentPosition: Option[PositionState],
     profile: MarketProfile,
     lastUpdatedAt: Instant,
-    createdAt: Instant
+    createdAt: Instant,
+    previousProfile: Option[MarketProfile] = None
 ) derives Codec.AsObject

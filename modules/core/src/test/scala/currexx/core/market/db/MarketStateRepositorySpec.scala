@@ -22,17 +22,17 @@ class MarketStateRepositorySpec extends MongoSpec {
       "create new state if it doesn't exist" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- MarketStateRepository.make(db)
-          res  <- repo.update(Users.uid, Markets.gbpeur, Markets.profile)
+          res  <- repo.update(Users.uid, Markets.gbpeur, Markets.profile, MarketProfile())
         yield res
 
-        result.map(_.withTime(ts) mustBe MarketState(Users.uid, Markets.gbpeur, None, Markets.profile, ts, ts))
+        result.map(_.withTime(ts) mustBe MarketState(Users.uid, Markets.gbpeur, None, Markets.profile, ts, ts, Some(MarketProfile())))
       }
 
       "update existing state if it exists" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- MarketStateRepository.make(db)
           _    <- repo.update(Users.uid, Markets.gbpeur, None)
-          _    <- repo.update(Users.uid, Markets.gbpeur, Markets.profile)
+          _    <- repo.update(Users.uid, Markets.gbpeur, Markets.profile, MarketProfile())
           res  <- repo.getAll(Users.uid)
         yield res
 
@@ -44,7 +44,7 @@ class MarketStateRepositorySpec extends MongoSpec {
       "update position field in the state" in withEmbeddedMongoDb { db =>
         val result = for
           repo <- MarketStateRepository.make(db)
-          _    <- repo.update(Users.uid, Markets.gbpeur, Markets.profile)
+          _    <- repo.update(Users.uid, Markets.gbpeur, Markets.profile, MarketProfile())
           res  <- repo.update(Users.uid, Markets.gbpeur, Some(Markets.positionState))
         yield res
 

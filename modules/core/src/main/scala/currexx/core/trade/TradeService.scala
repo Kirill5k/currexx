@@ -31,7 +31,7 @@ import java.time.Instant
 trait TradeService[F[_]]:
   def getAllOrders(uid: UserId, sp: SearchParams): F[List[TradeOrderPlacement]]
   def getOrderStatistics(uid: UserId, sp: SearchParams): F[OrderStatistics]
-  def processMarketStateUpdate(state: MarketState, previousProfile: MarketProfile): F[Unit]
+  def processMarketStateUpdate(state: MarketState): F[Unit]
   def placeOrder(uid: UserId, order: TradeOrder, closePendingOrders: Boolean): F[Unit]
   def closeOpenOrders(uid: UserId): F[Unit]
   def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
@@ -105,7 +105,8 @@ final private class LiveTradeService[F[_]](
         .traverse(to => submitOrderPlacement(TradeOrderPlacement(uid, to, settings.broker, time)))
     yield ()
 
-  override def processMarketStateUpdate(state: MarketState, previousProfile: MarketProfile): F[Unit] =
+  override def processMarketStateUpdate(state: MarketState): F[Unit] = {
+    val previousProfile = state.previousProfile.getOrElse(MarketProfile())
     for
       settings <- settingsRepository.get(state.userId)
       closeAction = Rule.findTriggeredAction(settings.strategy.closeRules, state, previousProfile)
@@ -129,6 +130,7 @@ final private class LiveTradeService[F[_]](
       }
       _ <- finalAction.traverse_(executeAction(_, state, settings))
     yield ()
+  }
 
   private def executeAction(action: TradeAction, state: MarketState, settings: TradeSettings): F[Unit] = {
     def submit(order: TradeOrder, time: Instant, skipEvent: Boolean = false): F[Unit] =

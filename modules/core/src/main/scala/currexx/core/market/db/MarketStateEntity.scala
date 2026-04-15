@@ -16,7 +16,8 @@ final case class MarketStateEntity(
     currentPosition: Option[PositionState],
     profile: MarketProfile,
     lastUpdatedAt: Instant,
-    createdAt: Instant
+    createdAt: Instant,
+    previousProfile: Option[MarketProfile] = None
 ) derives Codec.AsObject:
   def toDomain: MarketState = MarketState(
     userId = UserId(userId),
@@ -24,5 +25,6 @@ final case class MarketStateEntity(
     currentPosition = currentPosition,
     profile = profile,
     lastUpdatedAt = lastUpdatedAt,
-    createdAt = createdAt
+    createdAt = createdAt,
+    previousProfile = previousProfile
   )

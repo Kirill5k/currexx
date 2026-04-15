@@ -19,9 +19,9 @@ final private class TestMarketStateRepository[F[_]: Monad](
 ) extends MarketStateRepository[F]:
   override def delete(uid: UserId, cp: CurrencyPair): F[Unit]                                  = Monad[F].unit
   override def deleteAll(uid: UserId): F[Unit]                                                 = Monad[F].unit
-  override def update(uid: UserId, pair: CurrencyPair, profile: MarketProfile): F[MarketState] =
+  override def update(uid: UserId, pair: CurrencyPair, profile: MarketProfile, previousProfile: MarketProfile): F[MarketState] =
     clock.now.flatMap { now =>
-      state.updateAndGet(s => s.copy(profile = profile, lastUpdatedAt = now))
+      state.updateAndGet(s => s.copy(profile = profile, previousProfile = Some(previousProfile), lastUpdatedAt = now))
     }
   override def update(uid: UserId, pair: CurrencyPair, position: Option[PositionState]): F[MarketState] =
     clock.now.flatMap { now =>

@@ -4,6 +4,7 @@ import cats.effect.Temporal
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.applicativeError.*
+import cats.syntax.flatMap.*
 import currexx.core.monitor.MonitorService
 import currexx.core.market.MarketService
 import currexx.core.settings.SettingsService
@@ -77,9 +78,9 @@ final private class LiveActionProcessor[F[_]](
     case Action.CloseOpenOrders(uid, pair) =>
       logger.info(s"closing opened order for $uid/$pair currency pair") *>
         tradeService.closeOpenOrders(uid, pair)
-    case Action.ProcessMarketStateUpdate(state, previousProfile) =>
-      logger.info(s"processing market state update for ${state.userId}/${state.currencyPair}") *>
-        tradeService.processMarketStateUpdate(state, previousProfile)
+    case Action.ProcessMarketStateUpdate(uid, cp) =>
+      logger.info(s"processing market state update for $uid/$cp") *>
+        marketService.getState(uid, cp).flatMap(tradeService.processMarketStateUpdate)
     case Action.ProcessTradeOrderPlacement(order) =>
       logger.info(s"processing trade order placement $order") *>
         marketService.processTradeOrderPlacement(order)

@@ -118,7 +118,7 @@ class MarketServiceSpec extends IOWordSpec {
 
         val (stateRepo, disp) = mocks
         when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(Markets.state)
-        when(stateRepo.update(any[UserId], any[CurrencyPair], any[MarketProfile])).thenReturnIO(updatedState)
+        when(stateRepo.update(any[UserId], any[CurrencyPair], any[MarketProfile], any[MarketProfile])).thenReturnIO(updatedState)
 
         val result = for
           svc   <- MarketService.make[IO](stateRepo, disp)
@@ -127,8 +127,8 @@ class MarketServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
-          verify(stateRepo).update(Users.uid, Markets.gbpeur, updatedProfile)
-          disp.submittedActions mustBe List(Action.ProcessMarketStateUpdate(updatedState, Markets.profile))
+          verify(stateRepo).update(Users.uid, Markets.gbpeur, updatedProfile, Markets.profile)
+          disp.submittedActions mustBe List(Action.ProcessMarketStateUpdate(Users.uid, Markets.gbpeur))
           res mustBe ()
         }
       }

@@ -54,6 +54,9 @@ object errors {
         if (cps.size == 1) s"Currency pair ${cps.head} is not being tracked"
         else s"Currency pairs ${cps.mkString(", ")} are not being tracked"
 
+    final case class MissingMarketState(cp: CurrencyPair) extends NotFound:
+      override val message: String = s"Market state for currency pair $cp does not exist"
+
     case object InvalidEmailOrPassword extends Unauth:
       override val message: String = "Invalid email or password"
 

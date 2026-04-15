@@ -345,8 +345,8 @@ class TradeServiceSpec extends IOWordSpec {
     }
 
     "processMarketStateUpdate" should {
-      val state         = Markets.state
       val marketProfile = MarketProfile(trend = Some(TrendState(Direction.Downward, Markets.ts)))
+      val state         = Markets.state.copy(previousProfile = Some(marketProfile))
 
       "not do anything when no rules are triggered" in {
         val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
@@ -354,7 +354,7 @@ class TradeServiceSpec extends IOWordSpec {
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
-          _   <- svc.processMarketStateUpdate(state, marketProfile)
+          _   <- svc.processMarketStateUpdate(state)
         yield ()
 
         result.asserting { res =>
@@ -378,7 +378,7 @@ class TradeServiceSpec extends IOWordSpec {
         val tradeState = state.copy(currentPosition = None)
         val result     = for
           svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
-          _   <- svc.processMarketStateUpdate(tradeState, marketProfile)
+          _   <- svc.processMarketStateUpdate(tradeState)
         yield ()
 
         result.asserting { res =>
@@ -407,7 +407,7 @@ class TradeServiceSpec extends IOWordSpec {
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
-          _   <- svc.processMarketStateUpdate(state, marketProfile)
+          _   <- svc.processMarketStateUpdate(state)
         yield ()
 
         result.asserting { res =>
@@ -436,7 +436,7 @@ class TradeServiceSpec extends IOWordSpec {
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
-          _   <- svc.processMarketStateUpdate(state, marketProfile)
+          _   <- svc.processMarketStateUpdate(state)
         yield ()
 
         result.asserting { res =>
@@ -466,7 +466,7 @@ class TradeServiceSpec extends IOWordSpec {
 
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
-          _   <- svc.processMarketStateUpdate(state, marketProfile)
+          _   <- svc.processMarketStateUpdate(state)
         yield ()
 
         result.asserting { res =>

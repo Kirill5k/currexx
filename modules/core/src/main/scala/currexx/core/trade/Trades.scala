@@ -23,9 +23,9 @@ object Trades:
       dispatcher: ActionDispatcher[F]
   ): F[Trades[F]] =
     for
-      settingsRepo      <- TradeSettingsRepository.make[F](database)
-      orderRepo         <- TradeOrderRepository.make[F](database)
-      orderStatusRepo   <- OrderStatusRepository.make[F](database)
-      svc               <- TradeService.make[F](settingsRepo, orderRepo, orderStatusRepo, clients.broker, clients.marketData, dispatcher)
-      ctrl              <- TradeController.make[F](svc)
+      settingsRepo    <- TradeSettingsRepository.make[F](database)
+      orderRepo       <- TradeOrderRepository.make[F](database)
+      orderStatusRepo <- OrderStatusRepository.make[F](database)
+      svc             <- TradeService.make[F](settingsRepo, orderRepo, orderStatusRepo, clients.broker, clients.marketData, dispatcher)
+      ctrl            <- TradeController.make[F](svc)
     yield Trades[F](svc, ctrl)

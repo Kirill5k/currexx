@@ -50,8 +50,8 @@ final class TestServices[F[_]] private (
         _ <- collectPendingActions { case Action.ProcessSignals(uid, cp, signals) =>
           marketService.processSignals(uid, cp, signals)
         }
-        _ <- collectPendingActions { case Action.ProcessMarketStateUpdate(state, triggeredBy) =>
-          tradeService.processMarketStateUpdate(state, triggeredBy)
+        _ <- collectPendingActions { case Action.ProcessMarketStateUpdate(uid, cp) =>
+          marketService.getState(uid, cp).flatMap(tradeService.processMarketStateUpdate)
         }
         _ <- collectPendingActions { case Action.ProcessTradeOrderPlacement(top) =>
           marketService.processTradeOrderPlacement(top)

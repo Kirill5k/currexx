@@ -17,7 +17,7 @@ import mongo4cats.operations.{Index, Update}
 import mongo4cats.database.MongoDatabase
 
 trait MarketStateRepository[F[_]]:
-  def update(uid: UserId, pair: CurrencyPair, profile: MarketProfile): F[MarketState]
+  def update(uid: UserId, pair: CurrencyPair, profile: MarketProfile, previousProfile: MarketProfile): F[MarketState]
   def update(uid: UserId, pair: CurrencyPair, position: Option[PositionState]): F[MarketState]
   def update(uid: UserId, pair: CurrencyPair, profile: MarketProfile, position: Option[PositionState]): F[MarketState]
   def getAll(uid: UserId): F[List[MarketState]]
@@ -41,12 +41,13 @@ final private class LiveMarketStateRepository[F[_]](
       .deleteOne(userIdAndCurrencyPairEq(uid, cp))
       .flatMap(errorIfNotDeleted(AppError.NotTracked(List(cp))))
 
-  override def update(uid: UserId, cp: CurrencyPair, profile: MarketProfile): F[MarketState] =
+  override def update(uid: UserId, cp: CurrencyPair, profile: MarketProfile, previousProfile: MarketProfile): F[MarketState] =
     collection
       .findOneAndUpdate(
         userIdAndCurrencyPairEq(uid, cp),
         Update
           .set("profile", profile)
+          .set("previousProfile", previousProfile)
           .currentDate(Repository.Field.LastUpdatedAt)
           .setOnInsert("userId", uid.toObjectId)
           .setOnInsert("currencyPair", cp)
