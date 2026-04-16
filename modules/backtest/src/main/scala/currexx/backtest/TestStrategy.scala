@@ -30,6 +30,12 @@ object TestStrategy {
         upperBoundary = 50.0,
         lowerBoundary = 44.0
       ),
+      // Momentum tracking
+      Indicator.ValueTracking(
+        role = ValueRole.Momentum,
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 16)
+      ),
       // Volatility filter
       Indicator.VolatilityRegimeDetection(
         atrLength = 9,
@@ -43,6 +49,7 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.upwardCrossover,
             Rule.Condition.volatilityIsLow,
+            Rule.Condition.MomentumIs(Direction.Upward),
             Rule.Condition.Not(Rule.Condition.momentumIsInOverbought)
           )
         ),
@@ -51,6 +58,7 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.downwardCrossover,
             Rule.Condition.volatilityIsLow,
+            Rule.Condition.MomentumIs(Direction.Downward),
             Rule.Condition.Not(Rule.Condition.momentumIsInOversold)
           )
         )
@@ -96,8 +104,8 @@ object TestStrategy {
 
       // The volatility filter indicator.
       Indicator.VolatilityRegimeDetection(
-        atrLength = 9,
-        smoothingType = ValueTransformation.SMA(length = 5), // Compare ATR to its 20-period SMA
+        atrLength = 14,
+        smoothingType = ValueTransformation.SMA(length = 20), // Compare ATR to its 20-period SMA
       )
     ),
     rules = TradeStrategy(
