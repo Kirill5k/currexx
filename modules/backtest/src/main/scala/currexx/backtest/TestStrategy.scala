@@ -27,7 +27,7 @@ object TestStrategy {
       Indicator.ThresholdCrossing(
         source = ValueSource.Close,
         transformation = ValueTransformation.RSX(length = 16),
-        upperBoundary = 52.0,
+        upperBoundary = 50.0,
         lowerBoundary = 42.0
       ),
       // Momentum tracking
