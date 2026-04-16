@@ -17,74 +17,56 @@ object TestStrategy {
   // median win-to-loss ratio: 1.50425, total profit: 0.41534, total orders: 2879, median profit: 0.07230, median loss: -0.00157
   val s1 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
-      Indicator.TrendChangeDetection(
+      // Primary signal: JMA crossover
+      Indicator.LinesCrossing(
         source = ValueSource.HLC3,
-        transformation = ValueTransformation.HMA(length = 25)
+        line1Transformation = ValueTransformation.JMA(length = 43, phase = -67, power = 1),
+        line2Transformation = ValueTransformation.JMA(length = 16, phase = 45, power = 8)
       ),
+      // Momentum filter
       Indicator.ThresholdCrossing(
         source = ValueSource.Close,
-        transformation = ValueTransformation.STOCH(length = 14),
-        upperBoundary = 83.0,
-        lowerBoundary = 23.0
+        transformation = ValueTransformation.RSX(length = 16),
+        upperBoundary = 50.0,
+        lowerBoundary = 44.0
       ),
-      Indicator.ValueTracking(
-        role = ValueRole.Momentum,
-        source = ValueSource.Close,
-        transformation = ValueTransformation.STOCH(length = 14)
-      ),
+      // Volatility filter
       Indicator.VolatilityRegimeDetection(
-        atrLength = 10,
-        smoothingType = ValueTransformation.SMA(length = 20)
+        atrLength = 9,
+        smoothingType = ValueTransformation.SMA(length = 5)
       )
     ),
     rules = TradeStrategy(
       openRules = List(
-        // Rule for LONG positions
         Rule(
           action = TradeAction.OpenLong,
           conditions = Rule.Condition.allOf(
-            Rule.Condition.NoPosition,
-            Rule.Condition.trendIsUpward,
-            Rule.Condition.TrendActiveFor(1.hour),
-            Rule.Condition.volatilityIsHigh,
-            // The original logic was good, and now it's robust because we have ValueTracking.
-            Rule.Condition.anyOf(
-              Rule.Condition.MomentumEntered(MomentumZone.Neutral),
-              Rule.Condition.MomentumIs(Direction.Upward)
-            ),
+            Rule.Condition.upwardCrossover,
+            Rule.Condition.volatilityIsLow,
             Rule.Condition.Not(Rule.Condition.momentumIsInOverbought)
           )
         ),
-        // Symmetrical rule for SHORT positions
         Rule(
           action = TradeAction.OpenShort,
           conditions = Rule.Condition.allOf(
-            Rule.Condition.NoPosition,
-            Rule.Condition.trendIsDownward,
-            Rule.Condition.TrendActiveFor(1.hour),
-            Rule.Condition.volatilityIsHigh,
-            Rule.Condition.anyOf(
-              Rule.Condition.MomentumEntered(MomentumZone.Neutral),
-              Rule.Condition.MomentumIs(Direction.Downward)
-            ),
+            Rule.Condition.downwardCrossover,
+            Rule.Condition.volatilityIsLow,
             Rule.Condition.Not(Rule.Condition.momentumIsInOversold)
           )
         )
       ),
-      // SIMPLIFIED close rules that don't depend on knowing the position direction.
-      // This is a more general and often more robust approach.
       closeRules = List(
         Rule(
           action = TradeAction.ClosePosition,
           conditions = Rule.Condition.anyOf(
-            // Exit if momentum enters an extreme zone opposite to the presumed trade.
-            // E.g., if we are long, this triggers when we become overbought.
-            // If we are short, this triggers when we become oversold.
-            Rule.Condition.momentumEnteredOverbought,
-            Rule.Condition.momentumEnteredOversold,
-            // Exit if the primary trend flips against us. This acts as a master stop-loss.
-            Rule.Condition.TrendChangedTo(Direction.Downward),
-            Rule.Condition.TrendChangedTo(Direction.Upward)
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.momentumEnteredOverbought
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.momentumEnteredOversold
+            )
           )
         )
       )
