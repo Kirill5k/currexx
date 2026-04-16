@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `sbt test` - Run all tests
 - `sbt "testOnly *ClassName*"` - Run specific test class
 - `sbt "project core" run` - Run the core application
-- `sbt "project backtest" run` - Run backtesting
+- `sbt "project backtest" "runMain currexx.backtest.Backtester"` - Run backtesting
 - `sbt docker:publishLocal` - Build Docker image locally
 
 ### Module-Specific Commands
