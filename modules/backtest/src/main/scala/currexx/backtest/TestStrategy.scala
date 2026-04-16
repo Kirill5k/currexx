@@ -28,7 +28,7 @@ object TestStrategy {
         source = ValueSource.Close,
         transformation = ValueTransformation.RSX(length = 16),
         upperBoundary = 50.0,
-        lowerBoundary = 42.0
+        lowerBoundary = 40.0
       ),
       // Momentum tracking
       Indicator.ValueTracking(
