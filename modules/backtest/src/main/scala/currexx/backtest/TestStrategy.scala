@@ -81,13 +81,13 @@ object TestStrategy {
     )
   )
 
-  // median win-to-loss ratio: 8.06250, total profit: 0.14200, total orders: 381, median profit: 0.035695, median loss: -0.004103
+  // median win-to-loss ratio: 8.07143, total profit: 0.14133, total orders: 380, median profit: 0.036145, median loss: -0.004103
   val s2 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.LinesCrossing(
         source = ValueSource.HLC3,
         line1Transformation = ValueTransformation.JMA(length = 43, phase = -67, power = 1),
-        line2Transformation = ValueTransformation.JMA(length = 16, phase = 45, power = 8)
+        line2Transformation = ValueTransformation.JMA(length = 16, phase = 35, power = 8)
       ),
       Indicator.ThresholdCrossing(
         source = ValueSource.Close,
