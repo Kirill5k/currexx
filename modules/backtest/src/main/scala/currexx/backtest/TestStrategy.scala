@@ -81,7 +81,7 @@ object TestStrategy {
     )
   )
 
-  // median win-to-loss ratio: 6.03297, total profit: 0.13519, total orders: 409, median profit: 0.03766, median loss: -0.003730
+  // median win-to-loss ratio: 8.06250, total profit: 0.14200, total orders: 381, median profit: 0.035695, median loss: -0.004103
   val s2 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.LinesCrossing(
@@ -95,14 +95,9 @@ object TestStrategy {
         upperBoundary = 51.0,
         lowerBoundary = 44.0
       ),
-      Indicator.ValueTracking(
-        role = ValueRole.Momentum,
-        source = ValueSource.Close,
-        transformation = ValueTransformation.RSX(length = 16)
-      ),
       Indicator.VolatilityRegimeDetection(
-        atrLength = 9,
-        smoothingType = ValueTransformation.SMA(length = 5)
+        atrLength = 6,
+        smoothingType = ValueTransformation.SMA(length = 4)
       )
     ),
     rules = TradeStrategy(
