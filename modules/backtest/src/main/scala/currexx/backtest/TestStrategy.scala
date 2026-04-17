@@ -83,68 +83,46 @@ object TestStrategy {
 
   // median win-to-loss ratio: 5.901785, total profit: 0.20349, total orders: 652, median profit: 0.04662, median loss: -0.004795
   val s2 = TestStrategy(
-    // --- The Set of Indicators for the Filtered JMA Crossover Strategy ---
     indicator = Indicator.compositeAnyOf(
-      // The primary crossover indicator using two different JMAs.
       Indicator.LinesCrossing(
-        source = ValueSource.HLC3, // Use a smooth price source for the JMAs
-        // The FAST line: short length, positive phase for responsiveness
+        source = ValueSource.HLC3,
         line1Transformation = ValueTransformation.JMA(length = 43, phase = -67, power = 1),
-        // The SLOW line: longer length, negative phase for extreme smoothness
         line2Transformation = ValueTransformation.JMA(length = 16, phase = 45, power = 8)
       ),
-
-      // The momentum filter indicator.
       Indicator.ThresholdCrossing(
         source = ValueSource.Close,
         transformation = ValueTransformation.RSX(length = 16),
-        upperBoundary = 50.0, // Defines the Overbought zone
-        lowerBoundary = 44.0   // Defines the Oversold zone
+        upperBoundary = 50.0,
+        lowerBoundary = 44.0
       ),
-
-      // The volatility filter indicator.
       Indicator.VolatilityRegimeDetection(
-        atrLength = 14,
-        smoothingType = ValueTransformation.SMA(length = 20), // Compare ATR to its 20-period SMA
+        atrLength = 9,
+        smoothingType = ValueTransformation.SMA(length = 5)
       )
     ),
     rules = TradeStrategy(
-      // openRules are now the primary drivers for both entries and reversals.
       openRules = List(
-        // Rule for being LONG
         Rule(
           action = TradeAction.OpenLong,
           conditions = Rule.Condition.allOf(
-            // Entry Trigger: A "Golden Cross" of the JMAs.
             Rule.Condition.upwardCrossover,
-
-            // FILTERS: These apply to both initial entries and reversals.
             Rule.Condition.volatilityIsLow,
             Rule.Condition.Not(Rule.Condition.momentumIsInOverbought)
           )
         ),
-
-        // Rule for being SHORT
         Rule(
           action = TradeAction.OpenShort,
           conditions = Rule.Condition.allOf(
-            // Entry Trigger: A "Death Cross" of the JMAs.
             Rule.Condition.downwardCrossover,
-
-            // FILTERS:
             Rule.Condition.volatilityIsLow,
             Rule.Condition.Not(Rule.Condition.momentumIsInOversold)
           )
         )
       ),
-
-      // closeRules are now for non-reversing exits to a FLAT state.
-      // The crossover logic has been REMOVED from here.
       closeRules = List(
         Rule(
           action = TradeAction.ClosePosition,
           conditions = Rule.Condition.anyOf(
-            // Emergency Exit 2 (Take Profit): Momentum becomes completely exhausted.
             Rule.Condition.allOf(
               Rule.Condition.positionIsBuy,
               Rule.Condition.momentumEnteredOverbought
@@ -292,7 +270,7 @@ object TestStrategy {
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsDownward,
             Rule.Condition.TrendActiveFor(2.hours),
-            Rule.Condition.volatilityIsHigh, // Apply filter to shorts as well
+            Rule.Condition.volatilityIsLow, // Apply filter to shorts as well
             Rule.Condition.anyOf(
               Rule.Condition.MomentumEntered(MomentumZone.Neutral),
               Rule.Condition.allOf(
