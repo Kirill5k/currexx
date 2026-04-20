@@ -46,8 +46,11 @@ final class Http[F[_]: Async] private (
     .andThen((http: HttpRoutes[F]) => CORS.policy.withAllowOriginAll.withAllowCredentials(false).apply(http))
     .andThen((http: HttpRoutes[F]) => Timeout(60.seconds)(http))
 
-  private val loggers: HttpRoutes[F] => HttpRoutes[F] = { (http: HttpRoutes[F]) => RequestLogger.httpRoutes(true, true)(http) }
-    .andThen((http: HttpRoutes[F]) => ResponseLogger.httpRoutes(true, true)(http))
+  private val redactor = SensitiveDataRedactor[F](Set("password"))
+
+  private val loggers: HttpRoutes[F] => HttpRoutes[F] = { (http: HttpRoutes[F]) =>
+    RequestLogger.httpRoutes(true, true, logAction = Some(redactor.log))(http)
+  }.andThen((http: HttpRoutes[F]) => ResponseLogger.httpRoutes(true, true)(http))
 
   val app: HttpRoutes[F] = loggers(middleware(apiRoutes)) <+> healthRoutes
 }
