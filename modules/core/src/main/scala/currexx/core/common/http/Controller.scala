@@ -95,21 +95,23 @@ object Controller extends TapirSchema with TapirJson with TapirCodecs {
       .options
   }
 
-  private val FailedRegexValidation = "Predicate failed: \"(.*)\"\\.matches\\(.*\\)\\.".r
-  private val NullFieldValidation   = "Attempt to decode value on failed cursor".r
-  private val EmptyFieldValidation  = "Predicate isEmpty\\(\\) did not fail\\.".r
-  private val IdValidation          = "Predicate failed: \\((.*) is valid id\\).".r
+  private val FailedRegexValidation  = "Predicate failed: \"(.*)\"\\.matches\\(.*\\)\\.".r
+  private val NullFieldValidation    = "Attempt to decode value on failed cursor".r
+  private val EmptyFieldValidation   = "Predicate isEmpty\\(\\) did not fail\\.".r
+  private val IdValidation           = "Predicate failed: \\((.*) is valid id\\).".r
+  private val MissingFieldValidation = "Missing required field".r
 
   private def formatJsonError(err: JsonDecodeException): String =
     err.errors
       .map { je =>
         je.msg match
-          case FailedRegexValidation(value) => s"$value is not a valid ${je.path.head.name}"
-          case NullFieldValidation()        => s"${je.path.head.name} is required"
-          case EmptyFieldValidation()       => s"${je.path.head.name} must not be empty"
-          case IdValidation(value)          => s"$value is not a valid ${je.path.head.name}"
-          case msg if je.path.isEmpty       => s"Invalid message body: Could not decode $msg json"
-          case msg                          => msg
+          case FailedRegexValidation(value)                 => s"$value is not a valid ${je.path.head.name}"
+          case NullFieldValidation()                        => s"${je.path.head.name} is required"
+          case EmptyFieldValidation()                       => s"${je.path.head.name} must not be empty"
+          case IdValidation(value)                          => s"$value is not a valid ${je.path.head.name}"
+          case MissingFieldValidation() if je.path.nonEmpty => s"Missing required field ${je.path.map(_.name).mkString(".")}"
+          case msg if je.path.isEmpty                       => s"Invalid message body: Could not decode $msg json"
+          case msg                                          => msg
       }
       .mkString(", ")
 

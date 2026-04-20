@@ -206,10 +206,28 @@ class SettingsControllerSpec extends HttpRoutesWordSpec {
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val req = Request[IO](Method.PUT, uri"/settings").withAuthHeader().withBody("""{"signal": "invalid"}""")
+        val req = Request[IO](Method.PUT, uri"/settings").withAuthHeader().withBody(
+          """{
+            |"signal": "invalid",
+            |"trade": {
+            |        "strategy": {
+            |            "openRules": [],
+            |            "closeRules": []
+            |        },
+            |        "broker": {
+            |            "apiKey": "apiKey",
+            |            "demo": true,
+            |            "accountId": "1",
+            |            "broker": "oanda"
+            |        },
+            |        "trading": {
+            |
+            |        }
+            |    }
+            |}""".stripMargin)
         val res = SettingsController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        res mustHaveStatus (Status.UnprocessableContent, Some("""{"message" : "Got value '\"invalid\"' with wrong type, expecting object"}"""))
+        res mustHaveStatus (Status.UnprocessableContent, Some("""{"message" : "Got value '\"invalid\"' with wrong type, expecting object, Missing required field trade.trading.volume, Missing required field trade.trading.stopLossPerCurrency"}"""))
         verifyNoInteractions(svc)
       }
     }
