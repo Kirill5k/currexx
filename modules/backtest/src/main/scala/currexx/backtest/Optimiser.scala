@@ -30,38 +30,22 @@ object Optimiser extends IOApp.Simple {
   )
 
   val rounds: List[OptimisationRound] = List(
+    // --- s1: Trend-following with momentum confirmation ---
     OptimisationRound(
-      name = "s1a-balanced",
+      name = "s1-balanced",
       strategy = TestStrategy.s1,
       gaParameters = gaParameters,
-      // Scoring function selection - see SCORING_GUIDE.md for detailed guide
-      // Recommended: Balanced scoring (combines profit, win/loss ratio, and consistency)
       scoringFunction = ScoringFunction.balanced(
-        profitWeight = 0.4,      // 40% weight on total profit
-        ratioWeight = 0.3,       // 30% weight on win/loss ratio
-        consistencyWeight = 0.3, // 30% weight on monthly consistency
-        minOrders = Some(50),    // Minimum orders per dataset
-        maxOrders = Some(700),   // Maximum orders per dataset
-        targetRatio = 2.0        // Target win/loss ratio for normalization
+        profitWeight = 0.4,
+        ratioWeight = 0.3,
+        consistencyWeight = 0.3,
+        minOrders = Some(50),
+        maxOrders = Some(700),
+        targetRatio = 2.0
       ),
       testDataSets = MarketDataProvider.majors1h
     ),
-    OptimisationRound(
-      name = "s1b-balanced",
-      strategy = TestStrategy.s1,
-      gaParameters = gaParameters,
-      // Scoring function selection - see SCORING_GUIDE.md for detailed guide
-      // Recommended: Balanced scoring (combines profit, win/loss ratio, and consistency)
-      scoringFunction = ScoringFunction.balanced(
-        profitWeight = 0.4,      // 40% weight on total profit
-        ratioWeight = 0.3,       // 30% weight on win/loss ratio
-        consistencyWeight = 0.3, // 30% weight on monthly consistency
-        minOrders = Some(50),    // Minimum orders per dataset
-        maxOrders = Some(700),   // Maximum orders per dataset
-        targetRatio = 2.0        // Target win/loss ratio for normalization
-      ),
-      testDataSets = MarketDataProvider.majors1h
-    ),
+    // --- s2: JMA crossover (mean-reversion), original params ---
     OptimisationRound(
       name = "s2-balanced",
       strategy = TestStrategy.s2,
@@ -69,11 +53,51 @@ object Optimiser extends IOApp.Simple {
       scoringFunction = ScoringFunction.balanced(minOrders = Some(50), maxOrders = Some(700)),
       testDataSets = MarketDataProvider.majors1h
     ),
+    // --- s2_v2: Best-performing strategy (8.07 w/l) — optimize for w/l ratio ---
+    OptimisationRound(
+      name = "s2v2-wl-ratio",
+      strategy = TestStrategy.s2_v2,
+      gaParameters = gaParameters,
+      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(200), maxOrders = Some(600)),
+      testDataSets = MarketDataProvider.majors1h
+    ),
+    // --- s2_v2: Same structure, optimize for risk-adjusted returns ---
+    OptimisationRound(
+      name = "s2v2-risk-adjusted",
+      strategy = TestStrategy.s2_v2,
+      gaParameters = gaParameters,
+      scoringFunction = ScoringFunction.riskAdjusted(minOrders = Some(200), maxOrders = Some(600)),
+      testDataSets = MarketDataProvider.majors1h
+    ),
+    // --- s3: Velocity-based breakout — poor baseline, but GA may find viable params ---
     OptimisationRound(
       name = "s3-balanced",
       strategy = TestStrategy.s3,
       gaParameters = gaParameters,
       scoringFunction = ScoringFunction.balanced(minOrders = Some(50), maxOrders = Some(700)),
+      testDataSets = MarketDataProvider.majors1h
+    ),
+    // --- s4: Keltner channel breakout — decent profit (0.176), optimize for more ---
+    OptimisationRound(
+      name = "s4-profit",
+      strategy = TestStrategy.s4,
+      gaParameters = gaParameters,
+      scoringFunction = ScoringFunction.totalProfit,
+      testDataSets = MarketDataProvider.majors1h
+    ),
+    // --- s5: Bollinger dual-mode (breakout + reversion) — highest profit (0.263), optimize ratio ---
+    OptimisationRound(
+      name = "s5-balanced",
+      strategy = TestStrategy.s5,
+      gaParameters = gaParameters,
+      scoringFunction = ScoringFunction.balanced(
+        profitWeight = 0.3,
+        ratioWeight = 0.4,
+        consistencyWeight = 0.3,
+        minOrders = Some(50),
+        maxOrders = Some(700),
+        targetRatio = 2.0
+      ),
       testDataSets = MarketDataProvider.majors1h
     )
   )
