@@ -529,4 +529,167 @@ object TestStrategy {
       )
     )
   )
+
+  val s1_balanced_optimised = s1.copy(
+    indicator = Indicator.compositeAnyOf(
+      Indicator.TrendChangeDetection(
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.HMA(length = 28)
+      ),
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.STOCH(length = 17),
+        upperBoundary = 86.0,
+        lowerBoundary = 21.0
+      ),
+      Indicator.ValueTracking(
+        role = ValueRole.Momentum,
+        source = ValueSource.Close,
+        transformation = ValueTransformation.STOCH(length = 30)
+      ),
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 8,
+        smoothingType = ValueTransformation.SMA(length = 11)
+      )
+    )
+  )
+
+  val s2_balanced_optimised = s2.copy(
+    indicator = Indicator.compositeAnyOf(
+      Indicator.LinesCrossing(
+        source = ValueSource.HLC3,
+        line1Transformation = ValueTransformation.JMA(length = 21, phase = -2, power = 4),
+        line2Transformation = ValueTransformation.JMA(length = 10, phase = -55, power = 4)
+      ),
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 13),
+        upperBoundary = 67.0,
+        lowerBoundary = 28.0
+      ),
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 33,
+        smoothingType = ValueTransformation.SMA(length = 55)
+      )
+    )
+  )
+
+  val s2v2_wl_ratio_optimised = s2_v2.copy(
+    indicator = Indicator.compositeAnyOf(
+      Indicator.LinesCrossing(
+        source = ValueSource.HLC3,
+        line1Transformation = ValueTransformation.JMA(length = 30, phase = 8, power = 1),
+        line2Transformation = ValueTransformation.JMA(length = 7, phase = 31, power = 10)
+      ),
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 10),
+        upperBoundary = 57.0,
+        lowerBoundary = 41.0
+      ),
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 23,
+        smoothingType = ValueTransformation.SMA(length = 5)
+      )
+    )
+  )
+
+  val s2v2_risk_adjusted_optimised = s2_v2.copy(
+    indicator = Indicator.compositeAnyOf(
+      Indicator.LinesCrossing(
+        source = ValueSource.HLC3,
+        line1Transformation = ValueTransformation.JMA(length = 23, phase = 17, power = 3),
+        line2Transformation = ValueTransformation.JMA(length = 22, phase = 4, power = 2)
+      ),
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 20),
+        upperBoundary = 73.0,
+        lowerBoundary = 27.0
+      ),
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 17,
+        smoothingType = ValueTransformation.SMA(length = 40)
+      )
+    )
+  )
+
+  val s3_balanced_optimised = s3.copy(
+    indicator = Indicator.compositeAnyOf(
+      Indicator.TrendChangeDetection(
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.Kalman(gain = 0.25, measurementNoise = 0.01)
+      ),
+      Indicator.ValueTracking(
+        role = ValueRole.Velocity,
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.KalmanVelocity(gain = 0.48, measurementNoise = 0.02)
+      ),
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 10),
+        upperBoundary = 70.0,
+        lowerBoundary = 29.0
+      ),
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 11,
+        smoothingType = ValueTransformation.SMA(length = 31)
+      )
+    )
+  )
+
+  val s4_profit_optimised = s4.copy(
+    indicator = Indicator.compositeAnyOf(
+      Indicator.TrendChangeDetection(
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.JMA(length = 31, phase = -88, power = 3)
+      ),
+      Indicator.KeltnerChannel(
+        source = ValueSource.Close,
+        middleBand = ValueTransformation.EMA(length = 26),
+        atrLength = 49,
+        atrMultiplier = 1.0
+      ),
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 22),
+        upperBoundary = 78.0,
+        lowerBoundary = 12.0
+      ),
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 37,
+        smoothingType = ValueTransformation.SMA(length = 30)
+      )
+    )
+  )
+
+  val s5_balanced_optimised = s5.copy(
+    indicator = Indicator.compositeAnyOf(
+      Indicator.TrendChangeDetection(
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.JMA(length = 28, phase = -100, power = 1)
+      ),
+      Indicator.BollingerBands(
+        source = ValueSource.Close,
+        middleBand = ValueTransformation.SMA(length = 26),
+        stdDevLength = 33,
+        stdDevMultiplier = 1.9
+      ),
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 21,
+        smoothingType = ValueTransformation.SMA(length = 17)
+      ),
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 6),
+        upperBoundary = 71.0,
+        lowerBoundary = 30.0
+      ),
+      Indicator.ValueTracking(
+        role = ValueRole.Momentum,
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 19)
+      )
+    )
+  )
 }
