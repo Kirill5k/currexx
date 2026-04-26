@@ -662,34 +662,4 @@ object TestStrategy {
       )
     )
   )
-
-  val s5_balanced_optimised = s5.copy(
-    indicator = Indicator.compositeAnyOf(
-      Indicator.TrendChangeDetection(
-        source = ValueSource.HLC3,
-        transformation = ValueTransformation.JMA(length = 28, phase = -100, power = 1)
-      ),
-      Indicator.BollingerBands(
-        source = ValueSource.Close,
-        middleBand = ValueTransformation.SMA(length = 26),
-        stdDevLength = 33,
-        stdDevMultiplier = 1.9
-      ),
-      Indicator.VolatilityRegimeDetection(
-        atrLength = 21,
-        smoothingType = ValueTransformation.SMA(length = 17)
-      ),
-      Indicator.ThresholdCrossing(
-        source = ValueSource.Close,
-        transformation = ValueTransformation.RSX(length = 6),
-        upperBoundary = 71.0,
-        lowerBoundary = 30.0
-      ),
-      Indicator.ValueTracking(
-        role = ValueRole.Momentum,
-        source = ValueSource.Close,
-        transformation = ValueTransformation.RSX(length = 19)
-      )
-    )
-  )
 }
