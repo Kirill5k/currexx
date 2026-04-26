@@ -530,7 +530,7 @@ object TestStrategy {
     )
   )
 
-  val s1_balanced_optimised = s1.copy(
+  val s1_balanced_optimised = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
         source = ValueSource.HLC3,
@@ -551,10 +551,53 @@ object TestStrategy {
         atrLength = 8,
         smoothingType = ValueTransformation.SMA(length = 11)
       )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsUpward,
+            Rule.Condition.TrendActiveFor(1.hour),
+            Rule.Condition.volatilityIsHigh,
+            Rule.Condition.anyOf(
+              Rule.Condition.MomentumEntered(MomentumZone.Neutral),
+              Rule.Condition.MomentumIs(Direction.Upward)
+            ),
+            Rule.Condition.Not(Rule.Condition.momentumIsInOverbought)
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsDownward,
+            Rule.Condition.TrendActiveFor(1.hour),
+            Rule.Condition.volatilityIsHigh,
+            Rule.Condition.anyOf(
+              Rule.Condition.MomentumEntered(MomentumZone.Neutral),
+              Rule.Condition.MomentumIs(Direction.Downward)
+            ),
+            Rule.Condition.Not(Rule.Condition.momentumIsInOversold)
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            Rule.Condition.momentumEnteredOverbought,
+            Rule.Condition.momentumEnteredOversold,
+            Rule.Condition.TrendChangedTo(Direction.Downward),
+            Rule.Condition.TrendChangedTo(Direction.Upward)
+          )
+        )
+      )
     )
   )
 
-  val s2_balanced_optimised = s2.copy(
+  val s2_balanced_optimised = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.LinesCrossing(
         source = ValueSource.HLC3,
@@ -571,10 +614,45 @@ object TestStrategy {
         atrLength = 33,
         smoothingType = ValueTransformation.SMA(length = 55)
       )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.upwardCrossover,
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.Not(Rule.Condition.momentumIsInOverbought)
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.downwardCrossover,
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.Not(Rule.Condition.momentumIsInOversold)
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.momentumEnteredOverbought
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.momentumEnteredOversold
+            )
+          )
+        )
+      )
     )
   )
 
-  val s2v2_wl_ratio_optimised = s2_v2.copy(
+  val s2v2_wl_ratio_optimised = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.LinesCrossing(
         source = ValueSource.HLC3,
@@ -591,10 +669,45 @@ object TestStrategy {
         atrLength = 23,
         smoothingType = ValueTransformation.SMA(length = 5)
       )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.upwardCrossover,
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.MomentumIsIn(MomentumZone.Neutral)
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.downwardCrossover,
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.MomentumIsIn(MomentumZone.Neutral)
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.momentumEnteredOverbought
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.momentumEnteredOversold
+            )
+          )
+        )
+      )
     )
   )
 
-  val s2v2_risk_adjusted_optimised = s2_v2.copy(
+  val s2v2_risk_adjusted_optimised = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.LinesCrossing(
         source = ValueSource.HLC3,
@@ -611,10 +724,45 @@ object TestStrategy {
         atrLength = 17,
         smoothingType = ValueTransformation.SMA(length = 40)
       )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.upwardCrossover,
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.MomentumIsIn(MomentumZone.Neutral)
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.downwardCrossover,
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.MomentumIsIn(MomentumZone.Neutral)
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.momentumEnteredOverbought
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.momentumEnteredOversold
+            )
+          )
+        )
+      )
     )
   )
 
-  val s3_balanced_optimised = s3.copy(
+  val s3_balanced_optimised = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
         source = ValueSource.HLC3,
@@ -635,10 +783,57 @@ object TestStrategy {
         atrLength = 11,
         smoothingType = ValueTransformation.SMA(length = 31)
       )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsUpward,
+            Rule.Condition.TrendActiveFor(2.hours),
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.VelocityCrossedLevel(level = 0.0012, direction = Direction.Upward)
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsDownward,
+            Rule.Condition.TrendActiveFor(2.hours),
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.VelocityCrossedLevel(level = -0.0012, direction = Direction.Downward)
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.VelocityCrossedLevel(level = -0.0002, direction = Direction.Downward)
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.VelocityCrossedLevel(level = 0.0002, direction = Direction.Upward)
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.momentumEnteredOverbought
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.momentumEnteredOversold
+            )
+          )
+        )
+      )
     )
   )
 
-  val s4_profit_optimised = s4.copy(
+  val s4_profit_optimised = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
         source = ValueSource.HLC3,
@@ -659,6 +854,47 @@ object TestStrategy {
       Indicator.VolatilityRegimeDetection(
         atrLength = 37,
         smoothingType = ValueTransformation.SMA(length = 30)
+      )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsUpward,
+            Rule.Condition.TrendActiveFor(2.hours),
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.UpperBandCrossed(Direction.Upward)
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsDownward,
+            Rule.Condition.TrendActiveFor(2.hours),
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.LowerBandCrossed(Direction.Downward)
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            Rule.Condition.TrendChangedTo(Direction.Downward),
+            Rule.Condition.TrendChangedTo(Direction.Upward),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.momentumEnteredOverbought
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.momentumEnteredOversold
+            )
+          )
+        )
       )
     )
   )
