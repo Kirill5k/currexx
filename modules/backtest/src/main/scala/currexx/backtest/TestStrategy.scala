@@ -103,11 +103,6 @@ object TestStrategy {
         transformation = ValueTransformation.STOCH(length = 90),
         upperBoundary = 90.0,
         lowerBoundary = 11.0
-      ),
-      Indicator.ValueTracking(
-        role = ValueRole.Momentum,
-        source = ValueSource.Close,
-        transformation = ValueTransformation.STOCH(length = 14)
       )
     ),
     rules = TradeStrategy(
