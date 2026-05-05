@@ -112,7 +112,7 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsUpward,
-            Rule.Condition.MomentumIsIn(MomentumZone.Neutral)
+            Rule.Condition.MomentumEntered(MomentumZone.Neutral)
           )
         ),
         Rule(
@@ -120,7 +120,7 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsDownward,
-            Rule.Condition.MomentumIsIn(MomentumZone.Neutral)
+            Rule.Condition.MomentumEntered(MomentumZone.Neutral)
           )
         )
       ),
@@ -354,7 +354,7 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.upwardCrossover,
             Rule.Condition.volatilityIsLow,
-            Rule.Condition.MomentumIsIn(MomentumZone.Neutral)
+            Rule.Condition.MomentumEntered(MomentumZone.Neutral)
           )
         ),
         Rule(
@@ -362,7 +362,7 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.downwardCrossover,
             Rule.Condition.volatilityIsLow,
-            Rule.Condition.MomentumIsIn(MomentumZone.Neutral)
+            Rule.Condition.MomentumEntered(MomentumZone.Neutral)
           )
         )
       ),
@@ -410,7 +410,7 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.upwardCrossover,
             Rule.Condition.volatilityIsLow,
-            Rule.Condition.MomentumIsIn(MomentumZone.Neutral)
+            Rule.Condition.MomentumEntered(MomentumZone.Neutral)
           )
         ),
         Rule(
@@ -418,7 +418,7 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.downwardCrossover,
             Rule.Condition.volatilityIsLow,
-            Rule.Condition.MomentumIsIn(MomentumZone.Neutral)
+            Rule.Condition.MomentumEntered(MomentumZone.Neutral)
           )
         )
       ),
