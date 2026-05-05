@@ -108,10 +108,6 @@ object TestStrategy {
         role = ValueRole.Momentum,
         source = ValueSource.Close,
         transformation = ValueTransformation.STOCH(length = 14)
-      ),
-      Indicator.VolatilityRegimeDetection(
-        atrLength = 18,
-        smoothingType = ValueTransformation.SMA(length = 29)
       )
     ),
     rules = TradeStrategy(
