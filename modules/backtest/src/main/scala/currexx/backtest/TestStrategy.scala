@@ -101,8 +101,8 @@ object TestStrategy {
       Indicator.ThresholdCrossing(
         source = ValueSource.Close,
         transformation = ValueTransformation.STOCH(length = 50),
-        upperBoundary = 89.0,
-        lowerBoundary = 13.0
+        upperBoundary = 90.0,
+        lowerBoundary = 12.0
       ),
       Indicator.ValueTracking(
         role = ValueRole.Momentum,
