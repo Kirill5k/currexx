@@ -100,7 +100,7 @@ object TestStrategy {
       ),
       Indicator.ThresholdCrossing(
         source = ValueSource.Close,
-        transformation = ValueTransformation.STOCH(length = 65),
+        transformation = ValueTransformation.STOCH(length = 70),
         upperBoundary = 90.0,
         lowerBoundary = 11.0
       ),
