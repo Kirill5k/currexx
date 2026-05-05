@@ -122,7 +122,6 @@ object TestStrategy {
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsUpward,
             Rule.Condition.TrendActiveFor(3.hours),
-            Rule.Condition.volatilityIsLow,
             Rule.Condition.MomentumIsIn(MomentumZone.Neutral)
           )
         ),
@@ -132,7 +131,6 @@ object TestStrategy {
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsDownward,
             Rule.Condition.TrendActiveFor(3.hours),
-            Rule.Condition.volatilityIsLow,
             Rule.Condition.MomentumIsIn(MomentumZone.Neutral)
           )
         )
