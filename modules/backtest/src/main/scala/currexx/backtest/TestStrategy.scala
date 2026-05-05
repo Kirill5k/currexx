@@ -96,7 +96,7 @@ object TestStrategy {
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
         source = ValueSource.HLC3,
-        transformation = ValueTransformation.NMA(length = 100, signalLength = 40, lambda = 0.8, maCalc = currexx.domain.signal.MovingAverage.Exponential)
+        transformation = ValueTransformation.NMA(length = 100, signalLength = 45, lambda = 0.8, maCalc = currexx.domain.signal.MovingAverage.Exponential)
       ),
       Indicator.ThresholdCrossing(
         source = ValueSource.Close,
