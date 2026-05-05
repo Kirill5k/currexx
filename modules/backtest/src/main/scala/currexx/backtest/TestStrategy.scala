@@ -117,7 +117,6 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsUpward,
-            Rule.Condition.TrendActiveFor(1.hour),
             Rule.Condition.MomentumIsIn(MomentumZone.Neutral)
           )
         ),
@@ -126,7 +125,6 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsDownward,
-            Rule.Condition.TrendActiveFor(1.hour),
             Rule.Condition.MomentumIsIn(MomentumZone.Neutral)
           )
         )
