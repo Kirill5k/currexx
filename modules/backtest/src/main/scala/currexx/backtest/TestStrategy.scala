@@ -45,7 +45,7 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsUpward,
-            Rule.Condition.TrendActiveFor(1.hour),
+            Rule.Condition.TrendActiveFor(3.hours),
             Rule.Condition.volatilityIsHigh,
             // The original logic was good, and now it's robust because we have ValueTracking.
             Rule.Condition.anyOf(
@@ -61,7 +61,7 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsDownward,
-            Rule.Condition.TrendActiveFor(1.hour),
+            Rule.Condition.TrendActiveFor(3.hours),
             Rule.Condition.volatilityIsHigh,
             Rule.Condition.anyOf(
               Rule.Condition.MomentumEntered(MomentumZone.Neutral),
@@ -121,7 +121,7 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsUpward,
-            Rule.Condition.TrendActiveFor(1.hour),
+            Rule.Condition.TrendActiveFor(3.hours),
             Rule.Condition.volatilityIsLow,
             Rule.Condition.MomentumIsIn(MomentumZone.Neutral)
           )
@@ -131,7 +131,7 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsDownward,
-            Rule.Condition.TrendActiveFor(1.hour),
+            Rule.Condition.TrendActiveFor(3.hours),
             Rule.Condition.volatilityIsLow,
             Rule.Condition.MomentumIsIn(MomentumZone.Neutral)
           )
@@ -491,7 +491,7 @@ object TestStrategy {
             // Prerequisites:
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsUpward,
-            Rule.Condition.TrendActiveFor(2.hours), // CONFIRMATION: The trend must be established for at least 4 hours.
+            Rule.Condition.TrendActiveFor(3.hours), // CONFIRMATION: The trend must be established for at least 4 hours.
             Rule.Condition.volatilityIsLow,         // FILTER: Only enter during low-volatility periods.
 
             // The Entry Trigger:
@@ -506,7 +506,7 @@ object TestStrategy {
             // Prerequisites:
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsDownward,
-            Rule.Condition.TrendActiveFor(2.hours), // CONFIRMATION
+            Rule.Condition.TrendActiveFor(3.hours), // CONFIRMATION
             Rule.Condition.volatilityIsLow,         // FILTER
 
             // The Entry Trigger:
@@ -577,7 +577,7 @@ object TestStrategy {
             // Prerequisites:
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsUpward,
-            Rule.Condition.TrendActiveFor(2.hours), // CONFIRMATION: The trend must be established for at least 4 hours.
+            Rule.Condition.TrendActiveFor(3.hours), // CONFIRMATION: The trend must be established for at least 4 hours.
             Rule.Condition.volatilityIsLow, // FILTER: Only enter during low-volatility periods.
 
             // The Entry Trigger:
@@ -592,7 +592,7 @@ object TestStrategy {
             // Prerequisites:
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsDownward,
-            Rule.Condition.TrendActiveFor(2.hours), // CONFIRMATION
+            Rule.Condition.TrendActiveFor(3.hours), // CONFIRMATION
             Rule.Condition.volatilityIsLow, // FILTER
 
             // The Entry Trigger:
@@ -667,7 +667,7 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsUpward,
-            Rule.Condition.TrendActiveFor(2.hours),
+            Rule.Condition.TrendActiveFor(3.hours),
             Rule.Condition.volatilityIsLow, // Squeeze
             Rule.Condition.UpperBandCrossed(Direction.Upward) // Breakout
           )
@@ -677,7 +677,7 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsDownward,
-            Rule.Condition.TrendActiveFor(2.hours),
+            Rule.Condition.TrendActiveFor(3.hours),
             Rule.Condition.volatilityIsLow,
             Rule.Condition.LowerBandCrossed(Direction.Downward)
           )
@@ -734,7 +734,7 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsUpward,
-            Rule.Condition.TrendActiveFor(2.hours),
+            Rule.Condition.TrendActiveFor(3.hours),
             Rule.Condition.volatilityIsLow, // Squeeze
             Rule.Condition.UpperBandCrossed(Direction.Upward) // Breakout
           )
@@ -744,7 +744,7 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsDownward,
-            Rule.Condition.TrendActiveFor(2.hours),
+            Rule.Condition.TrendActiveFor(3.hours),
             Rule.Condition.volatilityIsLow,
             Rule.Condition.LowerBandCrossed(Direction.Downward)
           )
