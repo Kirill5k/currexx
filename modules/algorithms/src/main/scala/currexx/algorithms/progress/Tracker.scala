@@ -5,7 +5,6 @@ import cats.effect.Async
 import currexx.algorithms.{EvaluatedPopulation, Fitness, Parameters}
 
 import java.time.Instant
-import scala.concurrent.duration.*
 
 trait Tracker[F[_], I]:
   def displayInitial(target: I, params: Parameters.GA): F[Unit]
@@ -33,8 +32,18 @@ trait Tracker[F[_], I]:
     s"Stats: Best=$best, Avg=$avg, Worst=$worst"
 
   protected def durationMsg(start: Instant, end: Instant): String =
-    val duration = (end.toEpochMilli - start.toEpochMilli).millis.toCoarsest
-    s"\nTotal duration: $duration"
+    val totalMs = end.toEpochMilli - start.toEpochMilli
+    val hours   = totalMs / 3600000
+    val minutes = (totalMs % 3600000) / 60000
+    val seconds = (totalMs % 60000) / 1000
+    val ms      = totalMs % 1000
+    val parts   = List(
+      Option.when(hours > 0)(s"${hours}h"),
+      Option.when(hours > 0 || minutes > 0)(s"${minutes}m"),
+      Some(s"${seconds}s"),
+      Some(s"${ms}ms")
+    ).flatten
+    s"\nTotal duration: ${parts.mkString(" ")}"
 
 object Tracker {
 
