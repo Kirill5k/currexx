@@ -107,7 +107,7 @@ object TestStrategy {
       Indicator.ValueTracking(
         role = ValueRole.Momentum,
         source = ValueSource.Close,
-        transformation = ValueTransformation.STOCH(length = 11)
+        transformation = ValueTransformation.STOCH(length = 14)
       ),
       Indicator.VolatilityRegimeDetection(
         atrLength = 18,
