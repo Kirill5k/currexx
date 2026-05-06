@@ -140,7 +140,7 @@ Testing a strategy against historical set of data via Backtester: `sbt "backtest
 
 ## Key Technologies
 
-- **Language**: Scala 3.7.4
+- **Language**: Scala 3.8
 - **Effect System**: Cats Effect 3, FS2 streams
 - **Functional**: Cats Free (Free Monad for algorithms)
 - **HTTP**: Tapir (endpoint definitions) + Http4s (server) + Sttp4 (clients)
