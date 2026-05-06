@@ -23,7 +23,8 @@ final class Http[F[_]: Async] private (
     private val monitors: Monitors[F],
     private val markets: Markets[F],
     private val trades: Trades[F],
-    private val settings: Settings[F]
+    private val settings: Settings[F],
+    private val redactor: SensitiveDataRedactor[F]
 ) {
 
   private val apiRoutes: HttpRoutes[F] = {
@@ -46,11 +47,9 @@ final class Http[F[_]: Async] private (
     .andThen((http: HttpRoutes[F]) => CORS.policy.withAllowOriginAll.withAllowCredentials(false).apply(http))
     .andThen((http: HttpRoutes[F]) => Timeout(60.seconds)(http))
 
-  private val redactor = SensitiveDataRedactor[F](Set("password"))
-
   private val loggers: HttpRoutes[F] => HttpRoutes[F] = { (http: HttpRoutes[F]) =>
     RequestLogger.httpRoutes(true, true, logAction = Some(redactor.log))(http)
-  }.andThen((http: HttpRoutes[F]) => ResponseLogger.httpRoutes(true, true)(http))
+  }.andThen((http: HttpRoutes[F]) => ResponseLogger.httpRoutes(true, true, logAction = Some(redactor.log))(http))
 
   val app: HttpRoutes[F] = loggers(middleware(apiRoutes)) <+> healthRoutes
 }
@@ -64,4 +63,14 @@ object Http:
       markets: Markets[F],
       trades: Trades[F],
       settings: Settings[F]
-  ): F[Http[F]] = new Http[F](health, auth, signals, monitors, markets, trades, settings).pure[F]
+  ): F[Http[F]] =
+    Http[F](
+      health = health,
+      auth = auth,
+      signals = signals,
+      monitors = monitors,
+      markets = markets,
+      trades = trades,
+      settings = settings,
+      redactor = SensitiveDataRedactor[F](Set("password", "currentPassword", "newPassword", "apiKey"))
+    ).pure[F]
