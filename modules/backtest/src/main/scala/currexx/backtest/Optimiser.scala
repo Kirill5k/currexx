@@ -34,49 +34,49 @@ object Optimiser extends IOApp.Simple {
       name = "s1-wl-ratio",
       strategy = TestStrategy.s1,
       gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(50), maxOrders = Some(1000)),
+      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(25), maxOrders = Some(400)),
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
       name = "s1v2-wl-ratio",
       strategy = TestStrategy.s1_v2,
       gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(50), maxOrders = Some(1000)),
+      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(25), maxOrders = Some(400)),
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
       name = "s2-wl-ratio",
       strategy = TestStrategy.s2,
       gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(50), maxOrders = Some(1000)),
+      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(25), maxOrders = Some(400)),
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
       name = "s2v2-wl-ratio",
       strategy = TestStrategy.s2_v2,
       gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(50), maxOrders = Some(1000)),
+      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(25), maxOrders = Some(400)),
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
       name = "s3-wl-ratio",
       strategy = TestStrategy.s3,
       gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(50), maxOrders = Some(1000)),
+      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(25), maxOrders = Some(400)),
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
       name = "s4-wl-ratio",
       strategy = TestStrategy.s4,
       gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(50), maxOrders = Some(1000)),
+      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(25), maxOrders = Some(400)),
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
       name = "s5-wl-ratio",
       strategy = TestStrategy.s5,
       gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(50), maxOrders = Some(1000)),
+      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(25), maxOrders = Some(400)),
       testDataSets = MarketDataProvider.majors1h
     )
   )

@@ -65,8 +65,8 @@ object IndicatorEvaluator {
         profitWeight: Double = 0.4,
         ratioWeight: Double = 0.3,
         consistencyWeight: Double = 0.3,
-        minOrders: Option[Int] = Some(30),
-        maxOrders: Option[Int] = Some(500),
+        minOrders: Option[Int] = Some(25),
+        maxOrders: Option[Int] = Some(400),
         targetRatio: Double = 2.0
     ): ScoringFunction = stats =>
       if (stats.isEmpty) 0.0
@@ -121,8 +121,8 @@ object IndicatorEvaluator {
       *   Score based on risk-adjusted returns
       */
     def riskAdjusted(
-        minOrders: Option[Int] = Some(30),
-        maxOrders: Option[Int] = Some(500)
+        minOrders: Option[Int] = Some(25),
+        maxOrders: Option[Int] = Some(400)
     ): ScoringFunction = stats =>
       if (stats.isEmpty) 0.0
       else {
