@@ -3,7 +3,7 @@ package currexx.backtest
 import io.circe.Codec
 import currexx.core.market.MomentumZone
 import currexx.core.trade.{Rule, TradeAction, TradeStrategy}
-import currexx.domain.signal.{Direction, Indicator, ValueRole, ValueSource, ValueTransformation}
+import currexx.domain.signal.{Direction, Indicator, ValueRole, ValueSource, ValueTransformation, VolatilityRegime}
 
 import scala.concurrent.duration.*
 
@@ -615,6 +615,388 @@ object TestStrategy {
             Rule.Condition.allOf(
               Rule.Condition.positionIsSell,
               Rule.Condition.momentumEnteredOversold
+            )
+          )
+        )
+      )
+    )
+  )
+
+  // S6: Pure Mean Reversion (Bollinger Bounce)
+  // Trade price returning to the mean after extreme band touches in ranging markets.
+  val s6 = TestStrategy(
+    indicator = Indicator.compositeAnyOf(
+      Indicator.BollingerBands(
+        source = ValueSource.Close,
+        middleBand = ValueTransformation.SMA(length = 20),
+        stdDevLength = 20,
+        stdDevMultiplier = 2.0
+      ),
+      Indicator.ValueTracking(
+        role = ValueRole.ChannelMiddleBand,
+        source = ValueSource.Close,
+        transformation = ValueTransformation.SMA(length = 20)
+      ),
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 14),
+        upperBoundary = 70.0,
+        lowerBoundary = 30.0
+      ),
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 14,
+        smoothingType = ValueTransformation.SMA(length = 20)
+      )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.LowerBandCrossed(Direction.Upward),
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.Not(Rule.Condition.trendIsDownward),
+            Rule.Condition.MomentumEntered(MomentumZone.Neutral)
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.UpperBandCrossed(Direction.Downward),
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.Not(Rule.Condition.trendIsUpward),
+            Rule.Condition.MomentumEntered(MomentumZone.Neutral)
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            // Take profit at middle band
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.PriceCrossedLine(ValueRole.ChannelMiddleBand, Direction.Upward)
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.PriceCrossedLine(ValueRole.ChannelMiddleBand, Direction.Downward)
+            ),
+            // Time stop
+            Rule.Condition.PositionOpenFor(4.hours)
+          )
+        )
+      )
+    )
+  )
+
+  // S7: Momentum Continuation (Trend Pullback Recovery)
+  // Enter after a pullback within an established trend, confirmed by velocity recovery.
+  val s7 = TestStrategy(
+    indicator = Indicator.compositeAnyOf(
+      Indicator.TrendChangeDetection(
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.JMA(length = 50, phase = 0, power = 2)
+      ),
+      Indicator.ValueTracking(
+        role = ValueRole.Velocity,
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.KalmanVelocity(gain = 0.3, measurementNoise = 0.02)
+      ),
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 14),
+        upperBoundary = 70.0,
+        lowerBoundary = 30.0
+      ),
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 14,
+        smoothingType = ValueTransformation.SMA(length = 20)
+      )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsUpward,
+            Rule.Condition.TrendActiveFor(4.hours),
+            Rule.Condition.MomentumEntered(MomentumZone.Neutral), // recovering from oversold
+            Rule.Condition.VelocityCrossedLevel(level = 0.0005, direction = Direction.Upward)
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsDownward,
+            Rule.Condition.TrendActiveFor(4.hours),
+            Rule.Condition.MomentumEntered(MomentumZone.Neutral), // recovering from overbought
+            Rule.Condition.VelocityCrossedLevel(level = -0.0005, direction = Direction.Downward)
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            // Velocity died
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.VelocityCrossedLevel(level = -0.0003, direction = Direction.Downward)
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.VelocityCrossedLevel(level = 0.0003, direction = Direction.Upward)
+            ),
+            // Time cap
+            Rule.Condition.PositionOpenFor(8.hours),
+            // Trend reversal
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.TrendChangedTo(Direction.Downward)
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.TrendChangedTo(Direction.Upward)
+            )
+          )
+        )
+      )
+    )
+  )
+
+  // S8: Volatility Expansion Breakout
+  // Trade the transition from low to high volatility, riding the initial impulse.
+  val s8 = TestStrategy(
+    indicator = Indicator.compositeAnyOf(
+      Indicator.KeltnerChannel(
+        source = ValueSource.Close,
+        middleBand = ValueTransformation.EMA(length = 20),
+        atrLength = 14,
+        atrMultiplier = 2.0
+      ),
+      Indicator.ValueTracking(
+        role = ValueRole.Velocity,
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.KalmanVelocity(gain = 0.3, measurementNoise = 0.02)
+      ),
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 14,
+        smoothingType = ValueTransformation.SMA(length = 20)
+      ),
+      Indicator.TrendChangeDetection(
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.JMA(length = 30, phase = 0, power = 2)
+      )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.PreviousVolatilityIs(VolatilityRegime.Low),
+            Rule.Condition.volatilityIsHigh,
+            Rule.Condition.UpperBandCrossed(Direction.Upward),
+            Rule.Condition.VelocityIs(Direction.Upward)
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.PreviousVolatilityIs(VolatilityRegime.Low),
+            Rule.Condition.volatilityIsHigh,
+            Rule.Condition.LowerBandCrossed(Direction.Downward),
+            Rule.Condition.VelocityIs(Direction.Downward)
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            // Velocity exhaustion
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.VelocityIsBelow(0.0001)
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.VelocityIsBelow(0.0001)
+            ),
+            // Trend reversal
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.TrendChangedTo(Direction.Downward)
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.TrendChangedTo(Direction.Upward)
+            )
+          )
+        )
+      )
+    )
+  )
+
+  // S9: Dual-Timeframe Divergence
+  // Fast RSX diverges from price trend — detect exhaustion and trade the reversal.
+  // Uses fast+slow RSX: when slow trend is up but fast momentum drops to oversold, it signals a pullback entry.
+  val s9 = TestStrategy(
+    indicator = Indicator.compositeAnyOf(
+      Indicator.TrendChangeDetection(
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.JMA(length = 60, phase = 0, power = 2)
+      ),
+      // Fast momentum for divergence detection
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 7),
+        upperBoundary = 80.0,
+        lowerBoundary = 20.0
+      ),
+      // Slow momentum for confirmation
+      Indicator.ValueTracking(
+        role = ValueRole.Momentum,
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 28)
+      ),
+      Indicator.BollingerBands(
+        source = ValueSource.Close,
+        middleBand = ValueTransformation.SMA(length = 20),
+        stdDevLength = 20,
+        stdDevMultiplier = 2.0
+      )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsUpward,
+            Rule.Condition.TrendActiveFor(2.hours),
+            // Fast RSX was oversold (price pulled back) but is now recovering
+            Rule.Condition.MomentumEntered(MomentumZone.Neutral),
+            // Price touching/crossing lower band = deep pullback within uptrend
+            Rule.Condition.LowerBandCrossed(Direction.Upward)
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsDownward,
+            Rule.Condition.TrendActiveFor(2.hours),
+            // Fast RSX was overbought (price bounced) but is now falling
+            Rule.Condition.MomentumEntered(MomentumZone.Neutral),
+            // Price touching/crossing upper band = bounce within downtrend
+            Rule.Condition.UpperBandCrossed(Direction.Downward)
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            // Take profit at middle band
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.PriceCrossedLine(ValueRole.ChannelMiddleBand, Direction.Upward)
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.PriceCrossedLine(ValueRole.ChannelMiddleBand, Direction.Downward)
+            ),
+            // Trend reversal stop
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.TrendChangedTo(Direction.Downward)
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.TrendChangedTo(Direction.Upward)
+            ),
+            // Time stop
+            Rule.Condition.PositionOpenFor(6.hours)
+          )
+        )
+      )
+    )
+  )
+
+  // S10: Fresh Momentum Continuation
+  // Enter on fresh overbought/oversold in a confirmed trend — early momentum = continuation, not exhaustion.
+  val s10 = TestStrategy(
+    indicator = Indicator.compositeAnyOf(
+      Indicator.TrendChangeDetection(
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.JMA(length = 45, phase = 0, power = 2)
+      ),
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 10),
+        upperBoundary = 75.0,
+        lowerBoundary = 25.0
+      ),
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 14,
+        smoothingType = ValueTransformation.SMA(length = 20)
+      ),
+      Indicator.ValueTracking(
+        role = ValueRole.Velocity,
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.KalmanVelocity(gain = 0.3, measurementNoise = 0.02)
+      )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsUpward,
+            Rule.Condition.TrendActiveFor(1.hour),
+            Rule.Condition.volatilityIsLow,
+            // Fresh entry into overbought = breakout continuation
+            Rule.Condition.momentumEnteredOverbought,
+            Rule.Condition.VelocityIs(Direction.Upward)
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsDownward,
+            Rule.Condition.TrendActiveFor(1.hour),
+            Rule.Condition.volatilityIsLow,
+            // Fresh entry into oversold = breakdown continuation
+            Rule.Condition.momentumEnteredOversold,
+            Rule.Condition.VelocityIs(Direction.Downward)
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            // Time-based exit — momentum edge decays
+            Rule.Condition.PositionOpenFor(2.hours),
+            // Momentum returned to neutral (edge gone)
+            Rule.Condition.MomentumEntered(MomentumZone.Neutral),
+            // Trend reversal
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.TrendChangedTo(Direction.Downward)
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.TrendChangedTo(Direction.Upward)
             )
           )
         )
