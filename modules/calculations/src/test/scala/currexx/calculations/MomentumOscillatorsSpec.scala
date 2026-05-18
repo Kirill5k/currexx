@@ -36,6 +36,127 @@ class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
         stoch.take(5).map(rounded(4)) mustBe List(45.7173, 53.731, 67.1259, 81.6228, 80.055)
       }
     }
+    "averageDirectionalIndex" should {
+      "calculate ADX values" in {
+        val adx = MomentumOscillators.averageDirectionalIndex(
+          closings = values.map(_._4),
+          highs = values.map(_._2),
+          lows = values.map(_._3),
+          length = 14
+        )
+
+        adx.size mustBe values.size
+        // First 14 values are warm-up (0.0), then ADX starts
+        adx.takeRight(14) mustBe List.fill(14)(0.0)
+        // ADX should be between 0 and 100
+        adx.foreach(v => assert(v >= 0.0 && v <= 100.0, s"ADX value $v out of range"))
+        // Verify some computed values
+        adx.take(5).map(rounded(4)) mustBe List(26.523, 27.5621, 29.0376, 30.6266, 32.8747)
+      }
+
+      "return zeros for insufficient data" in {
+        val adx = MomentumOscillators.averageDirectionalIndex(List(1.0), List(1.5), List(0.5), 14)
+        adx mustBe List(0.0)
+      }
+    }
+
+    "williamsR" should {
+      "calculate Williams %R values" in {
+        val wr = MomentumOscillators.williamsR(
+          closings = values.map(_._4),
+          highs = values.map(_._2),
+          lows = values.map(_._3),
+          length = 14
+        )
+
+        wr.size mustBe values.size
+        // Williams %R should be between -100 and 0
+        wr.drop(14).foreach(v => assert(v >= -100.0 && v <= 0.0, s"Williams %%R value $v out of range"))
+        wr.take(5).map(rounded(4)) mustBe List(-54.2827, -46.269, -32.8741, -18.3772, -19.945)
+      }
+    }
+
+    "commodityChannelIndex" should {
+      "calculate CCI values" in {
+        val cci = MomentumOscillators.commodityChannelIndex(
+          closings = values.map(_._4),
+          highs = values.map(_._2),
+          lows = values.map(_._3),
+          length = 20
+        )
+
+        cci.size mustBe values.size
+        // CCI is unbounded but typically between -300 and 300
+        cci.take(5).map(rounded(4)) mustBe List(42.4933, 63.6702, 78.9702, 127.584, 107.1128)
+      }
+    }
+
+    "ichimokuKijunSen" should {
+      "calculate Kijun-Sen (base line) values" in {
+        val kijun = MomentumOscillators.ichimokuKijunSen(
+          highs = values.map(_._2),
+          lows = values.map(_._3),
+          length = 26
+        )
+
+        kijun.size mustBe values.size
+        // Kijun-Sen is (highest high + lowest low) / 2 over 26 periods
+        kijun.take(5).map(rounded(5)) mustBe List(1.12338, 1.12338, 1.12338, 1.12338, 1.12131)
+      }
+    }
+
+    "parabolicSAR" should {
+      "calculate Parabolic SAR values" in {
+        val sar = MomentumOscillators.parabolicSAR(
+          highs = values.map(_._2),
+          lows = values.map(_._3),
+          afStart = 0.02,
+          afMax = 0.2,
+          afStep = 0.02
+        )
+
+        sar.size mustBe values.size
+        // SAR should be within the price range (roughly)
+        val allHighs = values.map(_._2)
+        val allLows  = values.map(_._3)
+        val maxHigh  = allHighs.max
+        val minLow   = allLows.min
+        sar.foreach(v => assert(v >= minLow * 0.95 && v <= maxHigh * 1.05, s"SAR value $v out of expected range"))
+      }
+
+      "return zeros for insufficient data" in {
+        val sar = MomentumOscillators.parabolicSAR(List(1.5), List(0.5), 0.02, 0.2, 0.02)
+        sar mustBe List(0.0)
+      }
+    }
+
+    "chaikinMoneyFlow" should {
+      "calculate CMF values" in {
+        val volumes = List.fill(values.size)(1000.0) // uniform volume for predictable results
+        val cmf = MomentumOscillators.chaikinMoneyFlow(
+          closings = values.map(_._4),
+          highs = values.map(_._2),
+          lows = values.map(_._3),
+          volumes = volumes,
+          length = 20
+        )
+
+        cmf.size mustBe values.size
+        // CMF should be between -1 and 1
+        cmf.drop(20).foreach(v => assert(v >= -1.0 && v <= 1.0, s"CMF value $v out of range"))
+      }
+
+      "return zero when volume is zero" in {
+        val cmf = MomentumOscillators.chaikinMoneyFlow(
+          closings = values.take(20).map(_._4),
+          highs = values.take(20).map(_._2),
+          lows = values.take(20).map(_._3),
+          volumes = List.fill(20)(0.0),
+          length = 20
+        )
+        cmf.head mustBe 0.0
+      }
+    }
   }
 
   def rounded(scale: Int)(num: Double): Double =

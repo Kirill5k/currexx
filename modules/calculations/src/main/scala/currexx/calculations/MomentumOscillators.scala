@@ -121,6 +121,345 @@ object MomentumOscillators {
     resultBuffer.toList.reverse
   }
 
+  /** Calculates the Average Directional Index (ADX).
+    *
+    * @param closings
+    *   List of closing prices, sorted from latest to earliest.
+    * @param highs
+    *   List of high prices, sorted from latest to earliest.
+    * @param lows
+    *   List of low prices, sorted from latest to earliest.
+    * @param length
+    *   The ADX smoothing period (typically 14).
+    * @return
+    *   A list of ADX values (0-100), sorted from latest to earliest, same size as input.
+    */
+  def averageDirectionalIndex(
+      closings: List[Double],
+      highs: List[Double],
+      lows: List[Double],
+      length: Int
+  ): List[Double] =
+    if (closings.size < 2) List.fill(closings.size)(0.0)
+    else {
+      val data         = closings.lazyZip(highs).lazyZip(lows).toList.reverse // chronological
+      val resultBuffer = new ListBuffer[Double]
+
+      var prevHigh  = data.head._2
+      var prevLow   = data.head._3
+      var prevClose = data.head._1
+
+      var smoothedPlusDM  = 0.0
+      var smoothedMinusDM = 0.0
+      var smoothedTR      = 0.0
+      var smoothedADX     = 0.0
+      var count           = 0
+
+      resultBuffer += 0.0 // first element has no DM
+
+      val it = data.iterator
+      val _ = it.next() // skip first
+      while (it.hasNext) {
+        val (close, high, low) = it.next()
+        count += 1
+
+        val tr      = math.max(high - low, math.max(math.abs(high - prevClose), math.abs(low - prevClose)))
+        val plusDM  = if (high - prevHigh > prevLow - low && high - prevHigh > 0) high - prevHigh else 0.0
+        val minusDM = if (prevLow - low > high - prevHigh && prevLow - low > 0) prevLow - low else 0.0
+
+        if (count <= length) {
+          smoothedPlusDM += plusDM
+          smoothedMinusDM += minusDM
+          smoothedTR += tr
+          if (count == length) {
+            smoothedPlusDM /= length
+            smoothedMinusDM /= length
+            smoothedTR /= length
+          }
+          resultBuffer += 0.0
+        } else {
+          smoothedPlusDM = (smoothedPlusDM * (length - 1) + plusDM) / length
+          smoothedMinusDM = (smoothedMinusDM * (length - 1) + minusDM) / length
+          smoothedTR = (smoothedTR * (length - 1) + tr) / length
+
+          val plusDI  = if (smoothedTR == 0.0) 0.0 else 100.0 * smoothedPlusDM / smoothedTR
+          val minusDI = if (smoothedTR == 0.0) 0.0 else 100.0 * smoothedMinusDM / smoothedTR
+          val diSum   = plusDI + minusDI
+          val dx      = if (diSum == 0.0) 0.0 else 100.0 * math.abs(plusDI - minusDI) / diSum
+
+          if (count == length + 1) {
+            smoothedADX = dx
+          } else {
+            smoothedADX = (smoothedADX * (length - 1) + dx) / length
+          }
+          resultBuffer += smoothedADX
+        }
+
+        prevHigh = high
+        prevLow = low
+        prevClose = close
+      }
+      resultBuffer.toList.reverse
+    }
+
+  /** Calculates Williams %R.
+    *
+    * @param closings
+    *   List of closing prices, sorted from latest to earliest.
+    * @param highs
+    *   List of high prices, sorted from latest to earliest.
+    * @param lows
+    *   List of low prices, sorted from latest to earliest.
+    * @param length
+    *   The lookback period (typically 14).
+    * @return
+    *   A list of Williams %R values (-100 to 0), sorted from latest to earliest, same size as input.
+    */
+  def williamsR(
+      closings: List[Double],
+      highs: List[Double],
+      lows: List[Double],
+      length: Int
+  ): List[Double] = {
+    val data         = closings.lazyZip(highs).lazyZip(lows).toList
+    val highWindow   = MQueue.empty[Double]
+    val lowWindow    = MQueue.empty[Double]
+    val resultBuffer = new ListBuffer[Double]
+
+    val it = data.reverseIterator
+    while (it.hasNext) {
+      val (close, high, low) = it.next()
+      highWindow.enqueue(high)
+      lowWindow.enqueue(low)
+      if (highWindow.size > length) {
+        val _ = highWindow.dequeue()
+        val _ = lowWindow.dequeue()
+      }
+
+      var wr = -50.0
+      if (highWindow.size == length) {
+        val hh    = highWindow.max
+        val ll    = lowWindow.min
+        val range = hh - ll
+        wr = if (range == 0.0) -50.0 else ((hh - close) / range) * -100.0
+      }
+      resultBuffer += wr
+    }
+    resultBuffer.toList.reverse
+  }
+
+  /** Calculates the Commodity Channel Index (CCI).
+    *
+    * @param closings
+    *   List of closing prices, sorted from latest to earliest.
+    * @param highs
+    *   List of high prices, sorted from latest to earliest.
+    * @param lows
+    *   List of low prices, sorted from latest to earliest.
+    * @param length
+    *   The CCI period (typically 20).
+    * @return
+    *   A list of CCI values (unbounded), sorted from latest to earliest, same size as input.
+    */
+  def commodityChannelIndex(
+      closings: List[Double],
+      highs: List[Double],
+      lows: List[Double],
+      length: Int
+  ): List[Double] = {
+    val typicalPrices = closings.lazyZip(highs).lazyZip(lows).map((c, h, l) => (h + l + c) / 3.0).toList
+    val window        = MQueue.empty[Double]
+    val resultBuffer  = new ListBuffer[Double]
+
+    val it = typicalPrices.reverseIterator
+    while (it.hasNext) {
+      val tp = it.next()
+      window.enqueue(tp)
+      if (window.size > length) {
+        val _ = window.dequeue()
+      }
+
+      var cci = 0.0
+      if (window.size == length) {
+        val mean = window.sum / length
+        var madSum = 0.0
+        window.foreach(v => madSum += math.abs(v - mean))
+        val meanDeviation = madSum / length
+        cci = if (meanDeviation == 0.0) 0.0 else (tp - mean) / (0.015 * meanDeviation)
+      }
+      resultBuffer += cci
+    }
+    resultBuffer.toList.reverse
+  }
+
+  /** Calculates the Ichimoku Kijun-Sen (Base Line). Midpoint of highest high and lowest low over N periods.
+    *
+    * @param highs
+    *   List of high prices, sorted from latest to earliest.
+    * @param lows
+    *   List of low prices, sorted from latest to earliest.
+    * @param length
+    *   The lookback period (typically 26).
+    * @return
+    *   A list of Kijun-Sen values, sorted from latest to earliest, same size as input.
+    */
+  def ichimokuKijunSen(
+      highs: List[Double],
+      lows: List[Double],
+      length: Int
+  ): List[Double] = {
+    val highWindow   = MQueue.empty[Double]
+    val lowWindow    = MQueue.empty[Double]
+    val resultBuffer = new ListBuffer[Double]
+
+    val it = highs.lazyZip(lows).toList.reverseIterator
+    while (it.hasNext) {
+      val (high, low) = it.next()
+      highWindow.enqueue(high)
+      lowWindow.enqueue(low)
+      if (highWindow.size > length) {
+        val _ = highWindow.dequeue()
+        val _ = lowWindow.dequeue()
+      }
+
+      val kijun = if (highWindow.size == length) {
+        (highWindow.max + lowWindow.min) / 2.0
+      } else {
+        (high + low) / 2.0
+      }
+      resultBuffer += kijun
+    }
+    resultBuffer.toList.reverse
+  }
+
+  /** Calculates the Parabolic SAR.
+    *
+    * @param highs
+    *   List of high prices, sorted from latest to earliest.
+    * @param lows
+    *   List of low prices, sorted from latest to earliest.
+    * @param afStart
+    *   Initial acceleration factor (typically 0.02).
+    * @param afMax
+    *   Maximum acceleration factor (typically 0.2).
+    * @param afStep
+    *   Acceleration factor increment (typically 0.02).
+    * @return
+    *   A list of SAR values, sorted from latest to earliest, same size as input.
+    */
+  def parabolicSAR(
+      highs: List[Double],
+      lows: List[Double],
+      afStart: Double,
+      afMax: Double,
+      afStep: Double
+  ): List[Double] =
+    if (highs.size < 2) List.fill(highs.size)(0.0)
+    else {
+      val hArr = highs.reverse.toArray
+      val lArr = lows.reverse.toArray
+      val n    = hArr.length
+      val result = new Array[Double](n)
+
+      var isLong = hArr(1) > hArr(0) || lArr(1) > lArr(0)
+      var af     = afStart
+      var ep     = if (isLong) hArr(0) else lArr(0)
+      var sar    = if (isLong) lArr(0) else hArr(0)
+      result(0) = sar
+
+      var i = 1
+      while (i < n) {
+        val prevSar = sar
+        sar = prevSar + af * (ep - prevSar)
+
+        if (isLong) {
+          sar = math.min(sar, lArr(i - 1))
+          if (i >= 2) sar = math.min(sar, lArr(i - 2))
+
+          if (lArr(i) < sar) {
+            isLong = false
+            sar = ep
+            ep = lArr(i)
+            af = afStart
+          } else {
+            if (hArr(i) > ep) {
+              ep = hArr(i)
+              af = math.min(af + afStep, afMax)
+            }
+          }
+        } else {
+          sar = math.max(sar, hArr(i - 1))
+          if (i >= 2) sar = math.max(sar, hArr(i - 2))
+
+          if (hArr(i) > sar) {
+            isLong = true
+            sar = ep
+            ep = hArr(i)
+            af = afStart
+          } else {
+            if (lArr(i) < ep) {
+              ep = lArr(i)
+              af = math.min(af + afStep, afMax)
+            }
+          }
+        }
+        result(i) = sar
+        i += 1
+      }
+      result.toList.reverse
+    }
+
+  /** Calculates the Chaikin Money Flow (CMF).
+    *
+    * @param closings
+    *   List of closing prices, sorted from latest to earliest.
+    * @param highs
+    *   List of high prices, sorted from latest to earliest.
+    * @param lows
+    *   List of low prices, sorted from latest to earliest.
+    * @param volumes
+    *   List of volume values, sorted from latest to earliest.
+    * @param length
+    *   The CMF period (typically 20).
+    * @return
+    *   A list of CMF values (-1 to 1), sorted from latest to earliest, same size as input.
+    */
+  def chaikinMoneyFlow(
+      closings: List[Double],
+      highs: List[Double],
+      lows: List[Double],
+      volumes: List[Double],
+      length: Int
+  ): List[Double] = {
+    val mfvWindow    = MQueue.empty[Double]
+    val volWindow    = MQueue.empty[Double]
+    val resultBuffer = new ListBuffer[Double]
+
+    val data = closings.lazyZip(highs).lazyZip(lows).toList.lazyZip(volumes).toList
+    val it   = data.reverseIterator
+    while (it.hasNext) {
+      val ((close, high, low), volume) = it.next()
+      val range = high - low
+      val mfMultiplier = if (range == 0.0) 0.0 else ((close - low) - (high - close)) / range
+      val mfVolume     = mfMultiplier * volume
+
+      mfvWindow.enqueue(mfVolume)
+      volWindow.enqueue(volume)
+      if (mfvWindow.size > length) {
+        val _ = mfvWindow.dequeue()
+        val _ = volWindow.dequeue()
+      }
+
+      var cmf = 0.0
+      if (mfvWindow.size == length) {
+        val volSum = volWindow.sum
+        cmf = if (volSum == 0.0) 0.0 else mfvWindow.sum / volSum
+      }
+      resultBuffer += cmf
+    }
+    resultBuffer.toList.reverse
+  }
+
   // A mutable class is better for a while loop to avoid creating many case class instances.
   final private class JrsiState {
     var f8_price: Double            = 0.0

@@ -25,6 +25,12 @@ object IndicatorInitialiser:
         case _: VT.HMA               => VT.HMA(rand.nextInt(41) + 2)
         case _: VT.JMA               => VT.JMA(rand.nextInt(41) + 2, rand.nextInt(40) * 5 - 100, rand.nextInt(2) + 2)
         case nma: VT.NMA             => VT.NMA(rand.nextInt(48) + 2, rand.nextInt(28) + 2, (1 + rand.nextInt(80)) * 0.25d, nma.maCalc)
+        case _: VT.ADX               => VT.ADX(rand.nextInt(41) + 7)
+        case _: VT.WilliamsR         => VT.WilliamsR(rand.nextInt(41) + 5)
+        case _: VT.CCI               => VT.CCI(rand.nextInt(41) + 10)
+        case _: VT.IchimokuKijunSen  => VT.IchimokuKijunSen(rand.nextInt(44) + 9)
+        case _: VT.ParabolicSAR      => VT.ParabolicSAR(0.01 + rand.nextInt(4) * 0.005, 0.1 + rand.nextInt(7) * 0.05, 0.01 + rand.nextInt(4) * 0.005)
+        case _: VT.CMF               => VT.CMF(rand.nextInt(31) + 10)
 
       def randomiseInd(indicator: Indicator): Indicator = indicator match
         case Indicator.TrendChangeDetection(vs, vt) =>

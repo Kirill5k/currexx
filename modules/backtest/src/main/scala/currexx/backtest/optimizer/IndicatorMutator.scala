@@ -65,6 +65,18 @@ object IndicatorMutator {
             VT.JMA(mutInt(length, 5, 50), mutInt(phase, -100, 100), mutInt(power, 1, 10)) // JMA phase can be negative
           case VT.NMA(length, signalLength, lambda, maCalc) =>
             VT.NMA(mutInt(length, 5, 50), mutInt(signalLength, 5, 50), mutDouble(lambda, 0.5, 4.0, 0.25), maCalc)
+          case VT.ADX(length) =>
+            VT.ADX(mutInt(length, 7, 50))
+          case VT.WilliamsR(length) =>
+            VT.WilliamsR(mutInt(length, 5, 50))
+          case VT.CCI(length) =>
+            VT.CCI(mutInt(length, 10, 50))
+          case VT.IchimokuKijunSen(length) =>
+            VT.IchimokuKijunSen(mutInt(length, 9, 52))
+          case VT.ParabolicSAR(afStart, afMax, afStep) =>
+            VT.ParabolicSAR(mutDouble(afStart, 0.01, 0.05, 0.005), mutDouble(afMax, 0.1, 0.4, 0.01), mutDouble(afStep, 0.01, 0.05, 0.005))
+          case VT.CMF(length) =>
+            VT.CMF(mutInt(length, 10, 40))
 
         def mutInd(indicator: Indicator): Indicator = indicator match
           case Indicator.Composite(is, comb) =>

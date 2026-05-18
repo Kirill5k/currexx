@@ -32,6 +32,12 @@ enum ValueTransformation derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.
   case NMA(length: Int, signalLength: Int, lambda: Double, maCalc: MovingAverage)
   case JMA(length: Int, phase: Int, power: Int)
   case STOCH(length: Int)
+  case ADX(length: Int)
+  case WilliamsR(length: Int)
+  case CCI(length: Int)
+  case IchimokuKijunSen(length: Int)
+  case ParabolicSAR(afStart: Double, afMax: Double, afStep: Double)
+  case CMF(length: Int)
 
 object ValueTransformation {
   def sequenced(vt: ValueTransformation, vtSequence: ValueTransformation*): ValueTransformation =
@@ -47,6 +53,12 @@ object ValueTransformation {
       "rsx"             -> JsonTaggedAdt.tagged[ValueTransformation.RSX],
       "jrsx"            -> JsonTaggedAdt.tagged[ValueTransformation.JRSX],
       "stoch"           -> JsonTaggedAdt.tagged[ValueTransformation.STOCH],
+      "adx"             -> JsonTaggedAdt.tagged[ValueTransformation.ADX],
+      "williams-r"      -> JsonTaggedAdt.tagged[ValueTransformation.WilliamsR],
+      "cci"             -> JsonTaggedAdt.tagged[ValueTransformation.CCI],
+      "ichimoku-kijun"  -> JsonTaggedAdt.tagged[ValueTransformation.IchimokuKijunSen],
+      "parabolic-sar"   -> JsonTaggedAdt.tagged[ValueTransformation.ParabolicSAR],
+      "cmf"             -> JsonTaggedAdt.tagged[ValueTransformation.CMF],
       "ema"             -> JsonTaggedAdt.tagged[ValueTransformation.EMA],
       "hma"             -> JsonTaggedAdt.tagged[ValueTransformation.HMA],
       "nma"             -> JsonTaggedAdt.tagged[ValueTransformation.NMA],
