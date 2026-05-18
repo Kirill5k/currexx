@@ -42,9 +42,11 @@ The project follows a modular architecture with clear separation of concerns:
 3. **calculations** - Financial indicators and statistics
     - Pure Scala functions using Breeze library
     - Moving averages (SMA, EMA, WMA, HMA, JMA, NMA)
-    - Momentum oscillators (RSX, JRSX, STOCH)
+    - Momentum oscillators (RSX, JRSX, STOCH, ADX, Williams %R, CCI)
     - Filters (Kalman, KalmanVelocity)
     - Volatility measures (ATR, Standard Deviation)
+    - Price-level indicators (Ichimoku Kijun-Sen, Parabolic SAR)
+    - Volume indicators (Chaikin Money Flow)
 
 4. **clients** - External API integrations
     - HTTP clients for market data providers (Oanda, XTB, AlphaVantage, TwelveData)
@@ -105,9 +107,11 @@ Indicators define what to detect in market data: (Defined in `modules/domain/src
 
 Mathematical functions applied to price data to calculate indicators: (Defined in `modules/domain/src/main/scala/currexx/domain/signal/Indicator.scala`)
 - Moving Averages: SMA, EMA, WMA, HMA, NMA (Nyquist), JMA (Jurik)
-- Oscillators: RSX, JRSX (Jurik RSI), STOCH (Stochastic)
+- Oscillators: RSX, JRSX (Jurik RSI), STOCH (Stochastic), ADX (trend strength), WilliamsR (fast oscillator), CCI (deviation from mean)
 - Filters: Kalman (smoothing), KalmanVelocity (momentum)
 - Statistical: StandardDeviation, ATR
+- Price-level lines: IchimokuKijunSen (midpoint of N-period range), ParabolicSAR (trailing stop/reversal)
+- Volume-based: CMF (Chaikin Money Flow, requires volume data)
 
 ### Price Sources
 - Close, Open, HL2, HLC3.
