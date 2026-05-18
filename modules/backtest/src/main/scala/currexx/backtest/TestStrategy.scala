@@ -624,6 +624,7 @@ object TestStrategy {
 
   // S6: Pure Mean Reversion (Bollinger Bounce)
   // Trade price returning to the mean after extreme band touches in ranging markets.
+  // Uses Williams %R (faster than RSX for reversal timing) and ADX to confirm ranging market.
   val s6 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.BollingerBands(
@@ -639,9 +640,9 @@ object TestStrategy {
       ),
       Indicator.ThresholdCrossing(
         source = ValueSource.Close,
-        transformation = ValueTransformation.RSX(length = 14),
-        upperBoundary = 70.0,
-        lowerBoundary = 30.0
+        transformation = ValueTransformation.WilliamsR(length = 14),
+        upperBoundary = -20.0,
+        lowerBoundary = -80.0
       ),
       Indicator.VolatilityRegimeDetection(
         atrLength = 14,
@@ -694,6 +695,7 @@ object TestStrategy {
 
   // S7: Momentum Continuation (Trend Pullback Recovery)
   // Enter after a pullback within an established trend, confirmed by velocity recovery.
+  // ADX confirms strong trend environment before attempting pullback entries.
   val s7 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -704,6 +706,12 @@ object TestStrategy {
         role = ValueRole.Velocity,
         source = ValueSource.HLC3,
         transformation = ValueTransformation.KalmanVelocity(gain = 0.3, measurementNoise = 0.02)
+      ),
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.ADX(length = 14),
+        upperBoundary = 50.0,
+        lowerBoundary = 25.0
       ),
       Indicator.ThresholdCrossing(
         source = ValueSource.Close,
@@ -771,6 +779,7 @@ object TestStrategy {
 
   // S8: Volatility Expansion Breakout
   // Trade the transition from low to high volatility, riding the initial impulse.
+  // Uses Parabolic SAR as adaptive trailing exit instead of fixed velocity threshold.
   val s8 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.KeltnerChannel(
@@ -791,6 +800,12 @@ object TestStrategy {
       Indicator.TrendChangeDetection(
         source = ValueSource.HLC3,
         transformation = ValueTransformation.JMA(length = 30, phase = 0, power = 2)
+      ),
+      // Parabolic SAR for adaptive trailing exit
+      Indicator.PriceLineCrossing(
+        source = ValueSource.Close,
+        role = ValueRole.Momentum,
+        transformation = ValueTransformation.ParabolicSAR(afStart = 0.02, afMax = 0.2, afStep = 0.02)
       )
     ),
     rules = TradeStrategy(
@@ -820,16 +835,16 @@ object TestStrategy {
         Rule(
           action = TradeAction.ClosePosition,
           conditions = Rule.Condition.anyOf(
-            // Velocity exhaustion
+            // Parabolic SAR flip — adaptive trailing stop
             Rule.Condition.allOf(
               Rule.Condition.positionIsBuy,
-              Rule.Condition.VelocityIsBelow(0.0001)
+              Rule.Condition.PriceCrossedLine(ValueRole.Momentum, Direction.Downward)
             ),
             Rule.Condition.allOf(
               Rule.Condition.positionIsSell,
-              Rule.Condition.VelocityIsBelow(0.0001)
+              Rule.Condition.PriceCrossedLine(ValueRole.Momentum, Direction.Upward)
             ),
-            // Trend reversal
+            // Trend reversal fallback
             Rule.Condition.allOf(
               Rule.Condition.positionIsBuy,
               Rule.Condition.TrendChangedTo(Direction.Downward)
@@ -845,26 +860,26 @@ object TestStrategy {
   )
 
   // S9: Dual-Timeframe Divergence
-  // Fast RSX diverges from price trend — detect exhaustion and trade the reversal.
-  // Uses fast+slow RSX: when slow trend is up but fast momentum drops to oversold, it signals a pullback entry.
+  // Fast CCI diverges from price trend — detect exhaustion and trade the reversal.
+  // Uses Ichimoku Kijun-Sen as trend/equilibrium line and CCI for faster divergence detection.
   val s9 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
+      // Trend via Ichimoku Kijun-Sen — price above = bullish, below = bearish
+      Indicator.PriceLineCrossing(
+        source = ValueSource.Close,
+        role = ValueRole.ChannelMiddleBand,
+        transformation = ValueTransformation.IchimokuKijunSen(length = 26)
+      ),
       Indicator.TrendChangeDetection(
         source = ValueSource.HLC3,
-        transformation = ValueTransformation.JMA(length = 60, phase = 0, power = 2)
+        transformation = ValueTransformation.IchimokuKijunSen(length = 26)
       ),
-      // Fast momentum for divergence detection
+      // Fast CCI for divergence/reversal detection (unbounded, extreme readings are significant)
       Indicator.ThresholdCrossing(
         source = ValueSource.Close,
-        transformation = ValueTransformation.RSX(length = 7),
-        upperBoundary = 80.0,
-        lowerBoundary = 20.0
-      ),
-      // Slow momentum for confirmation
-      Indicator.ValueTracking(
-        role = ValueRole.Momentum,
-        source = ValueSource.Close,
-        transformation = ValueTransformation.RSX(length = 28)
+        transformation = ValueTransformation.CCI(length = 14),
+        upperBoundary = 100.0,
+        lowerBoundary = -100.0
       ),
       Indicator.BollingerBands(
         source = ValueSource.Close,
@@ -880,8 +895,7 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsUpward,
-            Rule.Condition.TrendActiveFor(2.hours),
-            // Fast RSX was oversold (price pulled back) but is now recovering
+            // CCI was below -100 (oversold/pullback) and is now recovering
             Rule.Condition.MomentumEntered(MomentumZone.Neutral),
             // Price touching/crossing lower band = deep pullback within uptrend
             Rule.Condition.LowerBandCrossed(Direction.Upward)
@@ -892,8 +906,7 @@ object TestStrategy {
           conditions = Rule.Condition.allOf(
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsDownward,
-            Rule.Condition.TrendActiveFor(2.hours),
-            // Fast RSX was overbought (price bounced) but is now falling
+            // CCI was above +100 (overbought/bounce) and is now falling
             Rule.Condition.MomentumEntered(MomentumZone.Neutral),
             // Price touching/crossing upper band = bounce within downtrend
             Rule.Condition.UpperBandCrossed(Direction.Downward)
@@ -904,7 +917,7 @@ object TestStrategy {
         Rule(
           action = TradeAction.ClosePosition,
           conditions = Rule.Condition.anyOf(
-            // Take profit at middle band
+            // Take profit at Kijun-Sen (equilibrium line)
             Rule.Condition.allOf(
               Rule.Condition.positionIsBuy,
               Rule.Condition.PriceCrossedLine(ValueRole.ChannelMiddleBand, Direction.Upward)
@@ -932,6 +945,7 @@ object TestStrategy {
 
   // S10: Fresh Momentum Continuation
   // Enter on fresh overbought/oversold in a confirmed trend — early momentum = continuation, not exhaustion.
+  // ADX > 25 confirms we're in a trending environment where momentum continuation is valid.
   val s10 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -942,6 +956,13 @@ object TestStrategy {
         source = ValueSource.Close,
         transformation = ValueTransformation.RSX(length = 10),
         upperBoundary = 75.0,
+        lowerBoundary = 25.0
+      ),
+      // ADX as trend strength confirmation
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.ADX(length = 14),
+        upperBoundary = 50.0,
         lowerBoundary = 25.0
       ),
       Indicator.VolatilityRegimeDetection(
@@ -997,6 +1018,194 @@ object TestStrategy {
             Rule.Condition.allOf(
               Rule.Condition.positionIsSell,
               Rule.Condition.TrendChangedTo(Direction.Upward)
+            )
+          )
+        )
+      )
+    )
+  )
+
+  // S11: Volume-Confirmed Breakout (CMF)
+  // Only trade breakouts that have institutional volume behind them.
+  // CMF > 0 confirms buying pressure for longs; CMF < 0 confirms selling pressure for shorts.
+  // Avoids fake-outs where price breaks a level but volume doesn't participate.
+  val s11 = TestStrategy(
+    indicator = Indicator.compositeAnyOf(
+      // Trend detection
+      Indicator.TrendChangeDetection(
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.JMA(length = 40, phase = 0, power = 2)
+      ),
+      // Keltner Channel for breakout detection
+      Indicator.KeltnerChannel(
+        source = ValueSource.Close,
+        middleBand = ValueTransformation.EMA(length = 20),
+        atrLength = 14,
+        atrMultiplier = 1.5
+      ),
+      // CMF for volume confirmation — tracked as Momentum role for threshold access
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.CMF(length = 20),
+        upperBoundary = 0.05,
+        lowerBoundary = -0.05
+      ),
+      // Volatility filter
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 14,
+        smoothingType = ValueTransformation.SMA(length = 20)
+      ),
+      // Parabolic SAR for trailing exit
+      Indicator.PriceLineCrossing(
+        source = ValueSource.Close,
+        role = ValueRole.Momentum,
+        transformation = ValueTransformation.ParabolicSAR(afStart = 0.02, afMax = 0.2, afStep = 0.02)
+      )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsUpward,
+            Rule.Condition.TrendActiveFor(1.hour),
+            Rule.Condition.volatilityIsLow,
+            // Keltner breakout
+            Rule.Condition.UpperBandCrossed(Direction.Upward),
+            // CMF crossed above +0.05 = volume confirms the breakout
+            Rule.Condition.momentumEnteredOverbought
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsDownward,
+            Rule.Condition.TrendActiveFor(1.hour),
+            Rule.Condition.volatilityIsLow,
+            // Keltner breakdown
+            Rule.Condition.LowerBandCrossed(Direction.Downward),
+            // CMF crossed below -0.05 = volume confirms the breakdown
+            Rule.Condition.momentumEnteredOversold
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            // Parabolic SAR flip — adaptive trailing stop
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.PriceCrossedLine(ValueRole.Momentum, Direction.Downward)
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.PriceCrossedLine(ValueRole.Momentum, Direction.Upward)
+            ),
+            // Trend reversal
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.TrendChangedTo(Direction.Downward)
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.TrendChangedTo(Direction.Upward)
+            ),
+            // Time cap — volume edge decays
+            Rule.Condition.PositionOpenFor(4.hours)
+          )
+        )
+      )
+    )
+  )
+
+  // S12: CMF Trend Confirmation
+  // Enter when CMF confirms trend direction — buying pressure aligns with uptrend, selling pressure with downtrend.
+  // CMF threshold cross acts as the primary entry trigger; Ichimoku Kijun-Sen provides trend context.
+  // ADX filters out ranging markets. Parabolic SAR for adaptive trailing exit.
+  val s12 = TestStrategy(
+    indicator = Indicator.compositeAnyOf(
+      Indicator.TrendChangeDetection(
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.IchimokuKijunSen(length = 26)
+      ),
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.CMF(length = 20),
+        upperBoundary = 0.05,
+        lowerBoundary = -0.05
+      ),
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.ADX(length = 14),
+        upperBoundary = 50.0,
+        lowerBoundary = 20.0
+      ),
+      Indicator.PriceLineCrossing(
+        source = ValueSource.Close,
+        role = ValueRole.Momentum,
+        transformation = ValueTransformation.ParabolicSAR(afStart = 0.02, afMax = 0.2, afStep = 0.02)
+      ),
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 14,
+        smoothingType = ValueTransformation.SMA(length = 20)
+      )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsUpward,
+            Rule.Condition.TrendActiveFor(1.hour),
+            Rule.Condition.momentumEnteredOverbought, // CMF crossed above +0.05
+            Rule.Condition.volatilityIsLow
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsDownward,
+            Rule.Condition.TrendActiveFor(1.hour),
+            Rule.Condition.momentumEnteredOversold, // CMF crossed below -0.05
+            Rule.Condition.volatilityIsLow
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            // Parabolic SAR flip
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.PriceCrossedLine(ValueRole.Momentum, Direction.Downward)
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.PriceCrossedLine(ValueRole.Momentum, Direction.Upward)
+            ),
+            // Trend reversal
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.TrendChangedTo(Direction.Downward)
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.TrendChangedTo(Direction.Upward)
+            ),
+            // CMF flipped against position (volume participation lost)
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.momentumEnteredOversold
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.momentumEnteredOverbought
             )
           )
         )
