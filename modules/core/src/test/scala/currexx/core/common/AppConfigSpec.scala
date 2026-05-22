@@ -18,7 +18,7 @@ class AppConfigSpec extends IOWordSpec {
     "load itself from application.conf" in
       AppConfig.load[IO].asserting { config =>
         config.server.host mustBe "0.0.0.0"
-        config.mongo.connectionUri mustBe "mongodb+srv://user:password@mongo/currexx"
+        config.mongo.user mustBe "user"
         config.clients.alphaVantage.apiKey mustBe "av-key"
         config.clients.twelveData.apiKey mustBe "td-key"
         config.clients.oandaData.apiKey mustBe "od-key"

@@ -26,7 +26,10 @@ object config {
   ) derives ConfigReader
 
   final case class MongoConfig(
-      connectionUri: String,
+      user: String,
+      password: String,
+      host: String,
+      dbName: String,
       connectTimeout: FiniteDuration,
       readTimeout: FiniteDuration,
       serverSelectionTimeout: FiniteDuration
@@ -44,8 +47,7 @@ object config {
       clients: ClientsConfig
   ) derives ConfigReader
 
-  object AppConfig {
+  object AppConfig:
     def load[F[_]: Sync]: F[AppConfig] =
       Sync[F].blocking(ConfigSource.default.loadOrThrow[AppConfig])
-  }
 }
