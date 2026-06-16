@@ -2,13 +2,13 @@ import com.typesafe.sbt.packager.docker.*
 import org.typelevel.scalacoptions.ScalacOptions
 import sbtghactions.JavaSpec
 
-ThisBuild / scalaVersion                        := "3.8.4"
+ThisBuild / scalaVersion := "3.8.4"
+ThisBuild / scalacOptions ++= Seq("-Wunused:all", "-Xmax-inlines:256")
 ThisBuild / version                             := scala.sys.process.Process("git rev-parse HEAD").!!.trim.slice(0, 7)
 ThisBuild / organization                        := "io.github.kirill5k"
 ThisBuild / githubWorkflowPublishTargetBranches := Nil
 ThisBuild / githubWorkflowJavaVersions          := Seq(JavaSpec.corretto("26"))
-ThisBuild / scalacOptions ++= Seq("-Wunused:all", "-Xmax-inlines:256")
-githubWorkflowDir := (LocalRootProject / baseDirectory).value / ".github"
+githubWorkflowDir                               := (LocalRootProject / baseDirectory).value / ".github"
 
 val noPublish = Seq(
   publish         := {},
