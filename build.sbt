@@ -2,12 +2,13 @@ import com.typesafe.sbt.packager.docker.*
 import org.typelevel.scalacoptions.ScalacOptions
 import sbtghactions.JavaSpec
 
-ThisBuild / scalaVersion                        := "3.8.3"
+ThisBuild / scalaVersion                        := "3.8.4"
 ThisBuild / version                             := scala.sys.process.Process("git rev-parse HEAD").!!.trim.slice(0, 7)
 ThisBuild / organization                        := "io.github.kirill5k"
 ThisBuild / githubWorkflowPublishTargetBranches := Nil
 ThisBuild / githubWorkflowJavaVersions          := Seq(JavaSpec.corretto("26"))
 ThisBuild / scalacOptions ++= Seq("-Wunused:all", "-Xmax-inlines:256")
+githubWorkflowDir := (LocalRootProject / baseDirectory).value / ".github"
 
 val noPublish = Seq(
   publish         := {},
@@ -65,7 +66,7 @@ val calculations = project
   .settings(
     name       := "currexx-calculations",
     moduleName := "currexx-calculations",
-    libraryDependencies ++= Dependencies.test,
+    libraryDependencies ++= Dependencies.test
   )
 
 val clients = project
@@ -75,7 +76,7 @@ val clients = project
   .settings(
     name       := "currexx-clients",
     moduleName := "currexx-clients",
-    libraryDependencies ++= Dependencies.clients ++ Dependencies.test,
+    libraryDependencies ++= Dependencies.clients ++ Dependencies.test
   )
 
 val core = project
@@ -87,7 +88,7 @@ val core = project
   .settings(
     name       := "currexx-core",
     moduleName := "currexx-core",
-    libraryDependencies ++= Dependencies.core,
+    libraryDependencies ++= Dependencies.core
   )
 
 val backtest = project
@@ -104,15 +105,15 @@ val backtest = project
     //   < 8GB RAM: use -Xms2g -Xmx4g
     //   > 16GB RAM: use -Xms8g -Xmx16g
     Compile / run / javaOptions ++= Seq(
-      "-Xms8g",                                    // Initial heap size
-      "-Xmx16g",                                   // Maximum heap size
-      "-XX:+UseG1GC",                              // Use G1 garbage collector
-      "-XX:MaxGCPauseMillis=200",                  // Target max GC pause
-      "-XX:G1ReservePercent=10",                   // Reserve heap to reduce GC
-      "-XX:InitiatingHeapOccupancyPercent=45",     // When to start GC
-      "-Xss2m",                                    // Stack size
-      "-XX:+TieredCompilation",                    // Use tiered compilation
-      "-XX:TieredStopAtLevel=4"                    // Maximum optimization level
+      "-Xms8g",                                // Initial heap size
+      "-Xmx16g",                               // Maximum heap size
+      "-XX:+UseG1GC",                          // Use G1 garbage collector
+      "-XX:MaxGCPauseMillis=200",              // Target max GC pause
+      "-XX:G1ReservePercent=10",               // Reserve heap to reduce GC
+      "-XX:InitiatingHeapOccupancyPercent=45", // When to start GC
+      "-Xss2m",                                // Stack size
+      "-XX:+TieredCompilation",                // Use tiered compilation
+      "-XX:TieredStopAtLevel=4"                // Maximum optimization level
     )
   )
 
