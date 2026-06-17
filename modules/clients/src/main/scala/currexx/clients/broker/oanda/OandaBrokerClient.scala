@@ -150,13 +150,13 @@ final private class LiveOandaBrokerClient[F[_]](
         case Left(err) => handleError("get-account", err)
     }
 
-  private def handleError[A](endpoint: String, error: Any): F[A] =
+  private def handleError[A](endpoint: String, error: ResponseException[String]): F[A] =
     error match
       case ResponseException.DeserializationException(responseBody, error, _) =>
         logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
           F.raiseError(AppError.JsonParsingFailure(responseBody, s"${name} client returned $error"))
       case ResponseException.UnexpectedStatusCode(body, meta) =>
-        val errorMessage = body.toString.trim
+        val errorMessage = body.trim
         logger.error(s"$name-client/${meta.code.code}: $errorMessage") >>
           F.raiseError(AppError.ClientFailure(name, s"$endpoint returned ${meta.code}: $errorMessage"))
 

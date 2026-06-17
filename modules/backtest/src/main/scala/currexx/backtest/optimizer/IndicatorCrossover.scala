@@ -40,7 +40,7 @@ object IndicatorCrossover:
             case 2 =>    // Arithmetic crossover with random weight (25%)
               val alpha = r.nextDouble()
               math.round(i1 * alpha + i2 * (1.0 - alpha)).toInt
-            case 3 => // Random value within the range of both parents (25%)
+            case _ => // Random value within the range of both parents (25%)
               val minVal = math.min(i1, i2)
               val maxVal = math.max(i1, i2)
               if (minVal == maxVal) minVal else minVal + r.nextInt(maxVal - minVal + 1)
