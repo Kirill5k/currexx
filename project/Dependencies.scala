@@ -4,21 +4,21 @@ object Dependencies {
   object Versions {
     val fs2            = "3.13.0"
     val cats           = "2.13.0"
-    val commonScala    = "0.1.27"
-    val mongo4cats     = "0.7.17"
+    val commonScala    = "0.1.29"
+    val mongo4cats     = "0.7.18"
     val pureConfig     = "0.17.10"
     val circe          = "0.14.15"
     val circeRefined   = "0.15.1"
-    val sttp4          = "4.0.24"
-    val logback        = "1.5.32"
+    val sttp4          = "4.0.25"
+    val logback        = "1.5.34"
     val log4cats       = "2.8.0"
     val bcrypt         = "4.3.0"
     val refined        = "0.11.3"
-    val tapir          = "1.13.19"
+    val tapir          = "1.13.23"
     val jwt            = "11.0.4"
     val cronUtils      = "9.2.1"
     val taggedAdtCodec = "0.11.0"
-    val caffeine       = "3.2.3"
+    val caffeine       = "3.2.4"
   }
 
   object Libraries {
