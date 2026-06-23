@@ -68,6 +68,18 @@ object IndicatorCrossover:
             Right(VT.JMA(crossInt(l1, l2, Some(5)), clampedPhase, r.pickOne(pow1, pow2)))
           case (VT.NMA(l1, sl1, d1, ma1), VT.NMA(l2, sl2, d2, _)) =>
             Right(VT.NMA(crossInt(l1, l2), crossInt(sl1, sl2), crossDouble(d1, d2, 0.5), ma1))
+          case (VT.WilliamsR(l1), VT.WilliamsR(l2)) =>
+            Right(VT.WilliamsR(crossInt(l1, l2, Some(5))))
+          case (VT.ADX(l1), VT.ADX(l2)) =>
+            Right(VT.ADX(crossInt(l1, l2, Some(5))))
+          case (VT.CCI(l1), VT.CCI(l2)) =>
+            Right(VT.CCI(crossInt(l1, l2, Some(5))))
+          case (VT.IchimokuKijunSen(l1), VT.IchimokuKijunSen(l2)) =>
+            Right(VT.IchimokuKijunSen(crossInt(l1, l2, Some(5))))
+          case (VT.CMF(l1), VT.CMF(l2)) =>
+            Right(VT.CMF(crossInt(l1, l2, Some(5))))
+          case (VT.ParabolicSAR(start1, max1, step1), VT.ParabolicSAR(start2, max2, step2)) =>
+            Right(VT.ParabolicSAR(crossDouble(start1, start2, 0.01), crossDouble(max1, max2, 0.05), crossDouble(step1, step2, 0.01)))
           case (VT.Sequenced(s1), VT.Sequenced(s2)) =>
             // Ensure sequences have same length before crossing
             if (s1.length != s2.length) {
@@ -75,7 +87,8 @@ object IndicatorCrossover:
             } else {
               s1.zip(s2).traverse((v1, v2) => crossVt(v1, v2)).map(VT.Sequenced(_))
             }
-          case _ => Left(new IllegalArgumentException("both parents must be of the same type"))
+          case (v1, v2) =>
+            Left(new IllegalArgumentException(s"both parents must be of the same type: $v1 vs $v2"))
 
         def crossInd(ind1: Indicator, ind2: Indicator): Either[Throwable, Indicator] = (ind1, ind2) match
           case (Indicator.VolatilityRegimeDetection(atr1, vt1), Indicator.VolatilityRegimeDetection(atr2, vt2)) =>
@@ -112,8 +125,8 @@ object IndicatorCrossover:
             crossVt(md1, md2).map(md => Indicator.BollingerBands(vs, md, crossInt(sdl1, sdl2, Some(5)), crossDouble(sdm1, sdm2, 0.1)))
           case (Indicator.PriceLineCrossing(s, r, vt1), Indicator.PriceLineCrossing(_, _, vt2)) =>
             crossVt(vt1, vt2).map(Indicator.PriceLineCrossing(s, r, _))
-          case _ =>
-            Left(new IllegalArgumentException("both parents must be of the same type"))
+          case (i1, i2) =>
+            Left(new IllegalArgumentException(s"both parents must be of the same type: $i1 vs $i2"))
 
         F.fromEither(crossInd(par1, par2))
           .handleErrorWith { e =>
