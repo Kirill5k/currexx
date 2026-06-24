@@ -31,52 +31,52 @@ object Optimiser extends IOApp.Simple {
 
   val rounds: List[OptimisationRound] = List(
     OptimisationRound(
-      name = "s1-wl-ratio",
-      strategy = TestStrategy.s1,
+      name = "s6",
+      strategy = TestStrategy.s6,
       gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(25), maxOrders = Some(400)),
+      scoringFunction = ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
-      name = "s1v2-wl-ratio",
-      strategy = TestStrategy.s1_v2,
+      name = "s7",
+      strategy = TestStrategy.s7,
       gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(25), maxOrders = Some(400)),
+      scoringFunction = ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
-      name = "s2-wl-ratio",
-      strategy = TestStrategy.s2,
+      name = "s8",
+      strategy = TestStrategy.s8,
       gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(25), maxOrders = Some(400)),
+      scoringFunction = ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
-      name = "s2v2-wl-ratio",
-      strategy = TestStrategy.s2_v2,
+      name = "s9",
+      strategy = TestStrategy.s9,
       gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(25), maxOrders = Some(400)),
+      scoringFunction = ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
-      name = "s3-wl-ratio",
-      strategy = TestStrategy.s3,
+      name = "s10",
+      strategy = TestStrategy.s10,
       gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(25), maxOrders = Some(400)),
+      scoringFunction = ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
-      name = "s4-wl-ratio",
-      strategy = TestStrategy.s4,
+      name = "s11",
+      strategy = TestStrategy.s11,
       gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(25), maxOrders = Some(400)),
+      scoringFunction = ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
-      name = "s5-wl-ratio",
-      strategy = TestStrategy.s5,
+      name = "s12",
+      strategy = TestStrategy.s12,
       gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.medianWinLossRatio(minOrders = Some(25), maxOrders = Some(400)),
+      scoringFunction = ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
       testDataSets = MarketDataProvider.majors1h
     )
   )
