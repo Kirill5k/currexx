@@ -92,7 +92,7 @@ class IndicatorCrossoverSpec extends IOWordSpec {
       yield result
 
       result.attempt.asserting { res =>
-        res.left.map(_.getMessage) mustBe Left("failed to cross TrendChangeDetection(Close,Sequenced(List(HMA(40), Kalman(0.7,1.0)))) and TrendChangeDetection(Close,HMA(37)) together: both parents must be of the same type")
+        res.left.map(_.getMessage) mustBe Left("failed to cross TrendChangeDetection(Close,Sequenced(List(HMA(40), Kalman(0.7,1.0)))) and TrendChangeDetection(Close,HMA(37)) together: both parents must be of the same type: Sequenced(List(HMA(40), Kalman(0.7,1.0))) vs HMA(37)")
       }
     }
   }
