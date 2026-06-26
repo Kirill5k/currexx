@@ -1404,7 +1404,7 @@ object TestStrategy {
   // Only trade breakouts that have institutional volume behind them.
   // CMF > 0 confirms buying pressure for longs; CMF < 0 confirms selling pressure for shorts.
   // Avoids fake-outs where price breaks a level but volume doesn't participate.
-  //median win-to-loss ratio: 0.805555, total profit: 0.00703, total orders: 139, median profit: -0.00165, median loss: -0.0016274999999999998
+  //median win-to-loss ratio: 1.20441, total profit: 0.08671, total orders: 225, median profit: 0.010675, median loss: -0.00146237318840579735
   val s11 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       // Trend detection
@@ -1417,7 +1417,7 @@ object TestStrategy {
         source = ValueSource.Close,
         middleBand = ValueTransformation.EMA(length = 20),
         atrLength = 14,
-        atrMultiplier = 1.5
+        atrMultiplier = 2.3
       ),
       // CMF for volume confirmation — tracked as Momentum role for threshold access
       Indicator.ThresholdCrossing(
