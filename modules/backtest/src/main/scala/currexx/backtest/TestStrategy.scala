@@ -1582,7 +1582,7 @@ object TestStrategy {
   // Enter when CMF confirms trend direction — buying pressure aligns with uptrend, selling pressure with downtrend.
   // CMF threshold cross acts as the primary entry trigger; Ichimoku Kijun-Sen provides trend context.
   // Trend + low-volatility filters screen out ranging markets. Parabolic SAR for adaptive trailing exit.
-  // median win-to-loss ratio: 0.746575, total profit: 0.10058, total orders: 777, median profit: 0.026735, median loss: -0.00157863013698630155
+  // median win-to-loss ratio: 0.735755, total profit: 0.06177, total orders: 490, median profit: 0.01081, median loss: -0.0016911932367149762
   val s12 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -1594,8 +1594,8 @@ object TestStrategy {
       Indicator.ThresholdCrossing(
         source = ValueSource.Close,
         transformation = ValueTransformation.CMF(length = 20),
-        upperBoundary = 0.05,
-        lowerBoundary = -0.05
+        upperBoundary = 0.17,
+        lowerBoundary = -0.17
       ),
       // NOTE: an ADX ThresholdCrossing was removed here. ThresholdCrossing indicators all write the
       // single shared `momentum` zone, so ADX silently overwrote/corrupted the CMF signal that the
@@ -1619,7 +1619,7 @@ object TestStrategy {
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsUpward,
             Rule.Condition.TrendActiveFor(1.hour),
-            Rule.Condition.momentumEnteredOverbought, // CMF crossed above +0.05
+            Rule.Condition.momentumEnteredOverbought, // CMF crossed above +0.17
             Rule.Condition.volatilityIsLow
           )
         ),
@@ -1629,7 +1629,7 @@ object TestStrategy {
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsDownward,
             Rule.Condition.TrendActiveFor(1.hour),
-            Rule.Condition.momentumEnteredOversold, // CMF crossed below -0.05
+            Rule.Condition.momentumEnteredOversold, // CMF crossed below -0.17
             Rule.Condition.volatilityIsLow
           )
         )
