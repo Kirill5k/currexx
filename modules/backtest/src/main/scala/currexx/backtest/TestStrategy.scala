@@ -1447,10 +1447,10 @@ object TestStrategy {
             Rule.Condition.trendIsUpward,
             Rule.Condition.TrendActiveFor(1.hour),
             Rule.Condition.volatilityIsLow,
-            // Keltner breakout
+            // Keltner breakout = entry trigger
             Rule.Condition.UpperBandCrossed(Direction.Upward),
-            // CMF crossed above +0.05 = volume confirms the breakout
-            Rule.Condition.momentumEnteredOverbought
+            // CMF is in buying-pressure zone = volume confirms the breakout (state filter, not a fresh cross)
+            Rule.Condition.momentumIsInOverbought
           )
         ),
         Rule(
@@ -1460,10 +1460,10 @@ object TestStrategy {
             Rule.Condition.trendIsDownward,
             Rule.Condition.TrendActiveFor(1.hour),
             Rule.Condition.volatilityIsLow,
-            // Keltner breakdown
+            // Keltner breakdown = entry trigger
             Rule.Condition.LowerBandCrossed(Direction.Downward),
-            // CMF crossed below -0.05 = volume confirms the breakdown
-            Rule.Condition.momentumEnteredOversold
+            // CMF is in selling-pressure zone = volume confirms the breakdown (state filter, not a fresh cross)
+            Rule.Condition.momentumIsInOversold
           )
         )
       ),
@@ -1589,18 +1589,18 @@ object TestStrategy {
         source = ValueSource.HLC3,
         transformation = ValueTransformation.IchimokuKijunSen(length = 26)
       ),
+      // CMF is the sole momentum-zone driver (a second ThresholdCrossing would collide on the
+      // single shared momentum slot — see ADX removal note below).
       Indicator.ThresholdCrossing(
         source = ValueSource.Close,
         transformation = ValueTransformation.CMF(length = 20),
         upperBoundary = 0.05,
         lowerBoundary = -0.05
       ),
-      Indicator.ThresholdCrossing(
-        source = ValueSource.Close,
-        transformation = ValueTransformation.ADX(length = 14),
-        upperBoundary = 50.0,
-        lowerBoundary = 20.0
-      ),
+      // NOTE: an ADX ThresholdCrossing was removed here. ThresholdCrossing indicators all write the
+      // single shared `momentum` zone, so ADX silently overwrote/corrupted the CMF signal that the
+      // rules read via momentumEntered*, and was never consumed as a filter. Trend + volatility
+      // filters below already screen out ranging markets.
       Indicator.PriceLineCrossing(
         source = ValueSource.Close,
         role = ValueRole.Momentum,
