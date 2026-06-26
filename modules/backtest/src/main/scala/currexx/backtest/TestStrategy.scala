@@ -1581,8 +1581,8 @@ object TestStrategy {
   // S12: CMF Trend Confirmation
   // Enter when CMF confirms trend direction — buying pressure aligns with uptrend, selling pressure with downtrend.
   // CMF threshold cross acts as the primary entry trigger; Ichimoku Kijun-Sen provides trend context.
-  // ADX filters out ranging markets. Parabolic SAR for adaptive trailing exit.
-  // median win-to-loss ratio: 0.719115, total profit: 0.22841, total orders: 846, median profit: 0.036535, median loss: -0.0013486609336609333
+  // Trend + low-volatility filters screen out ranging markets. Parabolic SAR for adaptive trailing exit.
+  // median win-to-loss ratio: 0.746575, total profit: 0.10058, total orders: 777, median profit: 0.026735, median loss: -0.00157863013698630155
   val s12 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -1604,7 +1604,7 @@ object TestStrategy {
       Indicator.PriceLineCrossing(
         source = ValueSource.Close,
         role = ValueRole.Momentum,
-        transformation = ValueTransformation.ParabolicSAR(afStart = 0.02, afMax = 0.2, afStep = 0.02)
+        transformation = ValueTransformation.ParabolicSAR(afStart = 0.04, afMax = 0.3, afStep = 0.04)
       ),
       Indicator.VolatilityRegimeDetection(
         atrLength = 14,
@@ -1655,15 +1655,6 @@ object TestStrategy {
             Rule.Condition.allOf(
               Rule.Condition.positionIsSell,
               Rule.Condition.TrendChangedTo(Direction.Upward)
-            ),
-            // CMF flipped against position (volume participation lost)
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsBuy,
-              Rule.Condition.momentumEnteredOversold
-            ),
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsSell,
-              Rule.Condition.momentumEnteredOverbought
             )
           )
         )
