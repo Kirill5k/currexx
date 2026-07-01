@@ -73,7 +73,8 @@ class MarketControllerSpec extends HttpRoutesWordSpec {
              |  "GBPEUR": {
              |    "currentPosition": {
              |      "position": "buy",
-             |      "openedAt": "${Markets.ts}"
+             |      "openedAt": "${Markets.ts}",
+             |      "openPrice" : null
              |    },
              |    "profile" : {
              |      "trend" : {
@@ -88,7 +89,9 @@ class MarketControllerSpec extends HttpRoutesWordSpec {
              |      "lastVelocityValue": null,
              |      "lastBandCrossing" : null,
              |      "lastChannelMiddleBandValue" : null,
-             |      "lastPriceLineCrossing" : null
+             |      "lastPriceLineCrossing" : null,
+             |      "lastTrendStrengthValue" : null,
+             |      "lastClosePrice" : null
              |    },
              |    "lastUpdatedAt": "${Markets.ts}",
              |    "createdAt": "${Markets.ts}"
