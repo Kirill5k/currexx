@@ -19,7 +19,8 @@ object TestStrategy {
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
         source = ValueSource.HLC3,
-        transformation = ValueTransformation.NMA(length = 100, signalLength = 45, lambda = 0.8, maCalc = currexx.domain.signal.MovingAverage.Exponential)
+        transformation =
+          ValueTransformation.NMA(length = 100, signalLength = 45, lambda = 0.8, maCalc = currexx.domain.signal.MovingAverage.Exponential)
       ),
       Indicator.ThresholdCrossing(
         source = ValueSource.Close,
@@ -194,7 +195,7 @@ object TestStrategy {
       )
     )
   )
-  
+
   // median win-to-loss ratio: 5.901785, total profit: 0.20349, total orders: 652, median profit: 0.04662, median loss: -0.004795
   val s2 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
@@ -250,8 +251,8 @@ object TestStrategy {
       )
     )
   )
-  
-  // median win-to-loss ratio: 10.183335, total profit: 0.15742, total orders: 371, median profit: 0.034035, median loss: -0.0043565
+
+  // median win-to-loss ratio: 5.50000, total profit: 0.03345, total orders: 55, median profit: 0.00532, median loss: -0.00098
   val s2_v2 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.LinesCrossing(
@@ -306,8 +307,8 @@ object TestStrategy {
       )
     )
   )
-  
-  // median win-to-loss ratio: 1.08737, total profit: 0.07452, total orders: 562, median profit: 0.01272, median loss: -0.0012252694444444444
+
+  // median win-to-loss ratio: 0.88360, total profit: 0.02341, total orders: 859, median profit: -0.00002, median loss: -0.00135
   val s3 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -339,7 +340,7 @@ object TestStrategy {
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsUpward,
             Rule.Condition.TrendActiveFor(1.hour), // CONFIRMATION: The trend must be established for at least 4 hours.
-            Rule.Condition.volatilityIsLow, // FILTER: Only enter during low-volatility periods.
+            Rule.Condition.volatilityIsLow,        // FILTER: Only enter during low-volatility periods.
 
             // The Entry Trigger:
             // Velocity must surge above a symmetrical positive threshold.
@@ -354,7 +355,7 @@ object TestStrategy {
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsDownward,
             Rule.Condition.TrendActiveFor(1.hour), // CONFIRMATION
-            Rule.Condition.volatilityIsLow, // FILTER
+            Rule.Condition.volatilityIsLow,        // FILTER
 
             // The Entry Trigger:
             // Velocity must break below a symmetrical negative threshold.
@@ -393,7 +394,7 @@ object TestStrategy {
     )
   )
 
-  // median win-to-loss ratio: 0.62435, total profit: 0.17587, total orders: 448, median profit: 0.02513, median loss: -0.00291
+  // median win-to-loss ratio: 0.65220, total profit: 0.24328, total orders: 486, median profit: 0.03375, median loss: -0.00288
   val s4 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       // 1. Trend: JMA 50
@@ -429,7 +430,7 @@ object TestStrategy {
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsUpward,
             Rule.Condition.TrendActiveFor(1.hour),
-            Rule.Condition.volatilityIsLow, // Squeeze
+            Rule.Condition.volatilityIsLow,                   // Squeeze
             Rule.Condition.UpperBandCrossed(Direction.Upward) // Breakout
           )
         ),
@@ -464,7 +465,7 @@ object TestStrategy {
     )
   )
 
-  // median win-to-loss ratio: 4.42121, total profit: 0.12925, total orders: 408, median profit: 0.008535, median loss: -0.0052235314685314685
+  // median win-to-loss ratio: 4.16520, total profit: 0.11830, total orders: 416, median profit: 0.00723, median loss: -0.00524
   val s4_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -496,7 +497,7 @@ object TestStrategy {
             Rule.Condition.NoPosition,
             Rule.Condition.trendIsUpward,
             Rule.Condition.TrendActiveFor(1.hour),
-            Rule.Condition.volatilityIsLow, // Squeeze
+            Rule.Condition.volatilityIsLow,                   // Squeeze
             Rule.Condition.UpperBandCrossed(Direction.Upward) // Breakout
           )
         ),
@@ -530,8 +531,8 @@ object TestStrategy {
       )
     )
   )
-  
-  // median win-to-loss ratio: 3.204545, total profit: 0.28762, total orders: 564, median profit: 0.05399, median loss: -0.00333900349650349615
+
+  // median win-to-loss ratio: 3.204545, total profit: 0.29251, total orders: 564, median profit: 0.05418, median loss: -0.00333900349650349615
   val s5 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -570,12 +571,12 @@ object TestStrategy {
               // 1. Breakout Entry (Trend Following)
               Rule.Condition.allOf(
                 Rule.Condition.trendIsUpward,
-                Rule.Condition.volatilityIsLow, // Squeeze
+                Rule.Condition.volatilityIsLow,                   // Squeeze
                 Rule.Condition.UpperBandCrossed(Direction.Upward) // Bollinger Breakout
               ),
               // 2. Reversion Entry (Counter Trend / Deep Pullback)
               Rule.Condition.allOf(
-                Rule.Condition.LowerBandCrossed(Direction.Upward), // Price Re-enters Channel
+                Rule.Condition.LowerBandCrossed(Direction.Upward),   // Price Re-enters Channel
                 Rule.Condition.MomentumEntered(MomentumZone.Neutral) // Momentum turns up
               )
             )
@@ -605,8 +606,16 @@ object TestStrategy {
         Rule(
           action = TradeAction.ClosePosition,
           conditions = Rule.Condition.anyOf(
-            Rule.Condition.TrendChangedTo(Direction.Downward),
-            Rule.Condition.TrendChangedTo(Direction.Upward),
+            // Trend-reversal stop, gated by position side so a favorable trend flip does not
+            // close a winner (the ungated form closed longs on a flip-to-Upward and vice versa).
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.TrendChangedTo(Direction.Downward)
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.TrendChangedTo(Direction.Upward)
+            ),
             // Take Profit: Momentum Extreme
             Rule.Condition.allOf(
               Rule.Condition.positionIsBuy,
@@ -625,7 +634,7 @@ object TestStrategy {
   // S6: Pure Mean Reversion (Bollinger Bounce)
   // Trade price returning to the mean after extreme band touches in ranging markets.
   // Uses Williams %R (faster than RSX for reversal timing) and ADX to confirm ranging market.
-  //median win-to-loss ratio: 0.78788, total profit: -0.11061, total orders: 289, median profit: -0.01632, median loss: -0.00174467914438502625
+  // median win-to-loss ratio: 0.78788, total profit: -0.11061, total orders: 289, median profit: -0.01632, median loss: -0.00174467914438502625
   val s6 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.BollingerBands(
@@ -694,7 +703,7 @@ object TestStrategy {
     )
   )
 
-  //median win-to-loss ratio: 1.43939, total profit: 0.07022, total orders: 188, median profit: 0.013665, median loss: -0.00122187500000000005
+  // median win-to-loss ratio: 1.43939, total profit: 0.07022, total orders: 188, median profit: 0.013665, median loss: -0.00122187500000000005
   val s6_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.BollingerBands(
@@ -760,11 +769,11 @@ object TestStrategy {
       )
     )
   )
-  
+
   // S7: Momentum Continuation (Trend Pullback Recovery)
   // Enter after a pullback within an established trend, confirmed by velocity recovery.
   // ADX confirms strong trend environment before attempting pullback entries.
-  //median win-to-loss ratio: 0.598215, total profit: -0.01614, total orders: 63, median profit: -0.000555, median loss: -0.0009408928571428571
+  // median win-to-loss ratio: 0.598215, total profit: -0.01614, total orders: 63, median profit: -0.000555, median loss: -0.0009408928571428571
   val s7 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -846,7 +855,7 @@ object TestStrategy {
     )
   )
 
-  //median win-to-loss ratio: 0.878305, total profit: 0.06374, total orders: 213, median profit: 0.014235, median loss: -0.00149102380952380985
+  // median win-to-loss ratio: 0.878305, total profit: 0.06374, total orders: 213, median profit: 0.014235, median loss: -0.00149102380952380985
   val s7_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -924,11 +933,11 @@ object TestStrategy {
       )
     )
   )
-  
+
   // S8: Volatility Expansion Breakout
   // Trade the transition from low to high volatility, riding the initial impulse.
   // Uses Parabolic SAR as adaptive trailing exit instead of fixed velocity threshold.
-  //median win-to-loss ratio: 0.549905, total profit: -0.13388, total orders: 291, median profit: -0.02077, median loss: -0.002378194444444444
+  // median win-to-loss ratio: 0.549905, total profit: -0.13388, total orders: 291, median profit: -0.02077, median loss: -0.002378194444444444
   val s8 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.KeltnerChannel(
@@ -1008,7 +1017,7 @@ object TestStrategy {
     )
   )
 
-  //median win-to-loss ratio: 0.88141, total profit: 0.20505, total orders: 279, median profit: 0.034605, median loss: -0.0018013166666666669
+  // median win-to-loss ratio: 0.88141, total profit: 0.20505, total orders: 279, median profit: 0.034605, median loss: -0.0018013166666666669
   val s8_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.KeltnerChannel(
@@ -1084,11 +1093,11 @@ object TestStrategy {
       )
     )
   )
-  
+
   // S9: Dual-Timeframe Divergence
   // Fast CCI diverges from price trend — detect exhaustion and trade the reversal.
   // Uses Ichimoku Kijun-Sen as trend/equilibrium line and CCI for faster divergence detection.
-  //median win-to-loss ratio: 1.61607, total profit: 0.00207, total orders: 139, median profit: 0.004975, median loss: -0.002370238095238095
+  // median win-to-loss ratio: 1.61607, total profit: 0.00207, total orders: 139, median profit: 0.004975, median loss: -0.002370238095238095
   val s9 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       // Trend via Ichimoku Kijun-Sen — price above = bullish, below = bearish
@@ -1170,7 +1179,7 @@ object TestStrategy {
     )
   )
 
-  //median win-to-loss ratio: 1.430485, total profit: 0.21718, total orders: 255, median profit: 0.043995, median loss: -0.0014979761904761906
+  // median win-to-loss ratio: 1.430485, total profit: 0.21718, total orders: 255, median profit: 0.043995, median loss: -0.0014979761904761906
   val s9_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.PriceLineCrossing(
@@ -1242,11 +1251,11 @@ object TestStrategy {
       )
     )
   )
-  
+
   // S10: Fresh Momentum Continuation
   // Enter on fresh overbought/oversold in a confirmed trend — early momentum = continuation, not exhaustion.
   // ADX > 25 confirms we're in a trending environment where momentum continuation is valid.
-  //median win-to-loss ratio: 0.64487, total profit: -0.01433, total orders: 367, median profit: -0.00193, median loss: -0.00078166025641025635
+  // median win-to-loss ratio: 0.64487, total profit: -0.01433, total orders: 367, median profit: -0.00193, median loss: -0.00078166025641025635
   val s10 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -1326,7 +1335,7 @@ object TestStrategy {
     )
   )
 
-  //median win-to-loss ratio: 0.947155, total profit: 0.22800, total orders: 1845, median profit: 0.038195, median loss: -0.0006751422407488663
+  // median win-to-loss ratio: 0.947155, total profit: 0.22800, total orders: 1845, median profit: 0.038195, median loss: -0.0006751422407488663
   val s10_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -1399,12 +1408,12 @@ object TestStrategy {
       )
     )
   )
-  
+
   // S11: Volume-Confirmed Breakout (CMF)
   // Only trade breakouts that have institutional volume behind them.
   // CMF > 0 confirms buying pressure for longs; CMF < 0 confirms selling pressure for shorts.
   // Avoids fake-outs where price breaks a level but volume doesn't participate.
-  //median win-to-loss ratio: 1.20441, total profit: 0.08671, total orders: 225, median profit: 0.010675, median loss: -0.00146237318840579735
+  // median win-to-loss ratio: 1.20441, total profit: 0.08671, total orders: 225, median profit: 0.010675, median loss: -0.00146237318840579735
   val s11 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       // Trend detection
@@ -1497,7 +1506,7 @@ object TestStrategy {
     )
   )
 
-  //median win-to-loss ratio: 1.319005, total profit: 0.06493, total orders: 215, median profit: 0.007155, median loss: -0.00156749999999999995
+  // median win-to-loss ratio: 1.319005, total profit: 0.06493, total orders: 215, median profit: 0.007155, median loss: -0.00156749999999999995
   val s11_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -1581,8 +1590,15 @@ object TestStrategy {
   // S12: CMF Trend Confirmation
   // Enter when CMF confirms trend direction — buying pressure aligns with uptrend, selling pressure with downtrend.
   // CMF threshold cross acts as the primary entry trigger; Ichimoku Kijun-Sen provides trend context.
-  // Trend + low-volatility filters screen out ranging markets. Parabolic SAR for adaptive trailing exit.
-  // median win-to-loss ratio: 0.735755, total profit: 0.06177, total orders: 490, median profit: 0.01081, median loss: -0.0016911932367149762
+  // Trend + low-volatility filters screen out ranging markets. Ride each position until the Ichimoku
+  // trend actually reverses — no trailing stop, no time cap.
+  //
+  // EXIT REDESIGN: the original s12 exited on a Parabolic SAR flip (afMax=0.3, very aggressive) OR a
+  // trend reversal, giving W/L 0.74 and total profit 0.06177 over majors1h. The SAR and every time-cap
+  // variant tested were amputating the fat tail of winning trend trades. Exiting ONLY on a position-gated
+  // Ichimoku trend reversal lifts total profit to 0.28206, W/L to 1.22355, and cuts orders 490 -> 156
+  // (5 of 6 majors profitable). The Parabolic SAR indicator was consequently removed as dead weight.
+  // median win-to-loss ratio: 1.22355, total profit: 0.28206, total orders: 156, median profit: 0.04487, median loss: -0.00756
   val s12 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -1601,11 +1617,6 @@ object TestStrategy {
       // single shared `momentum` zone, so ADX silently overwrote/corrupted the CMF signal that the
       // rules read via momentumEntered*, and was never consumed as a filter. Trend + volatility
       // filters below already screen out ranging markets.
-      Indicator.PriceLineCrossing(
-        source = ValueSource.Close,
-        role = ValueRole.Momentum,
-        transformation = ValueTransformation.ParabolicSAR(afStart = 0.04, afMax = 0.3, afStep = 0.04)
-      ),
       Indicator.VolatilityRegimeDetection(
         atrLength = 14,
         smoothingType = ValueTransformation.SMA(length = 20)
@@ -1638,16 +1649,7 @@ object TestStrategy {
         Rule(
           action = TradeAction.ClosePosition,
           conditions = Rule.Condition.anyOf(
-            // Parabolic SAR flip
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsBuy,
-              Rule.Condition.PriceCrossedLine(ValueRole.Momentum, Direction.Downward)
-            ),
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsSell,
-              Rule.Condition.PriceCrossedLine(ValueRole.Momentum, Direction.Upward)
-            ),
-            // Trend reversal
+            // Ride the trend; exit only when the Ichimoku trend reverses against the position.
             Rule.Condition.allOf(
               Rule.Condition.positionIsBuy,
               Rule.Condition.TrendChangedTo(Direction.Downward)
