@@ -1,42 +1,36 @@
 ---
 name: strategy-optimization
-description: 交易策略優化方法論，從診斷到達標的迭代流程
+description: Trading strategy optimization methodology, an iterative process from diagnosis to hitting the target
 schema: "1.0"
 version: 1.0.0
 triggers:
   keywords:
     primary:
-      - 策略優化
-        - 優化策略
-        - 提高勝率
-        - 改善報酬
-        - strategy optimization
-        - improve returns
-        secondary:
-        - win rate
-          - 回測
-          - backtest
-          - 調參
-          - parameter tuning
-          - 績效改善
-          context_boost:
+      - strategy optimization
+      - optimize strategy
+      - improve win rate
+      - improve returns
+    secondary:
+      - win rate
+      - backtest
+      - parameter tuning
+      - performance improvement
+    context_boost:
       - trading
-        - quant
-        - 交易
-        - 量化
-        - return
-    - profit
+      - quant
+      - return
+      - profit
   context_penalty:
     - design
-      - marketing
-      - frontend
+    - marketing
+    - frontend
   priority: high
 keywords:
   - finance
-    - trading
-    - optimization
-    - strategy
-    - backtest
+  - trading
+  - optimization
+  - strategy
+  - backtest
 dependencies:
   domain-skills:
     - quant-trading
@@ -44,266 +38,267 @@ author: claude-domain-skills
 metadata:
   mcpmarket-version: 1.0.0
 ---
-# 交易策略優化 Strategy Optimization
+# Trading Strategy Optimization
 
-> 系統化的策略優化流程，從診斷問題到達成目標
+> A systematic strategy optimization process, from diagnosing the problem to reaching the goal
 
-## 適用場景
+## When to Use
 
-- 勝率過低（< 40%）
-- 報酬未達目標
-    - 策略在特定市場狀態表現差
-    - 需要達成特定報酬目標（如 15%+）
+- Win rate too low (< 40%)
+- Returns below target
+    - Strategy performs poorly in specific market states
+    - Need to hit a specific return target (e.g. 15%+)
 
-## 核心流程
+## Core Process
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
   │                                                                 │
-  │                   策略優化迭代循環                              │
+  │                   Strategy Optimization Iteration Loop          │
   │                                                                 │
   │  ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐         │
   │  │ ANALYZE │ → │ DIAGNOSE│ → │ RESEARCH│ → │IMPLEMENT│         │
-  │  │  分析   │   │  診斷   │   │  研究   │   │  實作   │         │
+  │  │         │   │         │   │         │   │         │         │
   │  └────┬────┘   └────┬────┘   └────┬────┘   └────┬────┘         │
   │       │             │             │             │               │
   │       ▼             ▼             ▼             ▼               │
-  │  收集指標      找根因       搜尋方案      實作變更             │
+  │  gather metrics  find root cause  search solutions  make changes │
   │                                                                 │
   │       ┌─────────────────────────────────────────┐               │
   │       │                                         │               │
   │       ▼                                         │               │
   │  ┌─────────┐   ┌─────────┐                     │               │
   │  │VALIDATE │ → │ ITERATE │ ────────────────────┘               │
-  │  │  驗證   │   │  迭代   │   未達標 → 回到 ANALYZE              │
+  │  │         │   │         │   not met → back to ANALYZE          │
   │  └────┬────┘   └─────────┘                                      │
   │       │                                                         │
   │       ▼                                                         │
-  │   達標 → 文檔化部署                                             │
+  │   target met → document & deploy                               │
   │                                                                 │
   └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Phase 1: ANALYZE（分析）
+## Phase 1: ANALYZE
 
-收集當前績效指標：
+Gather current performance metrics:
 
-| 指標 | 說明 | 健康標準 |
+| Metric | Description | Healthy Standard |
   |------|------|----------|
-| **勝率** | 獲利交易比例 | > 40% |
-| **報酬** | 總損益 | 正數 |
-| **回撤** | 最大虧損幅度 | < 20% |
-| **交易次數** | 統計顯著性 | > 100 筆 |
-| **期望值** | 每筆預期獲利 | 正數 |
+| **Win rate** | Proportion of winning trades | > 40% |
+| **Return** | Total profit/loss | Positive |
+| **Drawdown** | Maximum loss magnitude | < 20% |
+| **Trade count** | Statistical significance | > 100 trades |
+| **Expectancy** | Expected profit per trade | Positive |
 
-### 期望值公式
+### Expectancy Formula
 
 ```
 Expectancy = (WinRate × AvgWin) - ((1-WinRate) × AvgLoss)
 
-範例：
-勝率: 54.5%, 平均贏: $7.42, 平均輸: $8.26
-期望值: (0.545 × 7.42) - (0.455 × 8.26) = +$0.29/筆
+Example:
+Win rate: 54.5%, Avg win: $7.42, Avg loss: $8.26
+Expectancy: (0.545 × 7.42) - (0.455 × 8.26) = +$0.29/trade
 
-正期望值 × 大量交易 = 穩定獲利
+Positive expectancy × high trade count = steady profit
 ```
 
-## Phase 2: DIAGNOSE（診斷）
+## Phase 2: DIAGNOSE
 
-**關鍵：找根因，不是症狀**
+**Key: find the root cause, not the symptom**
 
-### 常見根因
+### Common Root Causes
 
-| 症狀 | 可能根因 | 診斷方法 |
+| Symptom | Possible Root Cause | Diagnostic Method |
   |------|---------|---------|
-| 勝率低 | 策略不適合市場狀態 | 檢查 ADX/市場 regime |
-| 報酬低 | SL/TP 比例不佳 | 分析盈虧分布 |
-| 回撤大 | 槓桿過高 | 計算風險暴露 |
-| 交易少 | 條件太嚴格 | 放寬進場條件 |
+| Low win rate | Strategy doesn't fit the market state | Check ADX / market regime |
+| Low returns | Poor SL/TP ratio | Analyze profit/loss distribution |
+| Large drawdown | Leverage too high | Compute risk exposure |
+| Few trades | Conditions too strict | Loosen entry conditions |
 
-### 市場狀態分析
+### Market State Analysis
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-  │  市場狀態 vs 策略匹配                                           │
+  │  Market State vs Strategy Fit                                  │
   │                                                                 │
-  │  ADX < 25 (盤整)  → Grid Trading, Mean Reversion               │
-  │  ADX > 25 (趨勢)  → Trend Following, Momentum                   │
-  │  高波動            → Scalping, 減少部位                         │
-  │  低波動            → Grid Trading, Breakout 準備                │
+  │  ADX < 25 (ranging)  → Grid Trading, Mean Reversion            │
+  │  ADX > 25 (trending) → Trend Following, Momentum               │
+  │  High volatility     → Scalping, reduce position size          │
+  │  Low volatility      → Grid Trading, prepare for breakout      │
   │                                                                 │
-  │  ⚠️ 90% 時間市場在盤整，趨勢策略會持續虧損！                    │
+  │  ⚠️ 90% of the time the market is ranging; trend strategies    │
+  │     will keep losing!                                           │
   └─────────────────────────────────────────────────────────────────┘
   ```
 
-### 診斷範例
+### Diagnostic Example
 
 ```
-症狀: 勝率只有 25%
+Symptom: win rate only 25%
   ↓
-分析: 使用 RSI+MACD 趨勢策略
+Analysis: using an RSI+MACD trend strategy
 ↓
-檢查: ADX 平均 < 25（90% 時間在盤整）
+Check: average ADX < 25 (ranging 90% of the time)
 ↓
-根因: 趨勢策略用在盤整市場
+Root cause: trend strategy used in a ranging market
 ↓
-方向: 需要盤整市場策略（Grid Trading）
+Direction: need a ranging-market strategy (Grid Trading)
 ```
 
-## Phase 3: RESEARCH（研究）
+## Phase 3: RESEARCH
 
-### 策略-市場狀態對應表
+### Strategy-to-Market-State Mapping
 
-| 市場狀態 | 推薦策略 | 原因 |
+| Market State | Recommended Strategy | Reason |
   |---------|---------|------|
-| **盤整** (ADX < 25) | Grid Trading | 利用價格震盪 |
-| | Mean Reversion | 回歸均值 |
-| | Scalping | 快進快出 |
-| **趨勢** (ADX > 25) | Trend Following | 順勢而為 |
-| | Momentum | 動量延續 |
-| | Breakout | 突破跟進 |
-| **高波動** | Scalping | 快速獲利 |
-| | 減少部位 | 控制風險 |
+| **Ranging** (ADX < 25) | Grid Trading | Exploit price oscillation |
+| | Mean Reversion | Revert to the mean |
+| | Scalping | Quick in and out |
+| **Trending** (ADX > 25) | Trend Following | Go with the trend |
+| | Momentum | Ride the momentum |
+| | Breakout | Follow the breakout |
+| **High volatility** | Scalping | Fast profit |
+| | Reduce position | Control risk |
 
-### Sharp Edge: 研究數據驗證
+### Sharp Edge: Validate Research Data
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-  │  ⚠️ SE-1: 研究數據必須實測驗證                                  │
+  │  ⚠️ SE-1: Research data must be validated with real testing    │
   │                                                                 │
-  │  嚴重度: critical                                               │
+  │  Severity: critical                                             │
   │                                                                 │
-  │  案例：                                                         │
-  │  - 研究聲稱圖表模式有 80-84% 成功率                             │
-  │  - 實際回測：讓策略表現更差                                     │
-  │  - 原因：股市數據不適用於加密貨幣                               │
+  │  Case:                                                          │
+  │  - Research claimed chart patterns had 80-84% success rate      │
+  │  - Actual backtest: made the strategy perform worse             │
+  │  - Reason: stock market data doesn't apply to crypto            │
   │                                                                 │
-  │  教訓：                                                         │
-  │  ❌ 看到研究數據就實作                                          │
-  │  ✅ 先用真實數據回測驗證                                        │
+  │  Lesson:                                                        │
+  │  ❌ Implementing as soon as you see research data               │
+  │  ✅ First validate by backtesting with real data                │
   └─────────────────────────────────────────────────────────────────┘
   ```
 
-## Phase 4: IMPLEMENT（實作）
+## Phase 4: IMPLEMENT
 
-### 參數調整策略
+### Parameter Tuning Strategy
 
-| 參數 | 調整方向 | 影響 |
+| Parameter | Tuning Direction | Impact |
   |------|---------|------|
-| **SL/TP 比例** | 對稱 (1:1) vs 非對稱 | 勝率 vs 盈虧比 |
-| **槓桿** | 1x → 10x | 報酬 vs 風險 |
-| **進場閾值** | 寬鬆 vs 嚴格 | 交易次數 vs 品質 |
+| **SL/TP ratio** | Symmetric (1:1) vs asymmetric | Win rate vs risk/reward |
+| **Leverage** | 1x → 10x | Return vs risk |
+| **Entry threshold** | Loose vs strict | Trade count vs quality |
 
-### 關鍵發現
+### Key Findings
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-  │  優化發現                                                       │
+  │  Optimization Findings                                         │
   │                                                                 │
-  │  1. 對稱 SL/TP 更好                                             │
-  │     - 1.8%/1.8% 產生 ~55% 勝率                                  │
-  │     - 比 1%/3% 的表現更好                                       │
+  │  1. Symmetric SL/TP is better                                  │
+  │     - 1.8%/1.8% yields ~55% win rate                           │
+  │     - Outperforms 1%/3%                                        │
   │                                                                 │
-  │  2. Grid Trading 在盤整市場                                     │
-  │     - 勝率從 25% 提升到 55%                                     │
-  │     - 關鍵：ADX < 25 時啟用                                     │
+  │  2. Grid Trading in ranging markets                            │
+  │     - Win rate rose from 25% to 55%                            │
+  │     - Key: enable when ADX < 25                                │
   │                                                                 │
-  │  3. 更多交易 + 正期望值                                         │
-  │     - 小獲利累積成大報酬                                        │
-  │     - 191 筆交易 × $0.29/筆 = +$55                              │
+  │  3. More trades + positive expectancy                          │
+  │     - Small profits accumulate into a large return             │
+  │     - 191 trades × $0.29/trade = +$55                          │
   └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Phase 5: VALIDATE（驗證）
+## Phase 5: VALIDATE
 
-### 回測要求
+### Backtest Requirements
 
-| 項目 | 最低要求 | 建議 |
+| Item | Minimum | Recommended |
   |------|---------|------|
-| 回測期間 | 60 天 | 180 天 |
-| 交易次數 | 50 筆 | 100+ 筆 |
-| 樣本外測試 | 有 | 必須 |
-| 交易成本 | 包含 | 包含滑價 |
+| Backtest period | 60 days | 180 days |
+| Trade count | 50 trades | 100+ trades |
+| Out-of-sample test | Yes | Required |
+| Trading costs | Included | Include slippage |
 
-### 驗證清單
+### Validation Checklist
 
 ```markdown
-  □ 勝率是否改善？
-□ 報酬是否達標？
-□ 回撤是否可接受？
-□ 期望值是否為正？
-□ 樣本外表現如何？
+  □ Did the win rate improve?
+□ Did returns hit the target?
+□ Is the drawdown acceptable?
+□ Is expectancy positive?
+□ How does it perform out of sample?
 ```
 
-## Phase 6: ITERATE（迭代）
+## Phase 6: ITERATE
 
 ```
-未達標 → 回到 ANALYZE
+Target not met → back to ANALYZE
   │
-    ├── 分析新結果
-    ├── 調整參數或策略
-    ├── 重新驗證
-    └── 重複直到達標
+    ├── Analyze the new results
+    ├── Adjust parameters or strategy
+    ├── Re-validate
+    └── Repeat until target met
 ```
 
-## 最佳實踐
+## Best Practices
 
-1. **先診斷再動手** - 不要盲目調參數
-2. **一次改一個變量** - 才能知道什麼有效
-3. **驗證研究結論** - 理論數據不可信
-4. **足夠的交易次數** - 統計顯著性
-5. **文檔化成功經驗** - 寫成 ADR
+1. **Diagnose before acting** - Don't blindly tune parameters
+2. **Change one variable at a time** - So you know what worked
+3. **Validate research conclusions** - Theoretical data can't be trusted
+4. **Enough trades** - For statistical significance
+5. **Document successful experience** - Write it up as an ADR
 
-## 常見錯誤
+## Common Mistakes
 
-| 錯誤 | 後果 | 修正 |
+| Mistake | Consequence | Fix |
   |------|------|------|
-| ❌ 只調參數不換策略 | 無法解決根本問題 | 先診斷根因 |
-| ❌ 回測期間太短 | 過度擬合 | 180+ 天 |
-| ❌ 忽略市場狀態 | 策略-市場不匹配 | 使用 Regime Detection |
-| ❌ 追求高勝率 | 犧牲盈虧比 | 關注期望值 |
+| ❌ Only tuning parameters, never changing strategy | Can't solve the underlying problem | Diagnose the root cause first |
+| ❌ Backtest period too short | Overfitting | 180+ days |
+| ❌ Ignoring market state | Strategy-market mismatch | Use regime detection |
+| ❌ Chasing high win rate | Sacrifices risk/reward | Focus on expectancy |
 
-## 成功案例
+## Success Case
 
 ```
-優化前：
-- 報酬: 0.46%
-  - 勝率: 23.5%
-  - 策略: RSI+MACD（趨勢策略用在盤整市場）
+Before optimization:
+- Return: 0.46%
+  - Win rate: 23.5%
+  - Strategy: RSI+MACD (trend strategy used in a ranging market)
 
-診斷：
-- 90% 時間 ADX < 25（盤整）
-- 趨勢策略不適合
+Diagnosis:
+- ADX < 25 90% of the time (ranging)
+- Trend strategy is a poor fit
 
-優化後：
-- 報酬: +19.93%
-  - 勝率: 54.5%
-  - 策略: Grid Trading + Regime Detection
+After optimization:
+- Return: +19.93%
+  - Win rate: 54.5%
+  - Strategy: Grid Trading + Regime Detection
 
-關鍵改變：
-1. 新增 Grid Trading 策略
-2. 使用 Regime Detection 動態切換
-3. 對稱 SL/TP (1.8%/1.8%)
-4. 10x 槓桿 + 191 筆交易
+Key changes:
+1. Added a Grid Trading strategy
+2. Used regime detection to switch dynamically
+3. Symmetric SL/TP (1.8%/1.8%)
+4. 10x leverage + 191 trades
   ```
 
-## 風險警示
+## Risk Warning
 
 ```
-⚠️ 高報酬伴隨高風險
+⚠️ High returns come with high risk
 
-  - 上述案例最大回撤 48.84%
-  - 考慮降低槓桿 (5x) 換取更低風險
-  - 持續監控市場狀態變化
-    - 設定停損機制
+  - The case above had a maximum drawdown of 48.84%
+  - Consider lowering leverage (5x) for lower risk
+  - Continuously monitor changes in market state
+    - Set up a stop-loss mechanism
 ```
 
-## 參考配置
+## Reference Configuration
 
 ```python
-# 經過驗證的配置
+# Validated configuration
 config = {
-  "leverage": 10.0,          # 或 5.0 降低風險
+  "leverage": 10.0,          # or 5.0 to reduce risk
     "stop_loss_pct": 0.018,    # 1.8%
     "take_profit_pct": 0.018,  # 1.8%
     "top_n_signals": 3,
@@ -312,8 +307,8 @@ config = {
 }
 ```
 
-## 相關 Skills
+## Related Skills
 
-- `finance/quant-trading` - 量化交易基礎
-- `finance/investment-analysis` - 投資分析
-- `methodology/knowledge-acquisition-4c` - 學習新領域
+- `finance/quant-trading` - Quantitative trading fundamentals
+- `finance/investment-analysis` - Investment analysis
+- `methodology/knowledge-acquisition-4c` - Learning a new domain
