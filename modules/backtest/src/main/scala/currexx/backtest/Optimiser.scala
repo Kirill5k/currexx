@@ -29,42 +29,9 @@ object Optimiser extends IOApp.Simple {
     shuffle = false
   )
 
+  // Rounds seed from surviving strategies only (deprecated/low-performing seeds were pruned from
+  // TestStrategy). Re-seed additional rounds from any current strategy's indicator as needed.
   val rounds: List[OptimisationRound] = List(
-    OptimisationRound(
-      name = "s6",
-      strategy = TestStrategy.s6,
-      gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
-      testDataSets = MarketDataProvider.majors1h
-    ),
-    OptimisationRound(
-      name = "s7",
-      strategy = TestStrategy.s7,
-      gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
-      testDataSets = MarketDataProvider.majors1h
-    ),
-    OptimisationRound(
-      name = "s8",
-      strategy = TestStrategy.s8,
-      gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
-      testDataSets = MarketDataProvider.majors1h
-    ),
-    OptimisationRound(
-      name = "s9",
-      strategy = TestStrategy.s9,
-      gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
-      testDataSets = MarketDataProvider.majors1h
-    ),
-    OptimisationRound(
-      name = "s10",
-      strategy = TestStrategy.s10,
-      gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
-      testDataSets = MarketDataProvider.majors1h
-    ),
     OptimisationRound(
       name = "s11",
       strategy = TestStrategy.s11,
