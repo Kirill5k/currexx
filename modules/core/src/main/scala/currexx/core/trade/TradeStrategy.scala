@@ -69,6 +69,10 @@ object Rule extends JsonCodecs {
     case LowerBandCrossed(direction: Direction)
     case PriceCrossedLine(lineRole: ValueRole, direction: Direction)
     case ValueIs(role: ValueRole, operator: Operator, level: Double)
+    // Price-distance stop: true when price has moved at least `nAtr` * ATR against the open
+    // position. Requires the profile to track a Price value (lastClosePrice) and a Volatility
+    // value (lastVolatilityValue = ATR), and the position to carry its entry price (openPrice).
+    case PriceMovedAgainstEntry(nAtr: Double)
 
   object Condition:
     given JsonTaggedAdt.Config[Condition] = JsonTaggedAdt.Config.Values[Condition](
@@ -92,9 +96,10 @@ object Rule extends JsonCodecs {
         "position-is"            -> JsonTaggedAdt.tagged[Condition.PositionIs],
         "position-open-for"      -> JsonTaggedAdt.tagged[Condition.PositionOpenFor],
         "no-position"            -> JsonTaggedAdt.tagged[Condition.NoPosition.type],
-        "upper-band-crossed"     -> JsonTaggedAdt.tagged[Condition.UpperBandCrossed],
-        "lower-band-crossed"     -> JsonTaggedAdt.tagged[Condition.LowerBandCrossed],
-        "price-crossed-line"     -> JsonTaggedAdt.tagged[Condition.PriceCrossedLine]
+        "upper-band-crossed"       -> JsonTaggedAdt.tagged[Condition.UpperBandCrossed],
+        "lower-band-crossed"       -> JsonTaggedAdt.tagged[Condition.LowerBandCrossed],
+        "price-crossed-line"       -> JsonTaggedAdt.tagged[Condition.PriceCrossedLine],
+        "price-moved-against-entry" -> JsonTaggedAdt.tagged[Condition.PriceMovedAgainstEntry]
       ),
       strict = true,
       typeFieldName = "kind"
@@ -145,9 +150,11 @@ object Rule extends JsonCodecs {
       case Rule.Condition.ValueIs(role, operator, level) =>
         val valueToTest = role match
           case ValueRole.Momentum          => currentProfile.lastMomentumValue
-          case ValueRole.Volatility          => currentProfile.lastVolatilityValue
+          case ValueRole.Volatility        => currentProfile.lastVolatilityValue
           case ValueRole.Velocity          => currentProfile.lastVelocityValue
           case ValueRole.ChannelMiddleBand => currentProfile.lastChannelMiddleBandValue
+          case ValueRole.TrendStrength     => currentProfile.lastTrendStrengthValue
+          case ValueRole.Price             => currentProfile.lastClosePrice
         valueToTest.exists { value =>
           val bdLevel = BigDecimal.valueOf(level)
           operator match
@@ -255,6 +262,19 @@ object Rule extends JsonCodecs {
       case Condition.PriceCrossedLine(lineRole, direction) =>
         currentProfile.lastPriceLineCrossing.exists(cross => cross.role == lineRole && cross.direction == direction)
         && currentProfile.lastPriceLineCrossing != previousProfile.lastPriceLineCrossing
+
+      case Condition.PriceMovedAgainstEntry(nAtr) =>
+        (state.currentPosition, currentProfile.lastClosePrice, currentProfile.lastVolatilityValue) match {
+          case (Some(pos), Some(currentPrice), Some(atr)) =>
+            pos.openPrice.exists { entryPrice =>
+              // Adverse excursion: how far price has moved against the position since entry.
+              val adverseMove = pos.position match
+                case TradeOrder.Position.Buy  => entryPrice - currentPrice // a long loses as price falls
+                case TradeOrder.Position.Sell => currentPrice - entryPrice // a short loses as price rises
+              adverseMove >= (BigDecimal(nAtr) * atr)
+            }
+          case _ => false // need position (with entry price), current price and ATR to evaluate
+        }
     }
   }
 }

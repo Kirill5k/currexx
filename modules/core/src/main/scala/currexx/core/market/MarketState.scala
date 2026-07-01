@@ -54,13 +54,21 @@ final case class MarketProfile(
     lastVelocityValue: Option[BigDecimal] = None,
     lastBandCrossing: Option[BandCrossingState] = None,
     lastChannelMiddleBandValue: Option[BigDecimal] = None,
-    lastPriceLineCrossing: Option[PriceLineCrossingState] = None
+    lastPriceLineCrossing: Option[PriceLineCrossingState] = None,
+    // Trend strength (e.g. ADX) tracked in its own slot so it does NOT collide with the shared
+    // momentum zone that oscillator ThresholdCrossings write to. Read via ValueIs(TrendStrength, ...).
+    lastTrendStrengthValue: Option[BigDecimal] = None,
+    // Latest source price, tracked so price-distance stops (PriceMovedAgainstEntry) can be evaluated.
+    lastClosePrice: Option[BigDecimal] = None
 ) derives Codec.AsObject
 
 
 final case class PositionState(
     position: TradeOrder.Position,
-    openedAt: Instant
+    openedAt: Instant,
+    // Entry price of the open position; used by price-distance stops. Optional for codec
+    // backward-compatibility with states persisted before this field existed.
+    openPrice: Option[BigDecimal] = None
 ) derives Codec.AsObject
 
 final case class MarketState(

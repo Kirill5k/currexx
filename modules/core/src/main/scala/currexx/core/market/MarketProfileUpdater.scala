@@ -12,6 +12,8 @@ object MarketProfileUpdater:
           case ValueRole.Volatility        => profile.copy(lastVolatilityValue = Some(value))
           case ValueRole.Velocity          => profile.copy(lastVelocityValue = Some(value))
           case ValueRole.ChannelMiddleBand => profile.copy(lastChannelMiddleBandValue = Some(value))
+          case ValueRole.TrendStrength     => profile.copy(lastTrendStrengthValue = Some(value))
+          case ValueRole.Price             => profile.copy(lastClosePrice = Some(value))
 
       case Condition.TrendDirectionChange(_, to, _) =>
         val currentTrendDirection = profile.trend.map(_.direction)
