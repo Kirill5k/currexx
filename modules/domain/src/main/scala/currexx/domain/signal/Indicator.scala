@@ -15,7 +15,7 @@ enum ValueSource:
 
 object ValueRole extends EnumType[ValueRole](() => ValueRole.values)
 enum ValueRole:
-  case Momentum, Volatility, Velocity, ChannelMiddleBand
+  case Momentum, Volatility, Velocity, ChannelMiddleBand, TrendStrength, Price
 
 enum ValueTransformation derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Sequenced(sequence: List[ValueTransformation])
