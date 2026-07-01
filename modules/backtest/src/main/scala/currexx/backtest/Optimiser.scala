@@ -34,7 +34,7 @@ object Optimiser extends IOApp.Simple {
   val rounds: List[OptimisationRound] = List(
     OptimisationRound(
       name = "s11",
-      strategy = TestStrategy.s11,
+      strategy = TestStrategy.s1,
       gaParameters = gaParameters,
       scoringFunction = ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
       testDataSets = MarketDataProvider.majors1h
