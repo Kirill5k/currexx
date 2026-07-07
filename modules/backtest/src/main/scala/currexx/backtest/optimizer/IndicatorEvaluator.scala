@@ -41,13 +41,13 @@ object IndicatorEvaluator {
       else (stats.foldLeft(BigDecimal(0))(_ + _.medianProfitByMonth) / BigDecimal(stats.size)).toDouble
 
     /** Balanced scoring function that combines multiple objectives:
-      *   - Total profit (absolute returns)
+      *   - Profit per order (efficiency of returns, not raw trade volume)
       *   - Win/loss ratio (trade quality)
       *   - Median profit by month (consistency)
       *   - Penalizes strategies with too few or too many trades
       *
       * @param profitWeight
-      *   Weight for total profit component (default: 0.4)
+      *   Weight for profit-per-order component (default: 0.4)
       * @param ratioWeight
       *   Weight for win/loss ratio component (default: 0.3)
       * @param consistencyWeight
@@ -58,6 +58,8 @@ object IndicatorEvaluator {
       *   Maximum number of orders per dataset (penalize if above)
       * @param targetRatio
       *   Target win/loss ratio for normalization (default: 2.0)
+      * @param targetProfitPerOrder
+      *   Per-order profit that normalizes to a score of 1.0 (default: 0.005, a strong per-trade edge for FX price diffs)
       * @return
       *   Weighted composite score
       */
@@ -67,13 +69,14 @@ object IndicatorEvaluator {
         consistencyWeight: Double = 0.3,
         minOrders: Option[Int] = Some(25),
         maxOrders: Option[Int] = Some(400),
-        targetRatio: Double = 2.0
+        targetRatio: Double = 2.0,
+        targetProfitPerOrder: Double = 0.005
     ): ScoringFunction = stats =>
       if (stats.isEmpty) 0.0
       else {
         // Single-pass calculation of all metrics
-        val (validCount, totalProfit, totalWinLossRatio, totalConsistency) =
-          stats.foldLeft((0, BigDecimal(0), BigDecimal(0), BigDecimal(0))) { case ((count, profit, ratio, consistency), os) =>
+        val (validCount, totalOrders, totalProfit, totalWinLossRatio, totalConsistency) =
+          stats.foldLeft((0, 0, BigDecimal(0), BigDecimal(0), BigDecimal(0))) { case ((count, orders, profit, ratio, consistency), os) =>
             val numOrders  = os.total
             val isBelowMin = minOrders.exists(numOrders < _)
             val isAboveMax = maxOrders.exists(numOrders > _)
@@ -81,6 +84,7 @@ object IndicatorEvaluator {
 
             (
               if (isValid) count + 1 else count,
+              orders + numOrders,
               profit + os.totalProfit,
               ratio + os.winLossRatio,
               consistency + os.medianProfitByMonth
@@ -92,6 +96,10 @@ object IndicatorEvaluator {
         // If most strategies violate order constraints, heavily penalize
         if (orderCountPenalty < 0.5) 0.0
         else {
+          // Component 1: Profit per order (efficiency, not raw trade volume), normalized against the target (uncapped)
+          val profitPerOrder  = if (totalOrders == 0) BigDecimal(0) else totalProfit / BigDecimal(totalOrders)
+          val normalizedProfit = profitPerOrder / BigDecimal(targetProfitPerOrder)
+
           // Component 2: Win/Loss Ratio (normalized and capped)
           val avgWinLossRatio = totalWinLossRatio / BigDecimal(stats.size)
           val normalizedRatio = (avgWinLossRatio / BigDecimal(targetRatio)).min(BigDecimal(1))
@@ -101,7 +109,7 @@ object IndicatorEvaluator {
 
           // Combine with weights
           val compositeScore =
-            (totalProfit * BigDecimal(profitWeight)) +
+            (normalizedProfit * BigDecimal(profitWeight)) +
               (normalizedRatio * BigDecimal(ratioWeight)) +
               (avgConsistency * BigDecimal(consistencyWeight))
 
