@@ -9,15 +9,6 @@ import java.time.format.DateTimeFormatter
 import java.time.ZonedDateTime
 
 object MarketDataProvider:
-  val majors = List(
-    "aud-usd-1d-2years.csv",
-    "eur-usd-1d-2years.csv",
-    "gbp-usd-1d-2years.csv",
-    "nzd-usd-1d-2years.csv",
-    "usd-cad-1d-2years.csv",
-    "usd-chf-1d-2years.csv"
-  )
-
   val majors1h = List(
     "aud-usd-1h-1year.csv",
     "eur-usd-1h-1year.csv",
@@ -25,38 +16,6 @@ object MarketDataProvider:
     "nzd-usd-1h-1year.csv",
     "usd-cad-1h-1year.csv",
     "usd-chf-1h-1year.csv"
-  )
-
-  val completeDataset = List(
-    "aud-cad-1d.csv",
-    "aud-jpy-1d.csv",
-    "cad-jpy-1d.csv",
-    "eur-aud-1d.csv",
-    "eur-chf-1d.csv",
-    "eur-gbp-1d.csv",
-    "gbp-jpy-1d.csv",
-    "nzd-cad-1d.csv",
-    "nzd-chf-1d.csv",
-    "nzd-jpy-1d.csv",
-    "usd-dkk-1d.csv",
-    "usd-jpy-1d.csv",
-    "usd-nok-1d.csv",
-    "usd-pln-1d.csv"
-  )
-
-  val euusDataset = List(
-    "aud-cad-1d.csv",
-    "eur-aud-1d.csv",
-    "eur-chf-1d.csv",
-    "eur-gbp-1d.csv",
-    "nzd-cad-1d.csv",
-    "nzd-chf-1d.csv",
-    "usd-dkk-1d.csv"
-  )
-
-  val audDataset = List(
-    "aud-cad-1d.csv",
-    "eur-aud-1d.csv"
   )
 
   private val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss.SSSXXX")
