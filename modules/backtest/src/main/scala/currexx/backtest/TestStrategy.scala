@@ -290,6 +290,75 @@ object TestStrategy {
     )
   )
 
+  // GA-optimized indicator params for s1_v2, re-optimized from s1_v2_optimized (rules unchanged). Best
+  // Top-25 member from ga-optimisation-2026-07-14-2343-s1_v2_optimized.md (fitness 0.957191).
+  // median win-to-loss ratio: 2.00000, total profit: 0.99721, total orders: 196, median profit: 0.16303, median loss: -0.005137
+  val s1_v2_optimized_v2 = TestStrategy(
+    indicator = Indicator.compositeAnyOf(
+      // Primary signal: JMA crossover
+      Indicator.LinesCrossing(
+        source = ValueSource.HLC3,
+        line1Transformation = ValueTransformation.JMA(length = 40, phase = -55, power = 4),
+        line2Transformation = ValueTransformation.JMA(length = 19, phase = -1, power = 9)
+      ),
+      // Momentum filter
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 28),
+        upperBoundary = 72.0,
+        lowerBoundary = 14.0
+      ),
+      // Momentum tracking
+      Indicator.ValueTracking(
+        role = ValueRole.Momentum,
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 6)
+      ),
+      // Volatility filter
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 19,
+        smoothingType = ValueTransformation.SMA(length = 55)
+      )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.upwardCrossover,
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.MomentumIs(Direction.Upward),
+            Rule.Condition.Not(Rule.Condition.momentumIsInOverbought)
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.downwardCrossover,
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.MomentumIs(Direction.Downward),
+            Rule.Condition.Not(Rule.Condition.momentumIsInOversold)
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.momentumEnteredOverbought
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.momentumEnteredOversold
+            )
+          )
+        )
+      )
+    )
+  )
+
   // median win-to-loss ratio: 5.901785, total profit: 0.20349, total orders: 652, median profit: 0.04662, median loss: -0.004795
   val s2 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
@@ -364,6 +433,64 @@ object TestStrategy {
       ),
       Indicator.VolatilityRegimeDetection(
         atrLength = 12,
+        smoothingType = ValueTransformation.SMA(length = 5)
+      )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.upwardCrossover,
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.Not(Rule.Condition.momentumIsInOverbought)
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.downwardCrossover,
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.Not(Rule.Condition.momentumIsInOversold)
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.momentumEnteredOverbought
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.momentumEnteredOversold
+            )
+          )
+        )
+      )
+    )
+  )
+
+  // GA-optimized indicator params for s2, re-optimized from s2_optimized (rules unchanged). Best Top-25
+  // member from ga-optimisation-2026-07-15-0052-s2_optimized.md (fitness 0.687735).
+  // median win-to-loss ratio: 2.77270, total profit: 0.54006, total orders: 195, median profit: 0.08943, median loss: -0.010073
+  val s2_optimized_v2 = TestStrategy(
+    indicator = Indicator.compositeAnyOf(
+      Indicator.LinesCrossing(
+        source = ValueSource.HLC3,
+        line1Transformation = ValueTransformation.JMA(length = 35, phase = -58, power = 1),
+        line2Transformation = ValueTransformation.JMA(length = 44, phase = 90, power = 1)
+      ),
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 31),
+        upperBoundary = 59.0,
+        lowerBoundary = 31.0
+      ),
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 10,
         smoothingType = ValueTransformation.SMA(length = 5)
       )
     ),
@@ -703,6 +830,82 @@ object TestStrategy {
     )
   )
 
+  // GA-optimized indicator params for s4_regime, re-optimized from s4_regime_optimized (rules unchanged).
+  // Best Top-25 member from ga-optimisation-2026-07-17-1714-s4_regime_optimized.md (fitness 0.563624).
+  // median win-to-loss ratio: 3.67500, total profit: 0.31070, total orders: 165, median profit: 0.04992, median loss: -0.002982
+  val s4_regime_optimized_v2 = TestStrategy(
+    indicator = Indicator.compositeAnyOf(
+      Indicator.TrendChangeDetection(
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.JMA(length = 45, phase = -25, power = 1)
+      ),
+      Indicator.KeltnerChannel(
+        source = ValueSource.Close,
+        middleBand = ValueTransformation.EMA(length = 24),
+        atrLength = 27,
+        atrMultiplier = 1.6
+      ),
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 22),
+        upperBoundary = 67.0,
+        lowerBoundary = 35.0
+      ),
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 19,
+        smoothingType = ValueTransformation.SMA(length = 55)
+      ),
+      Indicator.ValueTracking(
+        role = ValueRole.TrendStrength,
+        source = ValueSource.Close,
+        transformation = ValueTransformation.ADX(length = 23)
+      )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsUpward,
+            Rule.Condition.TrendActiveFor(1.hour),
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.UpperBandCrossed(Direction.Upward),
+            Rule.Condition.ValueIs(ValueRole.TrendStrength, Rule.Operator.GreaterThan, 25.0) // regime gate
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.trendIsDownward,
+            Rule.Condition.TrendActiveFor(1.hour),
+            Rule.Condition.volatilityIsLow,
+            Rule.Condition.LowerBandCrossed(Direction.Downward),
+            Rule.Condition.ValueIs(ValueRole.TrendStrength, Rule.Operator.GreaterThan, 25.0) // regime gate
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            Rule.Condition.TrendChangedTo(Direction.Downward),
+            Rule.Condition.TrendChangedTo(Direction.Upward),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.momentumEnteredOverbought
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.momentumEnteredOversold
+            )
+          )
+        )
+      )
+    )
+  )
+
   // median win-to-loss ratio: 3.204545, total profit: 0.29251, total orders: 564, median profit: 0.05418, median loss: -0.00333900349650349615
   val s5 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
@@ -831,6 +1034,104 @@ object TestStrategy {
         role = ValueRole.Momentum,
         source = ValueSource.Close,
         transformation = ValueTransformation.RSX(length = 7)
+      )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.anyOf(
+              // 1. Breakout Entry (Trend Following)
+              Rule.Condition.allOf(
+                Rule.Condition.trendIsUpward,
+                Rule.Condition.volatilityIsLow,                   // Squeeze
+                Rule.Condition.UpperBandCrossed(Direction.Upward) // Bollinger Breakout
+              ),
+              // 2. Reversion Entry (Counter Trend / Deep Pullback)
+              Rule.Condition.allOf(
+                Rule.Condition.LowerBandCrossed(Direction.Upward),   // Price Re-enters Channel
+                Rule.Condition.MomentumEntered(MomentumZone.Neutral) // Momentum turns up
+              )
+            )
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.anyOf(
+              // 1. Breakout Entry
+              Rule.Condition.allOf(
+                Rule.Condition.trendIsDownward,
+                Rule.Condition.volatilityIsLow,
+                Rule.Condition.LowerBandCrossed(Direction.Downward)
+              ),
+              // 2. Reversion Entry
+              Rule.Condition.allOf(
+                Rule.Condition.UpperBandCrossed(Direction.Downward), // Price Re-enters Channel
+                Rule.Condition.MomentumEntered(MomentumZone.Neutral) // Momentum turns down
+              )
+            )
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.TrendChangedTo(Direction.Downward)
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.TrendChangedTo(Direction.Upward)
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.momentumEnteredOverbought
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.momentumEnteredOversold
+            )
+          )
+        )
+      )
+    )
+  )
+
+  // GA-optimized indicator params for s5, re-optimized from the s5 baseline (rules unchanged). Best
+  // Top-25 member from ga-optimisation-2026-07-17-1858-s5.md (fitness 0.539268).
+  // median win-to-loss ratio: 3.03330, total profit: 0.32643, total orders: 191, median profit: 0.05944, median loss: -0.003692
+  val s5_optimized_v2 = TestStrategy(
+    indicator = Indicator.compositeAnyOf(
+      Indicator.TrendChangeDetection(
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.JMA(length = 50, phase = 54, power = 1)
+      ),
+      Indicator.BollingerBands(
+        source = ValueSource.Close,
+        middleBand = ValueTransformation.SMA(length = 43),
+        stdDevLength = 38,
+        stdDevMultiplier = 2.8
+      ),
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 13,
+        smoothingType = ValueTransformation.SMA(length = 39)
+      ),
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 15),
+        upperBoundary = 63.0,
+        lowerBoundary = 31.0
+      ),
+      Indicator.ValueTracking(
+        role = ValueRole.Momentum,
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 5)
       )
     ),
     rules = TradeStrategy(
