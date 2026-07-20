@@ -290,25 +290,6 @@ Key changes:
   - The case above had a maximum drawdown of 48.84%
   - Consider lowering leverage (5x) for lower risk
   - Continuously monitor changes in market state
-    - Set up a stop-loss mechanism
+  - Set up a stop-loss mechanism
 ```
 
-## Reference Configuration
-
-```python
-# Validated configuration
-config = {
-  "leverage": 10.0,          # or 5.0 to reduce risk
-    "stop_loss_pct": 0.018,    # 1.8%
-    "take_profit_pct": 0.018,  # 1.8%
-    "top_n_signals": 3,
-  "min_confidence": 0.5,
-  "use_regime_selector": True,
-}
-```
-
-## Related Skills
-
-- `finance/quant-trading` - Quantitative trading fundamentals
-- `finance/investment-analysis` - Investment analysis
-- `methodology/knowledge-acquisition-4c` - Learning a new domain
