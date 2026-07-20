@@ -1,332 +1,139 @@
 package currexx.backtest.optimizer
 
-import currexx.backtest.OrderStats
 import currexx.backtest.optimizer.IndicatorEvaluator.ScoringFunction
+import currexx.backtest.{CompletedTrade, OrderStats, RiskSettings}
+import currexx.domain.market.TradeOrder.Position
+import currexx.domain.market.{Currency, CurrencyPair}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.time.Instant
+import scala.concurrent.duration.*
+
 class ScoringFunctionSpec extends AnyWordSpec with Matchers {
 
-  def mkStats(
-      total: Int = 100,
-      profit: BigDecimal = BigDecimal(100),
-      lossCount: Int = 25,
-      lossTotal: Double = -25.0,
-      biggestWin: BigDecimal = BigDecimal(10),
-      maxDrawdown: BigDecimal = BigDecimal(5),
-      profitByMonth: Map[String, BigDecimal] = Map(
-        "2025-01" -> BigDecimal(10),
-        "2025-02" -> BigDecimal(15),
-        "2025-03" -> BigDecimal(20)
+  private val start = Instant.parse("2025-01-01T00:00:00Z")
+  private val pairs = List(
+    CurrencyPair(Currency.EUR, Currency.USD),
+    CurrencyPair(Currency.GBP, Currency.USD),
+    CurrencyPair(Currency.USD, Currency.CAD)
+  )
+
+  private def statsFor(
+      pair: CurrencyPair,
+      netProfits: List[BigDecimal],
+      costPerTrade: BigDecimal = BigDecimal(0),
+      initialBalance: BigDecimal = BigDecimal(10000),
+      invalidOrderCount: Int = 0
+  ): OrderStats = {
+    val trades = netProfits.zipWithIndex.map { case (netProfit, index) =>
+      val closedAt = start.plusSeconds(index.toLong * 32.days.toSeconds)
+      CompletedTrade(
+        currencyPair = pair,
+        position = Position.Buy,
+        openedAt = closedAt.minusSeconds(1.hour.toSeconds),
+        closedAt = closedAt,
+        entryPrice = BigDecimal(1),
+        exitPrice = BigDecimal(1),
+        volume = BigDecimal("0.1"),
+        grossProfit = netProfit + costPerTrade,
+        costs = costPerTrade,
+        netProfit = netProfit
       )
-  ): OrderStats =
-    OrderStats(
-      total = total,
-      buys = total / 2,
-      sells = total / 2,
-      winCount = total - lossCount,
-      lossCount = lossCount,
-      lossTotal = lossTotal,
-      totalProfit = profit,
-      biggestWin = biggestWin,
-      biggestLoss = -maxDrawdown,
-      profitByMonth = profitByMonth,
-      maxDrawdown = maxDrawdown
+    }
+    OrderStats.fromTrades(
+      trades = trades,
+      openPositions = Nil,
+      settings = RiskSettings(initialBalance = initialBalance),
+      invalidOrderCount = invalidOrderCount
     )
-
-  "ScoringFunction.balanced" should {
-    "return 0 for empty stats list" in {
-      val result = ScoringFunction.balanced()(List.empty)
-      result mustBe 0.0
-    }
-
-    "return 0 when more than 50% of datasets violate order constraints" in {
-      val stats = List(
-        mkStats(total = 10), // Below minOrders=50
-        mkStats(total = 15), // Below minOrders=50
-        mkStats(total = 100) // Valid
-      )
-      val result = ScoringFunction.balanced(minOrders = Some(50))(stats)
-      result mustBe 0.0
-    }
-
-    "calculate score for valid stats with default weights" in {
-      val stats = List(
-        mkStats(total = 100, profit = BigDecimal(50), lossCount = 20, lossTotal = -20.0),
-        mkStats(total = 150, profit = BigDecimal(75), lossCount = 30, lossTotal = -30.0)
-      )
-      val result = ScoringFunction.balanced()(stats)
-
-      // Should be positive and reasonable
-      result must ((be > 0.0).and(be < 200.0)) // Less than total profit due to weighted components
-    }
-
-    "prioritize profit when profitWeight is high" in {
-      val stats = List(mkStats(total = 100, profit = BigDecimal(100), lossCount = 40, lossTotal = -40.0))
-
-      val highProfitWeight = ScoringFunction.balanced(profitWeight = 0.8, ratioWeight = 0.1, consistencyWeight = 0.1)(stats)
-      val lowProfitWeight  = ScoringFunction.balanced(profitWeight = 0.2, ratioWeight = 0.4, consistencyWeight = 0.4)(stats)
-
-      highProfitWeight must be > lowProfitWeight
-    }
-
-    "prioritize win/loss ratio when ratioWeight is high" in {
-      val highRatioStats = List(mkStats(total = 100, profit = BigDecimal(50), lossCount = 10, lossTotal = -10.0))
-      val lowRatioStats  = List(mkStats(total = 100, profit = BigDecimal(50), lossCount = 40, lossTotal = -40.0))
-
-      val scoring = ScoringFunction.balanced(profitWeight = 0.2, ratioWeight = 0.6, consistencyWeight = 0.2)
-
-      val highRatioScore = scoring(highRatioStats)
-      val lowRatioScore  = scoring(lowRatioStats)
-
-      highRatioScore must be > lowRatioScore
-    }
-
-    "prioritize consistency when consistencyWeight is high" in {
-      val consistentStats = List(
-        mkStats(
-          total = 100,
-          profit = BigDecimal(60),
-          profitByMonth = Map("2025-01" -> BigDecimal(20), "2025-02" -> BigDecimal(20), "2025-03" -> BigDecimal(20))
-        )
-      )
-
-      val inconsistentStats = List(
-        mkStats(
-          total = 100,
-          profit = BigDecimal(60),
-          profitByMonth = Map("2025-01" -> BigDecimal(50), "2025-02" -> BigDecimal(5), "2025-03" -> BigDecimal(5))
-        )
-      )
-
-      val scoring = ScoringFunction.balanced(profitWeight = 0.2, ratioWeight = 0.2, consistencyWeight = 0.6)
-
-      val consistentScore   = scoring(consistentStats)
-      val inconsistentScore = scoring(inconsistentStats)
-
-      consistentScore must be > inconsistentScore
-    }
-
-    "penalize strategies with too few orders" in {
-      val tooFewOrders = List(mkStats(total = 20, profit = BigDecimal(100)))
-      val result       = ScoringFunction.balanced(minOrders = Some(50))(tooFewOrders)
-      result mustBe 0.0
-    }
-
-    "penalize strategies with too many orders" in {
-      val tooManyOrders = List(mkStats(total = 1000, profit = BigDecimal(100)))
-      val result        = ScoringFunction.balanced(maxOrders = Some(700))(tooManyOrders)
-      result mustBe 0.0
-    }
-
-    "normalize win/loss ratio using targetRatio" in {
-      val stats = List(mkStats(total = 100, profit = BigDecimal(50), lossCount = 25, lossTotal = -25.0))
-
-      // With lower targetRatio, the normalized ratio will be higher (capped at 1.0)
-      val lowTarget  = ScoringFunction.balanced(targetRatio = 1.5, ratioWeight = 1.0, profitWeight = 0, consistencyWeight = 0)(stats)
-      val highTarget = ScoringFunction.balanced(targetRatio = 5.0, ratioWeight = 1.0, profitWeight = 0, consistencyWeight = 0)(stats)
-
-      lowTarget must be >= highTarget
-    }
-
-    "handle edge case with no losses (perfect win ratio)" in {
-      val perfectStats = List(mkStats(total = 100, profit = BigDecimal(100), lossCount = 0, lossTotal = 0.0))
-      val result       = ScoringFunction.balanced()(perfectStats)
-
-      result must be > 0.0
-    }
-
-    "combine multiple datasets correctly" in {
-      val stats = List(
-        mkStats(total = 100, profit = BigDecimal(50)),
-        mkStats(total = 120, profit = BigDecimal(60)),
-        mkStats(total = 90, profit = BigDecimal(40))
-      )
-      val result = ScoringFunction.balanced()(stats)
-
-      // Total profit is 150, should contribute significantly to score
-      result must ((be > 0.0).and(be < 200.0)) // But less than raw profit due to other components
-    }
-
-    "apply order count penalty proportionally" in {
-      val oneInvalid = List(
-        mkStats(total = 100),
-        mkStats(total = 100),
-        mkStats(total = 10) // Invalid
-      )
-      val twoInvalid = List(
-        mkStats(total = 100),
-        mkStats(total = 10), // Invalid
-        mkStats(total = 10)  // Invalid
-      )
-
-      val scoring = ScoringFunction.balanced(minOrders = Some(50))
-
-      val oneInvalidScore = scoring(oneInvalid)
-      val twoInvalidScore = scoring(twoInvalid)
-
-      // With 2/3 invalid, should get penalized more (actually returns 0)
-      twoInvalidScore mustBe 0.0
-      oneInvalidScore must be > 0.0 // 1/3 invalid is < 50%
-    }
   }
 
-  "ScoringFunction.riskAdjusted" should {
-    "return 0 for empty stats list" in {
-      val result = ScoringFunction.riskAdjusted()(List.empty)
-      result mustBe 0.0
+  private val permissiveConfig = ScoringFunction.RobustConfig(
+    minClosedTrades = 1,
+    minProfitableDatasetRatio = 1.0,
+    maxDrawdownPercent = 100.0
+  )
+
+  "ScoringFunction.robust" should {
+    "return zero for no datasets" in {
+      ScoringFunction.robust()(Nil) mustBe 0.0
     }
 
-    "return 0 when all datasets violate order constraints" in {
+    "score a robust candidate between zero and one" in {
+      val stats = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(10))))
+
+      val score = ScoringFunction.robust()(stats)
+
+      score must ((be > 0.0).and(be <= 1.0))
+    }
+
+    "reject candidates with too few closed trades" in {
+      val stats = pairs.map(pair => statsFor(pair, List.fill(49)(BigDecimal(10))))
+
+      ScoringFunction.robust()(stats) mustBe 0.0
+    }
+
+    "reject candidates with non-positive expectancy" in {
+      val stats = List(statsFor(pairs.head, List(BigDecimal(10), BigDecimal(-20))))
+
+      ScoringFunction.robust(permissiveConfig)(stats) mustBe 0.0
+    }
+
+    "reject candidates below the minimum profit factor" in {
+      val stats = List(statsFor(pairs.head, List(BigDecimal(8), BigDecimal(-7))))
+
+      ScoringFunction.robust(permissiveConfig)(stats) mustBe 0.0
+    }
+
+    "treat a candidate with wins and no losses as having an acceptable profit factor" in {
+      val stats = List(statsFor(pairs.head, List(BigDecimal("0.001"))))
+
+      ScoringFunction.robust(permissiveConfig)(stats) must be > 0.0
+    }
+
+    "reject candidates above the maximum drawdown" in {
+      val stats  = List(statsFor(pairs.head, List(BigDecimal(100), BigDecimal(-200), BigDecimal(200)), initialBalance = BigDecimal(1000)))
+      val config = permissiveConfig.copy(minClosedTrades = 3, maxDrawdownPercent = 15.0)
+
+      ScoringFunction.robust(config)(stats) mustBe 0.0
+    }
+
+    "reject candidates whose profit is concentrated in too few datasets" in {
       val stats = List(
-        mkStats(total = 10),
-        mkStats(total = 15)
+        statsFor(pairs(0), List(BigDecimal(100))),
+        statsFor(pairs(1), List(BigDecimal(-10))),
+        statsFor(pairs(2), List(BigDecimal(-10)))
       )
-      val result = ScoringFunction.riskAdjusted(minOrders = Some(50))(stats)
-      result mustBe 0.0
+      val config = permissiveConfig.copy(minClosedTrades = 3, minProfitableDatasetRatio = 2.0 / 3.0)
+
+      ScoringFunction.robust(config)(stats) mustBe 0.0
     }
 
-    "calculate risk-adjusted return correctly" in {
-      val stats = List(
-        mkStats(total = 100, profit = BigDecimal(100), maxDrawdown = BigDecimal(10))
-      )
-      val result = ScoringFunction.riskAdjusted()(stats)
+    "reject candidates whose costs consume too much pre-cost profit" in {
+      val stats = List(statsFor(pairs.head, List(BigDecimal(50)), costPerTrade = BigDecimal(50)))
 
-      // Score should be approximately profit / loss = 100 / 10 = 10
-      result must ((be > 9.0).and(be < 11.0))
+      ScoringFunction.robust(permissiveConfig)(stats) mustBe 0.0
     }
 
-    "favor strategies with lower drawdown for same profit" in {
-      val lowRisk  = List(mkStats(total = 100, profit = BigDecimal(100), maxDrawdown = BigDecimal(5)))
-      val highRisk = List(mkStats(total = 100, profit = BigDecimal(100), maxDrawdown = BigDecimal(20)))
+    "reject candidates that generated invalid orders" in {
+      val stats = List(statsFor(pairs.head, List(BigDecimal(100)), invalidOrderCount = 1))
 
-      val scoring = ScoringFunction.riskAdjusted()
-
-      val lowRiskScore  = scoring(lowRisk)
-      val highRiskScore = scoring(highRisk)
-
-      lowRiskScore must be > highRiskScore
+      ScoringFunction.robust(permissiveConfig)(stats) mustBe 0.0
     }
 
-    "favor strategies with higher profit for same drawdown" in {
-      val highProfit = List(mkStats(total = 100, profit = BigDecimal(200), maxDrawdown = BigDecimal(10)))
-      val lowProfit  = List(mkStats(total = 100, profit = BigDecimal(100), maxDrawdown = BigDecimal(10)))
+    "favor stronger return and recovery when candidates pass the same gates" in {
+      val weaker   = List(statsFor(pairs.head, List(BigDecimal(20), BigDecimal(-10), BigDecimal(20))))
+      val stronger = List(statsFor(pairs.head, List(BigDecimal(100), BigDecimal(-10), BigDecimal(100))))
+      val scoring  = ScoringFunction.robust(permissiveConfig.copy(minClosedTrades = 3))
 
-      val scoring = ScoringFunction.riskAdjusted()
-
-      val highProfitScore = scoring(highProfit)
-      val lowProfitScore  = scoring(lowProfit)
-
-      highProfitScore must be > lowProfitScore
+      scoring(stronger) must be > scoring(weaker)
     }
 
-    "handle zero loss with epsilon" in {
-      val noLossStats = List(mkStats(total = 100, profit = BigDecimal(100), maxDrawdown = BigDecimal(0)))
-      val result      = ScoringFunction.riskAdjusted()(noLossStats)
+    "cap every normalized component so exceptional values cannot dominate fitness" in {
+      val stats = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(1000))))
 
-      // Should not divide by zero, epsilon prevents this
-      result must be > 0.0
-    }
-
-    "filter out datasets violating order constraints" in {
-      val stats = List(
-        mkStats(total = 100, profit = BigDecimal(100), maxDrawdown = BigDecimal(10)),
-        mkStats(total = 10, profit = BigDecimal(50), maxDrawdown = BigDecimal(5)) // Too few orders
-      )
-      val result = ScoringFunction.riskAdjusted(minOrders = Some(50))(stats)
-
-      // Should only use first dataset: 100 / 10 ≈ 10
-      result must ((be > 9.0).and(be < 11.0))
-    }
-
-    "combine multiple valid datasets" in {
-      val stats = List(
-        mkStats(total = 100, profit = BigDecimal(100), maxDrawdown = BigDecimal(10)),
-        mkStats(total = 120, profit = BigDecimal(80), maxDrawdown = BigDecimal(8)),
-        mkStats(total = 90, profit = BigDecimal(60), maxDrawdown = BigDecimal(6))
-      )
-      val result = ScoringFunction.riskAdjusted()(stats)
-
-      // Each dataset has a recovery factor of 10, so their average is 10.
-      result must ((be > 9.0).and(be < 11.0))
-    }
-
-    "penalize high drawdowns even with good profits" in {
-      val lowDrawdown  = List(mkStats(total = 100, profit = BigDecimal(100), maxDrawdown = BigDecimal(2)))
-      val highDrawdown = List(mkStats(total = 100, profit = BigDecimal(150), maxDrawdown = BigDecimal(50)))
-
-      val scoring = ScoringFunction.riskAdjusted()
-
-      val lowDrawdownScore  = scoring(lowDrawdown)  // 100 / 2 = 50
-      val highDrawdownScore = scoring(highDrawdown) // 150 / 50 = 3
-
-      lowDrawdownScore must be > highDrawdownScore
-    }
-  }
-
-  "ScoringFunction.totalProfit" should {
-    "return 0 for empty list" in {
-      ScoringFunction.totalProfit(List.empty) mustBe 0.0
-    }
-
-    "sum total profit across all datasets" in {
-      val stats = List(
-        mkStats(profit = BigDecimal(50)),
-        mkStats(profit = BigDecimal(75)),
-        mkStats(profit = BigDecimal(25))
-      )
-      ScoringFunction.totalProfit(stats) mustBe 150.0
-    }
-
-    "handle negative profits" in {
-      val stats = List(
-        mkStats(profit = BigDecimal(50)),
-        mkStats(profit = BigDecimal(-30))
-      )
-      ScoringFunction.totalProfit(stats) mustBe 20.0
-    }
-  }
-
-  "ScoringFunction.medianWinLossRatio" should {
-    "return 0 for empty list" in {
-      ScoringFunction.medianWinLossRatio()(List.empty) mustBe 0.0
-    }
-
-    "penalize strategies with too few orders" in {
-      val stats = List(mkStats(total = 20))
-      ScoringFunction.medianWinLossRatio(minOrders = Some(50))(stats) mustBe 0.0
-    }
-
-    "penalize strategies with too many orders" in {
-      val stats = List(mkStats(total = 1000))
-      ScoringFunction.medianWinLossRatio(maxOrders = Some(700))(stats) mustBe 0.0
-    }
-
-    "calculate median win/loss ratio correctly" in {
-      val stats = List(
-        mkStats(total = 100, lossCount = 25, lossTotal = -25.0), // Ratio: 75/25 = 3
-        mkStats(total = 100, lossCount = 50, lossTotal = -50.0)  // Ratio: 50/50 = 1
-      )
-      val result = ScoringFunction.medianWinLossRatio()(stats)
-      result mustBe 2.0 // Median of [3, 1] = 2
-    }
-  }
-
-  "ScoringFunction.averageMedianProfitByMonth" should {
-    "return 0 for empty list" in {
-      ScoringFunction.averageMedianProfitByMonth(List.empty) mustBe 0.0
-    }
-
-    "calculate average of median monthly profits" in {
-      val stats = List(
-        mkStats(profitByMonth = Map("2025-01" -> BigDecimal(10), "2025-02" -> BigDecimal(20), "2025-03" -> BigDecimal(30))),
-        mkStats(profitByMonth = Map("2025-01" -> BigDecimal(15), "2025-02" -> BigDecimal(25), "2025-03" -> BigDecimal(35)))
-      )
-      val result = ScoringFunction.averageMedianProfitByMonth(stats)
-
-      // First dataset median: 20, Second dataset median: 25
-      // Average: (20 + 25) / 2 = 22.5
-      result mustBe 22.5
+      ScoringFunction.robust()(stats) must be <= 1.0
     }
   }
 }

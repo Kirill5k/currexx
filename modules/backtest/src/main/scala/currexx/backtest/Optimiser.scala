@@ -29,6 +29,8 @@ object Optimiser extends IOApp.Simple {
     shuffle = false
   )
 
+  val robustScoring: ScoringFunction = ScoringFunction.robust()
+
   // Rounds seed from surviving strategies only (deprecated/low-performing seeds were pruned from
   // TestStrategy). Re-seed additional rounds from any current strategy's indicator as needed.
   val rounds: List[OptimisationRound] = List(
@@ -36,41 +38,31 @@ object Optimiser extends IOApp.Simple {
       name = "s4_regime_optimized",
       strategy = TestStrategy.s4_regime_optimized,
       gaParameters = gaParameters,
-      scoringFunction =
-        ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
+      scoringFunction = robustScoring,
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
       name = "s5",
       strategy = TestStrategy.s5,
       gaParameters = gaParameters,
-      scoringFunction =
-        ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
+      scoringFunction = robustScoring,
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
       name = "s12",
       strategy = TestStrategy.s12,
       gaParameters = gaParameters,
-      scoringFunction =
-        ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
+      scoringFunction = robustScoring,
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
       name = "s12_optimized",
       strategy = TestStrategy.s12_optimized,
       gaParameters = gaParameters,
-      scoringFunction =
-        ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
+      scoringFunction = robustScoring,
       testDataSets = MarketDataProvider.majors1h
     )
   )
-
-  // Alternative options:
-  // val scoringFunction = ScoringFunction.riskAdjusted(Some(50), Some(700))
-  // val scoringFunction = ScoringFunction.totalProfit
-  // val scoringFunction = ScoringFunction.medianWinLossRatio(Some(50), Some(700))
-  // val scoringFunction = ScoringFunction.averageMedianProfitByMonth
 
   override def run: IO[Unit] =
     rounds.traverse_ { round =>

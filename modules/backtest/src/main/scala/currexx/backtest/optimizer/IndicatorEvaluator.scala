@@ -8,8 +8,7 @@ import cats.syntax.parallel.*
 import currexx.algorithms.Fitness
 import currexx.algorithms.operators.Evaluator
 import currexx.backtest.services.TestServicesPool
-import currexx.backtest.syntax.*
-import currexx.backtest.{MarketDataProvider, OrderStats, TestSettings}
+import currexx.backtest.{MarketDataProvider, OrderStats, RiskSettings, TestSettings}
 import currexx.core.signal.SignalDetector
 import currexx.core.trade.TradeStrategy
 import currexx.domain.signal.Indicator
@@ -20,135 +19,87 @@ object IndicatorEvaluator {
   type ScoringFunction = List[OrderStats] => Double
 
   object ScoringFunction {
-    val totalProfit: ScoringFunction = _.foldLeft(BigDecimal(0))(_ + _.totalProfit).toDouble
+    final case class RobustConfig(
+        minClosedTrades: Int = 150,
+        minProfitableDatasetRatio: Double = 2.0 / 3.0,
+        minProfitFactor: Double = 1.2,
+        maxDrawdownPercent: Double = 15.0,
+        maxCostToPreCostProfitRatio: Double = 0.4,
+        targetNetReturn: Double = 0.5,
+        targetRecoveryFactor: Double = 3.0,
+        targetSortinoRatio: Double = 2.0,
+        targetExpectancyToLossRatio: Double = 0.2
+    ) {
+      require(minClosedTrades > 0, "Minimum closed trades must be positive")
+      require(minProfitableDatasetRatio > 0 && minProfitableDatasetRatio <= 1, "Profitable dataset ratio must be in (0, 1]")
+      require(minProfitFactor > 1, "Minimum profit factor must be greater than 1")
+      require(maxDrawdownPercent > 0, "Maximum drawdown must be positive")
+      require(maxCostToPreCostProfitRatio > 0, "Maximum cost ratio must be positive")
+      require(targetNetReturn > 0, "Target net return must be positive")
+      require(targetRecoveryFactor > 0, "Target recovery factor must be positive")
+      require(targetSortinoRatio > 0, "Target Sortino ratio must be positive")
+      require(targetExpectancyToLossRatio > 0, "Target expectancy ratio must be positive")
+    }
 
-    def medianWinLossRatio(minOrders: Option[Int] = None, maxOrders: Option[Int] = None): ScoringFunction = stats =>
-      if (stats.isEmpty) 0.0
-      else {
-        // Single-pass filtering and mapping - using List with prepend for O(1) operations
-        val validRatios = stats.foldLeft(List.empty[BigDecimal]) { (acc, os) =>
-          val numOrders  = os.total
-          val isBelowMin = minOrders.exists(numOrders < _)
-          val isAboveMax = maxOrders.exists(numOrders > _)
-
-          if (isBelowMin || isAboveMax) BigDecimal(0) :: acc else os.winLossRatio :: acc
-        }
-        validRatios.median.toDouble
-      }
-
-    val averageMedianProfitByMonth: ScoringFunction = stats =>
-      if (stats.isEmpty) 0.0
-      else (stats.foldLeft(BigDecimal(0))(_ + _.medianProfitByMonth) / BigDecimal(stats.size)).toDouble
-
-    /** Balanced scoring function that combines multiple objectives:
-      *   - Profit per order (efficiency of returns, not raw trade volume)
-      *   - Win/loss ratio (trade quality)
-      *   - Median profit by month (consistency)
-      *   - Penalizes strategies with too few or too many trades
+    /** Scores a candidate on cost-adjusted portfolio performance while rejecting statistically weak or unsafe candidates.
       *
-      * @param profitWeight
-      *   Weight for profit-per-order component (default: 0.4)
-      * @param ratioWeight
-      *   Weight for win/loss ratio component (default: 0.3)
-      * @param consistencyWeight
-      *   Weight for consistency component (default: 0.3)
-      * @param minOrders
-      *   Minimum number of orders per dataset (penalize if below)
-      * @param maxOrders
-      *   Maximum number of orders per dataset (penalize if above)
-      * @param targetRatio
-      *   Target win/loss ratio for normalization (default: 2.0)
-      * @param targetProfitPerOrder
-      *   Per-order profit that normalizes to a score of 1.0 (default: 0.005, a strong per-trade edge for FX price diffs)
-      * @return
-      *   Weighted composite score
+      * Hard gates require enough closed trades, positive expectancy, acceptable drawdown and costs, no invalid orders, and profitability
+      * across at least two thirds of datasets. Passing candidates receive a normalized score in [0, 1]:
+      *   - 30% net return
+      *   - 25% recovery factor
+      *   - 15% Sortino ratio
+      *   - 15% expectancy relative to average loss
+      *   - 15% profitable-dataset ratio
+      *
+      * Each component is capped at its target so a single outlier cannot dominate selection.
       */
-    def balanced(
-        profitWeight: Double = 0.4,
-        ratioWeight: Double = 0.3,
-        consistencyWeight: Double = 0.3,
-        minOrders: Option[Int] = Some(25),
-        maxOrders: Option[Int] = Some(400),
-        targetRatio: Double = 2.0,
-        targetProfitPerOrder: Double = 0.005
-    ): ScoringFunction = stats =>
+    def robust(config: RobustConfig = RobustConfig()): ScoringFunction = stats =>
       if (stats.isEmpty) 0.0
       else {
-        // Single-pass calculation of all metrics
-        val (validCount, totalOrders, totalProfit, totalWinLossRatio, totalConsistency) =
-          stats.foldLeft((0, 0, BigDecimal(0), BigDecimal(0), BigDecimal(0))) { case ((count, orders, profit, ratio, consistency), os) =>
-            val numOrders  = os.total
-            val isBelowMin = minOrders.exists(numOrders < _)
-            val isAboveMax = maxOrders.exists(numOrders > _)
-            val isValid    = !isBelowMin && !isAboveMax
+        val initialBalance      = stats.head.initialBalance
+        val portfolio           = OrderStats.combine(stats, RiskSettings(initialBalance = initialBalance))
+        val profitableRatio     = stats.count(_.totalProfit > 0).toDouble / stats.size
+        val costToPreCostProfit =
+          if (portfolio.preCostProfit <= 0) Double.PositiveInfinity
+          else (portfolio.totalCosts / portfolio.preCostProfit).toDouble
+        val meetsProfitFactor =
+          (portfolio.lossCount == 0 && portfolio.winCount > 0) ||
+            portfolio.profitFactor.toDouble >= config.minProfitFactor
+        val passesHardConstraints =
+          portfolio.total >= config.minClosedTrades &&
+            portfolio.totalProfit > 0 &&
+            portfolio.expectancy > 0 &&
+            meetsProfitFactor &&
+            portfolio.maxDrawdownPercent.toDouble <= config.maxDrawdownPercent &&
+            profitableRatio >= config.minProfitableDatasetRatio &&
+            costToPreCostProfit <= config.maxCostToPreCostProfitRatio &&
+            portfolio.invalidOrderCount == 0
 
-            (
-              if (isValid) count + 1 else count,
-              orders + numOrders,
-              profit + os.totalProfit,
-              ratio + os.winLossRatio,
-              consistency + os.medianProfitByMonth
-            )
-          }
-
-        val orderCountPenalty = validCount.toDouble / stats.size.toDouble
-
-        // If most strategies violate order constraints, heavily penalize
-        if (orderCountPenalty < 0.5) 0.0
+        if (!passesHardConstraints) 0.0
         else {
-          // Component 1: Profit per order (efficiency, not raw trade volume), normalized against the target (uncapped)
-          val profitPerOrder   = if (totalOrders == 0) BigDecimal(0) else totalProfit / BigDecimal(totalOrders)
-          val normalizedProfit = profitPerOrder / BigDecimal(targetProfitPerOrder)
+          val netReturn      = (portfolio.totalProfit / initialBalance).toDouble
+          val recoveryFactor =
+            if (portfolio.maxDrawdown == 0) config.targetRecoveryFactor
+            else (portfolio.totalProfit / portfolio.maxDrawdown).toDouble
+          val expectancyToLoss =
+            if (portfolio.averageLoss == 0) config.targetExpectancyToLossRatio
+            else (portfolio.expectancy / portfolio.averageLoss).toDouble
 
-          // Component 2: Win/Loss Ratio (normalized and capped)
-          val avgWinLossRatio = totalWinLossRatio / BigDecimal(stats.size)
-          val normalizedRatio = (avgWinLossRatio / BigDecimal(targetRatio)).min(BigDecimal(1))
+          val netReturnScore  = normalized(netReturn, config.targetNetReturn)
+          val recoveryScore   = normalized(recoveryFactor, config.targetRecoveryFactor)
+          val sortinoScore    = normalized(portfolio.sortinoRatio, config.targetSortinoRatio)
+          val expectancyScore = normalized(expectancyToLoss, config.targetExpectancyToLossRatio)
 
-          // Component 3: Consistency (median profit by month)
-          val avgConsistency = totalConsistency / BigDecimal(stats.size)
-
-          // Combine with weights
-          val compositeScore =
-            (normalizedProfit * BigDecimal(profitWeight)) +
-              (normalizedRatio * BigDecimal(ratioWeight)) +
-              (avgConsistency * BigDecimal(consistencyWeight))
-
-          // Apply order count penalty
-          (compositeScore * BigDecimal(orderCountPenalty)).toDouble
+          (0.30 * netReturnScore) +
+            (0.25 * recoveryScore) +
+            (0.15 * sortinoScore) +
+            (0.15 * expectancyScore) +
+            (0.15 * profitableRatio)
         }
       }
 
-    /** Risk-adjusted return scoring that prioritizes profitability while controlling equity drawdown. Uses the average recovery factor (net
-      * profit / maximum drawdown) across valid datasets.
-      *
-      * @param minOrders
-      *   Minimum number of orders per dataset
-      * @param maxOrders
-      *   Maximum number of orders per dataset
-      * @return
-      *   Score based on risk-adjusted returns
-      */
-    def riskAdjusted(
-        minOrders: Option[Int] = Some(25),
-        maxOrders: Option[Int] = Some(400)
-    ): ScoringFunction = stats =>
-      if (stats.isEmpty) 0.0
-      else {
-        val validStats = stats.filter { os =>
-          val numOrders = os.total
-          !minOrders.exists(numOrders < _) && !maxOrders.exists(numOrders > _)
-        }
-
-        if (validStats.isEmpty) 0.0
-        else
-          validStats
-            .map { os =>
-              if (os.maxDrawdown == 0) os.totalProfit
-              else os.totalProfit / os.maxDrawdown
-            }
-            .sum
-            .toDouble / validStats.size
-      }
+    private def normalized(value: Double, target: Double): Double =
+      math.max(0.0, math.min(value / target, 1.0))
   }
 
   def make[F[_]: {Async, Parallel}](
@@ -157,7 +108,7 @@ object IndicatorEvaluator {
       poolSize: Int,
       otherIndicators: List[Indicator] = Nil,
       signalDetector: SignalDetector = SignalDetector.pure,
-      scoringFunction: ScoringFunction = ScoringFunction.totalProfit
+      scoringFunction: ScoringFunction = ScoringFunction.robust()
   ): F[Evaluator[F, Indicator]] =
     for
       testDataSets <- testFilePaths.parTraverse(MarketDataProvider.read[F](_).compile.toList)
