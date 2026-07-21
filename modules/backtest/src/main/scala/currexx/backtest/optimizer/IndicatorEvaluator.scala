@@ -12,34 +12,43 @@ import currexx.backtest.{MarketDataProvider, OrderStats, RiskSettings, TestSetti
 import currexx.core.signal.SignalDetector
 import currexx.core.trade.TradeStrategy
 import currexx.domain.signal.Indicator
+import eu.timepit.refined.api.{Refined, RefinedTypeOps}
+import eu.timepit.refined.auto.autoUnwrap
+import eu.timepit.refined.numeric.{Greater, Interval}
+import eu.timepit.refined.types.numeric.{PosDouble, PosInt}
 import fs2.Stream
+
+import scala.language.implicitConversions
 
 object IndicatorEvaluator {
 
   type ScoringFunction = List[OrderStats] => Double
 
   object ScoringFunction {
+    /** Ratio in the open-closed interval (0, 1]. */
+    type PositiveUnitInterval = Double Refined Interval.OpenClosed[0.0, 1.0]
+    object PositiveUnitInterval extends RefinedTypeOps[PositiveUnitInterval, Double]
+
+    /** Strictly greater than 1.0. */
+    type GreaterThanOne = Double Refined Greater[1.0]
+    object GreaterThanOne extends RefinedTypeOps[GreaterThanOne, Double]
+
+    given Conversion[Int, PosInt]                  = PosInt.unsafeFrom(_)
+    given Conversion[Double, PosDouble]            = PosDouble.unsafeFrom(_)
+    given Conversion[Double, PositiveUnitInterval] = PositiveUnitInterval.unsafeFrom(_)
+    given Conversion[Double, GreaterThanOne]       = GreaterThanOne.unsafeFrom(_)
+
     final case class RobustConfig(
-        minClosedTrades: Int = 150,
-        minProfitableDatasetRatio: Double = 2.0 / 3.0,
-        minProfitFactor: Double = 1.2,
-        maxDrawdownPercent: Double = 15.0,
-        maxCostToPreCostProfitRatio: Double = 0.4,
-        targetNetReturn: Double = 0.5,
-        targetRecoveryFactor: Double = 3.0,
-        targetSortinoRatio: Double = 2.0,
-        targetExpectancyToLossRatio: Double = 0.2
-    ) {
-      require(minClosedTrades > 0, "Minimum closed trades must be positive")
-      require(minProfitableDatasetRatio > 0 && minProfitableDatasetRatio <= 1, "Profitable dataset ratio must be in (0, 1]")
-      require(minProfitFactor > 1, "Minimum profit factor must be greater than 1")
-      require(maxDrawdownPercent > 0, "Maximum drawdown must be positive")
-      require(maxCostToPreCostProfitRatio > 0, "Maximum cost ratio must be positive")
-      require(targetNetReturn > 0, "Target net return must be positive")
-      require(targetRecoveryFactor > 0, "Target recovery factor must be positive")
-      require(targetSortinoRatio > 0, "Target Sortino ratio must be positive")
-      require(targetExpectancyToLossRatio > 0, "Target expectancy ratio must be positive")
-    }
+        minClosedTrades: PosInt = 150,
+        minProfitableDatasetRatio: PositiveUnitInterval = 2.0 / 3.0,
+        minProfitFactor: GreaterThanOne = 1.2,
+        maxDrawdownPercent: PosDouble = 15.0,
+        maxCostToPreCostProfitRatio: PosDouble = 0.4,
+        targetNetReturn: PosDouble = 0.5,
+        targetRecoveryFactor: PosDouble = 3.0,
+        targetSortinoRatio: PosDouble = 2.0,
+        targetExpectancyToLossRatio: PosDouble = 0.2
+    )
 
     /** Scores a candidate on cost-adjusted portfolio performance while rejecting statistically weak or unsafe candidates.
       *
@@ -80,10 +89,10 @@ object IndicatorEvaluator {
         else {
           val netReturn      = (portfolio.totalProfit / initialBalance).toDouble
           val recoveryFactor =
-            if (portfolio.maxDrawdown == 0) config.targetRecoveryFactor
+            if (portfolio.maxDrawdown == 0) config.targetRecoveryFactor: Double
             else (portfolio.totalProfit / portfolio.maxDrawdown).toDouble
           val expectancyToLoss =
-            if (portfolio.averageLoss == 0) config.targetExpectancyToLossRatio
+            if (portfolio.averageLoss == 0) config.targetExpectancyToLossRatio: Double
             else (portfolio.expectancy / portfolio.averageLoss).toDouble
 
           val netReturnScore  = scaled(netReturn, config.targetNetReturn)
