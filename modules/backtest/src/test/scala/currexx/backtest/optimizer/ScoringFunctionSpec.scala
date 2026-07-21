@@ -60,12 +60,10 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       ScoringFunction.robust()(Nil) mustBe 0.0
     }
 
-    "score a robust candidate between zero and one" in {
+    "assign positive fitness to a robust candidate" in {
       val stats = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(10))))
 
-      val score = ScoringFunction.robust()(stats)
-
-      score must ((be > 0.0).and(be <= 1.0))
+      ScoringFunction.robust()(stats) must be > 0.0
     }
 
     "reject candidates with too few closed trades" in {
@@ -130,10 +128,10 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       scoring(stronger) must be > scoring(weaker)
     }
 
-    "cap every normalized component so exceptional values cannot dominate fitness" in {
+    "allow exceptional candidates to exceed a fitness of one" in {
       val stats = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(1000))))
 
-      ScoringFunction.robust()(stats) must be <= 1.0
+      ScoringFunction.robust()(stats) must be > 1.0
     }
   }
 }

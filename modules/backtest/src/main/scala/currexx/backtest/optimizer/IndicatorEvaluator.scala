@@ -44,14 +44,15 @@ object IndicatorEvaluator {
     /** Scores a candidate on cost-adjusted portfolio performance while rejecting statistically weak or unsafe candidates.
       *
       * Hard gates require enough closed trades, positive expectancy, acceptable drawdown and costs, no invalid orders, and profitability
-      * across at least two thirds of datasets. Passing candidates receive a normalized score in [0, 1]:
+      * across at least two thirds of datasets. Passing candidates receive an unbounded weighted score:
       *   - 30% net return
       *   - 25% recovery factor
       *   - 15% Sortino ratio
       *   - 15% expectancy relative to average loss
       *   - 15% profitable-dataset ratio
       *
-      * Each component is capped at its target so a single outlier cannot dominate selection.
+      * Targets scale metrics into comparable units: reaching a target contributes that component's nominal weight, while exceeding it
+      * continues increasing fitness without an upper bound.
       */
     def robust(config: RobustConfig = RobustConfig()): ScoringFunction = stats =>
       if (stats.isEmpty) 0.0
@@ -85,10 +86,10 @@ object IndicatorEvaluator {
             if (portfolio.averageLoss == 0) config.targetExpectancyToLossRatio
             else (portfolio.expectancy / portfolio.averageLoss).toDouble
 
-          val netReturnScore  = normalized(netReturn, config.targetNetReturn)
-          val recoveryScore   = normalized(recoveryFactor, config.targetRecoveryFactor)
-          val sortinoScore    = normalized(portfolio.sortinoRatio, config.targetSortinoRatio)
-          val expectancyScore = normalized(expectancyToLoss, config.targetExpectancyToLossRatio)
+          val netReturnScore  = scaled(netReturn, config.targetNetReturn)
+          val recoveryScore   = scaled(recoveryFactor, config.targetRecoveryFactor)
+          val sortinoScore    = scaled(portfolio.sortinoRatio, config.targetSortinoRatio)
+          val expectancyScore = scaled(expectancyToLoss, config.targetExpectancyToLossRatio)
 
           (0.30 * netReturnScore) +
             (0.25 * recoveryScore) +
@@ -98,8 +99,8 @@ object IndicatorEvaluator {
         }
       }
 
-    private def normalized(value: Double, target: Double): Double =
-      math.max(0.0, math.min(value / target, 1.0))
+    private def scaled(value: Double, target: Double): Double =
+      math.max(0.0, value / target)
   }
 
   def make[F[_]: {Async, Parallel}](

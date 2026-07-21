@@ -13,7 +13,7 @@ final case class TestStrategy(
 ) derives Codec.AsObject
 
 object TestStrategy {
-  
+
   // median win-to-loss ratio: 4.8381, total profit: 0.79149, total orders: 2251, median profit: 0.13183, median loss: -0.005103
   val s1_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
@@ -146,7 +146,7 @@ object TestStrategy {
       )
     )
   )
-  
+
   // GA-optimized indicator params for s1_v2, re-optimized from s1_v2_optimized (rules unchanged). Best
   // Top-25 member from ga-optimisation-2026-07-14-2343-s1_v2_optimized.md (fitness 0.957191).
   // median win-to-loss ratio: 2.00000, total profit: 0.99721, total orders: 196, median profit: 0.16303, median loss: -0.005137
@@ -271,7 +271,7 @@ object TestStrategy {
       )
     )
   )
-  
+
   // GA-optimized indicator params for s2, re-optimized from s2_optimized (rules unchanged). Best Top-25
   // member from ga-optimisation-2026-07-15-0052-s2_optimized.md (fitness 0.687735).
   // median win-to-loss ratio: 2.77270, total profit: 0.54006, total orders: 195, median profit: 0.08943, median loss: -0.010073
@@ -329,7 +329,7 @@ object TestStrategy {
       )
     )
   )
-  
+
   // median win-to-loss ratio: 3.6919, total profit: 0.39980, total orders: 267, median profit: 0.05431, median loss: -0.004065
   val s4_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
@@ -396,7 +396,7 @@ object TestStrategy {
       )
     )
   )
-  
+
   // median win-to-loss ratio: 3.67500, total profit: 0.31070, total orders: 165, median profit: 0.04992, median loss: -0.002982
   val s4_regime_optimized_v2 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
@@ -470,7 +470,7 @@ object TestStrategy {
       )
     )
   )
-  
+
   // GA-optimized indicator params for s5, re-optimized from the s5 baseline (rules unchanged). Best
   // Top-25 member from ga-optimisation-2026-07-17-1858-s5.md (fitness 0.539268).
   // median win-to-loss ratio: 3.03330, total profit: 0.32643, total orders: 191, median profit: 0.05944, median loss: -0.003692
