@@ -85,8 +85,10 @@ final case class OrderStats(
     initialBalance: BigDecimal = BigDecimal(10000),
     maxDrawdown: BigDecimal = BigDecimal(0),
     // Largest peak-to-trough equity decline (((peak equity − lowest subsequent equity) / peak equity) × 100)
+    // Lower is better. It uses closed-trade equity points plus final marked open positions; it does not measure intra-trade drawdown between candles.
     maxDrawdownPercent: BigDecimal = BigDecimal(0),
     // Risk-adjusted performance calculated from monthly equity returns and annualized. Higher means returns were more consistent
+    // Higher means returns were more consistent. The implementation assumes a zero risk-free rate and returns 0 with fewer than two months.
     sharpeRatio: Double = 0.0,
     sortinoRatio: Double = 0.0,
     maxConsecutiveWins: Int = 0,
@@ -100,7 +102,11 @@ final case class OrderStats(
   def averageLoss: BigDecimal         = if (lossCount == 0) BigDecimal(0) else grossLoss / lossCount
   def payoffRatio: BigDecimal         = if (averageLoss == 0) averageWin else (averageWin / averageLoss).roundTo(5)
   def winRate: BigDecimal             = if (total == 0) BigDecimal(0) else (BigDecimal(winCount) / total).roundTo(5)
+  // Average realized net profit per closed trade
+  // Positive expectancy means the strategy made money per trade on average after costs. Unrealized open-position profit is excluded.
   def expectancy: BigDecimal          = if (total == 0) BigDecimal(0) else (realizedProfit / total).roundTo(8)
+  // Relationship between winning and losing closed trades
+  // Above 1 is profitable; 1.5 means $1.50 won for every $1 lost.
   def profitFactor: BigDecimal        = if (grossLoss == 0) grossProfit else (grossProfit / grossLoss).roundTo(5)
   def recoveryFactor: BigDecimal      = if (maxDrawdown == 0) totalProfit else (totalProfit / maxDrawdown).roundTo(5)
   def winLossRatio: BigDecimal        =
