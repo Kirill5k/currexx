@@ -75,6 +75,8 @@ final case class OrderStats(
     realizedProfit: BigDecimal = BigDecimal(0),
     unrealizedProfit: BigDecimal = BigDecimal(0),
     preCostProfit: BigDecimal = BigDecimal(0),
+    // Total estimated trading costs in account currency (spread + two-sided slippage + commission).
+    // Includes completed trades and estimated liquidation costs for final open positions
     totalCosts: BigDecimal = BigDecimal(0),
     grossProfit: BigDecimal = BigDecimal(0),
     grossLoss: BigDecimal = BigDecimal(0),
@@ -86,7 +88,9 @@ final case class OrderStats(
     equityCurve: List[EquityPoint] = Nil,
     initialBalance: BigDecimal = BigDecimal(10000),
     maxDrawdown: BigDecimal = BigDecimal(0),
+    // Largest peak-to-trough equity decline (((peak equity − lowest subsequent equity) / peak equity) × 100)
     maxDrawdownPercent: BigDecimal = BigDecimal(0),
+    // Risk-adjusted performance calculated from monthly equity returns and annualized. Higher means returns were more consistent
     sharpeRatio: Double = 0.0,
     sortinoRatio: Double = 0.0,
     maxConsecutiveWins: Int = 0,

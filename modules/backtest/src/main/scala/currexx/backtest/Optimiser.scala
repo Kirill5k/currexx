@@ -29,36 +29,52 @@ object Optimiser extends IOApp.Simple {
     shuffle = false
   )
 
+  val gaParametersWithShuffle = gaParameters.copy(shuffle = true)
+
   val robustScoring: ScoringFunction = ScoringFunction.robust()
 
   // Rounds seed from surviving strategies only (deprecated/low-performing seeds were pruned from
   // TestStrategy). Re-seed additional rounds from any current strategy's indicator as needed.
   val rounds: List[OptimisationRound] = List(
     OptimisationRound(
-      name = "s4_regime_optimized",
-      strategy = TestStrategy.s4_regime_optimized,
+      name = "s1_optimized",
+      strategy = TestStrategy.s1_optimized,
       gaParameters = gaParameters,
       scoringFunction = robustScoring,
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
-      name = "s5",
-      strategy = TestStrategy.s5,
+      name = "s1_optimized_shuffle",
+      strategy = TestStrategy.s1_optimized,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = robustScoring,
+      testDataSets = MarketDataProvider.majors1h
+    ),
+    OptimisationRound(
+      name = "s1_v2",
+      strategy = TestStrategy.s1_v2,
       gaParameters = gaParameters,
       scoringFunction = robustScoring,
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
-      name = "s12",
-      strategy = TestStrategy.s12,
+      name = "s1_v2_shuffle",
+      strategy = TestStrategy.s1_v2,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = robustScoring,
+      testDataSets = MarketDataProvider.majors1h
+    ),
+    OptimisationRound(
+      name = "s1_v2_optimized_v2",
+      strategy = TestStrategy.s1_v2_optimized_v2,
       gaParameters = gaParameters,
       scoringFunction = robustScoring,
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
-      name = "s12_optimized",
-      strategy = TestStrategy.s12_optimized,
-      gaParameters = gaParameters,
+      name = "s1_v2_optimized_v2_shuffle",
+      strategy = TestStrategy.s1_v2_optimized_v2,
+      gaParameters = gaParametersWithShuffle,
       scoringFunction = robustScoring,
       testDataSets = MarketDataProvider.majors1h
     )
