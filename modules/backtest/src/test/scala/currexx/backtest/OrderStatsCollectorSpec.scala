@@ -6,6 +6,7 @@ import currexx.domain.market.TradeOrder.{Enter, Exit, Position}
 import currexx.domain.user.UserId
 import currexx.core.trade.TradeOrderPlacement
 import currexx.domain.market.PriceRange
+import eu.timepit.refined.types.numeric.{NonNegBigDecimal, PosBigDecimal}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -17,10 +18,14 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
   val brokerParams = BrokerParameters.Oanda("key", true, "account")
   val cp           = CurrencyPair(Currency.EUR, Currency.USD)
   val start        = Instant.parse("2025-01-01T00:00:00Z")
-  val noCosts      = RiskSettings(
-    initialBalance = BigDecimal(1000),
-    unitsPerLot = BigDecimal(1),
-    transactionCosts = TransactionCosts(0, 0, 0)
+  val noCosts = RiskSettings(
+    initialBalance = PosBigDecimal.unsafeFrom(BigDecimal(1000)),
+    unitsPerLot = PosBigDecimal.unsafeFrom(BigDecimal(1)),
+    transactionCosts = TransactionCosts(
+      spreadPips = NonNegBigDecimal.unsafeFrom(BigDecimal(0)),
+      slippagePipsPerSide = NonNegBigDecimal.unsafeFrom(BigDecimal(0)),
+      commissionPerTrade = NonNegBigDecimal.unsafeFrom(BigDecimal(0))
+    )
   )
 
   def mkEnter(pos: Position, price: Double, hour: Long, volume: BigDecimal = BigDecimal(1)): TradeOrderPlacement =
@@ -100,12 +105,12 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
 
     "deduct spread, two-sided slippage and commission" in {
       val costs = RiskSettings(
-        initialBalance = BigDecimal(10000),
-        unitsPerLot = BigDecimal(1),
+        initialBalance = PosBigDecimal.unsafeFrom(BigDecimal(10000)),
+        unitsPerLot = PosBigDecimal.unsafeFrom(BigDecimal(1)),
         transactionCosts = TransactionCosts(
-          spreadPips = BigDecimal(1),
-          slippagePipsPerSide = BigDecimal("0.5"),
-          commissionPerTrade = BigDecimal(2)
+          spreadPips = NonNegBigDecimal.unsafeFrom(BigDecimal(1)),
+          slippagePipsPerSide = NonNegBigDecimal.unsafeFrom(BigDecimal("0.5")),
+          commissionPerTrade = NonNegBigDecimal.unsafeFrom(BigDecimal(2))
         )
       )
       val stats = OrderStatsCollector.collect(

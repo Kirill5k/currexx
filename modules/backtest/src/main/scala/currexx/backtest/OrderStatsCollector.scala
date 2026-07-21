@@ -1,32 +1,28 @@
 package currexx.backtest
 
 import currexx.backtest.syntax.*
+import currexx.backtest.types.given
 import currexx.core.trade.TradeOrderPlacement
 import currexx.domain.market.{Currency, CurrencyPair, PriceRange, TradeOrder as TO}
+import eu.timepit.refined.types.numeric.{NonNegBigDecimal, PosBigDecimal}
 
 import java.time.{Instant, ZoneOffset}
 import java.time.format.DateTimeFormatter
 import scala.math.sqrt
 
 final case class TransactionCosts(
-    spreadPips: BigDecimal = BigDecimal("0.8"),
-    slippagePipsPerSide: BigDecimal = BigDecimal("0.1"),
-    commissionPerTrade: BigDecimal = BigDecimal(0)
+    spreadPips: NonNegBigDecimal = BigDecimal("0.8"),
+    slippagePipsPerSide: NonNegBigDecimal = BigDecimal("0.1"),
+    commissionPerTrade: NonNegBigDecimal = BigDecimal(0)
 )
 
 final case class RiskSettings(
-    initialBalance: BigDecimal = BigDecimal(10000),
+    initialBalance: PosBigDecimal = BigDecimal(10000),
     accountCurrency: Currency = Currency.USD,
-    unitsPerLot: BigDecimal = BigDecimal(100000),
+    unitsPerLot: PosBigDecimal = BigDecimal(100000),
     transactionCosts: TransactionCosts = TransactionCosts(),
-    quoteToAccountRates: Map[Currency, BigDecimal] = Map.empty
-):
-  require(initialBalance > 0, "Initial balance must be positive")
-  require(unitsPerLot > 0, "Units per lot must be positive")
-  require(transactionCosts.spreadPips >= 0, "Spread cannot be negative")
-  require(transactionCosts.slippagePipsPerSide >= 0, "Slippage cannot be negative")
-  require(transactionCosts.commissionPerTrade >= 0, "Commission cannot be negative")
-  require(quoteToAccountRates.values.forall(_ > 0), "Quote-to-account conversion rates must be positive")
+    quoteToAccountRates: Map[Currency, PosBigDecimal] = Map.empty
+)
 
 final case class CompletedTrade(
     currencyPair: CurrencyPair,
@@ -156,14 +152,14 @@ object OrderStats {
       invalidOrderCount: Int = 0
   ): OrderStats = {
     val sortedTrades               = trades.sortBy(_.closedAt)
-    val (completed, realizedCurve) = buildRealizedEquityCurve(sortedTrades, settings.initialBalance)
-    val markedCurve                = appendMarkedEquity(realizedCurve, openPositions, settings.initialBalance)
+    val (completed, realizedCurve) = buildRealizedEquityCurve(sortedTrades, settings.initialBalance.value)
+    val markedCurve                = appendMarkedEquity(realizedCurve, openPositions, settings.initialBalance.value)
     val netProfits                 = completed.map(_.netProfit)
     val wins                       = netProfits.filter(_ > 0)
     val losses                     = netProfits.filter(_ < 0)
     val monthly                    = completed.groupMapReduce(t => monthFormatter.format(t.closedAt))(_.netProfit)(_ + _)
     val (maxWins, maxLosses)       = streaks(netProfits)
-    val (sharpe, sortino)          = monthlyRiskRatios(completed, settings.initialBalance)
+    val (sharpe, sortino)          = monthlyRiskRatios(completed, settings.initialBalance.value)
     val realized                   = netProfits.sum
     val unrealized                 = openPositions.map(_.unrealizedProfit).sum
     val drawdown                   = markedCurve.map(_.drawdown).maxOption.getOrElse(BigDecimal(0))
@@ -190,7 +186,7 @@ object OrderStats {
       completedTrades = completed,
       openPositions = openPositions,
       equityCurve = markedCurve,
-      initialBalance = settings.initialBalance,
+      initialBalance = settings.initialBalance.value,
       maxDrawdown = drawdown,
       maxDrawdownPercent = drawdownPct,
       sharpeRatio = sharpe,
@@ -342,7 +338,7 @@ object OrderStatsCollector {
       closedAt: Instant,
       settings: RiskSettings
   ): CompletedTrade = {
-    val units      = open.volume * settings.unitsPerLot
+    val units      = open.volume * settings.unitsPerLot.value
     val grossQuote = priceProfit(open.position, open.price, exitPrice) * units
     val gross      = toAccountCurrency(open.currencyPair, grossQuote, exitPrice, settings)
     val costs      = transactionCosts(open.currencyPair, units, exitPrice, settings)
@@ -367,7 +363,7 @@ object OrderStatsCollector {
       settings: RiskSettings
   ): OpenPositionSnapshot = {
     val markPrice  = BigDecimal(mark.close)
-    val units      = open.volume * settings.unitsPerLot
+    val units      = open.volume * settings.unitsPerLot.value
     val grossQuote = priceProfit(open.position, open.price, markPrice) * units
     val gross      = toAccountCurrency(open.currencyPair, grossQuote, markPrice, settings)
     val costs      = transactionCosts(open.currencyPair, units, markPrice, settings)
@@ -404,9 +400,9 @@ object OrderStatsCollector {
       settings: RiskSettings
   ): BigDecimal = {
     val pipSize           = if (currencyPair.quote.code == "JPY") BigDecimal("0.01") else BigDecimal("0.0001")
-    val variableCostPips  = settings.transactionCosts.spreadPips + (settings.transactionCosts.slippagePipsPerSide * 2)
+    val variableCostPips  = settings.transactionCosts.spreadPips.value + (settings.transactionCosts.slippagePipsPerSide.value * 2)
     val variableQuoteCost = variableCostPips * pipSize * units
-    toAccountCurrency(currencyPair, variableQuoteCost, exitPrice, settings).abs + settings.transactionCosts.commissionPerTrade
+    toAccountCurrency(currencyPair, variableQuoteCost, exitPrice, settings).abs + settings.transactionCosts.commissionPerTrade.value
   }
 
   private def toAccountCurrency(
@@ -420,7 +416,7 @@ object OrderStatsCollector {
     else
       settings.quoteToAccountRates
         .get(currencyPair.quote)
-        .map(quoteAmount * _)
+        .map(rate => quoteAmount * rate.value)
         .getOrElse {
           throw new IllegalArgumentException(
             s"Missing ${currencyPair.quote.code}/${settings.accountCurrency.code} conversion rate for $currencyPair"

@@ -1,10 +1,11 @@
 package currexx.backtest.optimizer
 
 import currexx.backtest.optimizer.IndicatorEvaluator.ScoringFunction
-import currexx.backtest.optimizer.IndicatorEvaluator.ScoringFunction.given
 import currexx.backtest.{CompletedTrade, OrderStats, RiskSettings}
+import currexx.backtest.types.given
 import currexx.domain.market.TradeOrder.Position
 import currexx.domain.market.{Currency, CurrencyPair}
+import eu.timepit.refined.types.numeric.PosBigDecimal
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -46,7 +47,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
     OrderStats.fromTrades(
       trades = trades,
       openPositions = Nil,
-      settings = RiskSettings(initialBalance = initialBalance),
+      settings = RiskSettings(initialBalance = PosBigDecimal.unsafeFrom(initialBalance)),
       invalidOrderCount = invalidOrderCount
     )
   }

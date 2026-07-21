@@ -8,14 +8,14 @@ import cats.syntax.parallel.*
 import currexx.algorithms.Fitness
 import currexx.algorithms.operators.Evaluator
 import currexx.backtest.services.TestServicesPool
+import currexx.backtest.types.{GreaterThanOne, PositiveUnitInterval}
+import currexx.backtest.types.given
 import currexx.backtest.{MarketDataProvider, OrderStats, RiskSettings, TestSettings}
 import currexx.core.signal.SignalDetector
 import currexx.core.trade.TradeStrategy
 import currexx.domain.signal.Indicator
-import eu.timepit.refined.api.{Refined, RefinedTypeOps}
-import eu.timepit.refined.auto.autoUnwrap
-import eu.timepit.refined.numeric.{Greater, Interval}
 import eu.timepit.refined.types.numeric.{PosDouble, PosInt}
+import eu.timepit.refined.auto.autoUnwrap
 import fs2.Stream
 
 import scala.language.implicitConversions
@@ -25,19 +25,6 @@ object IndicatorEvaluator {
   type ScoringFunction = List[OrderStats] => Double
 
   object ScoringFunction {
-    /** Ratio in the open-closed interval (0, 1]. */
-    type PositiveUnitInterval = Double Refined Interval.OpenClosed[0.0, 1.0]
-    object PositiveUnitInterval extends RefinedTypeOps[PositiveUnitInterval, Double]
-
-    /** Strictly greater than 1.0. */
-    type GreaterThanOne = Double Refined Greater[1.0]
-    object GreaterThanOne extends RefinedTypeOps[GreaterThanOne, Double]
-
-    given Conversion[Int, PosInt]                  = PosInt.unsafeFrom(_)
-    given Conversion[Double, PosDouble]            = PosDouble.unsafeFrom(_)
-    given Conversion[Double, PositiveUnitInterval] = PositiveUnitInterval.unsafeFrom(_)
-    given Conversion[Double, GreaterThanOne]       = GreaterThanOne.unsafeFrom(_)
-
     final case class RobustConfig(
         minClosedTrades: PosInt = 150,
         minProfitableDatasetRatio: PositiveUnitInterval = 2.0 / 3.0,
@@ -67,7 +54,7 @@ object IndicatorEvaluator {
       if (stats.isEmpty) 0.0
       else {
         val initialBalance      = stats.head.initialBalance
-        val portfolio           = OrderStats.combine(stats, RiskSettings(initialBalance = initialBalance))
+        val portfolio = OrderStats.combine(stats, RiskSettings(initialBalance = initialBalance))
         val profitableRatio     = stats.count(_.totalProfit > 0).toDouble / stats.size
         val costToPreCostProfit =
           if (portfolio.preCostProfit <= 0) Double.PositiveInfinity
