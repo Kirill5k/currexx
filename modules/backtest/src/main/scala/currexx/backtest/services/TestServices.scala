@@ -22,7 +22,6 @@ final class TestServices[F[_]] private (
     private val signalService: SignalService[F],
     private val marketService: MarketService[F],
     private val tradeService: TradeService[F],
-    private val clients: TestClients[F],
     private val clock: TestClock[F],
     private val appState: ApplicationState[F]
 )(using
@@ -62,7 +61,7 @@ final class TestServices[F[_]] private (
                 _ <- appState.finalMarkRef.set(Some(finalMark))
                 // Signals use the fully closed previous candle, while orders execute at the next
                 // candle's open. This avoids filling at a close that is only known retrospectively.
-                _      <- clients.data.setData(executionData)
+                _      <- appState.dataRef.set(Some(executionData))
                 _      <- clock.setTime(executionTime)
                 userId <- appState.userIdRef.get
                 _      <- marketService.updateTimeState(userId, signalData)
@@ -115,4 +114,4 @@ object TestServices:
 
       signalSettingsRepo = new TestSignalSettingsRepository[F](appState.signalSettingsRef)
       signal <- SignalService.make[F](TestSignalRepository[F], signalSettingsRepo, dispatcher)(using Temporal[F], clock)
-    yield TestServices[F](signal, market, trade, clients, clock, appState)
+    yield TestServices[F](signal, market, trade, clock, appState)
