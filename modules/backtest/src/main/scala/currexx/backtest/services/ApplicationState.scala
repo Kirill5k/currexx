@@ -5,7 +5,7 @@ import cats.effect.{Ref, Temporal}
 import cats.effect.std.Queue
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import currexx.backtest.TestSettings
+import currexx.backtest.{MarketMark, TestSettings}
 import currexx.core.common.action.Action
 import currexx.core.market.MarketState
 import currexx.core.settings.{SignalSettings, TradeSettings}
@@ -23,6 +23,7 @@ final class ApplicationState[F[_]](
     val signalSettingsRef: Ref[F, SignalSettings],
     val clockRef: Ref[F, Option[Instant]],
     val dataRef: Ref[F, Option[MarketTimeSeriesData]],
+    val finalMarkRef: Ref[F, Option[MarketMark]],
     val dispatcherQueue: Queue[F, Action],
     val userIdRef: Ref[F, UserId]
 )(using F: Monad[F]) {
@@ -35,6 +36,7 @@ final class ApplicationState[F[_]](
       _ <- signalSettingsRef.set(newSettings.signal)
       _ <- clockRef.set(None)
       _ <- dataRef.set(None)
+      _ <- finalMarkRef.set(None)
       _ <- dispatcherQueue.tryTakeN(None).void
       _ <- userIdRef.set(newSettings.userId)
     yield ()
@@ -46,6 +48,7 @@ object ApplicationState {
       dispatcherQueue   <- Queue.bounded[F, Action](1024)
       clockRef          <- Ref.of[F, Option[Instant]](None)
       dataRef           <- Ref.of[F, Option[MarketTimeSeriesData]](None)
+      finalMarkRef      <- Ref.of[F, Option[MarketMark]](None)
       marketStateRef    <- Ref.of[F, MarketState](settings.marketState)
       tradeSettingsRef  <- Ref.of[F, TradeSettings](settings.trade)
       tradeOrdersRef    <- Ref.of[F, ListBuffer[TradeOrderPlacement]](ListBuffer.empty)
@@ -58,6 +61,7 @@ object ApplicationState {
       signalSettingsRef = signalSettingsRef,
       clockRef = clockRef,
       dataRef = dataRef,
+      finalMarkRef = finalMarkRef,
       dispatcherQueue = dispatcherQueue,
       userIdRef = userIdRef
     )

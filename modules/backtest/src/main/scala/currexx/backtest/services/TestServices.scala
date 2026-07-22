@@ -47,22 +47,27 @@ final class TestServices[F[_]] private (
           previousData.getAndSet(Some(currentData)).flatMap {
             case None =>
               // The first window only primes the simulator; there is no next-bar fill for it yet.
-              clients.data.setData(currentData)
+              F.unit
 
             case Some(signalData) =>
               for
                 currentBar    = currentData.prices.head
                 executionBar  = currentBar.copy(close = currentBar.open)
                 executionData = currentData.copy(prices = NonEmptyList(executionBar, currentData.prices.tail))
-                executionTime = currentData.latestTime.plus(fetchTimeOffset)
-                userId <- appState.userIdRef.get
+                executionTime = currentBar.time.plus(fetchTimeOffset)
+                finalMark     = MarketMark(
+                  price = BigDecimal(currentBar.close),
+                  observedAt = currentBar.time.plus(currentData.interval.toDuration + fetchTimeOffset)
+                )
+                _ <- appState.finalMarkRef.set(Some(finalMark))
                 // Signals use the fully closed previous candle, while orders execute at the next
                 // candle's open. This avoids filling at a close that is only known retrospectively.
-                _ <- clients.data.setData(executionData)
-                _ <- clock.setTime(executionTime)
-                _ <- marketService.updateTimeState(userId, signalData)
-                _ <- signalService.processMarketData(userId, signalData, signalDetector)
-                _ <- collectPendingActions { case Action.ProcessSignals(uid, cp, signals) =>
+                _      <- clients.data.setData(executionData)
+                _      <- clock.setTime(executionTime)
+                userId <- appState.userIdRef.get
+                _      <- marketService.updateTimeState(userId, signalData)
+                _      <- signalService.processMarketData(userId, signalData, signalDetector)
+                _      <- collectPendingActions { case Action.ProcessSignals(uid, cp, signals) =>
                   marketService.processSignals(uid, cp, signals)
                 }
                 _ <- collectPendingActions { case Action.ProcessMarketStateUpdate(uid, cp) =>
@@ -71,8 +76,6 @@ final class TestServices[F[_]] private (
                 _ <- collectPendingActions { case Action.ProcessTradeOrderPlacement(top) =>
                   marketService.processTradeOrderPlacement(top)
                 }
-                // Keep the actual last close available for final mark-to-market accounting.
-                _ <- clients.data.setData(currentData)
               yield ()
           }
         }
@@ -80,14 +83,8 @@ final class TestServices[F[_]] private (
 
   def getOrderStats(riskSettings: RiskSettings = RiskSettings()): F[OrderStats] =
     for
-      orders     <- loadAllOrders
-      latestData <- appState.dataRef.get
-      finalMark = latestData.map { data =>
-        MarketMark(
-          price = BigDecimal(data.prices.head.close),
-          observedAt = data.latestTime.plus(data.interval.toDuration + fetchTimeOffset)
-        )
-      }
+      orders    <- loadAllOrders
+      finalMark <- appState.finalMarkRef.get
     yield OrderStatsCollector.collect(orders, finalMark, riskSettings)
 
   private def loadAllOrders: F[List[TradeOrderPlacement]] =
