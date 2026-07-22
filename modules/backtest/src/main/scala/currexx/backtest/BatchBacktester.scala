@@ -46,12 +46,14 @@ object BatchBacktester extends IOApp.Simple {
       .compile
       .toList
       .map { stats =>
-        val portfolio = OrderStats.combine(stats, riskSettings)
-        val winPct    = portfolio.winRate * 100
-        val drawdown  = portfolio.maxDrawdownPercent
+        val portfolio    = OrderStats.combine(stats, riskSettings)
+        val winPct       = portfolio.winRate * 100
+        val drawdown     = portfolio.maxDrawdownPercent
+        val profitFactor = portfolio.profitFactor.fold("    N/A")(pf => f"$pf%7.3f")
         f"$name%-25s net=${portfolio.totalProfit}%10.5f  closed=${portfolio.total}%5d  open=${portfolio.openPositions.size}%2d  " +
-          f"win=${winPct}%6.2f%%  exp=${portfolio.expectancy}%9.6f  PF=${portfolio.profitFactor}%7.3f  " +
-          f"DD=${drawdown}%6.2f%%  Sharpe=${portfolio.sharpeRatio}%7.3f  costs=${portfolio.totalCosts}%9.5f"
+          f"win=${winPct}%6.2f%%  exp=${portfolio.expectancy}%9.6f  PF=$profitFactor  " +
+          f"DD=${drawdown}%6.2f%%  Sharpe=${portfolio.sharpeRatio}%7.3f  gross=${portfolio.preCostProfit}%10.5f  " +
+          f"costs=${portfolio.totalCosts}%9.5f"
       }
 
   override val run: IO[Unit] =

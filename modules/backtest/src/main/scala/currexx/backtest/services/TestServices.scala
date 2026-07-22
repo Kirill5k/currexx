@@ -5,7 +5,7 @@ import cats.effect.{Ref, Temporal}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
-import currexx.backtest.{OrderStats, OrderStatsCollector, RiskSettings, TestSettings}
+import currexx.backtest.{MarketMark, OrderStats, OrderStatsCollector, RiskSettings, TestSettings}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.common.logging.Logger
@@ -29,6 +29,8 @@ final class TestServices[F[_]] private (
     F: Temporal[F]
 ) {
 
+  private val fetchTimeOffset: FiniteDuration = 100.seconds
+
   def reset(newSettings: TestSettings): F[Unit] =
     appState.reset(newSettings)
 
@@ -51,7 +53,7 @@ final class TestServices[F[_]] private (
               val currentBar    = currentData.prices.head
               val executionBar  = currentBar.copy(close = currentBar.open)
               val executionData = currentData.copy(prices = NonEmptyList(executionBar, currentData.prices.tail))
-              val executionTime = currentData.latestTime.plus(100.seconds)
+              val executionTime = currentData.latestTime.plus(fetchTimeOffset)
               for
                 userId <- appState.userIdRef.get
                 // Signals use the fully closed previous candle, while orders execute at the next
@@ -80,13 +82,18 @@ final class TestServices[F[_]] private (
     for
       orders     <- loadAllOrders
       latestData <- appState.dataRef.get
-    yield OrderStatsCollector.collect(orders, latestData.map(_.prices.head), riskSettings)
+      finalMark = latestData.map { data =>
+        MarketMark(
+          price = BigDecimal(data.prices.head.close),
+          observedAt = data.latestTime.plus(data.interval.toDuration + fetchTimeOffset)
+        )
+      }
+    yield OrderStatsCollector.collect(orders, finalMark, riskSettings)
 
   private def loadAllOrders: F[List[TradeOrderPlacement]] =
     appState.userIdRef.get.flatMap(userId => tradeService.getAllOrders(userId, SearchParams(None, None, None)))
 
-  def getAllOrders: F[List[TradeOrderPlacement]] =
-    loadAllOrders
+  def getAllOrders: F[List[TradeOrderPlacement]] = loadAllOrders
 }
 
 object TestServices:

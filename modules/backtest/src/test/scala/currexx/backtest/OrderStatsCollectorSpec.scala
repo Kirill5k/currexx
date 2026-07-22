@@ -1,16 +1,19 @@
 package currexx.backtest
 
+import cats.data.NonEmptyList
 import currexx.clients.broker.BrokerParameters
-import currexx.domain.market.{Currency, CurrencyPair}
+import currexx.backtest.types.given
+import currexx.domain.market.{Currency, CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import currexx.domain.market.TradeOrder.{Enter, Exit, Position}
 import currexx.domain.user.UserId
 import currexx.core.trade.TradeOrderPlacement
-import currexx.domain.market.PriceRange
 import eu.timepit.refined.types.numeric.{NonNegBigDecimal, PosBigDecimal}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+import kirill5k.common.syntax.time.*
 
 import java.time.Instant
+import scala.concurrent.duration.*
 
 class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
 
@@ -18,13 +21,13 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
   val brokerParams = BrokerParameters.Oanda("key", true, "account")
   val cp           = CurrencyPair(Currency.EUR, Currency.USD)
   val start        = Instant.parse("2025-01-01T00:00:00Z")
-  val noCosts = RiskSettings(
-    initialBalance = PosBigDecimal.unsafeFrom(BigDecimal(1000)),
-    unitsPerLot = PosBigDecimal.unsafeFrom(BigDecimal(1)),
+  val noCosts      = RiskSettings(
+    initialBalance = BigDecimal(1000),
+    unitsPerLot = BigDecimal(1),
     transactionCosts = TransactionCosts(
-      spreadPips = NonNegBigDecimal.unsafeFrom(BigDecimal(0)),
-      slippagePipsPerSide = NonNegBigDecimal.unsafeFrom(BigDecimal(0)),
-      commissionPerTrade = NonNegBigDecimal.unsafeFrom(BigDecimal(0))
+      spreadPips = BigDecimal(0),
+      slippagePipsPerSide = BigDecimal(0),
+      commissionPerTrade = BigDecimal(0)
     )
   )
 
@@ -34,8 +37,8 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
   def mkExit(price: Double, hour: Long): TradeOrderPlacement =
     TradeOrderPlacement(uid, Exit(cp, BigDecimal(price)), brokerParams, start.plusSeconds(hour * 3600))
 
-  def finalPrice(price: Double, hour: Long): PriceRange =
-    PriceRange(price, price, price, price, 1, start.plusSeconds(hour * 3600))
+  def finalMark(price: Double, hour: Long): MarketMark =
+    MarketMark(BigDecimal(price), start.plusSeconds(hour * 3600))
 
   "OrderStatsCollector" should {
     "calculate closed-trade statistics for a buy" in {
@@ -53,7 +56,9 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
       stats.winRate mustBe BigDecimal(1)
       stats.totalProfit mustBe BigDecimal(10)
       stats.expectancy mustBe BigDecimal(10)
-      stats.profitFactor mustBe BigDecimal(10)
+      stats.payoffRatio mustBe None
+      stats.profitFactor mustBe None
+      stats.recoveryFactor mustBe None
       stats.completedTrades.head.openedAt mustBe start
       stats.completedTrades.head.closedAt mustBe start.plusSeconds(3600)
     }
@@ -76,7 +81,7 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
         mkEnter(Position.Buy, 100, 0),
         mkEnter(Position.Sell, 90, 1)
       )
-      val stats = OrderStatsCollector.collect(orders, Some(finalPrice(80, 2)), noCosts)
+      val stats = OrderStatsCollector.collect(orders, Some(finalMark(80, 2)), noCosts)
 
       stats.total mustBe 1
       stats.buys mustBe 1
@@ -92,7 +97,7 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
     "exclude open positions from win rate even when they are profitable" in {
       val stats = OrderStatsCollector.collect(
         List(mkEnter(Position.Buy, 100, 0)),
-        Some(finalPrice(110, 1)),
+        Some(finalMark(110, 1)),
         noCosts
       )
 
@@ -146,8 +151,8 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
       stats.expectancy mustBe BigDecimal("-12.50000000")
       stats.averageWin mustBe BigDecimal(100)
       stats.averageLoss mustBe BigDecimal(75)
-      stats.payoffRatio mustBe BigDecimal("1.33333")
-      stats.profitFactor mustBe BigDecimal("0.66667")
+      stats.payoffRatio mustBe Some(BigDecimal("1.33333"))
+      stats.profitFactor mustBe Some(BigDecimal("0.66667"))
       stats.maxDrawdown mustBe BigDecimal(150)
       stats.maxDrawdownPercent mustBe BigDecimal("13.63636364")
       stats.maxConsecutiveWins mustBe 1
@@ -190,6 +195,44 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
 
       stats.sharpeRatio mustBe 2.092 +- 0.001
       stats.sortinoRatio mustBe 6.5905 +- 0.001
+    }
+
+    "mark positions opened at the production fetch offset for H1 and M1 candles" in
+      List(Interval.H1 -> 3700L, Interval.M1 -> 160L).foreach { case (interval, expectedMarkOffset) =>
+        val bar  = PriceRange(100, 110, 90, 105, 1, start)
+        val data = MarketTimeSeriesData(cp, interval, NonEmptyList.one(bar), "test")
+        val open = TradeOrderPlacement(
+          uid,
+          Enter(Position.Buy, cp, BigDecimal(100), BigDecimal(1)),
+          brokerParams,
+          start.plusSeconds(100)
+        )
+
+        val finalMark = MarketMark(
+          price = BigDecimal(data.prices.head.close),
+          observedAt = data.latestTime.plus(data.interval.toDuration + 100.seconds)
+        )
+
+        val stats = OrderStatsCollector.collect(List(open), Some(finalMark), noCosts)
+
+        stats.openPositions must have size 1
+        stats.openPositions.head.markedAt mustBe start.plusSeconds(expectedMarkOffset)
+        stats.unrealizedProfit mustBe BigDecimal(5)
+      }
+
+    "apply simultaneous portfolio closes as one equity event" in {
+      val closedAt = start.plusSeconds(3600)
+      val trades   = List(
+        CompletedTrade(cp, Position.Buy, start, closedAt, 100, 110, 1, 100, 0, 100),
+        CompletedTrade(CurrencyPair(Currency.USD, Currency.CAD), Position.Sell, start, closedAt, 100, 110, 1, -100, 0, -100)
+      )
+
+      val stats = OrderStats.fromTrades(trades, Nil, noCosts)
+
+      stats.equityCurve must have size 1
+      stats.equityCurve.head.equity mustBe BigDecimal(1000)
+      stats.maxDrawdown mustBe BigDecimal(0)
+      stats.completedTrades.map(_.returnPct).toSet mustBe Set(BigDecimal(10), BigDecimal(-10))
     }
 
     "track invalid duplicate and unmatched orders" in {

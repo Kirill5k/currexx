@@ -54,14 +54,14 @@ object IndicatorEvaluator {
       if (stats.isEmpty) 0.0
       else {
         val initialBalance      = stats.head.initialBalance
-        val portfolio = OrderStats.combine(stats, RiskSettings(initialBalance = initialBalance))
+        val portfolio           = OrderStats.combine(stats, RiskSettings(initialBalance = initialBalance))
         val profitableRatio     = stats.count(_.totalProfit > 0).toDouble / stats.size
         val costToPreCostProfit =
           if (portfolio.preCostProfit <= 0) Double.PositiveInfinity
           else (portfolio.totalCosts / portfolio.preCostProfit).toDouble
         val meetsProfitFactor =
           (portfolio.lossCount == 0 && portfolio.winCount > 0) ||
-            portfolio.profitFactor.toDouble >= config.minProfitFactor
+            portfolio.profitFactor.exists(_.toDouble >= config.minProfitFactor)
         val passesHardConstraints =
           portfolio.total >= config.minClosedTrades &&
             portfolio.totalProfit > 0 &&
@@ -76,8 +76,7 @@ object IndicatorEvaluator {
         else {
           val netReturn      = (portfolio.totalProfit / initialBalance).toDouble
           val recoveryFactor =
-            if (portfolio.maxDrawdown == 0) config.targetRecoveryFactor: Double
-            else (portfolio.totalProfit / portfolio.maxDrawdown).toDouble
+            portfolio.recoveryFactor.fold(config.targetRecoveryFactor: Double)(_.toDouble)
           val expectancyToLoss =
             if (portfolio.averageLoss == 0) config.targetExpectancyToLossRatio: Double
             else (portfolio.expectancy / portfolio.averageLoss).toDouble

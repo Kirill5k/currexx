@@ -3,7 +3,7 @@ package currexx.backtest
 import currexx.backtest.syntax.*
 import currexx.backtest.types.given
 import currexx.core.trade.TradeOrderPlacement
-import currexx.domain.market.{Currency, CurrencyPair, PriceRange, TradeOrder as TO}
+import currexx.domain.market.{Currency, CurrencyPair, TradeOrder as TO}
 import eu.timepit.refined.types.numeric.{NonNegBigDecimal, PosBigDecimal}
 
 import java.time.{Instant, ZoneOffset}
@@ -59,6 +59,11 @@ final case class EquityPoint(
     realized: Boolean
 )
 
+final case class MarketMark(
+    price: BigDecimal,
+    observedAt: Instant
+)
+
 final case class OrderStats(
     total: Int = 0,
     buys: Int = 0,
@@ -100,35 +105,39 @@ final case class OrderStats(
   def meanLoss: BigDecimal            = if (lossCount == 0) BigDecimal(0) else BigDecimal(lossTotal / lossCount)
   def averageWin: BigDecimal          = if (winCount == 0) BigDecimal(0) else grossProfit / winCount
   def averageLoss: BigDecimal         = if (lossCount == 0) BigDecimal(0) else grossLoss / lossCount
-  def payoffRatio: BigDecimal         = if (averageLoss == 0) averageWin else (averageWin / averageLoss).roundTo(5)
+  def payoffRatio: Option[BigDecimal] = Option.when(averageLoss != 0)((averageWin / averageLoss).roundTo(5))
   def winRate: BigDecimal             = if (total == 0) BigDecimal(0) else (BigDecimal(winCount) / total).roundTo(5)
   // Average realized net profit per closed trade
   // Positive expectancy means the strategy made money per trade on average after costs. Unrealized open-position profit is excluded.
-  def expectancy: BigDecimal          = if (total == 0) BigDecimal(0) else (realizedProfit / total).roundTo(8)
+  def expectancy: BigDecimal = if (total == 0) BigDecimal(0) else (realizedProfit / total).roundTo(8)
   // Relationship between winning and losing closed trades
   // Above 1 is profitable; 1.5 means $1.50 won for every $1 lost.
-  def profitFactor: BigDecimal        = if (grossLoss == 0) grossProfit else (grossProfit / grossLoss).roundTo(5)
-  def recoveryFactor: BigDecimal      = if (maxDrawdown == 0) totalProfit else (totalProfit / maxDrawdown).roundTo(5)
-  def winLossRatio: BigDecimal        =
+  def profitFactor: Option[BigDecimal]   = Option.when(grossLoss != 0)((grossProfit / grossLoss).roundTo(5))
+  def recoveryFactor: Option[BigDecimal] = Option.when(maxDrawdown != 0)((totalProfit / maxDrawdown).roundTo(5))
+  def winLossRatio: BigDecimal           =
     if (lossCount == 0) BigDecimal(winCount)
     else (BigDecimal(winCount) / BigDecimal(lossCount)).roundTo(5)
+
+  private def showRatio(value: Option[BigDecimal]): String =
+    value.fold("N/A")(_.toString)
 
   override def toString: String =
     s"""OrderStats(
        |netProfit=$totalProfit,
        |realizedProfit=$realizedProfit,
        |unrealizedProfit=$unrealizedProfit,
+       |preCostProfit=$preCostProfit,
        |closedTrades=$total,
        |openPositions=${openPositions.size},
        |winRate=$winRate,
        |expectancy=$expectancy,
        |averageWin=$averageWin,
        |averageLoss=$averageLoss,
-       |payoffRatio=$payoffRatio,
-       |profitFactor=$profitFactor,
+       |payoffRatio=${showRatio(payoffRatio)},
+       |profitFactor=${showRatio(profitFactor)},
        |maxDrawdown=$maxDrawdown,
        |maxDrawdownPercent=$maxDrawdownPercent,
-       |recoveryFactor=$recoveryFactor,
+       |recoveryFactor=${showRatio(recoveryFactor)},
        |sharpeRatio=$sharpeRatio,
        |sortinoRatio=$sortinoRatio,
        |meanProfitByMonth=$meanProfitByMonth,
@@ -215,16 +224,24 @@ object OrderStats {
       trades: List[CompletedTrade],
       initialBalance: BigDecimal
   ): (List[CompletedTrade], List[EquityPoint]) = {
-    val (_, _, completed, points) = trades.foldLeft(
+    val tradesByCloseTime         = trades.groupBy(_.closedAt).toList.sortBy(_._1)
+    val (_, _, completed, points) = tradesByCloseTime.foldLeft(
       (initialBalance, initialBalance, List.empty[CompletedTrade], List.empty[EquityPoint])
-    ) { case ((equity, peak, accTrades, accPoints), trade) =>
-      val returnPct = if (equity == 0) BigDecimal(0) else (trade.netProfit / equity * 100).roundTo(8)
-      val enriched  = trade.copy(returnPct = returnPct)
-      val next      = equity + trade.netProfit
-      val nextPeak  = peak.max(next)
-      val drawdown  = nextPeak - next
-      val ddPct     = if (nextPeak == 0) BigDecimal(0) else (drawdown / nextPeak * 100).roundTo(8)
-      (next, nextPeak, enriched :: accTrades, EquityPoint(trade.closedAt, next, drawdown, ddPct, realized = true) :: accPoints)
+    ) { case ((equity, peak, accTrades, accPoints), (closedAt, simultaneousTrades)) =>
+      val enriched = simultaneousTrades.map { trade =>
+        val returnPct = if (equity == 0) BigDecimal(0) else (trade.netProfit / equity * 100).roundTo(8)
+        trade.copy(returnPct = returnPct)
+      }
+      val next     = equity + simultaneousTrades.map(_.netProfit).sum
+      val nextPeak = peak.max(next)
+      val drawdown = nextPeak - next
+      val ddPct    = if (nextPeak == 0) BigDecimal(0) else (drawdown / nextPeak * 100).roundTo(8)
+      (
+        next,
+        nextPeak,
+        enriched.reverse ::: accTrades,
+        EquityPoint(closedAt, next, drawdown, ddPct, realized = true) :: accPoints
+      )
     }
     (completed.reverse, points.reverse)
   }
@@ -297,7 +314,7 @@ object OrderStatsCollector {
 
   def collect(
       orders: List[TradeOrderPlacement],
-      finalPrice: Option[PriceRange] = None,
+      finalMark: Option[MarketMark] = None,
       settings: RiskSettings = RiskSettings()
   ): OrderStats = {
     val state = orders.foldLeft(CollectionState()) { (state, currentOrder) =>
@@ -325,8 +342,8 @@ object OrderStatsCollector {
     val markedPosition = for
       placement <- state.openPosition
       open      <- asEnter(placement)
-      mark      <- finalPrice
-      if !mark.time.isBefore(placement.time)
+      mark      <- finalMark
+      if !mark.observedAt.isBefore(placement.time)
     yield markOpenPosition(open, placement.time, mark, settings)
 
     OrderStats.fromTrades(
@@ -365,10 +382,10 @@ object OrderStatsCollector {
   private def markOpenPosition(
       open: TO.Enter,
       openedAt: Instant,
-      mark: PriceRange,
+      mark: MarketMark,
       settings: RiskSettings
   ): OpenPositionSnapshot = {
-    val markPrice  = BigDecimal(mark.close)
+    val markPrice  = mark.price
     val units      = open.volume * settings.unitsPerLot.value
     val grossQuote = priceProfit(open.position, open.price, markPrice) * units
     val gross      = toAccountCurrency(open.currencyPair, grossQuote, markPrice, settings)
@@ -377,7 +394,7 @@ object OrderStatsCollector {
       currencyPair = open.currencyPair,
       position = open.position,
       openedAt = openedAt,
-      markedAt = mark.time,
+      markedAt = mark.observedAt,
       entryPrice = open.price,
       markPrice = markPrice,
       volume = open.volume,
