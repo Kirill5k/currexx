@@ -62,4 +62,11 @@ object BatchBacktester extends IOApp.Simple {
         acc.flatMap(lines => runOne(kv._1, kv._2).map(l => lines :+ l))
       }
       .flatMap(lines => IO.println("\n===== BATCH RESULTS =====\n" + lines.mkString("\n")))
+      .flatMap(_ => IO.println(
+        """
+          |exp - expectancy - Average realized net profit per closed trade
+          |PF - profit factor - Relationship between winning and losing closed trades (1.5 means $1.50 won for every $1 lost)
+          |DD - drawdown - Maximum percentage of the portfolio that was lost during the period
+          |sharpe - Risk-adjusted performance calculated from monthly equity returns and annualized. Higher means returns were more consistent
+          |""".stripMargin))
 }

@@ -92,7 +92,7 @@ final case class OrderStats(
     // Largest peak-to-trough equity decline (((peak equity − lowest subsequent equity) / peak equity) × 100)
     // Lower is better. It uses closed-trade equity points plus final marked open positions; it does not measure intra-trade drawdown between candles.
     maxDrawdownPercent: BigDecimal = BigDecimal(0),
-    // Risk-adjusted performance calculated from monthly equity returns and annualized. Higher means returns were more consistent
+    // Risk-adjusted performance calculated from monthly equity returns and annualized
     // Higher means returns were more consistent. The implementation assumes a zero risk-free rate and returns 0 with fewer than two months.
     sharpeRatio: Double = 0.0,
     sortinoRatio: Double = 0.0,
