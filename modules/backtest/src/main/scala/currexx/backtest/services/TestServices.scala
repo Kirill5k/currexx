@@ -50,11 +50,11 @@ final class TestServices[F[_]] private (
               clients.data.setData(currentData)
 
             case Some(signalData) =>
-              val currentBar    = currentData.prices.head
-              val executionBar  = currentBar.copy(close = currentBar.open)
-              val executionData = currentData.copy(prices = NonEmptyList(executionBar, currentData.prices.tail))
-              val executionTime = currentData.latestTime.plus(fetchTimeOffset)
               for
+                currentBar    = currentData.prices.head
+                executionBar  = currentBar.copy(close = currentBar.open)
+                executionData = currentData.copy(prices = NonEmptyList(executionBar, currentData.prices.tail))
+                executionTime = currentData.latestTime.plus(fetchTimeOffset)
                 userId <- appState.userIdRef.get
                 // Signals use the fully closed previous candle, while orders execute at the next
                 // candle's open. This avoids filling at a close that is only known retrospectively.
