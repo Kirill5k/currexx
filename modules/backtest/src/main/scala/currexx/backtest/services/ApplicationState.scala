@@ -1,6 +1,7 @@
 package currexx.backtest.services
 
 import cats.Monad
+import cats.data.NonEmptyList
 import cats.effect.{Ref, Temporal}
 import cats.effect.std.Queue
 import cats.syntax.flatMap.*
@@ -12,9 +13,11 @@ import currexx.core.settings.{SignalSettings, TradeSettings}
 import currexx.core.trade.TradeOrderPlacement
 import currexx.domain.market.MarketTimeSeriesData
 import currexx.domain.user.UserId
+import kirill5k.common.syntax.time.*
 
 import java.time.Instant
 import scala.collection.mutable.ListBuffer
+import scala.concurrent.duration.*
 
 final class ApplicationState[F[_]](
     val marketStateRef: Ref[F, MarketState],
@@ -27,6 +30,27 @@ final class ApplicationState[F[_]](
     val dispatcherQueue: Queue[F, Action],
     val userIdRef: Ref[F, UserId]
 )(using F: Monad[F]) {
+
+  private val fetchTimeOffset: FiniteDuration = 100.seconds
+
+  // Stages the current bar for execution: orders fill at the bar's open (close overwritten with open),
+  // records the mark-to-market of the real close for final accounting, and advances the clock to the
+  // fetch time. Signals still run against the fully closed previous candle, so fills never use a close
+  // that is only known retrospectively.
+  def prepareExecution(currentData: MarketTimeSeriesData): F[Unit] =
+    val currentBar    = currentData.prices.head
+    val executionBar  = currentBar.copy(close = currentBar.open)
+    val executionData = currentData.copy(prices = NonEmptyList(executionBar, currentData.prices.tail))
+    val executionTime = currentBar.time.plus(fetchTimeOffset)
+    val finalMark = MarketMark(
+      price = BigDecimal(currentBar.close),
+      observedAt = executionTime.plus(currentData.interval.toDuration)
+    )
+    for
+      _ <- finalMarkRef.set(Some(finalMark))
+      _ <- dataRef.set(Some(executionData))
+      _ <- clockRef.set(Some(executionTime))
+    yield ()
 
   def reset(newSettings: TestSettings): F[Unit] =
     for

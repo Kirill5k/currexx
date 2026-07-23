@@ -1,11 +1,10 @@
 package currexx.backtest.services
 
-import cats.data.NonEmptyList
 import cats.effect.{Ref, Temporal}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
-import currexx.backtest.{MarketMark, OrderStats, OrderStatsCollector, RiskSettings, TestSettings}
+import currexx.backtest.{OrderStats, OrderStatsCollector, RiskSettings, TestSettings}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.common.logging.Logger
@@ -14,21 +13,15 @@ import currexx.core.signal.{SignalDetector, SignalService}
 import currexx.core.trade.{TradeOrderPlacement, TradeService}
 import currexx.domain.market.MarketTimeSeriesData
 import fs2.{Pipe, Stream}
-import kirill5k.common.syntax.time.*
-
-import scala.concurrent.duration.*
 
 final class TestServices[F[_]] private (
     private val signalService: SignalService[F],
     private val marketService: MarketService[F],
     private val tradeService: TradeService[F],
-    private val clock: TestClock[F],
     private val appState: ApplicationState[F]
 )(using
     F: Temporal[F]
 ) {
-
-  private val fetchTimeOffset: FiniteDuration = 100.seconds
 
   def reset(newSettings: TestSettings): F[Unit] =
     appState.reset(newSettings)
@@ -50,19 +43,7 @@ final class TestServices[F[_]] private (
 
             case Some(signalData) =>
               for
-                currentBar    = currentData.prices.head
-                executionBar  = currentBar.copy(close = currentBar.open)
-                executionData = currentData.copy(prices = NonEmptyList(executionBar, currentData.prices.tail))
-                executionTime = currentBar.time.plus(fetchTimeOffset)
-                finalMark     = MarketMark(
-                  price = BigDecimal(currentBar.close),
-                  observedAt = currentBar.time.plus(currentData.interval.toDuration + fetchTimeOffset)
-                )
-                _ <- appState.finalMarkRef.set(Some(finalMark))
-                // Signals use the fully closed previous candle, while orders execute at the next
-                // candle's open. This avoids filling at a close that is only known retrospectively.
-                _      <- appState.dataRef.set(Some(executionData))
-                _      <- clock.setTime(executionTime)
+                _      <- appState.prepareExecution(currentData)
                 userId <- appState.userIdRef.get
                 _      <- marketService.updateTimeState(userId, signalData)
                 _      <- signalService.processMarketData(userId, signalData, signalDetector)
@@ -104,14 +85,18 @@ object TestServices:
 
       market <- MarketService.make[F](TestMarketStateRepository[F](appState.marketStateRef)(using Temporal[F], clock), dispatcher)
 
-      tradeSettingsRepo = new TestTradeSettingsRepository[F](appState.tradeSettingsRef)
-      tradeOrdersRepo   = new TestTradeOrderRepository[F](appState.tradeOrdersRef)
-      orderStatusRepo   = new TestOrderStatusRepository[F]()
-      trade <- TradeService.make[F](tradeSettingsRepo, tradeOrdersRepo, orderStatusRepo, clients.broker, clients.data, dispatcher)(using
+      trade <- TradeService.make[F](
+        settingsRepo = new TestTradeSettingsRepository[F](appState.tradeSettingsRef),
+        orderRepository = new TestTradeOrderRepository[F](appState.tradeOrdersRef),
+        orderStatusRepository = new TestOrderStatusRepository[F](),
+        clients.broker,
+        clients.data,
+        dispatcher
+      )(using
         Temporal[F],
         clock
       )
 
       signalSettingsRepo = new TestSignalSettingsRepository[F](appState.signalSettingsRef)
       signal <- SignalService.make[F](TestSignalRepository[F], signalSettingsRepo, dispatcher)(using Temporal[F], clock)
-    yield TestServices[F](signal, market, trade, clock, appState)
+    yield TestServices[F](signal, market, trade, appState)
