@@ -136,5 +136,16 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
 
       ScoringFunction.robust()(stats) must be > 1.0
     }
+
+    "compress gains above target so a single outlier metric cannot dominate fitness" in {
+      val strong  = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(1000))))
+      val extreme = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(1000000))))
+      val scoring = ScoringFunction.robust()
+
+      // A 1000x jump in per-trade profit is still rewarded, but logarithmic scaling keeps the fitness gain modest
+      // (well under proportional) so it cannot swamp the other components.
+      scoring(extreme) must be > scoring(strong)
+      scoring(extreme) must be < (scoring(strong) * 3)
+    }
   }
 }

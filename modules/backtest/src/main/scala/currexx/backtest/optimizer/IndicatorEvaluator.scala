@@ -40,15 +40,16 @@ object IndicatorEvaluator {
     /** Scores a candidate on cost-adjusted portfolio performance while rejecting statistically weak or unsafe candidates.
       *
       * Hard gates require enough closed trades, positive expectancy, acceptable drawdown and costs, no invalid orders, and profitability
-      * across at least two thirds of datasets. Passing candidates receive an unbounded weighted score:
+      * across at least two thirds of datasets. Passing candidates receive a weighted score:
       *   - 30% net return
       *   - 25% recovery factor
       *   - 15% Sortino ratio
       *   - 15% expectancy relative to average loss
       *   - 15% profitable-dataset ratio
       *
-      * Targets scale metrics into comparable units: reaching a target contributes that component's nominal weight, while exceeding it
-      * continues increasing fitness without an upper bound.
+      * Targets scale metrics into comparable units: hitting every target sums to 1.0. Below its target a component scores
+      * proportionally; above target it keeps rising but only logarithmically, so genuine outperformance is still rewarded while a single
+      * outlier metric (e.g. a near-zero-downside Sortino) cannot dominate selection.
       */
     def robust(config: RobustConfig = RobustConfig()): ScoringFunction = stats =>
       if (stats.isEmpty) 0.0
@@ -94,8 +95,16 @@ object IndicatorEvaluator {
         }
       }
 
+    /** Scales a metric against its target with diminishing returns past the target: proportional up to the target (target -> 1.0),
+      * then logarithmic above it so an outlier on a single axis cannot dominate the weighted sum.
+      */
     private def scaled(value: Double, target: Double): Double =
-      math.max(0.0, value / target)
+      if (value <= 0.0) 0.0
+      else {
+        val ratio = value / target
+        if (ratio <= 1.0) ratio
+        else 1.0 + math.log(ratio)
+      }
   }
 
   def make[F[_]: {Async, Parallel}](
