@@ -81,10 +81,14 @@ object TestServices:
       dispatcher <- ActionDispatcher.make[F](appState.dispatcherQueue)
 
       clock   = TestClock[F](appState.clockRef)
+
+      market <- MarketService.make[F](
+        stateRepo = TestMarketStateRepository[F](appState.marketStateRef)(using Temporal[F], clock),
+        dispatcher = dispatcher
+      )
+
       clients = TestClients[F](TestBrokerClient[F], TestMarketDataClient[F](appState.dataRef))
-
-      market <- MarketService.make[F](TestMarketStateRepository[F](appState.marketStateRef)(using Temporal[F], clock), dispatcher)
-
+      
       trade <- TradeService.make[F](
         settingsRepo = new TestTradeSettingsRepository[F](appState.tradeSettingsRef),
         orderRepository = new TestTradeOrderRepository[F](appState.tradeOrdersRef),
