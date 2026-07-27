@@ -17,8 +17,6 @@ import currexx.domain.signal.Indicator
 import eu.timepit.refined.types.numeric.{PosDouble, PosInt}
 import fs2.Stream
 
-import scala.language.implicitConversions
-
 object IndicatorEvaluator {
 
   /** How a run ranks candidates, together with the acceptance test that shares its thresholds.

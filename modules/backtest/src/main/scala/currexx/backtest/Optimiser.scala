@@ -11,13 +11,18 @@ import currexx.domain.signal.Indicator
 
 import scala.util.Random
 
+final case class OptimisationRound(
+    name: String,
+    strategy: TestStrategy,
+    gaParameters: Parameters.GA,
+    scoringFunction: ScoringFunction,
+    testDataSets: List[String]
+)
+
 object Optimiser extends IOApp.Simple {
 
   given Random = Random()
 
-  // Pool size for parallel evaluation.
-  // Backtesting replays in-memory market data through pure indicator calculations — CPU-bound,
-  // not I/O-bound. Optimal pool size equals available CPU cores to avoid context-switching overhead.
   val evaluatorPoolSize = Runtime.getRuntime.availableProcessors()
 
   val gaParameters = Parameters.GA(
@@ -33,8 +38,6 @@ object Optimiser extends IOApp.Simple {
 
   val robustScoring: ScoringFunction = ScoringFunction.robust()
 
-  // Rounds seed from surviving strategies only (deprecated/low-performing seeds were pruned from
-  // TestStrategy). Re-seed additional rounds from any current strategy's indicator as needed.
   val rounds: List[OptimisationRound] = List(
     OptimisationRound(
       name = "s1_optimized",

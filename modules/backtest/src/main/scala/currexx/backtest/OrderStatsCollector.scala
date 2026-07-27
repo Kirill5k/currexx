@@ -59,7 +59,7 @@ final case class MarketMark(
   * outcome — for Sortino, not one losing month — whereas too short a series means the ratio was never measured at all. A caller that
   * credits the second as generously as the first rewards a candidate for something it never demonstrated.
   */
-enum RiskRatio:
+enum RiskRatio {
   case Defined(value: Double)
   // The series had no dispersion to divide by: for Sortino, no month lost money; for Sharpe, every month returned the same.
   case ZeroDeviation
@@ -68,7 +68,8 @@ enum RiskRatio:
 
   def toOption: Option[Double] = this match
     case Defined(value) => Some(value)
-    case _              => None
+    case _ => None
+}
 
 object RiskRatio:
   def from(mean: Double, deviation: Double, annualizer: Double): RiskRatio =
