@@ -21,7 +21,15 @@ import scala.language.implicitConversions
 
 object IndicatorEvaluator {
 
-  type ScoringFunction = List[OrderStats] => Double
+  /** How a run ranks candidates, together with the acceptance test that shares its thresholds.
+    *
+    * `score` is what selection sorts by and `violations` is what decides whether to trust the result; the two answer different questions of
+    * the same thresholds. Keeping them on one object is what stops a champion from being re-checked against numbers it was never scored
+    * against — the search holds only this, so there is nothing else a caller could reach for and no configuration to pass twice.
+    */
+  trait ScoringFunction:
+    def score(stats: List[OrderStats]): Double
+    def violations(stats: List[OrderStats]): List[ScoringFunction.Violation]
 
   object ScoringFunction {
     final case class RobustConfig(
@@ -38,7 +46,8 @@ object IndicatorEvaluator {
         targetExpectancyToLossRatio: PosDouble = 0.2
     )
 
-    /** Scores a candidate on cost-adjusted portfolio performance, discounted by how far it falls short of being trustworthy.
+    /** Scores candidates on cost-adjusted portfolio performance, discounted by how far each falls short of being trustworthy, and reports
+      * the shortfalls of any one of them against the same thresholds.
       *
       * A quality score rates performance on four axes, each measured against a target that scales it into comparable units:
       *   - 35% net return
@@ -55,13 +64,27 @@ object IndicatorEvaluator {
       * book desynchronised, so none of the other numbers can be trusted) — are constraints too, carrying a factor of exactly 0.0 that
       * annihilates the product.
       */
-    def robust(config: RobustConfig = RobustConfig()): ScoringFunction = stats =>
-      if (stats.isEmpty) 0.0
-      else {
-        val portfolio = OrderStats.combine(stats)
-        val discount  = constraints(portfolio, profitableRatio(stats), config).map(_.satisfaction).product
-        if (discount == 0.0) 0.0 else quality(portfolio, config) * discount
-      }
+    def robust(config: RobustConfig = RobustConfig()): ScoringFunction =
+      new ScoringFunction:
+        override def score(stats: List[OrderStats]): Double =
+          if (stats.isEmpty) 0.0
+          else {
+            val portfolio = OrderStats.combine(stats)
+            val discount  = constraints(portfolio, profitableRatio(stats), config).map(_.satisfaction).product
+            if (discount == 0.0) 0.0 else quality(portfolio, config) * discount
+          }
+
+        /** Re-checks a result against the thresholds it was scored against, as pass or fail.
+          *
+          * Scoring ramps rather than gates on purpose, because gating flattens the fitness landscape and leaves selection nothing to rank.
+          * That makes it a good search signal and a poor acceptance test: the winner of a run is only the best of whatever happened to be
+          * tried, and a candidate breaching every threshold still scores above zero and still wins if nothing better turned up. Deciding
+          * whether to trust the winner is a separate question from ranking candidates during the search, and needs asking separately — of
+          * the same constraints, so that the answer cannot contradict the score.
+          */
+        override def violations(stats: List[OrderStats]): List[Violation] =
+          if (stats.isEmpty) List(Violation("dataset count", "0", "at least 1"))
+          else constraints(OrderStats.combine(stats), profitableRatio(stats), config).flatMap(_.violation)
 
     private def quality(portfolio: OrderStats, config: RobustConfig): Double = {
       // A metric whose denominator vanished is undefined rather than bad — no drawdown to recover from, no losing
@@ -108,8 +131,12 @@ object IndicatorEvaluator {
       * together; the champion check reports every one that did not reach 1.0. That equivalence is exact, because a ramp reaches 1.0 on
       * precisely the condition a pass/fail predicate would test. Writing the predicate separately would let it drift out of step with the
       * ramp, which would mean accepting a winner the search had penalised, or rejecting one it had not.
+      *
+      * Only the description is by-name, because only scoring is on the search's path: it reads `satisfaction` from all of these and the
+      * wording of none of them. Formatting eagerly meant every evaluation rendered eight BigDecimals it then discarded, once per candidate
+      * for the whole run, to describe a breach that is described at most once.
       */
-    final private case class Constraint(name: String, actual: String, required: String, satisfaction: Double):
+    final private class Constraint(name: String, actual: => String, required: => String, val satisfaction: Double):
       def violation: Option[Violation] = Option.when(satisfaction < 1.0)(Violation(name, actual, required))
 
     private def constraints(portfolio: OrderStats, profitableRatio: Double, config: RobustConfig): List[Constraint] = {
@@ -193,18 +220,6 @@ object IndicatorEvaluator {
         }
       }
 
-    /** Re-checks a result against the thresholds it was scored against, as pass or fail.
-      *
-      * Scoring ramps rather than gates on purpose, because gating flattens the fitness landscape and leaves selection nothing to rank. That
-      * makes it a good search signal and a poor acceptance test: the winner of a run is only the best of whatever happened to be tried, and
-      * a candidate breaching every threshold still scores above zero and still wins if nothing better turned up. Deciding whether to trust
-      * the winner is a separate question from ranking candidates during the search, and needs asking separately — of the same constraints,
-      * so that the answer cannot contradict the score.
-      */
-    def violations(stats: List[OrderStats], config: RobustConfig = RobustConfig()): List[Violation] =
-      if (stats.isEmpty) List(Violation("dataset count", "0", "at least 1"))
-      else constraints(OrderStats.combine(stats), profitableRatio(stats), config).flatMap(_.violation)
-
     /** 0 at or below `floor`, 1 at or above `target`, linear in between. */
     private def rampUp(value: Double, floor: Double, target: Double): Double =
       if (value <= floor) 0.0
@@ -253,6 +268,6 @@ object IndicatorEvaluator {
             yield orderStats
           }
         }
-      eval <- Evaluator.cached[F, Indicator](ind => backtest(ind).map(res => ind -> Fitness(scoringFunction(res))))
+      eval <- Evaluator.cached[F, Indicator](ind => backtest(ind).map(res => ind -> Fitness(scoringFunction.score(res))))
     yield Evaluation(eval, backtest)
 }

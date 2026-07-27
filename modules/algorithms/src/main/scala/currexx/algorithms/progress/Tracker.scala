@@ -10,6 +10,7 @@ trait Tracker[F[_], I]:
   def displayInitial(target: I, params: Parameters.GA): F[Unit]
   def displayProgress(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[I]): F[Unit]
   def displayFinal(population: EvaluatedPopulation[I]): F[Unit]
+  def displayNote(title: String, lines: List[String]): F[Unit]
 
   protected def progressMsg(currentGen: Int, maxGen: Int): String =
     s"Generation $currentGen out of $maxGen"

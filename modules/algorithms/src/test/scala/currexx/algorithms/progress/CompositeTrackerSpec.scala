@@ -17,23 +17,26 @@ class CompositeTrackerSpec extends IOWordSpec {
           override def displayInitial(target: String, params: Parameters.GA): IO[Unit]                                  = ref1.update(_ + 1)
           override def displayProgress(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[String]): IO[Unit] = ref1.update(_ + 1)
           override def displayFinal(population: EvaluatedPopulation[String]): IO[Unit]                                  = ref1.update(_ + 1)
+          override def displayNote(title: String, lines: List[String]): IO[Unit]                                        = ref1.update(_ + 1)
         }
         tracker2 = new Tracker[IO, String] {
           override def displayInitial(target: String, params: Parameters.GA): IO[Unit]                                  = ref2.update(_ + 1)
           override def displayProgress(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[String]): IO[Unit] = ref2.update(_ + 1)
           override def displayFinal(population: EvaluatedPopulation[String]): IO[Unit]                                  = ref2.update(_ + 1)
+          override def displayNote(title: String, lines: List[String]): IO[Unit]                                        = ref2.update(_ + 1)
         }
         composite = CompositeTracker.make[IO, String](tracker1, tracker2)
         _      <- composite.displayInitial("target", params)
         _      <- composite.displayProgress(1, 10, Vector.empty)
         _      <- composite.displayFinal(Vector.empty)
+        _      <- composite.displayNote("note", List("line"))
         count1 <- ref1.get
         count2 <- ref2.get
       } yield (count1, count2)
 
       result.asserting { case (count1, count2) =>
-        count1 mustBe 3
-        count2 mustBe 3
+        count1 mustBe 4
+        count2 mustBe 4
       }
     }
   }

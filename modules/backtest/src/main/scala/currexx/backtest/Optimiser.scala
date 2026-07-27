@@ -31,10 +31,7 @@ object Optimiser extends IOApp.Simple {
 
   val gaParametersWithShuffle = gaParameters.copy(shuffle = true)
 
-  // One config drives both jobs: the scoring function ramps towards these thresholds during the search, and the
-  // champion is re-checked against the same numbers afterwards.
-  val robustConfig                   = ScoringFunction.RobustConfig()
-  val robustScoring: ScoringFunction = ScoringFunction.robust(robustConfig)
+  val robustScoring: ScoringFunction = ScoringFunction.robust()
 
   // Rounds seed from surviving strategies only (deprecated/low-performing seeds were pruned from
   // TestStrategy). Re-seed additional rounds from any current strategy's indicator as needed.
@@ -116,7 +113,7 @@ object Optimiser extends IOApp.Simple {
         finalPop <- OptimisationAlgorithm
           .ga[IO, Indicator](init, cross, mut, eval.evaluator, sel, elit, prog)
           .optimise(round.strategy.indicator, round.gaParameters)
-        _ <- reportChampion(round, eval.backtest, finalPop)
+        _ <- reportChampion(round, eval.backtest, prog, finalPop)
       yield ()
     }
 
@@ -125,24 +122,26 @@ object Optimiser extends IOApp.Simple {
     * The scoring function discounts a breach instead of rejecting it, so that selection has a gradient to climb, which means finishing
     * first is no longer evidence of being acceptable. Nothing else downstream asks the question, and the population is sorted by a score
     * that has already blended every constraint into one number, so the breach is invisible by the time a result is written out.
+    *
+    * The verdict goes to the tracker rather than to stdout, so that it is recorded wherever the round's results are, and lasts as long as
+    * they do. It is the shortlist in that same file that a strategy is eventually picked from, and this is what says whether the candidate
+    * at the top of it can be trusted.
     */
   private def reportChampion(
       round: OptimisationRound,
       backtest: Indicator => IO[List[OrderStats]],
+      tracker: Tracker[IO, Indicator],
       population: EvaluatedPopulation[Indicator]
   ): IO[Unit] =
+    val title = s"Champion: ${round.name}"
     population.headOption match
-      case None                      => IO.println(s"[${round.name}] no candidates were evaluated")
+      case None                      => tracker.displayNote(title, List("No candidates were evaluated."))
       case Some((champion, fitness)) =>
-        for
-          stats <- backtest(champion)
-          breaches = ScoringFunction.violations(stats, robustConfig)
-          _ <- IO.println(f"[${round.name}] champion fitness ${fitness.value}%.6f")
-          _ <-
-            if (breaches.isEmpty) IO.println(s"[${round.name}] satisfies every constraint")
-            else
-              IO.println(s"[${round.name}] BREACHES ${breaches.size} constraint(s) despite winning:") *>
-                breaches.traverse_(breach => IO.println(s"[${round.name}]   - $breach"))
-          _ <- IO.println(s"[${round.name}] champion: $champion")
-        yield ()
+        backtest(champion).flatMap { stats =>
+          val breaches = round.scoringFunction.violations(stats)
+          val verdict  =
+            if (breaches.isEmpty) List("Satisfies every constraint.")
+            else s"BREACHES ${breaches.size} constraint(s) despite winning:" :: breaches.map(breach => s"  - $breach")
+          tracker.displayNote(title, f"Fitness: ${fitness.value}%.6f" :: verdict ::: List(s"Indicator: $champion"))
+        }
 }

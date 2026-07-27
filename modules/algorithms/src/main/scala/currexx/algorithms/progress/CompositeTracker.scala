@@ -19,6 +19,9 @@ final class CompositeTracker[F[_], I](
   override def displayFinal(population: EvaluatedPopulation[I]): F[Unit] =
     trackers.traverse(_.displayFinal(population)).void
 
+  override def displayNote(title: String, lines: List[String]): F[Unit] =
+    trackers.traverse(_.displayNote(title, lines)).void
+
 object CompositeTracker:
   def make[F[_]: Monad, I](trackers: Tracker[F, I]*): Tracker[F, I] =
     new CompositeTracker[F, I](trackers.toList)

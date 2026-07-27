@@ -22,7 +22,7 @@ class IndicatorEvaluatorSpec extends IOWordSpec {
         )
         scored <- evaluation.evaluator.evaluateIndividual(strategy.indicator)
         stats  <- evaluation.backtest(strategy.indicator)
-      yield (scored._2.value, scoring(stats))
+      yield (scored._2.value, scoring.score(stats))
 
       // The champion report re-runs the winner through this backtest to say whether it satisfies its constraints. If
       // the replay were configured even slightly differently from the search it would be describing a different run,

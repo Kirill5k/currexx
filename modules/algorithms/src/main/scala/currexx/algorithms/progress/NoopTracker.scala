@@ -11,6 +11,7 @@ final class NoopTracker[F[_], I](using
   override def displayInitial(target: I, params: Parameters.GA): F[Unit]                                  = F.unit
   override def displayProgress(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[I]): F[Unit] = F.unit
   override def displayFinal(population: EvaluatedPopulation[I]): F[Unit]                                  = F.unit
+  override def displayNote(title: String, lines: List[String]): F[Unit]                                   = F.unit
 }
 
 object NoopTracker:

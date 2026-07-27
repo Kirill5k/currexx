@@ -42,6 +42,9 @@ final class LoggingTracker[F[_], I] private (
       _ <- Async[F].delay(println(s"Final top $finalTopN members:\n$members\n$stats$duration"))
     yield ()
 
+  override def displayNote(title: String, lines: List[String]): F[Unit] =
+    Async[F].delay(println((title :: lines).mkString("\n")))
+
 object LoggingTracker:
   def make[F[_]: Async, I](
       logInterval: Int = 10,

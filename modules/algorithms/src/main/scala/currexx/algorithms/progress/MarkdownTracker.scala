@@ -71,6 +71,20 @@ final class MarkdownTracker[F[_], I] private (
       _ <- writeToFile(content, append = true)
     yield ()
 
+  // Fenced rather than bulleted: a note is written by a caller that knows what it is saying, so its own line breaks and
+  // indentation are meaningful, and the individuals it quotes are long enough that reflowing them helps nobody.
+  override def displayNote(title: String, lines: List[String]): F[Unit] =
+    writeToFile(
+      s"""|
+          |## $title
+          |
+          |```
+          |${lines.mkString("\n")}
+          |```
+          |""".stripMargin,
+      append = true
+    )
+
   override protected def membersMsg(population: EvaluatedPopulation[I], topN: Int): String =
     population
       .take(topN)

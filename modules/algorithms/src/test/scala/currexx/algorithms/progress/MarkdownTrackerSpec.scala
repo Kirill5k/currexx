@@ -23,7 +23,8 @@ class MarkdownTrackerSpec extends IOWordSpec {
         _       <- tracker.displayInitial("target-ind", params)
         _       <- tracker.displayProgress(1, 10, population)
         _       <- tracker.displayFinal(population)
-        files   <- filesS.list(resultsDir).compile.toList
+        _     <- tracker.displayNote("Champion: round-1", List("Fitness: 10.0", "BREACHES 1 constraint(s) despite winning:", "  - too few"))
+        files <- filesS.list(resultsDir).compile.toList
         latestFile = files.filter(_.fileName.toString.startsWith("ga-optimisation-")).maxBy(_.toString)
         content <- filesS.readUtf8(latestFile).compile.string
         _       <- filesS.deleteIfExists(latestFile)
@@ -36,6 +37,8 @@ class MarkdownTrackerSpec extends IOWordSpec {
         content must include("* #1: 10.0 - `ind1`")
         content must include("## Final Results")
         content must include("Stats: Best=10.0, Avg=7.5, Worst=5.0")
+        content must include("## Champion: round-1")
+        content must include("BREACHES 1 constraint(s) despite winning:\n  - too few")
       }
     }
   }
