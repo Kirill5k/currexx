@@ -76,36 +76,47 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
       stats.totalProfit mustBe BigDecimal(10)
     }
 
-    "count only the closed side of a reversal and mark the new position to market" in {
+    "close the reversed side of a position and liquidate the new one at the final mark" in {
       val orders = List(
         mkEnter(Position.Buy, 100, 0),
         mkEnter(Position.Sell, 90, 1)
       )
       val stats = OrderStatsCollector.collect(orders, Some(finalMark(80, 2)), noCosts)
 
-      stats.total mustBe 1
+      stats.total mustBe 2
       stats.buys mustBe 1
-      stats.sells mustBe 0
+      stats.sells mustBe 1
       stats.lossCount mustBe 1
+      stats.winCount mustBe 1
       stats.lossTotal mustBe -10.0
-      stats.realizedProfit mustBe BigDecimal(-10)
-      stats.unrealizedProfit mustBe BigDecimal(10)
       stats.totalProfit mustBe BigDecimal(0)
-      stats.openPositions must have size 1
+      stats.forcedClosureCount mustBe 1
     }
 
-    "exclude open positions from win rate even when they are profitable" in {
+    "liquidate a position still open at the end of the data at the final mark" in {
       val stats = OrderStatsCollector.collect(
         List(mkEnter(Position.Buy, 100, 0)),
         Some(finalMark(110, 1)),
         noCosts
       )
 
+      stats.total mustBe 1
+      stats.winCount mustBe 1
+      stats.winRate mustBe BigDecimal(1)
+      stats.totalProfit mustBe BigDecimal(10)
+      stats.expectancy mustBe BigDecimal(10)
+      stats.forcedClosureCount mustBe 1
+      stats.completedTrades.head.forcedClosure mustBe true
+      stats.completedTrades.head.closedAt mustBe start.plusSeconds(3600)
+      stats.equityCurve.last.equity mustBe BigDecimal(1010)
+    }
+
+    "leave a position open when there is no final mark to liquidate it against" in {
+      val stats = OrderStatsCollector.collect(List(mkEnter(Position.Buy, 100, 0)), None, noCosts)
+
       stats.total mustBe 0
-      stats.winCount mustBe 0
-      stats.winRate mustBe BigDecimal(0)
-      stats.unrealizedProfit mustBe BigDecimal(10)
-      stats.equityCurve.last.realized mustBe false
+      stats.totalProfit mustBe BigDecimal(0)
+      stats.forcedClosureCount mustBe 0
     }
 
     "deduct spread, two-sided slippage and commission" in {
@@ -193,11 +204,47 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
         settings = noCosts
       )
 
-      stats.sharpeRatio mustBe 2.092 +- 0.001
-      stats.sortinoRatio mustBe 6.5905 +- 0.001
+      stats.sharpeRatio.toOption.get mustBe 2.092 +- 0.001
+      stats.sortinoRatio.toOption.get mustBe 6.5905 +- 0.001
     }
 
-    "mark positions opened at the production fetch offset for H1 and M1 candles" in
+    "report a zero-deviation Sortino ratio when no month lost money" in {
+      val february = 31L * 24
+      val stats    = OrderStatsCollector.collect(
+        List(
+          mkEnter(Position.Buy, 100, 0),
+          mkExit(200, 1), // January +100
+          mkEnter(Position.Buy, 100, february),
+          mkExit(150, february + 1) // February +50
+        ),
+        settings = noCosts
+      )
+
+      // Not zero: a downside deviation of zero is the best possible outcome, and scoring it as zero would reward
+      // strategies for having a losing month.
+      stats.sortinoRatio mustBe RiskRatio.ZeroDeviation
+      stats.sharpeRatio mustBe a[RiskRatio.Defined]
+    }
+
+    "report insufficient data, not zero deviation, when every trade closed inside one month" in {
+      val stats = OrderStatsCollector.collect(
+        List(
+          mkEnter(Position.Buy, 100, 0),
+          mkExit(200, 1), // January +100
+          mkEnter(Position.Buy, 100, 2),
+          mkExit(150, 3) // January +50
+        ),
+        settings = noCosts
+      )
+
+      // One monthly return is no series at all, so nothing was measured. That is a different outcome from a series
+      // measured and found to have no downside in it, and a scorer that rewards the second must not reward this.
+      stats.profitByMonth must have size 1
+      stats.sortinoRatio mustBe RiskRatio.InsufficientData
+      stats.sharpeRatio mustBe RiskRatio.InsufficientData
+    }
+
+    "liquidate positions at the production fetch offset for H1 and M1 candles" in
       List(Interval.H1 -> 3700L, Interval.M1 -> 160L).foreach { case (interval, expectedMarkOffset) =>
         val bar  = PriceRange(100, 110, 90, 105, 1, start)
         val data = MarketTimeSeriesData(cp, interval, NonEmptyList.one(bar), "test")
@@ -215,9 +262,9 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
 
         val stats = OrderStatsCollector.collect(List(open), Some(finalMark), noCosts)
 
-        stats.openPositions must have size 1
-        stats.openPositions.head.markedAt mustBe start.plusSeconds(expectedMarkOffset)
-        stats.unrealizedProfit mustBe BigDecimal(5)
+        stats.completedTrades must have size 1
+        stats.completedTrades.head.closedAt mustBe start.plusSeconds(expectedMarkOffset)
+        stats.totalProfit mustBe BigDecimal(5)
       }
 
     "apply simultaneous portfolio closes as one equity event" in {
@@ -227,12 +274,26 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
         CompletedTrade(CurrencyPair(Currency.USD, Currency.CAD), Position.Sell, start, closedAt, 100, 110, 1, -100, 0, -100)
       )
 
-      val stats = OrderStats.fromTrades(trades, Nil, noCosts)
+      val stats = OrderStats.fromTrades(trades, noCosts)
 
       stats.equityCurve must have size 1
       stats.equityCurve.head.equity mustBe BigDecimal(1000)
       stats.maxDrawdown mustBe BigDecimal(0)
       stats.completedTrades.map(_.returnPct).toSet mustBe Set(BigDecimal(10), BigDecimal(-10))
+    }
+
+    "start the pooled portfolio with the sum of the member balances" in {
+      val closedAt = start.plusSeconds(3600)
+      val trade    = CompletedTrade(cp, Position.Buy, start, closedAt, 100, 110, 1, 100, 0, 100)
+      val member   = OrderStats.fromTrades(List(trade), noCosts)
+
+      val portfolio = OrderStats.combine(List(member, member, member))
+
+      // Charging three datasets' trades against one dataset's balance would treble the reported return and
+      // drawdown percentage, so every percentage threshold would shift as datasets are added or removed.
+      portfolio.initialBalance mustBe BigDecimal(3000)
+      portfolio.totalProfit mustBe BigDecimal(300)
+      portfolio.equityCurve.head.equity mustBe BigDecimal(3300)
     }
 
     "track invalid duplicate and unmatched orders" in {

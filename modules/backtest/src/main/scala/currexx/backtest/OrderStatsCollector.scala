@@ -35,34 +35,44 @@ final case class CompletedTrade(
     grossProfit: BigDecimal,
     costs: BigDecimal,
     netProfit: BigDecimal,
-    returnPct: BigDecimal = BigDecimal(0)
-)
-
-final case class OpenPositionSnapshot(
-    currencyPair: CurrencyPair,
-    position: TO.Position,
-    openedAt: Instant,
-    markedAt: Instant,
-    entryPrice: BigDecimal,
-    markPrice: BigDecimal,
-    volume: BigDecimal,
-    grossProfit: BigDecimal,
-    estimatedCosts: BigDecimal,
-    unrealizedProfit: BigDecimal
+    returnPct: BigDecimal = BigDecimal(0),
+    // True when the position was still open at the end of the data and was liquidated at the final mark price
+    // rather than by a trading rule.
+    forcedClosure: Boolean = false
 )
 
 final case class EquityPoint(
     time: Instant,
     equity: BigDecimal,
     drawdown: BigDecimal,
-    drawdownPercent: BigDecimal,
-    realized: Boolean
+    drawdownPercent: BigDecimal
 )
 
 final case class MarketMark(
     price: BigDecimal,
     observedAt: Instant
 )
+
+/** A risk-adjusted return ratio, or the reason there is no number to report.
+  *
+  * The two undefined cases mean opposite things and must not collapse into a single `None`. A vanished denominator is the best available
+  * outcome — for Sortino, not one losing month — whereas too short a series means the ratio was never measured at all. A caller that
+  * credits the second as generously as the first rewards a candidate for something it never demonstrated.
+  */
+enum RiskRatio:
+  case Defined(value: Double)
+  // The series had no dispersion to divide by: for Sortino, no month lost money; for Sharpe, every month returned the same.
+  case ZeroDeviation
+  // Fewer than two monthly returns, so there was no series to measure dispersion across.
+  case InsufficientData
+
+  def toOption: Option[Double] = this match
+    case Defined(value) => Some(value)
+    case _              => None
+
+object RiskRatio:
+  def from(mean: Double, deviation: Double, annualizer: Double): RiskRatio =
+    if (deviation == 0) ZeroDeviation else Defined(mean / deviation * annualizer)
 
 final case class OrderStats(
     total: Int = 0,
@@ -72,12 +82,11 @@ final case class OrderStats(
     lossCount: Int = 0,
     breakevenCount: Int = 0,
     lossTotal: Double = 0.0,
+    // Every figure below is realized: positions still open when the data ran out are liquidated at the final mark
+    // and counted as completed trades, so trade counts, profit and the equity curve all describe the same trades.
     totalProfit: BigDecimal = BigDecimal(0),
-    realizedProfit: BigDecimal = BigDecimal(0),
-    unrealizedProfit: BigDecimal = BigDecimal(0),
     preCostProfit: BigDecimal = BigDecimal(0),
-    // Total estimated trading costs in account currency (spread + two-sided slippage + commission).
-    // Includes completed trades and estimated liquidation costs for final open positions
+    // Total trading costs in account currency (spread + two-sided slippage + commission)
     totalCosts: BigDecimal = BigDecimal(0),
     grossProfit: BigDecimal = BigDecimal(0),
     grossLoss: BigDecimal = BigDecimal(0),
@@ -85,19 +94,20 @@ final case class OrderStats(
     biggestLoss: BigDecimal = BigDecimal(0),
     profitByMonth: Map[String, BigDecimal] = Map.empty,
     completedTrades: List[CompletedTrade] = Nil,
-    openPositions: List[OpenPositionSnapshot] = Nil,
     equityCurve: List[EquityPoint] = Nil,
     initialBalance: BigDecimal = BigDecimal(10000),
     maxDrawdown: BigDecimal = BigDecimal(0),
     // Largest peak-to-trough equity decline (((peak equity − lowest subsequent equity) / peak equity) × 100)
-    // Lower is better. It uses closed-trade equity points plus final marked open positions; it does not measure intra-trade drawdown between candles.
+    // Lower is better. Equity is only sampled at trade close times, so this does not capture intra-trade drawdown
+    // between candles, nor unrealized losses on positions that were open concurrently.
     maxDrawdownPercent: BigDecimal = BigDecimal(0),
-    // Risk-adjusted performance calculated from monthly equity returns and annualized
-    // Higher means returns were more consistent. The implementation assumes a zero risk-free rate and returns 0 with fewer than two months.
-    sharpeRatio: Double = 0.0,
-    sortinoRatio: Double = 0.0,
+    // Risk-adjusted performance calculated from monthly equity returns and annualized, assuming a zero risk-free
+    // rate. Higher means returns were more consistent. See RiskRatio for the two ways this can be unmeasurable.
+    sharpeRatio: RiskRatio = RiskRatio.InsufficientData,
+    sortinoRatio: RiskRatio = RiskRatio.InsufficientData,
     maxConsecutiveWins: Int = 0,
     maxConsecutiveLosses: Int = 0,
+    forcedClosureCount: Int = 0,
     invalidOrderCount: Int = 0
 ):
   def medianProfitByMonth: BigDecimal = profitByMonth.values.toList.median.roundTo(5)
@@ -107,9 +117,9 @@ final case class OrderStats(
   def averageLoss: BigDecimal         = if (lossCount == 0) BigDecimal(0) else grossLoss / lossCount
   def payoffRatio: Option[BigDecimal] = Option.when(averageLoss != 0)((averageWin / averageLoss).roundTo(5))
   def winRate: BigDecimal             = if (total == 0) BigDecimal(0) else (BigDecimal(winCount) / total).roundTo(5)
-  // Average realized net profit per closed trade
-  // Positive expectancy means the strategy made money per trade on average after costs. Unrealized open-position profit is excluded.
-  def expectancy: BigDecimal = if (total == 0) BigDecimal(0) else (realizedProfit / total).roundTo(8)
+  // Average net profit per closed trade
+  // Positive expectancy means the strategy made money per trade on average after costs.
+  def expectancy: BigDecimal = if (total == 0) BigDecimal(0) else (totalProfit / total).roundTo(8)
   // Relationship between winning and losing closed trades
   // Above 1 is profitable; 1.5 means $1.50 won for every $1 lost.
   def profitFactor: Option[BigDecimal]   = Option.when(grossLoss != 0)((grossProfit / grossLoss).roundTo(5))
@@ -118,17 +128,20 @@ final case class OrderStats(
     if (lossCount == 0) BigDecimal(winCount)
     else (BigDecimal(winCount) / BigDecimal(lossCount)).roundTo(5)
 
-  private def showRatio(value: Option[BigDecimal]): String =
+  private def showRatio(value: Option[?]): String =
     value.fold("N/A")(_.toString)
+
+  private def showRatio(value: RiskRatio): String = value match
+    case RiskRatio.Defined(v)       => v.toString
+    case RiskRatio.ZeroDeviation    => "zero-deviation"
+    case RiskRatio.InsufficientData => "insufficient-data"
 
   override def toString: String =
     s"""OrderStats(
        |netProfit=$totalProfit,
-       |realizedProfit=$realizedProfit,
-       |unrealizedProfit=$unrealizedProfit,
        |preCostProfit=$preCostProfit,
        |closedTrades=$total,
-       |openPositions=${openPositions.size},
+       |forcedClosures=$forcedClosureCount,
        |winRate=$winRate,
        |expectancy=$expectancy,
        |averageWin=$averageWin,
@@ -138,8 +151,8 @@ final case class OrderStats(
        |maxDrawdown=$maxDrawdown,
        |maxDrawdownPercent=$maxDrawdownPercent,
        |recoveryFactor=${showRatio(recoveryFactor)},
-       |sharpeRatio=$sharpeRatio,
-       |sortinoRatio=$sortinoRatio,
+       |sharpeRatio=${showRatio(sharpeRatio)},
+       |sortinoRatio=${showRatio(sortinoRatio)},
        |meanProfitByMonth=$meanProfitByMonth,
        |medianProfitByMonth=$medianProfitByMonth,
        |biggestWin=$biggestWin,
@@ -162,23 +175,17 @@ object OrderStats {
 
   def fromTrades(
       trades: List[CompletedTrade],
-      openPositions: List[OpenPositionSnapshot],
       settings: RiskSettings,
       invalidOrderCount: Int = 0
   ): OrderStats = {
-    val sortedTrades               = trades.sortBy(_.closedAt)
-    val (completed, realizedCurve) = buildRealizedEquityCurve(sortedTrades, settings.initialBalance.value)
-    val markedCurve                = appendMarkedEquity(realizedCurve, openPositions, settings.initialBalance.value)
-    val netProfits                 = completed.map(_.netProfit)
-    val wins                       = netProfits.filter(_ > 0)
-    val losses                     = netProfits.filter(_ < 0)
-    val monthly                    = completed.groupMapReduce(t => monthFormatter.format(t.closedAt))(_.netProfit)(_ + _)
-    val (maxWins, maxLosses)       = streaks(netProfits)
-    val (sharpe, sortino)          = monthlyRiskRatios(completed, settings.initialBalance.value)
-    val realized                   = netProfits.sum
-    val unrealized                 = openPositions.map(_.unrealizedProfit).sum
-    val drawdown                   = markedCurve.map(_.drawdown).maxOption.getOrElse(BigDecimal(0))
-    val drawdownPct                = markedCurve.map(_.drawdownPercent).maxOption.getOrElse(BigDecimal(0))
+    val sortedTrades         = trades.sortBy(_.closedAt)
+    val (completed, curve)   = buildEquityCurve(sortedTrades, settings.initialBalance.value)
+    val netProfits           = completed.map(_.netProfit)
+    val wins                 = netProfits.filter(_ > 0)
+    val losses               = netProfits.filter(_ < 0)
+    val monthly              = completed.groupMapReduce(t => monthFormatter.format(t.closedAt))(_.netProfit)(_ + _)
+    val (maxWins, maxLosses) = streaks(netProfits)
+    val (sharpe, sortino)    = monthlyRiskRatios(monthly, settings.initialBalance.value)
 
     OrderStats(
       total = completed.size,
@@ -188,39 +195,48 @@ object OrderStats {
       lossCount = losses.size,
       breakevenCount = netProfits.count(_ == 0),
       lossTotal = losses.sum.toDouble,
-      totalProfit = realized + unrealized,
-      realizedProfit = realized,
-      unrealizedProfit = unrealized,
-      preCostProfit = completed.map(_.grossProfit).sum + openPositions.map(_.grossProfit).sum,
-      totalCosts = completed.map(_.costs).sum + openPositions.map(_.estimatedCosts).sum,
+      totalProfit = netProfits.sum,
+      preCostProfit = completed.map(_.grossProfit).sum,
+      totalCosts = completed.map(_.costs).sum,
       grossProfit = wins.sum,
       grossLoss = losses.map(_.abs).sum,
       biggestWin = wins.maxOption.getOrElse(BigDecimal(0)),
       biggestLoss = losses.minOption.getOrElse(BigDecimal(0)),
       profitByMonth = monthly,
       completedTrades = completed,
-      openPositions = openPositions,
-      equityCurve = markedCurve,
+      equityCurve = curve,
       initialBalance = settings.initialBalance.value,
-      maxDrawdown = drawdown,
-      maxDrawdownPercent = drawdownPct,
+      maxDrawdown = curve.map(_.drawdown).maxOption.getOrElse(BigDecimal(0)),
+      maxDrawdownPercent = curve.map(_.drawdownPercent).maxOption.getOrElse(BigDecimal(0)),
       sharpeRatio = sharpe,
       sortinoRatio = sortino,
       maxConsecutiveWins = maxWins,
       maxConsecutiveLosses = maxLosses,
+      forcedClosureCount = completed.count(_.forcedClosure),
       invalidOrderCount = invalidOrderCount
     )
   }
 
-  def combine(stats: List[OrderStats], settings: RiskSettings = RiskSettings()): OrderStats =
+  /** Pools per-dataset results into a single portfolio.
+    *
+    * The pooled account starts with the sum of the member balances, because each dataset was simulated on its own account. Charging the
+    * combined trades against a single dataset's balance would scale returns and drawdown percentages with the number of datasets, so any
+    * threshold expressed as a percentage would silently change meaning whenever a dataset is added or removed.
+    *
+    * That sum is the only balance this can honestly use, so there is no settings parameter to pass one in with: initial balance is all
+    * `fromTrades` reads out of `RiskSettings`, and any value supplied here would be discarded. The default only ever applies to an empty
+    * list, which has no member balances to add up.
+    */
+  def combine(stats: List[OrderStats]): OrderStats =
     fromTrades(
       trades = stats.flatMap(_.completedTrades),
-      openPositions = stats.flatMap(_.openPositions),
-      settings = settings,
+      settings = stats.map(_.initialBalance).sum match
+        case pooled if pooled > 0 => RiskSettings(initialBalance = PosBigDecimal.unsafeFrom(pooled))
+        case _                    => RiskSettings(),
       invalidOrderCount = stats.map(_.invalidOrderCount).sum
     )
 
-  private def buildRealizedEquityCurve(
+  private def buildEquityCurve(
       trades: List[CompletedTrade],
       initialBalance: BigDecimal
   ): (List[CompletedTrade], List[EquityPoint]) = {
@@ -240,42 +256,28 @@ object OrderStats {
         next,
         nextPeak,
         enriched.reverse ::: accTrades,
-        EquityPoint(closedAt, next, drawdown, ddPct, realized = true) :: accPoints
+        EquityPoint(closedAt, next, drawdown, ddPct) :: accPoints
       )
     }
     (completed.reverse, points.reverse)
   }
 
-  private def appendMarkedEquity(
-      realizedCurve: List[EquityPoint],
-      openPositions: List[OpenPositionSnapshot],
-      initialBalance: BigDecimal
-  ): List[EquityPoint] =
-    if (openPositions.isEmpty) realizedCurve
-    else {
-      val realizedEquity = realizedCurve.lastOption.map(_.equity).getOrElse(initialBalance)
-      val previousPeak   = realizedCurve.map(_.equity).foldLeft(initialBalance)(_.max(_))
-      val markedEquity   = realizedEquity + openPositions.map(_.unrealizedProfit).sum
-      val peak           = previousPeak.max(markedEquity)
-      val drawdown       = peak - markedEquity
-      val drawdownPct    = if (peak == 0) BigDecimal(0) else (drawdown / peak * 100).roundTo(8)
-      val markedAt       = openPositions.maxBy(_.markedAt.toEpochMilli).markedAt
-      realizedCurve :+ EquityPoint(markedAt, markedEquity, drawdown, drawdownPct, realized = false)
-    }
-
-  private def monthlyRiskRatios(trades: List[CompletedTrade], initialBalance: BigDecimal): (Double, Double) = {
-    val monthlyProfits = trades
-      .groupMapReduce(t => monthFormatter.format(t.closedAt))(_.netProfit)(_ + _)
-      .toList
-      .sortBy(_._1)
-      .map(_._2)
+  /** Annualized Sharpe and Sortino from the monthly profit series.
+    *
+    * Neither a zero denominator nor too short a series is reported as a ratio of 0.0, because 0.0 is a poor result and neither of these is:
+    * a zero downside deviation means no month lost money, and a single month means nothing was measured. Scoring either as zero would push
+    * an optimiser towards strategies that do have losing months. They are returned as distinct cases rather than one catch-all so that a
+    * caller can credit the good outcome without also crediting the absent one.
+    */
+  private def monthlyRiskRatios(profitByMonth: Map[String, BigDecimal], initialBalance: BigDecimal): (RiskRatio, RiskRatio) = {
+    val monthlyProfits = profitByMonth.toList.sortBy(_._1).map(_._2)
 
     val (_, returns) = monthlyProfits.foldLeft((initialBalance, List.empty[Double])) { case ((balance, acc), profit) =>
       val monthlyReturn = if (balance == 0) 0.0 else (profit / balance).toDouble
       (balance + profit, monthlyReturn :: acc)
     }
     val orderedReturns = returns.reverse
-    if (orderedReturns.size < 2) (0.0, 0.0)
+    if (orderedReturns.size < 2) (RiskRatio.InsufficientData, RiskRatio.InsufficientData)
     else {
       val mean       = orderedReturns.sum / orderedReturns.size
       val variance   = orderedReturns.map(r => math.pow(r - mean, 2)).sum / (orderedReturns.size - 1)
@@ -283,10 +285,7 @@ object OrderStats {
       val downside   = orderedReturns.map(r => math.pow(math.min(r, 0.0), 2)).sum / orderedReturns.size
       val downsideSd = sqrt(downside)
       val annualizer = sqrt(12.0)
-      (
-        if (deviation == 0) 0.0 else mean / deviation * annualizer,
-        if (downsideSd == 0) 0.0 else mean / downsideSd * annualizer
-      )
+      (RiskRatio.from(mean, deviation, annualizer), RiskRatio.from(mean, downsideSd, annualizer))
     }
   }
 
@@ -339,16 +338,18 @@ object OrderStatsCollector {
       }
     }
 
-    val markedPosition = for
+    // A position still open when the data runs out is liquidated at the final mark instead of being reported as an
+    // unrealized balance. Reporting it separately left totalProfit including it while trade counts, expectancy,
+    // profit factor and the monthly return series all excluded it, so no two metrics described the same trades.
+    val forcedClosure = for
       placement <- state.openPosition
       open      <- asEnter(placement)
       mark      <- finalMark
       if !mark.observedAt.isBefore(placement.time)
-    yield markOpenPosition(open, placement.time, mark, settings)
+    yield closeTrade(open, placement.time, mark.price, mark.observedAt, settings, forcedClosure = true)
 
     OrderStats.fromTrades(
-      trades = state.trades.reverse,
-      openPositions = markedPosition.toList,
+      trades = state.trades.reverse ::: forcedClosure.toList,
       settings = settings,
       invalidOrderCount = state.invalidOrderCount
     )
@@ -359,7 +360,8 @@ object OrderStatsCollector {
       openedAt: Instant,
       exitPrice: BigDecimal,
       closedAt: Instant,
-      settings: RiskSettings
+      settings: RiskSettings,
+      forcedClosure: Boolean = false
   ): CompletedTrade = {
     val units      = open.volume * settings.unitsPerLot.value
     val grossQuote = priceProfit(open.position, open.price, exitPrice) * units
@@ -375,32 +377,8 @@ object OrderStatsCollector {
       volume = open.volume,
       grossProfit = gross,
       costs = costs,
-      netProfit = gross - costs
-    )
-  }
-
-  private def markOpenPosition(
-      open: TO.Enter,
-      openedAt: Instant,
-      mark: MarketMark,
-      settings: RiskSettings
-  ): OpenPositionSnapshot = {
-    val markPrice  = mark.price
-    val units      = open.volume * settings.unitsPerLot.value
-    val grossQuote = priceProfit(open.position, open.price, markPrice) * units
-    val gross      = toAccountCurrency(open.currencyPair, grossQuote, markPrice, settings)
-    val costs      = transactionCosts(open.currencyPair, units, markPrice, settings)
-    OpenPositionSnapshot(
-      currencyPair = open.currencyPair,
-      position = open.position,
-      openedAt = openedAt,
-      markedAt = mark.observedAt,
-      entryPrice = open.price,
-      markPrice = markPrice,
-      volume = open.volume,
-      grossProfit = gross,
-      estimatedCosts = costs,
-      unrealizedProfit = gross - costs
+      netProfit = gross - costs,
+      forcedClosure = forcedClosure
     )
   }
 

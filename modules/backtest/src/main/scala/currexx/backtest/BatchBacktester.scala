@@ -46,13 +46,14 @@ object BatchBacktester extends IOApp.Simple {
       .compile
       .toList
       .map { stats =>
-        val portfolio    = OrderStats.combine(stats, riskSettings)
+        val portfolio    = OrderStats.combine(stats)
         val winPct       = portfolio.winRate * 100
         val drawdown     = portfolio.maxDrawdownPercent
         val profitFactor = portfolio.profitFactor.fold("    N/A")(pf => f"$pf%7.3f")
-        f"$name%-25s net=${portfolio.totalProfit}%10.5f  closed=${portfolio.total}%5d  open=${portfolio.openPositions.size}%2d  " +
+        val sharpe       = portfolio.sharpeRatio.toOption.fold("    N/A")(s => f"$s%7.3f")
+        f"$name%-25s net=${portfolio.totalProfit}%10.5f  closed=${portfolio.total}%5d  forced=${portfolio.forcedClosureCount}%2d  " +
           f"win=${winPct}%6.2f%%  exp=${portfolio.expectancy}%9.6f  PF=$profitFactor  " +
-          f"DD=${drawdown}%6.2f%%  Sharpe=${portfolio.sharpeRatio}%7.3f  gross=${portfolio.preCostProfit}%10.5f  " +
+          f"DD=${drawdown}%6.2f%%  Sharpe=$sharpe  gross=${portfolio.preCostProfit}%10.5f  " +
           f"costs=${portfolio.totalCosts}%9.5f"
       }
 
@@ -62,11 +63,13 @@ object BatchBacktester extends IOApp.Simple {
         acc.flatMap(lines => runOne(kv._1, kv._2).map(l => lines :+ l))
       }
       .flatMap(lines => IO.println("\n===== BATCH RESULTS =====\n" + lines.mkString("\n")))
-      .flatMap(_ => IO.println(
-        """
-          |exp - expectancy - Average realized net profit per closed trade
+      .flatMap(_ =>
+        IO.println("""
+          |forced - positions still open when the data ran out, liquidated at the final mark price
+          |exp - expectancy - Average net profit per closed trade
           |PF - profit factor - Relationship between winning and losing closed trades (1.5 means $1.50 won for every $1 lost)
           |DD - drawdown - Maximum percentage of the portfolio that was lost during the period
           |sharpe - Risk-adjusted performance calculated from monthly equity returns and annualized. Higher means returns were more consistent
-          |""".stripMargin))
+          |""".stripMargin)
+      )
 }
