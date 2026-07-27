@@ -34,7 +34,7 @@ object Backtester extends IOApp.Simple {
       .compile
       .toList
       .flatMap { stats =>
-        val portfolio = OrderStats.combine(stats, riskSettings)
+        val portfolio = OrderStats.combine(stats)
         IO.println(s"Portfolio: $portfolio")
       }
 }

@@ -42,7 +42,7 @@ final class ApplicationState[F[_]](
     val executionBar  = currentBar.copy(close = currentBar.open)
     val executionData = currentData.copy(prices = NonEmptyList(executionBar, currentData.prices.tail))
     val executionTime = currentBar.time.plus(fetchTimeOffset)
-    val finalMark = MarketMark(
+    val finalMark     = MarketMark(
       price = BigDecimal(currentBar.close),
       observedAt = executionTime.plus(currentData.interval.toDuration)
     )
