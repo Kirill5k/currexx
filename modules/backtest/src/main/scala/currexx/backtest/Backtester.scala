@@ -19,7 +19,7 @@ object Backtester extends IOApp.Simple {
       .parEvalMap(16) { filePath =>
         for
           _ <- IO.println(s"Processing $filePath")
-          cp = MarketDataProvider.cpFromFilePath(filePath)
+          cp       = MarketDataProvider.cpFromFilePath(filePath)
           settings = TestSettings.make(cp, testStrategy.rules, List(testStrategy.indicator))
           services <- TestServices.make[IO](settings)
           _        <- MarketDataProvider

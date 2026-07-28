@@ -3,17 +3,20 @@ package currexx.calculations
 import scala.collection.mutable.{ListBuffer, Queue as MQueue}
 
 object Statistics {
-  /**
-   * Calculates the rolling standard deviation for a given list of values.
-   *
-   * @param values A list of values, sorted from latest to earliest.
-   * @param n      The rolling window period.
-   * @return A list of standard deviation values, sorted from latest to earliest.
-   */
+
+  /** Calculates the rolling standard deviation for a given list of values.
+    *
+    * @param values
+    *   A list of values, sorted from latest to earliest.
+    * @param n
+    *   The rolling window period.
+    * @return
+    *   A list of standard deviation values, sorted from latest to earliest.
+    */
   def standardDeviation(values: List[Double], n: Int): List[Double] = {
     val chronologicalValues = values.reverse
-    val window = MQueue.empty[Double]
-    val resultBuffer = new ListBuffer[Double]
+    val window              = MQueue.empty[Double]
+    val resultBuffer        = new ListBuffer[Double]
 
     chronologicalValues.foreach { value =>
       window.enqueue(value)

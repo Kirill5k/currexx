@@ -15,10 +15,10 @@ import kirill5k.common.cats.Clock
 final private class TestMarketStateRepository[F[_]: Monad](
     private val state: Ref[F, MarketState]
 )(using
-  clock: Clock[F]
+    clock: Clock[F]
 ) extends MarketStateRepository[F]:
-  override def delete(uid: UserId, cp: CurrencyPair): F[Unit]                                  = Monad[F].unit
-  override def deleteAll(uid: UserId): F[Unit]                                                 = Monad[F].unit
+  override def delete(uid: UserId, cp: CurrencyPair): F[Unit] = Monad[F].unit
+  override def deleteAll(uid: UserId): F[Unit]                = Monad[F].unit
   override def update(uid: UserId, pair: CurrencyPair, profile: MarketProfile, previousProfile: MarketProfile): F[MarketState] =
     clock.now.flatMap { now =>
       state.updateAndGet(s => s.copy(profile = profile, previousProfile = Some(previousProfile), lastUpdatedAt = now))
@@ -39,6 +39,5 @@ final private class TestMarketStateRepository[F[_]: Monad](
     }
 
 object TestMarketService:
-  def make[F[_]: {Concurrent, Clock, Logger}](initialState: MarketState, dispatcher: ActionDispatcher[F]): F[MarketService[F]] = {
+  def make[F[_]: {Concurrent, Clock, Logger}](initialState: MarketState, dispatcher: ActionDispatcher[F]): F[MarketService[F]] =
     Ref.of(initialState).flatMap(s => MarketService.make(TestMarketStateRepository(s), dispatcher))
-  }

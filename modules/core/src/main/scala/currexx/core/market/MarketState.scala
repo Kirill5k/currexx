@@ -62,7 +62,6 @@ final case class MarketProfile(
     lastClosePrice: Option[BigDecimal] = None
 ) derives Codec.AsObject
 
-
 final case class PositionState(
     position: TradeOrder.Position,
     openedAt: Instant,

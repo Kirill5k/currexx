@@ -8,7 +8,7 @@ import fs2.io.file.{Files, Path}
 class MarkdownTrackerSpec extends IOWordSpec {
 
   "MarkdownTracker" should {
-    val params = Parameters.GA(100, 10, 0.5, 0.1, 0.1, true)
+    val params     = Parameters.GA(100, 10, 0.5, 0.1, 0.1, true)
     val population = Vector(
       ("ind1", Fitness(10.0)),
       ("ind2", Fitness(5.0))

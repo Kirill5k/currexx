@@ -12,19 +12,6 @@ object BatchBacktester extends IOApp.Simple {
   inline given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
   val strategies: List[(String, TestStrategy)] = List(
-<<<<<<< HEAD
-    "s1"            -> TestStrategy.s1,
-    "s1_v2"         -> TestStrategy.s1_v2,
-    "s2"            -> TestStrategy.s2,
-    "s4"            -> TestStrategy.s4,
-    "s4_regime"     -> TestStrategy.s4_regime,
-    "s4_optimized"  -> TestStrategy.s4_optimized,
-    "s5"            -> TestStrategy.s5,
-    "s8_optimized"  -> TestStrategy.s8_optimized,
-    "s9_optimized"  -> TestStrategy.s9_optimized,
-    "s10_optimized" -> TestStrategy.s10_optimized,
-    "s12"           -> TestStrategy.s12
-=======
     "s1"              -> TestStrategy.s1,
     "s1_v2"           -> TestStrategy.s1_v2,
     "s2"              -> TestStrategy.s2,
@@ -39,7 +26,6 @@ object BatchBacktester extends IOApp.Simple {
     "s10_optimized"   -> TestStrategy.s10_optimized,
     "s11_optimized"   -> TestStrategy.s11_optimized,
     "s12"             -> TestStrategy.s12
->>>>>>> cf1fa208 (Delete redundant test strategies)
   )
 
   def runOne(name: String, ts: TestStrategy): IO[String] =
@@ -67,7 +53,8 @@ object BatchBacktester extends IOApp.Simple {
         val buys    = stats.map(_.buys).sum
         val sells   = stats.map(_.sells).sum
         val medProf = stats.map(_.totalProfit).median
-        f"$name%-16s profit=${profit}%9.5f  W/L=${wl}%8.4f  orders=${orders}%5d  buys=${buys}%5d  sells=${sells}%5d  medProfit=${medProf}%8.5f"
+        val medLoss = stats.map(_.meanLoss).median
+        f"$name%-20s profit=${profit}%9.5f  W/L=${wl}%8.4f  orders=${orders}%5d  buys=${buys}%5d  sells=${sells}%5d  medProfit=${medProf}%8.5f  medLoss=${medLoss}%9.6f"
       }
 
   override val run: IO[Unit] =

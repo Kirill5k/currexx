@@ -17,7 +17,9 @@ object Filters {
   def kalmanVelocity(values: List[Double], gain: Double, measurementNoise: Double = 1.0): List[Double] =
     runKalman(values, gain, measurementNoise)((_, x1) => x1)
 
-  private def runKalman(values: List[Double], processNoise: Double, measurementNoise: Double)(extract: (Double, Double) => Double): List[Double] =
+  private def runKalman(values: List[Double], processNoise: Double, measurementNoise: Double)(
+      extract: (Double, Double) => Double
+  ): List[Double] =
     if (values.isEmpty) Nil
     else {
       val q00    = processNoise * 0.25
@@ -50,8 +52,8 @@ object Filters {
         val k1 = p01p / s
         val y  = z - x0p
 
-        x0  = x0p + k0 * y
-        x1  = x1  + k1 * y
+        x0 = x0p + k0 * y
+        x1 = x1 + k1 * y
         p00 = (1.0 - k0) * p00p
         p01 = (1.0 - k0) * p01p
         p11 = p11p - k1 * p01p

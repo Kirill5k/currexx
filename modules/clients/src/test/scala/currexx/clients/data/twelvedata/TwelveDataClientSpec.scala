@@ -28,7 +28,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
         "interval"   -> "1day",
         "apikey"     -> "api-key",
         "outputsize" -> "150",
-        "timezone" -> "UTC"
+        "timezone"   -> "UTC"
       )
 
       val testingBackend = fs2BackendStub
@@ -39,7 +39,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
         }
 
       val result = for
-        cache <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+        cache  <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
         client <- TwelveDataClient.make[IO](config, testingBackend, cache, 100.millis)
         res    <- client.timeSeriesData(pair, Interval.D1)
       yield res
@@ -63,7 +63,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
         )
 
       val result = for
-        cache <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+        cache  <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
         client <- TwelveDataClient.make[IO](config, testingBackend, cache, 100.millis)
         res    <- client.timeSeriesData(pair, Interval.D1)
       yield res
@@ -96,7 +96,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
         }
 
       val result = for
-        cache <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+        cache  <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
         client <- TwelveDataClient.make[IO](config, testingBackend, cache, 100.millis)
         res    <- client.timeSeriesData(pair, Interval.H1)
       yield res
@@ -131,7 +131,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
         }
 
       val result = for
-        cache <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+        cache  <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
         client <- TwelveDataClient.make[IO](config, testingBackend, cache, 100.millis)
         res    <- client.timeSeriesData(pair, Interval.H1)
       yield res

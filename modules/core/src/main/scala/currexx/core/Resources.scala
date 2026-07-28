@@ -31,7 +31,7 @@ object Resources:
           "Please set the MONGO_USER, MONGO_PASSWORD, and MONGO_HOST environment variables."
       )
     )
-  
+
   private def mongoDb[F[_]: Async](config: MongoConfig): Resource[F, MongoDatabase[F]] =
     Resource
       .eval(Async[F].fromEither(mongoConnectionUri(config)))

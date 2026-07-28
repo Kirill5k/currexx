@@ -18,7 +18,7 @@ import java.time.temporal.ChronoUnit
 
 class SignalServiceSpec extends IOWordSpec {
   given Logger[IO] = Slf4jLogger.getLogger[IO]
-  
+
   "A SignalService" when {
     "submit" should {
       "store new signal in the repository and dispatch an action" in {

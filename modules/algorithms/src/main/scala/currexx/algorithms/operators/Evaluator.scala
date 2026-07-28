@@ -16,8 +16,7 @@ object Evaluator:
         override def evaluateIndividual(individual: I): F[(I, Fitness)] =
           cache.get.flatMap(_.get(individual) match
             case Some(d) => await(d, individual)
-            case None    => computeOrWait(individual)
-          )
+            case None    => computeOrWait(individual))
 
         private def await(d: Deferred[F, Either[Throwable, Fitness]], individual: I): F[(I, Fitness)] =
           d.get.flatMap {
@@ -27,19 +26,20 @@ object Evaluator:
 
         private def computeOrWait(individual: I): F[(I, Fitness)] =
           Deferred[F, Either[Throwable, Fitness]].flatMap { newDeferred =>
-            cache.modify { map =>
-              map.get(individual) match
-                case Some(existing) => (map, existing)
-                case None           => (map + (individual -> newDeferred), newDeferred)
-            }.flatMap { winner =>
-              if (winner eq newDeferred) compute(individual, newDeferred)
-              else await(winner, individual)
-            }
+            cache
+              .modify { map =>
+                map.get(individual) match
+                  case Some(existing) => (map, existing)
+                  case None           => (map + (individual -> newDeferred), newDeferred)
+              }
+              .flatMap { winner =>
+                if (winner eq newDeferred) compute(individual, newDeferred)
+                else await(winner, individual)
+              }
           }
 
         private def compute(individual: I, slot: Deferred[F, Either[Throwable, Fitness]]): F[(I, Fitness)] =
-          objectiveFn(individual)
-            .attempt
+          objectiveFn(individual).attempt
             .map(_.map(_._2))
             .flatTap { result =>
               slot.complete(result) >>

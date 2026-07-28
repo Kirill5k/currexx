@@ -100,7 +100,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
 
     "GET /trade/orders/stats" should {
       "return order statistics" in {
-        val svc = mock[TradeService[IO]]
+        val svc   = mock[TradeService[IO]]
         val stats = OrderStatistics(
           totalOrders = 10,
           successfulOrders = 7,
@@ -170,7 +170,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
             |  ]
             |}""".stripMargin
         res mustHaveStatus (Status.Ok, Some(responseBody))
-        
+
         verify(svc).getOrderStatistics(
           Users.uid,
           SearchParams(
@@ -182,7 +182,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
       }
 
       "return statistics without date filters" in {
-        val svc = mock[TradeService[IO]]
+        val svc   = mock[TradeService[IO]]
         val stats = OrderStatistics(
           totalOrders = 5,
           successfulOrders = 4,
@@ -227,7 +227,7 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
         res mustHaveStatus (Status.Ok, Some(responseBody))
         verify(svc).getOrderStatistics(Users.uid, SearchParams(None, None, None))
       }
-      
+
       "return bad request when from date is after to date" in {
         val svc = mock[TradeService[IO]]
 

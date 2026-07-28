@@ -197,4 +197,3 @@ class OrderStatusRepositorySpec extends MongoSpec {
         .use(_.getDatabase("currexx").flatMap(test))
     }.unsafeToFuture()(using IORuntime.global)
 }
-

@@ -30,7 +30,7 @@ final private class LiveMarketService[F[_]](
     F: MonadThrow[F],
     logger: Logger[F]
 ) extends MarketService[F] {
-  override def getState(uid: UserId): F[List[MarketState]]                   = stateRepo.getAll(uid)
+  override def getState(uid: UserId): F[List[MarketState]]             = stateRepo.getAll(uid)
   override def getState(uid: UserId, cp: CurrencyPair): F[MarketState] =
     stateRepo.find(uid, cp).flatMap(F.fromOption(_, AppError.MissingMarketState(cp)))
   override def clearState(uid: UserId, closePendingOrders: Boolean): F[Unit] =
@@ -59,11 +59,11 @@ final private class LiveMarketService[F[_]](
 
   override def updateTimeState(uid: UserId, data: MarketTimeSeriesData): F[Unit] = {
     val latestCandle = data.prices.head
-    val prevCandle = data.prices.tail.headOption
-    val timeGap = prevCandle.map(_.time.durationBetween(latestCandle.time))
+    val prevCandle   = data.prices.tail.headOption
+    val timeGap      = prevCandle.map(_.time.durationBetween(latestCandle.time))
     F.whenA(timeGap.exists(_ > (data.interval.toDuration * 2))) {
       val marketClosureGap = timeGap.get - data.interval.toDuration
-      val cp = data.currencyPair
+      val cp               = data.currencyPair
       stateRepo.find(uid, cp).flatMap {
         case Some(previousState) =>
           val shiftedProfile = previousState.profile.copy(

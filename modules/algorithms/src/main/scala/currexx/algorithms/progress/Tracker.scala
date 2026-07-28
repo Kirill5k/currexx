@@ -36,7 +36,7 @@ trait Tracker[F[_], I]:
     val hours   = totalMs / 3600000
     val minutes = (totalMs % 3600000) / 60000
     val seconds = (totalMs % 60000) / 1000
-    val ms      = totalMs % 1000
+    val ms      = totalMs  % 1000
     val parts   = List(
       Option.when(hours > 0)(s"${hours}h"),
       Option.when(hours > 0 || minutes > 0)(s"${minutes}m"),

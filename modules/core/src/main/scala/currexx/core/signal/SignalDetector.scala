@@ -197,7 +197,7 @@ object SignalDetector:
     // In practice there are O(monitors × indicators) distinct keys per time tick,
     // so 100 000 entries comfortably covers real-world loads within a few hundred MB.
     val maxEntries = (maxSizeMB * 1024L * 1024L) / 1024 // ~1 KB per entry as a rough heuristic
-    val cache = Caffeine
+    val cache      = Caffeine
       .newBuilder()
       .maximumSize(maxEntries)
       .build[CacheKey, Option[Signal]]()

@@ -15,7 +15,9 @@ class SensitiveDataRedactorSpec extends AnyWordSpec with Matchers {
 
     "redact multiple sensitive fields" in {
       val redactor = SensitiveDataRedactor[IO](Set("password", "currentPassword", "newPassword"))
-      redactor.redact("""{"currentPassword":"old-secret","newPassword":"new-secret"}""") mustBe """{"currentPassword":"***","newPassword":"***"}"""
+      redactor.redact(
+        """{"currentPassword":"old-secret","newPassword":"new-secret"}"""
+      ) mustBe """{"currentPassword":"***","newPassword":"***"}"""
     }
 
     "redact sensitive fields with spaces around colon" in {
@@ -35,12 +37,16 @@ class SensitiveDataRedactorSpec extends AnyWordSpec with Matchers {
 
     "redact a sensitive field nested in an object" in {
       val redactor = SensitiveDataRedactor[IO](Set("password"))
-      redactor.redact("""{"user":{"email":"foo@bar.com","password":"secret123"}}""") mustBe """{"user":{"email":"foo@bar.com","password":"***"}}"""
+      redactor.redact(
+        """{"user":{"email":"foo@bar.com","password":"secret123"}}"""
+      ) mustBe """{"user":{"email":"foo@bar.com","password":"***"}}"""
     }
 
     "redact all occurrences of a sensitive field" in {
       val redactor = SensitiveDataRedactor[IO](Set("password"))
-      redactor.redact("""{"password":"first","other":"value","password":"second"}""") mustBe """{"password":"***","other":"value","password":"***"}"""
+      redactor.redact(
+        """{"password":"first","other":"value","password":"second"}"""
+      ) mustBe """{"password":"***","other":"value","password":"***"}"""
     }
   }
 }

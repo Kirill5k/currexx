@@ -21,9 +21,9 @@ object MovingAverages {
     if (arr.isEmpty) Array.empty else exponentialKernel(arr, n, EmaSmoothing)
 
   private def exponentialKernel(arr: Array[Double], n: Int, smoothing: Double): Array[Double] = {
-    val k      = smoothing / (1 + n)
-    val result = new Array[Double](arr.length)
-    val last   = arr.length - 1
+    val k       = smoothing / (1 + n)
+    val result  = new Array[Double](arr.length)
+    val last    = arr.length - 1
     var prevEma = arr(last)
     result(last) = prevEma
     var i = last - 1
@@ -186,12 +186,12 @@ object MovingAverages {
       n: Int,
       maCalc: (Array[Double], Int) => Array[Double] = exponential
   ): List[Double] = {
-    val arr = values.toArray
-    val ma1 = maCalc(arr, n)
-    val ma2 = maCalc(ma1, n)
-    val ma3 = maCalc(ma2, n)
+    val arr    = values.toArray
+    val ma1    = maCalc(arr, n)
+    val ma2    = maCalc(ma1, n)
+    val ma3    = maCalc(ma2, n)
     val result = new Array[Double](arr.length)
-    var i = 0
+    var i      = 0
     while (i < arr.length) {
       result(i) = 3 * ma1(i) - 3 * ma2(i) + ma3(i)
       i += 1
@@ -256,11 +256,11 @@ object MovingAverages {
       while (i >= 0) {
         val price   = arr(i)
         val prevJma = jma
-        ma1  = (1 - alpha) * price + alpha * ma1
+        ma1 = (1 - alpha) * price + alpha * ma1
         det0 = (price - ma1) * (1 - beta) + beta * det0
         val ma2 = ma1 + pr * det0
         det1 = (ma2 - prevJma) * math.pow(1 - alpha, 2) + math.pow(alpha, 2) * det1
-        jma  = prevJma + det1
+        jma = prevJma + det1
         result(i) = jma
         i -= 1
       }

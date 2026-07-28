@@ -26,7 +26,7 @@ object Application extends IOApp.Simple:
 
   override def runtimeConfig: IORuntimeConfig =
     super.runtimeConfig.copy(cpuStarvationCheckInitialDelay = 2.minute)
-  
+
   override val run: IO[Unit] =
     Logger.make[IO].flatMap { implicit logger =>
       for

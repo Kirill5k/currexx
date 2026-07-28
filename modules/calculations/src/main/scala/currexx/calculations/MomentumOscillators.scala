@@ -6,19 +6,18 @@ object MomentumOscillators {
 
   /** Calculates the Relative Strength Index (RSI).
     *
-    * RSI measures the speed and magnitude of recent price changes to evaluate overbought/oversold conditions.
-    * It oscillates between 0 and 100. Traditionally, readings above 70 indicate overbought and below 30 oversold.
+    * RSI measures the speed and magnitude of recent price changes to evaluate overbought/oversold conditions. It oscillates between 0 and
+    * 100. Traditionally, readings above 70 indicate overbought and below 30 oversold.
     *
-    * Formula: RSI = 100 - (100 / (1 + RS)), where RS = Average Gain / Average Loss.
-    * Uses Wilder's smoothing (exponential with alpha = 1/length) after the initial SMA seed.
+    * Formula: RSI = 100 - (100 / (1 + RS)), where RS = Average Gain / Average Loss. Uses Wilder's smoothing (exponential with alpha =
+    * 1/length) after the initial SMA seed.
     *
     * @param values
     *   A list of prices sorted from latest to earliest.
     * @param length
     *   The RSI period (typically 14).
     * @return
-    *   A list of RSI values (0-100), sorted from latest to earliest, same size as input.
-    *   Returns neutral 50.0 during warm-up.
+    *   A list of RSI values (0-100), sorted from latest to earliest, same size as input. Returns neutral 50.0 during warm-up.
     */
   def relativeStrengthIndex(values: List[Double], length: Int): List[Double] =
     // RSI requires at least `length` periods of price changes, so `length + 1` prices.
@@ -80,9 +79,9 @@ object MomentumOscillators {
 
   /** Calculates the Stochastic Oscillator (%K).
     *
-    * The Stochastic measures where the current close sits relative to the high-low range over N periods.
-    * It oscillates between 0 and 100. Readings above 80 suggest overbought, below 20 oversold.
-    * Faster than RSI — reacts more quickly to price changes, making it useful for short-term timing.
+    * The Stochastic measures where the current close sits relative to the high-low range over N periods. It oscillates between 0 and 100.
+    * Readings above 80 suggest overbought, below 20 oversold. Faster than RSI — reacts more quickly to price changes, making it useful for
+    * short-term timing.
     *
     * Formula: %K = ((Close - Lowest Low) / (Highest High - Lowest Low)) * 100
     *
@@ -95,8 +94,7 @@ object MomentumOscillators {
     * @param length
     *   The lookback period (typically 14).
     * @return
-    *   A list of %K values (0-100), sorted from latest to earliest, same size as input.
-    *   Returns 0.0 during warm-up.
+    *   A list of %K values (0-100), sorted from latest to earliest, same size as input. Returns 0.0 during warm-up.
     */
   def stochastic(
       closings: List[Double],
@@ -136,8 +134,8 @@ object MomentumOscillators {
 
   /** Calculates the Average Directional Index (ADX).
     *
-    * ADX measures trend *strength* regardless of direction. It does not indicate whether the trend is up or down,
-    * only how strong or weak it is. Ranges from 0 to 100:
+    * ADX measures trend *strength* regardless of direction. It does not indicate whether the trend is up or down, only how strong or weak
+    * it is. Ranges from 0 to 100:
     *   - 0-20: Weak/absent trend (ranging market, favor mean-reversion strategies)
     *   - 20-40: Developing trend
     *   - 40-60: Strong trend
@@ -160,8 +158,8 @@ object MomentumOscillators {
     * @param length
     *   The ADX smoothing period (typically 14).
     * @return
-    *   A list of ADX values (0-100), sorted from latest to earliest, same size as input.
-    *   Returns 0.0 during the warm-up period (first 2*length bars).
+    *   A list of ADX values (0-100), sorted from latest to earliest, same size as input. Returns 0.0 during the warm-up period (first
+    *   2*length bars).
     */
   def averageDirectionalIndex(
       closings: List[Double],
@@ -187,7 +185,7 @@ object MomentumOscillators {
       resultBuffer += 0.0 // first element has no DM
 
       val it = data.iterator
-      val _ = it.next() // skip first
+      val _  = it.next() // skip first
       while (it.hasNext) {
         val (close, high, low) = it.next()
         count += 1
@@ -233,14 +231,12 @@ object MomentumOscillators {
 
   /** Calculates Williams %R (Williams Percent Range).
     *
-    * A momentum oscillator that measures where the close is relative to the high-low range over N periods.
-    * Similar to Stochastic %K but inverted and unsmoothed, making it faster and noisier.
-    * Ranges from -100 to 0:
+    * A momentum oscillator that measures where the close is relative to the high-low range over N periods. Similar to Stochastic %K but
+    * inverted and unsmoothed, making it faster and noisier. Ranges from -100 to 0:
     *   - -20 to 0: Overbought territory
     *   - -100 to -80: Oversold territory
     *
-    * Particularly useful for mean-reversion timing due to its speed — it leads price turns
-    * more quickly than RSI or Stochastic.
+    * Particularly useful for mean-reversion timing due to its speed — it leads price turns more quickly than RSI or Stochastic.
     *
     * Formula: %R = ((Highest High - Close) / (Highest High - Lowest Low)) * -100
     *
@@ -253,8 +249,7 @@ object MomentumOscillators {
     * @param length
     *   The lookback period (typically 14).
     * @return
-    *   A list of Williams %R values (-100 to 0), sorted from latest to earliest, same size as input.
-    *   Returns -50.0 during warm-up.
+    *   A list of Williams %R values (-100 to 0), sorted from latest to earliest, same size as input. Returns -50.0 during warm-up.
     */
   def williamsR(
       closings: List[Double],
@@ -291,9 +286,9 @@ object MomentumOscillators {
 
   /** Calculates the Commodity Channel Index (CCI).
     *
-    * CCI measures the deviation of the typical price from its statistical mean, normalized by the mean absolute
-    * deviation. Unlike bounded oscillators, CCI is unbounded — extreme readings (beyond ±200) are genuinely rare
-    * and more statistically significant than threshold crosses on bounded indicators.
+    * CCI measures the deviation of the typical price from its statistical mean, normalized by the mean absolute deviation. Unlike bounded
+    * oscillators, CCI is unbounded — extreme readings (beyond ±200) are genuinely rare and more statistically significant than threshold
+    * crosses on bounded indicators.
     *
     * Trading applications:
     *   - CCI > +100: Overbought / strong uptrend continuation
@@ -301,8 +296,8 @@ object MomentumOscillators {
     *   - CCI > +200 or < -200: Extreme readings, high-probability reversal zones
     *   - Divergence between CCI and price: Early reversal signal
     *
-    * Formula: CCI = (Typical Price - SMA(TP)) / (0.015 * Mean Absolute Deviation)
-    * where Typical Price = (High + Low + Close) / 3 and the 0.015 constant scales ~75% of values between ±100.
+    * Formula: CCI = (Typical Price - SMA(TP)) / (0.015 * Mean Absolute Deviation) where Typical Price = (High + Low + Close) / 3 and the
+    * 0.015 constant scales ~75% of values between ±100.
     *
     * @param closings
     *   List of closing prices, sorted from latest to earliest.
@@ -313,8 +308,7 @@ object MomentumOscillators {
     * @param length
     *   The CCI period (typically 20).
     * @return
-    *   A list of CCI values (unbounded, typically ±300), sorted from latest to earliest, same size as input.
-    *   Returns 0.0 during warm-up.
+    *   A list of CCI values (unbounded, typically ±300), sorted from latest to earliest, same size as input. Returns 0.0 during warm-up.
     */
   def commodityChannelIndex(
       closings: List[Double],
@@ -336,7 +330,7 @@ object MomentumOscillators {
 
       var cci = 0.0
       if (window.size == length) {
-        val mean = window.sum / length
+        val mean   = window.sum / length
         var madSum = 0.0
         window.foreach(v => madSum += math.abs(v - mean))
         val meanDeviation = madSum / length
@@ -349,8 +343,8 @@ object MomentumOscillators {
 
   /** Calculates the Ichimoku Kijun-Sen (Base Line).
     *
-    * The Kijun-Sen is the midpoint of the highest high and lowest low over the past N periods.
-    * It acts as dynamic support/resistance and a measure of medium-term equilibrium.
+    * The Kijun-Sen is the midpoint of the highest high and lowest low over the past N periods. It acts as dynamic support/resistance and a
+    * measure of medium-term equilibrium.
     *
     * Trading applications:
     *   - Price above Kijun-Sen: Bullish bias
@@ -359,9 +353,8 @@ object MomentumOscillators {
     *   - Flat Kijun-Sen: Market is ranging (no directional momentum)
     *   - Kijun-Sen slope: Indicates trend direction and speed
     *
-    * Compared to moving averages, Kijun-Sen is less sensitive to individual price spikes because it only
-    * considers the range extremes, not every close. Standard period is 26 (representing one trading month
-    * in Japanese markets where it originated).
+    * Compared to moving averages, Kijun-Sen is less sensitive to individual price spikes because it only considers the range extremes, not
+    * every close. Standard period is 26 (representing one trading month in Japanese markets where it originated).
     *
     * Formula: Kijun-Sen = (Highest High over N + Lowest Low over N) / 2
     *
@@ -372,8 +365,7 @@ object MomentumOscillators {
     * @param length
     *   The lookback period (typically 26).
     * @return
-    *   A list of Kijun-Sen values, sorted from latest to earliest, same size as input.
-    *   Uses (high + low) / 2 as fallback during warm-up.
+    *   A list of Kijun-Sen values, sorted from latest to earliest, same size as input. Uses (high + low) / 2 as fallback during warm-up.
     */
   def ichimokuKijunSen(
       highs: List[Double],
@@ -406,9 +398,9 @@ object MomentumOscillators {
 
   /** Calculates the Parabolic SAR (Stop and Reverse).
     *
-    * Parabolic SAR provides a trailing stop-loss level that accelerates toward price as the trend progresses.
-    * It produces a dotted line above (downtrend) or below (uptrend) the price. When price crosses the SAR
-    * line, the indicator flips direction — hence "Stop and Reverse".
+    * Parabolic SAR provides a trailing stop-loss level that accelerates toward price as the trend progresses. It produces a dotted line
+    * above (downtrend) or below (uptrend) the price. When price crosses the SAR line, the indicator flips direction — hence "Stop and
+    * Reverse".
     *
     * Trading applications:
     *   - SAR below price: Uptrend — use as trailing stop for long positions
@@ -416,11 +408,10 @@ object MomentumOscillators {
     *   - SAR flip (price crosses SAR): Trend reversal signal (use with PriceLineCrossing indicator)
     *   - The acceleration factor means exits get tighter over time, preventing profit give-back
     *
-    * The acceleration factor (AF) starts at `afStart` and increases by `afStep` each time price makes
-    * a new extreme in the trend direction, capped at `afMax`. Higher AF = tighter stops (faster exit).
+    * The acceleration factor (AF) starts at `afStart` and increases by `afStep` each time price makes a new extreme in the trend direction,
+    * capped at `afMax`. Higher AF = tighter stops (faster exit).
     *
-    * Formula: SAR(t) = SAR(t-1) + AF * (EP - SAR(t-1))
-    * where EP = extreme point (highest high in uptrend, lowest low in downtrend).
+    * Formula: SAR(t) = SAR(t-1) + AF * (EP - SAR(t-1)) where EP = extreme point (highest high in uptrend, lowest low in downtrend).
     *
     * @param highs
     *   List of high prices, sorted from latest to earliest.
@@ -444,9 +435,9 @@ object MomentumOscillators {
   ): List[Double] =
     if (highs.size < 2) List.fill(highs.size)(0.0)
     else {
-      val hArr = highs.reverse.toArray
-      val lArr = lows.reverse.toArray
-      val n    = hArr.length
+      val hArr   = highs.reverse.toArray
+      val lArr   = lows.reverse.toArray
+      val n      = hArr.length
       val result = new Array[Double](n)
 
       var isLong = hArr(1) > hArr(0) || lArr(1) > lArr(0)
@@ -499,9 +490,9 @@ object MomentumOscillators {
 
   /** Calculates the Chaikin Money Flow (CMF).
     *
-    * CMF measures the volume-weighted accumulation/distribution over N periods. It adds a dimension
-    * that pure price indicators lack: *participation*. A price breakout confirmed by positive CMF
-    * has institutional volume behind it; a breakout with negative CMF is more likely a fake-out.
+    * CMF measures the volume-weighted accumulation/distribution over N periods. It adds a dimension that pure price indicators lack:
+    * *participation*. A price breakout confirmed by positive CMF has institutional volume behind it; a breakout with negative CMF is more
+    * likely a fake-out.
     *
     * Ranges from -1 to +1:
     *   - CMF > 0: Buying pressure (accumulation) — close tends to be near the high
@@ -515,10 +506,8 @@ object MomentumOscillators {
     *   - Confirm breakouts: Only trade breakouts with CMF in the same direction
     *   - Filter entries: Avoid longs when CMF < 0, shorts when CMF > 0
     *
-    * Formula:
-    *   Money Flow Multiplier = ((Close - Low) - (High - Close)) / (High - Low)
-    *   Money Flow Volume = Multiplier * Volume
-    *   CMF = Sum(MFV over N) / Sum(Volume over N)
+    * Formula: Money Flow Multiplier = ((Close - Low) - (High - Close)) / (High - Low) Money Flow Volume = Multiplier * Volume CMF = Sum(MFV
+    * over N) / Sum(Volume over N)
     *
     * @param closings
     *   List of closing prices, sorted from latest to earliest.
@@ -531,8 +520,8 @@ object MomentumOscillators {
     * @param length
     *   The CMF period (typically 20).
     * @return
-    *   A list of CMF values (-1 to 1), sorted from latest to earliest, same size as input.
-    *   Returns 0.0 during warm-up or when volume is zero.
+    *   A list of CMF values (-1 to 1), sorted from latest to earliest, same size as input. Returns 0.0 during warm-up or when volume is
+    *   zero.
     */
   def chaikinMoneyFlow(
       closings: List[Double],
@@ -549,9 +538,9 @@ object MomentumOscillators {
     val it   = data.reverseIterator
     while (it.hasNext) {
       val ((close, high, low), volume) = it.next()
-      val range = high - low
-      val mfMultiplier = if (range == 0.0) 0.0 else ((close - low) - (high - close)) / range
-      val mfVolume     = mfMultiplier * volume
+      val range                        = high - low
+      val mfMultiplier                 = if (range == 0.0) 0.0 else ((close - low) - (high - close)) / range
+      val mfVolume                     = mfMultiplier * volume
 
       mfvWindow.enqueue(mfVolume)
       volWindow.enqueue(volume)
@@ -591,20 +580,18 @@ object MomentumOscillators {
 
   /** Calculates the Jurik Relative Strength Index (RSX).
     *
-    * RSX is a noise-free version of RSI that applies Jurik's triple-smoothing to the momentum calculation.
-    * It produces much smoother curves than standard RSI while maintaining responsiveness to genuine
-    * trend changes. Reduces false threshold crossings in choppy markets.
+    * RSX is a noise-free version of RSI that applies Jurik's triple-smoothing to the momentum calculation. It produces much smoother curves
+    * than standard RSI while maintaining responsiveness to genuine trend changes. Reduces false threshold crossings in choppy markets.
     *
-    * Ranges from 0 to 100 (same interpretation as RSI: >70 overbought, <30 oversold).
-    * Preferred over standard RSI for signal-based trading due to fewer whipsaws.
+    * Ranges from 0 to 100 (same interpretation as RSI: >70 overbought, <30 oversold). Preferred over standard RSI for signal-based trading
+    * due to fewer whipsaws.
     *
     * @param values
     *   A list of prices sorted from latest to earliest.
     * @param length
     *   The RSX period (typically 14).
     * @return
-    *   A list of RSX values (0-100), sorted from latest to earliest, same size as input.
-    *   Returns neutral 50.0 during warm-up.
+    *   A list of RSX values (0-100), sorted from latest to earliest, same size as input. Returns neutral 50.0 during warm-up.
     */
   def jurikRelativeStrengthIndex(values: List[Double], length: Int): List[Double] =
     if (values.isEmpty) Nil

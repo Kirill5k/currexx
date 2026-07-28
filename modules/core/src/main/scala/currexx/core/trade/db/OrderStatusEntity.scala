@@ -22,8 +22,8 @@ final case class OrderStatusEntity(
     status: OrderPlacementStatus,
     time: Instant
 ) {
-  val isEnter: Boolean     = orderKind == "enter"
-  val isExit: Boolean      = orderKind == "exit"
+  val isEnter: Boolean      = orderKind == "enter"
+  val isExit: Boolean       = orderKind == "exit"
   val isCancelled: Boolean  = status.isInstanceOf[OrderPlacementStatus.Cancelled]
   val isSuccess: Boolean    = status == OrderPlacementStatus.Success
   val isPending: Boolean    = status == OrderPlacementStatus.Pending

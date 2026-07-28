@@ -54,7 +54,7 @@ final private class LiveOandaDataClient[F[_]](
     val firstCandle   = data.prices.head
     val candleEndTime = firstCandle.time.plus(interval.toDuration)
     val shouldExclude = candleEndTime.isAfter(now)
-    
+
     if (shouldExclude && data.prices.size > 1) {
       F.pure(data.dropFirstPrice)
     } else if (shouldExclude && data.prices.size == 1) {

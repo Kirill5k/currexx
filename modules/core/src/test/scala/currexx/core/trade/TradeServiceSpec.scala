@@ -77,7 +77,7 @@ class TradeServiceSpec extends IOWordSpec {
 
       "save cancelled order status when broker rejects order" in {
         val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
-        val cancelReason = "Insufficient funds"
+        val cancelReason                                                           = "Insufficient funds"
         when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(OrderPlacementStatus.Cancelled(cancelReason))
         when(orderStatusRepo.save(any[TradeOrderPlacement], any[OrderPlacementStatus])).thenReturnUnit
@@ -367,8 +367,8 @@ class TradeServiceSpec extends IOWordSpec {
 
       "open a new long position when not in trade and open-long rule is triggered" in {
         val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
-        val openLongRule                                          = Rule(TradeAction.OpenLong, Rule.Condition.TrendIs(Direction.Upward))
-        val settings                                              = Settings.trade.copy(strategy = TradeStrategy(List(openLongRule), Nil))
+        val openLongRule = Rule(TradeAction.OpenLong, Rule.Condition.TrendIs(Direction.Upward))
+        val settings     = Settings.trade.copy(strategy = TradeStrategy(List(openLongRule), Nil))
         when(settRepo.get(any[UserId])).thenReturnIO(settings)
         when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(OrderPlacementStatus.Success)
@@ -426,8 +426,8 @@ class TradeServiceSpec extends IOWordSpec {
 
       "flip to short when in long position and open-short rule is triggered" in {
         val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
-        val openShortRule                                         = Rule(TradeAction.OpenShort, Rule.Condition.TrendIs(Direction.Upward))
-        val settings = Settings.trade.copy(strategy = TradeStrategy(openRules = List(openShortRule), closeRules = Nil))
+        val openShortRule = Rule(TradeAction.OpenShort, Rule.Condition.TrendIs(Direction.Upward))
+        val settings      = Settings.trade.copy(strategy = TradeStrategy(openRules = List(openShortRule), closeRules = Nil))
         when(settRepo.get(any[UserId])).thenReturnIO(settings)
         when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
         when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(OrderPlacementStatus.Success)
@@ -460,8 +460,8 @@ class TradeServiceSpec extends IOWordSpec {
 
       "do nothing when in long position and open-long rule is triggered" in {
         val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
-        val openLongRule                                          = Rule(TradeAction.OpenLong, Rule.Condition.TrendIs(Direction.Upward))
-        val settings                                              = Settings.trade.copy(strategy = TradeStrategy(List(openLongRule), Nil))
+        val openLongRule = Rule(TradeAction.OpenLong, Rule.Condition.TrendIs(Direction.Upward))
+        val settings     = Settings.trade.copy(strategy = TradeStrategy(List(openLongRule), Nil))
         when(settRepo.get(any[UserId])).thenReturnIO(settings)
 
         val result = for
@@ -479,7 +479,14 @@ class TradeServiceSpec extends IOWordSpec {
     }
   }
 
-  def mocks: (TradeSettingsRepository[IO], TradeOrderRepository[IO], OrderStatusRepository[IO], BrokerClient[IO], MarketDataClient[IO], MockActionDispatcher[IO]) =
+  def mocks: (
+      TradeSettingsRepository[IO],
+      TradeOrderRepository[IO],
+      OrderStatusRepository[IO],
+      BrokerClient[IO],
+      MarketDataClient[IO],
+      MockActionDispatcher[IO]
+  ) =
     (
       mock[TradeSettingsRepository[IO]],
       mock[TradeOrderRepository[IO]],

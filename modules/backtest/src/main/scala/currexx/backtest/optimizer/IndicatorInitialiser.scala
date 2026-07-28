@@ -9,7 +9,6 @@ import scala.util.Random
 object IndicatorInitialiser:
   def make[F[_]](using F: Sync[F], rand: Random): F[Initialiser[F, Indicator]] =
     Initialiser.simple[F, Indicator] { ind =>
-
       def randomiseVt(transformation: VT): VT = transformation match
         case VT.Sequenced(sequence)  => VT.Sequenced(sequence.map(randomiseVt))
         case _: VT.StandardDeviation => VT.StandardDeviation(rand.nextInt(41) + 2)
@@ -29,8 +28,9 @@ object IndicatorInitialiser:
         case _: VT.WilliamsR         => VT.WilliamsR(rand.nextInt(41) + 5)
         case _: VT.CCI               => VT.CCI(rand.nextInt(41) + 10)
         case _: VT.IchimokuKijunSen  => VT.IchimokuKijunSen(rand.nextInt(44) + 9)
-        case _: VT.ParabolicSAR      => VT.ParabolicSAR(0.01 + rand.nextInt(4) * 0.005, 0.1 + rand.nextInt(7) * 0.05, 0.01 + rand.nextInt(4) * 0.005)
-        case _: VT.CMF               => VT.CMF(rand.nextInt(31) + 10)
+        case _: VT.ParabolicSAR      =>
+          VT.ParabolicSAR(0.01 + rand.nextInt(4) * 0.005, 0.1 + rand.nextInt(7) * 0.05, 0.01 + rand.nextInt(4) * 0.005)
+        case _: VT.CMF => VT.CMF(rand.nextInt(31) + 10)
 
       def randomiseInd(indicator: Indicator): Indicator = indicator match
         case Indicator.TrendChangeDetection(vs, vt) =>

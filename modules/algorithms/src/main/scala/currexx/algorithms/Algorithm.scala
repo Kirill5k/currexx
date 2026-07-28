@@ -31,17 +31,17 @@ object Algorithm {
         initialSort <- Op.SortByFitness(initialEval).freeM
         finalPop    <- iterate(initialSort, params.maxGen) { (currentPop, i) =>
           for
-            elites      <- Op.SelectElites(currentPop, params.populationSize, params.elitismRatio).freeM
-            pairs       <- Op.SelectPairs(currentPop, params.populationSize).freeM
-            crossed1    <- Op.ApplyToAll(pairs, (pair: (I, I)) => Op.Cross(pair._1, pair._2, params.crossoverProbability)).freeM
-            crossed2    <- Op.ApplyToAll(pairs, (pair: (I, I)) => Op.Cross(pair._2, pair._1, params.crossoverProbability)).freeM
-            mutated     <- Op.ApplyToAll(crossed1 ++ crossed2, (ind: I) => Op.Mutate(ind, params.mutationProbability)).freeM
-            evPop       <- Op.EvaluatePopulation(mutated ++ elites).freeM
-            sortedPop   <- Op.SortByFitness(evPop).freeM
-            _           <- Op.DisplayProgress(i, params.maxGen, sortedPop).freeM
+            elites    <- Op.SelectElites(currentPop, params.populationSize, params.elitismRatio).freeM
+            pairs     <- Op.SelectPairs(currentPop, params.populationSize).freeM
+            crossed1  <- Op.ApplyToAll(pairs, (pair: (I, I)) => Op.Cross(pair._1, pair._2, params.crossoverProbability)).freeM
+            crossed2  <- Op.ApplyToAll(pairs, (pair: (I, I)) => Op.Cross(pair._2, pair._1, params.crossoverProbability)).freeM
+            mutated   <- Op.ApplyToAll(crossed1 ++ crossed2, (ind: I) => Op.Mutate(ind, params.mutationProbability)).freeM
+            evPop     <- Op.EvaluatePopulation(mutated ++ elites).freeM
+            sortedPop <- Op.SortByFitness(evPop).freeM
+            _         <- Op.DisplayProgress(i, params.maxGen, sortedPop).freeM
           yield sortedPop
         }
-        _           <- Op.DisplayFinal(finalPop).freeM
+        _ <- Op.DisplayFinal(finalPop).freeM
       yield finalPop
   }
 

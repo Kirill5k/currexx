@@ -133,7 +133,7 @@ class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
     "chaikinMoneyFlow" should {
       "calculate CMF values" in {
         val volumes = List.fill(values.size)(1000.0) // uniform volume for predictable results
-        val cmf = MomentumOscillators.chaikinMoneyFlow(
+        val cmf     = MomentumOscillators.chaikinMoneyFlow(
           closings = values.map(_._4),
           highs = values.map(_._2),
           lows = values.map(_._3),

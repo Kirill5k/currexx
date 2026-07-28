@@ -24,9 +24,9 @@ class CompositeTrackerSpec extends IOWordSpec {
           override def displayFinal(population: EvaluatedPopulation[String]): IO[Unit]                                  = ref2.update(_ + 1)
         }
         composite = CompositeTracker.make[IO, String](tracker1, tracker2)
-        _ <- composite.displayInitial("target", params)
-        _ <- composite.displayProgress(1, 10, Vector.empty)
-        _ <- composite.displayFinal(Vector.empty)
+        _      <- composite.displayInitial("target", params)
+        _      <- composite.displayProgress(1, 10, Vector.empty)
+        _      <- composite.displayFinal(Vector.empty)
         count1 <- ref1.get
         count2 <- ref2.get
       } yield (count1, count2)

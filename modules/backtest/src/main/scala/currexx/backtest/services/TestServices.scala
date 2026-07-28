@@ -78,7 +78,10 @@ object TestServices:
       tradeSettingsRepo = new TestTradeSettingsRepository[F](appState.tradeSettingsRef)
       tradeOrdersRepo   = new TestTradeOrderRepository[F](appState.tradeOrdersRef)
       orderStatusRepo   = new TestOrderStatusRepository[F]()
-      trade <- TradeService.make[F](tradeSettingsRepo, tradeOrdersRepo, orderStatusRepo, clients.broker, clients.data, dispatcher)(using Temporal[F], clock)
+      trade <- TradeService.make[F](tradeSettingsRepo, tradeOrdersRepo, orderStatusRepo, clients.broker, clients.data, dispatcher)(using
+        Temporal[F],
+        clock
+      )
 
       signalSettingsRepo = new TestSignalSettingsRepository[F](appState.signalSettingsRef)
       signal <- SignalService.make[F](TestSignalRepository[F], signalSettingsRepo, dispatcher)(using Temporal[F], clock)

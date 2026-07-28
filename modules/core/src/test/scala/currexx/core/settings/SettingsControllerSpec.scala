@@ -173,7 +173,7 @@ class SettingsControllerSpec extends HttpRoutesWordSpec {
       }
 
       "return full global settings with signal and trade configuration" in {
-        val svc = mock[SettingsService[IO]]
+        val svc      = mock[SettingsService[IO]]
         val settings = decode[GlobalSettingsView](fullSettingsJson).fold(throw _, _.toDomain(Users.uid))
         when(svc.get(any[UserId])).thenReturnIO(settings)
 
@@ -206,8 +206,9 @@ class SettingsControllerSpec extends HttpRoutesWordSpec {
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
-        val req = Request[IO](Method.PUT, uri"/settings").withAuthHeader().withBody(
-          """{
+        val req = Request[IO](Method.PUT, uri"/settings")
+          .withAuthHeader()
+          .withBody("""{
             |"signal": "invalid",
             |"trade": {
             |        "strategy": {
@@ -227,7 +228,12 @@ class SettingsControllerSpec extends HttpRoutesWordSpec {
             |}""".stripMargin)
         val res = SettingsController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        res mustHaveStatus (Status.UnprocessableContent, Some("""{"message" : "Got value '\"invalid\"' with wrong type, expecting object, Missing required field trade.trading.volume, Missing required field trade.trading.stopLossPerCurrency"}"""))
+        res mustHaveStatus (
+          Status.UnprocessableContent,
+          Some(
+            """{"message" : "Got value '\"invalid\"' with wrong type, expecting object, Missing required field trade.trading.volume, Missing required field trade.trading.stopLossPerCurrency"}"""
+          )
+        )
         verifyNoInteractions(svc)
       }
     }

@@ -54,7 +54,7 @@ final class MarkdownTracker[F[_], I] private (
       duration = startTime.map(start => durationMsg(start, now)).getOrElse("")
       stats    = statsMsg(population)
       members  = membersMsg(population, finalTopN)
-      content =
+      content  =
         s"""|
             |## Final Results
             |

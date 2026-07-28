@@ -37,5 +37,5 @@ final case class MarketTimeSeriesData(
   def highs: List[Double]    = prices.toList.map(_.high)
   def lows: List[Double]     = prices.toList.map(_.low)
   def volumes: List[Double]  = prices.toList.map(_.volume)
-  def latestTime: Instant   = prices.head.time
+  def latestTime: Instant    = prices.head.time
 }

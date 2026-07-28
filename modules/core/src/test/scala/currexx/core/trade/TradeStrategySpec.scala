@@ -1,7 +1,17 @@
 package currexx.core.trade
 
 import currexx.core.fixtures.Markets.*
-import currexx.core.market.{BandCrossingState, CrossoverState, MarketProfile, MarketState, MomentumState, MomentumZone, PriceLineCrossingState, TrendState, VolatilityState}
+import currexx.core.market.{
+  BandCrossingState,
+  CrossoverState,
+  MarketProfile,
+  MarketState,
+  MomentumState,
+  MomentumZone,
+  PriceLineCrossingState,
+  TrendState,
+  VolatilityState
+}
 import currexx.core.trade.Rule.Condition
 import currexx.domain.market.TradeOrder
 import currexx.domain.signal.{Boundary, Direction, ValueRole, VolatilityRegime}
@@ -53,7 +63,9 @@ class TradeStrategySpec extends AnyWordSpec with Matchers {
     profile = trendChangedState.profile.copy(lastBandCrossing = Some(BandCrossingState(Boundary.Lower, Direction.Downward, ts)))
   )
   val priceCrossedLineState: MarketState = trendChangedState.copy(
-    profile = trendChangedState.profile.copy(lastPriceLineCrossing = Some(PriceLineCrossingState(ValueRole.ChannelMiddleBand, Direction.Upward, ts)))
+    profile = trendChangedState.profile.copy(lastPriceLineCrossing =
+      Some(PriceLineCrossingState(ValueRole.ChannelMiddleBand, Direction.Upward, ts))
+    )
   )
 
   "A Rule.findTriggeredAction" should {
@@ -162,7 +174,7 @@ class TradeStrategySpec extends AnyWordSpec with Matchers {
 
     "not trigger UpperBandCrossed when it's not a fresh event" in {
       val prevProfile = previousProfile.copy(lastBandCrossing = Some(BandCrossingState(Boundary.Upper, Direction.Upward, ts)))
-      val rule = Rule(tradeAction, Condition.UpperBandCrossed(Direction.Upward))
+      val rule        = Rule(tradeAction, Condition.UpperBandCrossed(Direction.Upward))
       Rule.findTriggeredAction(List(rule), upperBandCrossedState, prevProfile) mustBe None
     }
 
@@ -178,7 +190,7 @@ class TradeStrategySpec extends AnyWordSpec with Matchers {
 
     "not trigger LowerBandCrossed when it's not a fresh event" in {
       val prevProfile = previousProfile.copy(lastBandCrossing = Some(BandCrossingState(Boundary.Lower, Direction.Downward, ts)))
-      val rule = Rule(tradeAction, Condition.LowerBandCrossed(Direction.Downward))
+      val rule        = Rule(tradeAction, Condition.LowerBandCrossed(Direction.Downward))
       Rule.findTriggeredAction(List(rule), lowerBandCrossedState, prevProfile) mustBe None
     }
 
@@ -198,7 +210,8 @@ class TradeStrategySpec extends AnyWordSpec with Matchers {
     }
 
     "not trigger PriceCrossedLine when it's not a fresh event" in {
-      val prevProfile = previousProfile.copy(lastPriceLineCrossing = Some(PriceLineCrossingState(ValueRole.ChannelMiddleBand, Direction.Upward, ts)))
+      val prevProfile =
+        previousProfile.copy(lastPriceLineCrossing = Some(PriceLineCrossingState(ValueRole.ChannelMiddleBand, Direction.Upward, ts)))
       val rule = Rule(tradeAction, Condition.PriceCrossedLine(ValueRole.ChannelMiddleBand, Direction.Upward))
       Rule.findTriggeredAction(List(rule), priceCrossedLineState, prevProfile) mustBe None
     }
