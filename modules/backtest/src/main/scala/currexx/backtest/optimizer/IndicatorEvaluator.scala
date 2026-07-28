@@ -9,7 +9,7 @@ import currexx.algorithms.Fitness
 import currexx.algorithms.operators.Evaluator
 import currexx.backtest.services.TestServicesPool
 import currexx.backtest.syntax.*
-import currexx.backtest.{MarketDataProvider, OrderStats, OrderStatsCollector, TestSettings}
+import currexx.backtest.{MarketDataProvider, OrderStats, TestSettings}
 import currexx.core.signal.SignalDetector
 import currexx.core.trade.TradeStrategy
 import currexx.domain.signal.Indicator
@@ -97,7 +97,7 @@ object IndicatorEvaluator {
         if (orderCountPenalty < 0.5) 0.0
         else {
           // Component 1: Profit per order (efficiency, not raw trade volume), normalized against the target (uncapped)
-          val profitPerOrder  = if (totalOrders == 0) BigDecimal(0) else totalProfit / BigDecimal(totalOrders)
+          val profitPerOrder   = if (totalOrders == 0) BigDecimal(0) else totalProfit / BigDecimal(totalOrders)
           val normalizedProfit = profitPerOrder / BigDecimal(targetProfitPerOrder)
 
           // Component 2: Win/Loss Ratio (normalized and capped)
@@ -118,8 +118,8 @@ object IndicatorEvaluator {
         }
       }
 
-    /** Risk-adjusted return scoring that prioritizes profitability while controlling drawdown Uses Sharpe-like ratio: (total profit / risk
-      * measure)
+    /** Risk-adjusted return scoring that prioritizes profitability while controlling equity drawdown. Uses the average recovery factor (net
+      * profit / maximum drawdown) across valid datasets.
       *
       * @param minOrders
       *   Minimum number of orders per dataset
@@ -134,30 +134,20 @@ object IndicatorEvaluator {
     ): ScoringFunction = stats =>
       if (stats.isEmpty) 0.0
       else {
-        // Single-pass calculation with filtering
-        val (validCount, totalProfit, totalBiggestLoss) = stats.foldLeft((0, BigDecimal(0), BigDecimal(0))) {
-          case ((count, profit, loss), os) =>
-            val numOrders  = os.total
-            val isBelowMin = minOrders.exists(numOrders < _)
-            val isAboveMax = maxOrders.exists(numOrders > _)
-            val isValid    = !isBelowMin && !isAboveMax
+        val validStats = stats.filter { os =>
+          val numOrders = os.total
+          !minOrders.exists(numOrders < _) && !maxOrders.exists(numOrders > _)
+        }
 
-            if (isValid) {
-              (count + 1, profit + os.totalProfit, loss + os.biggestLoss.abs)
-            } else {
-              (count, profit, loss)
+        if (validStats.isEmpty) 0.0
+        else
+          validStats
+            .map { os =>
+              if (os.maxDrawdown == 0) os.totalProfit
+              else os.totalProfit / os.maxDrawdown
             }
-        }
-
-        if (validCount == 0) 0.0
-        else {
-          val avgBiggestLoss = totalBiggestLoss / BigDecimal(validCount)
-
-          // Risk-adjusted return: profit / max drawdown
-          // Add small epsilon to avoid division by zero
-          val epsilon = BigDecimal(0.001)
-          (totalProfit / (avgBiggestLoss + epsilon)).toDouble
-        }
+            .sum
+            .toDouble / validStats.size
       }
   }
 
@@ -183,7 +173,7 @@ object IndicatorEvaluator {
                   .through(services.processMarketData(signalDetector))
                   .compile
                   .drain
-                orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
+                orderStats <- services.getOrderStats()
               yield orderStats
             }
           }

@@ -13,7 +13,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       lossCount: Int = 25,
       lossTotal: Double = -25.0,
       biggestWin: BigDecimal = BigDecimal(10),
-      biggestLoss: BigDecimal = BigDecimal(-5),
+      maxDrawdown: BigDecimal = BigDecimal(5),
       profitByMonth: Map[String, BigDecimal] = Map(
         "2025-01" -> BigDecimal(10),
         "2025-02" -> BigDecimal(15),
@@ -24,12 +24,14 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       total = total,
       buys = total / 2,
       sells = total / 2,
+      winCount = total - lossCount,
       lossCount = lossCount,
       lossTotal = lossTotal,
       totalProfit = profit,
       biggestWin = biggestWin,
-      biggestLoss = biggestLoss,
-      profitByMonth = profitByMonth
+      biggestLoss = -maxDrawdown,
+      profitByMonth = profitByMonth,
+      maxDrawdown = maxDrawdown
     )
 
   "ScoringFunction.balanced" should {
@@ -186,7 +188,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
 
     "calculate risk-adjusted return correctly" in {
       val stats = List(
-        mkStats(total = 100, profit = BigDecimal(100), biggestLoss = BigDecimal(-10))
+        mkStats(total = 100, profit = BigDecimal(100), maxDrawdown = BigDecimal(10))
       )
       val result = ScoringFunction.riskAdjusted()(stats)
 
@@ -195,8 +197,8 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
     }
 
     "favor strategies with lower drawdown for same profit" in {
-      val lowRisk  = List(mkStats(total = 100, profit = BigDecimal(100), biggestLoss = BigDecimal(-5)))
-      val highRisk = List(mkStats(total = 100, profit = BigDecimal(100), biggestLoss = BigDecimal(-20)))
+      val lowRisk  = List(mkStats(total = 100, profit = BigDecimal(100), maxDrawdown = BigDecimal(5)))
+      val highRisk = List(mkStats(total = 100, profit = BigDecimal(100), maxDrawdown = BigDecimal(20)))
 
       val scoring = ScoringFunction.riskAdjusted()
 
@@ -207,8 +209,8 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
     }
 
     "favor strategies with higher profit for same drawdown" in {
-      val highProfit = List(mkStats(total = 100, profit = BigDecimal(200), biggestLoss = BigDecimal(-10)))
-      val lowProfit  = List(mkStats(total = 100, profit = BigDecimal(100), biggestLoss = BigDecimal(-10)))
+      val highProfit = List(mkStats(total = 100, profit = BigDecimal(200), maxDrawdown = BigDecimal(10)))
+      val lowProfit  = List(mkStats(total = 100, profit = BigDecimal(100), maxDrawdown = BigDecimal(10)))
 
       val scoring = ScoringFunction.riskAdjusted()
 
@@ -219,7 +221,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
     }
 
     "handle zero loss with epsilon" in {
-      val noLossStats = List(mkStats(total = 100, profit = BigDecimal(100), biggestLoss = BigDecimal(0)))
+      val noLossStats = List(mkStats(total = 100, profit = BigDecimal(100), maxDrawdown = BigDecimal(0)))
       val result      = ScoringFunction.riskAdjusted()(noLossStats)
 
       // Should not divide by zero, epsilon prevents this
@@ -228,8 +230,8 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
 
     "filter out datasets violating order constraints" in {
       val stats = List(
-        mkStats(total = 100, profit = BigDecimal(100), biggestLoss = BigDecimal(-10)),
-        mkStats(total = 10, profit = BigDecimal(50), biggestLoss = BigDecimal(-5)) // Too few orders
+        mkStats(total = 100, profit = BigDecimal(100), maxDrawdown = BigDecimal(10)),
+        mkStats(total = 10, profit = BigDecimal(50), maxDrawdown = BigDecimal(5)) // Too few orders
       )
       val result = ScoringFunction.riskAdjusted(minOrders = Some(50))(stats)
 
@@ -239,20 +241,19 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
 
     "combine multiple valid datasets" in {
       val stats = List(
-        mkStats(total = 100, profit = BigDecimal(100), biggestLoss = BigDecimal(-10)),
-        mkStats(total = 120, profit = BigDecimal(80), biggestLoss = BigDecimal(-8)),
-        mkStats(total = 90, profit = BigDecimal(60), biggestLoss = BigDecimal(-6))
+        mkStats(total = 100, profit = BigDecimal(100), maxDrawdown = BigDecimal(10)),
+        mkStats(total = 120, profit = BigDecimal(80), maxDrawdown = BigDecimal(8)),
+        mkStats(total = 90, profit = BigDecimal(60), maxDrawdown = BigDecimal(6))
       )
       val result = ScoringFunction.riskAdjusted()(stats)
 
-      // Total profit = 240, avg biggest loss = (10+8+6)/3 = 8
-      // Score ≈ 240 / 8 = 30
-      result must ((be > 25.0).and(be < 35.0))
+      // Each dataset has a recovery factor of 10, so their average is 10.
+      result must ((be > 9.0).and(be < 11.0))
     }
 
     "penalize high drawdowns even with good profits" in {
-      val lowDrawdown  = List(mkStats(total = 100, profit = BigDecimal(100), biggestLoss = BigDecimal(-2)))
-      val highDrawdown = List(mkStats(total = 100, profit = BigDecimal(150), biggestLoss = BigDecimal(-50)))
+      val lowDrawdown  = List(mkStats(total = 100, profit = BigDecimal(100), maxDrawdown = BigDecimal(2)))
+      val highDrawdown = List(mkStats(total = 100, profit = BigDecimal(150), maxDrawdown = BigDecimal(50)))
 
       val scoring = ScoringFunction.riskAdjusted()
 

@@ -2,7 +2,6 @@ package currexx.backtest
 
 import cats.effect.{IO, IOApp}
 import currexx.backtest.services.TestServices
-import currexx.backtest.syntax.*
 import currexx.core.signal.SignalDetector
 import fs2.Stream
 import org.typelevel.log4cats.Logger
@@ -12,17 +11,20 @@ object BatchBacktester extends IOApp.Simple {
   inline given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
   val strategies: List[(String, TestStrategy)] = List(
-    "s1"              -> TestStrategy.s1,
-    "s1_v2"           -> TestStrategy.s1_v2,
-    "s2"              -> TestStrategy.s2,
-    "s4"              -> TestStrategy.s4,
-    "s4_optimized"    -> TestStrategy.s4_optimized,
-    "s5"              -> TestStrategy.s5,
-    "s8_optimized"    -> TestStrategy.s8_optimized,
-    "s9_optimized"    -> TestStrategy.s9_optimized,
-    "s10_optimized"   -> TestStrategy.s10_optimized,
-    "s12"             -> TestStrategy.s12
+    "s1_optimized"        -> TestStrategy.s1_optimized,
+    "s1_v2_optimized"     -> TestStrategy.s1_v2_optimized,
+    "s1_v2_optimized_v2"  -> TestStrategy.s1_v2_optimized_v2,
+    "s2_optimized"        -> TestStrategy.s2_optimized,
+    "s2_optimized_v2"     -> TestStrategy.s2_optimized_v2,
+    "s4_optimized"        -> TestStrategy.s4_optimized,
+    "s4_regime_optimized" -> TestStrategy.s4_regime_optimized,
+    "s4_regime_opt_v2"    -> TestStrategy.s4_regime_optimized_v2,
+    "s5_optimized"        -> TestStrategy.s5_optimized,
+    "s5_optimized_v2"     -> TestStrategy.s5_optimized_v2,
+    "s12_optimized"       -> TestStrategy.s12_optimized
   )
+
+  val riskSettings: RiskSettings = RiskSettings()
 
   def runOne(name: String, ts: TestStrategy): IO[String] =
     Stream
@@ -37,20 +39,18 @@ object BatchBacktester extends IOApp.Simple {
             .through(services.processMarketData(SignalDetector.pure))
             .compile
             .drain
-          orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
+          orderStats <- services.getOrderStats(riskSettings)
         yield orderStats
       }
       .compile
       .toList
       .map { stats =>
-        val profit  = stats.map(_.totalProfit).sum
-        val wl      = stats.map(_.winLossRatio).median
-        val orders  = stats.map(_.total).sum
-        val buys    = stats.map(_.buys).sum
-        val sells   = stats.map(_.sells).sum
-        val medProf = stats.map(_.totalProfit).median
-        val medLoss = stats.map(_.meanLoss).median
-        f"$name%-20s profit=${profit}%9.5f  W/L=${wl}%8.4f  orders=${orders}%5d  buys=${buys}%5d  sells=${sells}%5d  medProfit=${medProf}%8.5f  medLoss=${medLoss}%9.6f"
+        val portfolio = OrderStats.combine(stats, riskSettings)
+        val winPct    = portfolio.winRate * 100
+        val drawdown  = portfolio.maxDrawdownPercent
+        f"$name%-20s net=${portfolio.totalProfit}%10.5f  closed=${portfolio.total}%5d  open=${portfolio.openPositions.size}%2d  " +
+          f"win=${winPct}%6.2f%%  exp=${portfolio.expectancy}%9.6f  PF=${portfolio.profitFactor}%7.3f  " +
+          f"DD=${drawdown}%6.2f%%  Sharpe=${portfolio.sharpeRatio}%7.3f  costs=${portfolio.totalCosts}%9.5f"
       }
 
   override val run: IO[Unit] =

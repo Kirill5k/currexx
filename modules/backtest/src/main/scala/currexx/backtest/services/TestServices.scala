@@ -1,10 +1,11 @@
 package currexx.backtest.services
 
-import cats.effect.Temporal
+import cats.data.NonEmptyList
+import cats.effect.{Ref, Temporal}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
-import currexx.backtest.TestSettings
+import currexx.backtest.{OrderStats, OrderStatsCollector, RiskSettings, TestSettings}
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.common.logging.Logger
@@ -12,7 +13,7 @@ import currexx.core.market.MarketService
 import currexx.core.signal.{SignalDetector, SignalService}
 import currexx.core.trade.{TradeOrderPlacement, TradeService}
 import currexx.domain.market.MarketTimeSeriesData
-import fs2.Pipe
+import fs2.{Pipe, Stream}
 import kirill5k.common.syntax.time.*
 
 import scala.concurrent.duration.*
@@ -38,29 +39,54 @@ final class TestServices[F[_]] private (
     yield ()
 
   def processMarketData(signalDetector: SignalDetector): Pipe[F, MarketTimeSeriesData, Unit] =
-    _.evalMap { data =>
-      for
-        userId <- appState.userIdRef.get
-        _      <- clients.data.setData(data)
-        // Simulate live trading: process data with 1 interval delay + cron offset (3 minutes)
-        // E.g., 12:00 candle is processed at 13:03, matching when incomplete 13:00 candle is filtered out
-        _ <- clock.setTime(data.latestTime.plus(data.interval.toDuration + 100.seconds))
-        _ <- marketService.updateTimeState(userId, data)
-        _ <- signalService.processMarketData(userId, data, signalDetector)
-        _ <- collectPendingActions { case Action.ProcessSignals(uid, cp, signals) =>
-          marketService.processSignals(uid, cp, signals)
+    input =>
+      Stream.eval(Ref.of[F, Option[MarketTimeSeriesData]](None)).flatMap { previousData =>
+        input.evalMap { currentData =>
+          previousData.getAndSet(Some(currentData)).flatMap {
+            case None =>
+              // The first window only primes the simulator; there is no next-bar fill for it yet.
+              clients.data.setData(currentData)
+
+            case Some(signalData) =>
+              val currentBar    = currentData.prices.head
+              val executionBar  = currentBar.copy(close = currentBar.open)
+              val executionData = currentData.copy(prices = NonEmptyList(executionBar, currentData.prices.tail))
+              val executionTime = currentData.latestTime.plus(100.seconds)
+              for
+                userId <- appState.userIdRef.get
+                // Signals use the fully closed previous candle, while orders execute at the next
+                // candle's open. This avoids filling at a close that is only known retrospectively.
+                _ <- clients.data.setData(executionData)
+                _ <- clock.setTime(executionTime)
+                _ <- marketService.updateTimeState(userId, signalData)
+                _ <- signalService.processMarketData(userId, signalData, signalDetector)
+                _ <- collectPendingActions { case Action.ProcessSignals(uid, cp, signals) =>
+                  marketService.processSignals(uid, cp, signals)
+                }
+                _ <- collectPendingActions { case Action.ProcessMarketStateUpdate(uid, cp) =>
+                  marketService.getState(uid, cp).flatMap(tradeService.processMarketStateUpdate)
+                }
+                _ <- collectPendingActions { case Action.ProcessTradeOrderPlacement(top) =>
+                  marketService.processTradeOrderPlacement(top)
+                }
+                // Keep the actual last close available for final mark-to-market accounting.
+                _ <- clients.data.setData(currentData)
+              yield ()
+          }
         }
-        _ <- collectPendingActions { case Action.ProcessMarketStateUpdate(uid, cp) =>
-          marketService.getState(uid, cp).flatMap(tradeService.processMarketStateUpdate)
-        }
-        _ <- collectPendingActions { case Action.ProcessTradeOrderPlacement(top) =>
-          marketService.processTradeOrderPlacement(top)
-        }
-      yield ()
-    }
+      }
+
+  def getOrderStats(riskSettings: RiskSettings = RiskSettings()): F[OrderStats] =
+    for
+      orders     <- loadAllOrders
+      latestData <- appState.dataRef.get
+    yield OrderStatsCollector.collect(orders, latestData.map(_.prices.head), riskSettings)
+
+  private def loadAllOrders: F[List[TradeOrderPlacement]] =
+    appState.userIdRef.get.flatMap(userId => tradeService.getAllOrders(userId, SearchParams(None, None, None)))
 
   def getAllOrders: F[List[TradeOrderPlacement]] =
-    appState.userIdRef.get.flatMap(userId => tradeService.getAllOrders(userId, SearchParams(None, None, None)))
+    loadAllOrders
 }
 
 object TestServices:

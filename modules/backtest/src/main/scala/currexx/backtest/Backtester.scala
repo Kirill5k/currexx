@@ -2,7 +2,6 @@ package currexx.backtest
 
 import cats.effect.{IO, IOApp}
 import currexx.backtest.services.TestServices
-import currexx.backtest.syntax.*
 import currexx.core.signal.SignalDetector
 import fs2.Stream
 import org.typelevel.log4cats.Logger
@@ -11,7 +10,8 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 object Backtester extends IOApp.Simple {
   inline given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
-  val testStrategy = TestStrategy.s1
+  val testStrategy: TestStrategy = TestStrategy.s1
+  val riskSettings: RiskSettings = RiskSettings()
 
   override val run: IO[Unit] =
     Stream
@@ -27,19 +27,14 @@ object Backtester extends IOApp.Simple {
             .through(services.processMarketData(SignalDetector.pure))
             .compile
             .drain
-          orderStats <- services.getAllOrders.map(OrderStatsCollector.collect)
+          orderStats <- services.getOrderStats(riskSettings)
           _          <- IO.println(s"$cp: ${orderStats.toString}")
         yield orderStats
       }
       .compile
       .toList
       .flatMap { stats =>
-        IO.println(
-          s"""median win-to-loss ratio: ${stats.map(_.winLossRatio).median},
-             |total profit: ${stats.map(_.totalProfit).sum},
-             |total orders: ${stats.map(_.total).sum},
-             |median profit: ${stats.map(_.totalProfit).median},
-             |median loss: ${stats.map(_.meanLoss).median}""".stripMargin.replaceAll("\n", " ")
-        )
+        val portfolio = OrderStats.combine(stats, riskSettings)
+        IO.println(s"Portfolio: $portfolio")
       }
 }
