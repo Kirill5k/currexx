@@ -33,52 +33,6 @@ object Optimiser extends IOApp.Simple {
   // TestStrategy). Re-seed additional rounds from any current strategy's indicator as needed.
   val rounds: List[OptimisationRound] = List(
     OptimisationRound(
-<<<<<<< HEAD
-      name = "s11",
-      strategy = TestStrategy.s1,
-      gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
-=======
-      name = "s1_optimized",
-      strategy = TestStrategy.s1_optimized,
-      gaParameters = gaParameters,
-      scoringFunction =
-        ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
-      testDataSets = MarketDataProvider.majors1h
-    ),
-    OptimisationRound(
-      name = "s1_v2_optimized",
-      strategy = TestStrategy.s1_v2_optimized,
-      gaParameters = gaParameters,
-      scoringFunction =
-        ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
-      testDataSets = MarketDataProvider.majors1h
-    ),
-    OptimisationRound(
-      name = "s2_optimized",
-      strategy = TestStrategy.s2_optimized,
-      gaParameters = gaParameters,
-      scoringFunction =
-        ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
-      testDataSets = MarketDataProvider.majors1h
-    ),
-    OptimisationRound(
-      name = "s4_optimized",
-      strategy = TestStrategy.s4_optimized,
-      gaParameters = gaParameters,
-      scoringFunction =
-        ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
-      testDataSets = MarketDataProvider.majors1h
-    ),
-    OptimisationRound(
-      name = "s4_regime",
-      strategy = TestStrategy.s4_regime,
-      gaParameters = gaParameters,
-      scoringFunction =
-        ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
-      testDataSets = MarketDataProvider.majors1h
-    ),
-    OptimisationRound(
       name = "s4_regime_optimized",
       strategy = TestStrategy.s4_regime_optimized,
       gaParameters = gaParameters,
@@ -92,14 +46,14 @@ object Optimiser extends IOApp.Simple {
       gaParameters = gaParameters,
       scoringFunction =
         ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
->>>>>>> d29862ec (Update test strategies)
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
       name = "s12",
       strategy = TestStrategy.s12,
       gaParameters = gaParameters,
-      scoringFunction = ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
+      scoringFunction =
+        ScoringFunction.balanced(profitWeight = 0.7, consistencyWeight = 0, minOrders = Some(25), maxOrders = Some(400), targetRatio = 3),
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
