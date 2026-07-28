@@ -1,14 +1,13 @@
 package currexx.backtest.optimizer
 
 import cats.effect.IO
-import currexx.backtest.optimizer.IndicatorEvaluator.ScoringFunction
 import currexx.backtest.{MarketDataProvider, TestStrategy}
 import kirill5k.common.cats.test.IOWordSpec
 
 class IndicatorEvaluatorSpec extends IOWordSpec {
 
   private val strategy = TestStrategy.s1_v2_optimized_v2
-  private val scoring  = ScoringFunction.robust()
+  private val scoring  = ScoringFunction.Robust()
 
   "IndicatorEvaluator.make" should {
 

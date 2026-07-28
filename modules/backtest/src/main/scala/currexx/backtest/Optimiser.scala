@@ -5,8 +5,14 @@ import cats.syntax.foldable.*
 import currexx.algorithms.{EvaluatedPopulation, Parameters}
 import currexx.algorithms.operators.{Elitism, Selector}
 import currexx.algorithms.progress.Tracker
-import currexx.backtest.optimizer.{IndicatorCrossover, IndicatorEvaluator, IndicatorInitialiser, IndicatorMutator, OptimisationAlgorithm}
-import currexx.backtest.optimizer.IndicatorEvaluator.ScoringFunction
+import currexx.backtest.optimizer.{
+  IndicatorCrossover,
+  IndicatorEvaluator,
+  IndicatorInitialiser,
+  IndicatorMutator,
+  OptimisationAlgorithm,
+  ScoringFunction
+}
 import currexx.domain.signal.Indicator
 
 import scala.util.Random
@@ -36,7 +42,7 @@ object Optimiser extends IOApp.Simple {
 
   val gaParametersWithShuffle = gaParameters.copy(shuffle = true)
 
-  val robustScoring: ScoringFunction = ScoringFunction.robust()
+  val robustScoring: ScoringFunction = ScoringFunction.Robust()
 
   val rounds: List[OptimisationRound] = List(
     OptimisationRound(
