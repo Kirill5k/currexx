@@ -15,16 +15,12 @@ object BatchBacktester extends IOApp.Simple {
     "s1"              -> TestStrategy.s1,
     "s1_v2"           -> TestStrategy.s1_v2,
     "s2"              -> TestStrategy.s2,
-    "s3"              -> TestStrategy.s3,
     "s4"              -> TestStrategy.s4,
     "s4_optimized"    -> TestStrategy.s4_optimized,
     "s5"              -> TestStrategy.s5,
-    "s6_optimized"    -> TestStrategy.s6_optimized,
-    "s7_optimized"    -> TestStrategy.s7_optimized,
     "s8_optimized"    -> TestStrategy.s8_optimized,
     "s9_optimized"    -> TestStrategy.s9_optimized,
     "s10_optimized"   -> TestStrategy.s10_optimized,
-    "s11_optimized"   -> TestStrategy.s11_optimized,
     "s12"             -> TestStrategy.s12
   )
 
