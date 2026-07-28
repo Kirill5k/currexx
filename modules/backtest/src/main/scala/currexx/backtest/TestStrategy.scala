@@ -3,7 +3,7 @@ package currexx.backtest
 import io.circe.Codec
 import currexx.core.market.MomentumZone
 import currexx.core.trade.{Rule, TradeAction, TradeStrategy}
-import currexx.domain.signal.{Direction, Indicator, ValueRole, ValueSource, ValueTransformation}
+import currexx.domain.signal.{Direction, Indicator, MovingAverage, ValueRole, ValueSource, ValueTransformation}
 
 import scala.concurrent.duration.*
 
@@ -20,7 +20,7 @@ object TestStrategy {
       Indicator.TrendChangeDetection(
         source = ValueSource.HLC3,
         transformation =
-          ValueTransformation.NMA(length = 50, signalLength = 45, lambda = 1.0, maCalc = currexx.domain.signal.MovingAverage.Exponential)
+          ValueTransformation.NMA(length = 50, signalLength = 45, lambda = 1.0, maCalc = MovingAverage.Exponential)
       ),
       Indicator.ThresholdCrossing(
         source = ValueSource.Close,
