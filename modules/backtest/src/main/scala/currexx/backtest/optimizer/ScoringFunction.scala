@@ -6,22 +6,22 @@ import currexx.backtest.types.given
 import eu.timepit.refined.types.numeric.{PosDouble, PosInt}
 
 /** How a run ranks candidates, together with the acceptance test that shares its thresholds.
- *
- * `score` is what selection sorts by and `violations` is what decides whether to trust the result; the two answer different questions of
- * the same thresholds. Keeping them on one object is what stops a champion from being re-checked against numbers it was never scored
- * against — the search holds only this, so there is nothing else a caller could reach for and no configuration to pass twice.
- */
+  *
+  * `score` is what selection sorts by and `violations` is what decides whether to trust the result; the two answer different questions of
+  * the same thresholds. Keeping them on one object is what stops a champion from being re-checked against numbers it was never scored
+  * against — the search holds only this, so there is nothing else a caller could reach for and no configuration to pass twice.
+  */
 trait ScoringFunction:
   def score(stats: List[OrderStats]): Double
 
   /** Re-checks a result against the thresholds it was scored against, as pass or fail.
-   *
-   * Scoring ramps rather than gates on purpose, because gating flattens the fitness landscape and leaves selection nothing to rank.
-   * That makes it a good search signal and a poor acceptance test: the winner of a run is only the best of whatever happened to be
-   * tried, and a candidate breaching every threshold still scores above zero and still wins if nothing better turned up. Deciding
-   * whether to trust the winner is a separate question from ranking candidates during the search, and needs asking separately — of
-   * the same constraints, so that the answer cannot contradict the score.
-   */
+    *
+    * Scoring ramps rather than gates on purpose, because gating flattens the fitness landscape and leaves selection nothing to rank. That
+    * makes it a good search signal and a poor acceptance test: the winner of a run is only the best of whatever happened to be tried, and a
+    * candidate breaching every threshold still scores above zero and still wins if nothing better turned up. Deciding whether to trust the
+    * winner is a separate question from ranking candidates during the search, and needs asking separately — of the same constraints, so
+    * that the answer cannot contradict the score.
+    */
   def violations(stats: List[OrderStats]): List[ScoringFunction.Violation]
 
 object ScoringFunction {
@@ -29,16 +29,16 @@ object ScoringFunction {
     override def toString: String = s"$constraint is $actual, required $required"
 
   /** A threshold scoring function scores against, evaluated once and read two ways.
-   *
-   * `satisfaction` is the single encoding: 1.0 once the threshold is met, falling towards 0.0 below it. Scoring multiplies these
-   * together; the champion check reports every one that did not reach 1.0. That equivalence is exact, because a ramp reaches 1.0 on
-   * precisely the condition a pass/fail predicate would test. Writing the predicate separately would let it drift out of step with the
-   * ramp, which would mean accepting a winner the search had penalised, or rejecting one it had not.
-   *
-   * Only the description is by-name, because only scoring is on the search's path: it reads `satisfaction` from all of these and the
-   * wording of none of them. Formatting eagerly meant every evaluation rendered eight BigDecimals it then discarded, once per candidate
-   * for the whole run, to describe a breach that is described at most once.
-   */
+    *
+    * `satisfaction` is the single encoding: 1.0 once the threshold is met, falling towards 0.0 below it. Scoring multiplies these together;
+    * the champion check reports every one that did not reach 1.0. That equivalence is exact, because a ramp reaches 1.0 on precisely the
+    * condition a pass/fail predicate would test. Writing the predicate separately would let it drift out of step with the ramp, which would
+    * mean accepting a winner the search had penalised, or rejecting one it had not.
+    *
+    * Only the description is by-name, because only scoring is on the search's path: it reads `satisfaction` from all of these and the
+    * wording of none of them. Formatting eagerly meant every evaluation rendered eight BigDecimals it then discarded, once per candidate
+    * for the whole run, to describe a breach that is described at most once.
+    */
   final private class Constraint(name: String, actual: => String, required: => String, val satisfaction: Double):
     def violation: Option[Violation] = Option.when(satisfaction < 1.0)(Violation(name, actual, required))
 
@@ -87,7 +87,7 @@ object ScoringFunction {
           if (stats.isEmpty) 0.0
           else {
             val portfolio = OrderStats.combine(stats)
-            val discount = constraints(portfolio, profitableRatio(stats), config).map(_.satisfaction).product
+            val discount  = constraints(portfolio, profitableRatio(stats), config).map(_.satisfaction).product
             if (discount == 0.0) 0.0 else quality(portfolio, config) * discount
           }
 
@@ -203,13 +203,13 @@ object ScoringFunction {
     else 1.0 - ((value - limit) / (hardLimit - limit))
 
   /** Scales a metric against its target with diminishing returns past the target: proportional up to the target (target -> 1.0), then
-   * saturating towards `maxScore` above it, so that an outlier on a single axis cannot dominate the weighted sum.
-   *
-   * The saturation is asymptotic rather than a hard ceiling. A ceiling scores every candidate past it identically, which costs selection
-   * its ability to rank exactly where the candidates are most worth telling apart, and leaves that axis with no gradient for the
-   * optimiser to climb. `tanh` bends the same logarithmic curve — it shares its slope at the target — into one that is bounded yet still
-   * strictly increasing everywhere, so a better candidate always outscores a worse one however far out it is.
-   */
+    * saturating towards `maxScore` above it, so that an outlier on a single axis cannot dominate the weighted sum.
+    *
+    * The saturation is asymptotic rather than a hard ceiling. A ceiling scores every candidate past it identically, which costs selection
+    * its ability to rank exactly where the candidates are most worth telling apart, and leaves that axis with no gradient for the optimiser
+    * to climb. `tanh` bends the same logarithmic curve — it shares its slope at the target — into one that is bounded yet still strictly
+    * increasing everywhere, so a better candidate always outscores a worse one however far out it is.
+    */
   private def scaled(value: Double, target: Double, maxScore: Double): Double =
     if (value <= 0.0) 0.0
     else {
