@@ -40,43 +40,57 @@ object Optimiser extends IOApp.Simple {
 
   val rounds: List[OptimisationRound] = List(
     OptimisationRound(
-      name = "s1_optimized",
-      strategy = TestStrategy.s1_optimized,
+      name = "s2",
+      strategy = TestStrategy.s2,
       gaParameters = gaParameters,
       scoringFunction = robustScoring,
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
-      name = "s1_optimized_shuffle",
-      strategy = TestStrategy.s1_optimized,
+      name = "s2_shuffle",
+      strategy = TestStrategy.s2,
       gaParameters = gaParametersWithShuffle,
       scoringFunction = robustScoring,
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
-      name = "s1_v2",
-      strategy = TestStrategy.s1_v2,
+      name = "s2_optimized_v2",
+      strategy = TestStrategy.s2_optimized_v2,
       gaParameters = gaParameters,
       scoringFunction = robustScoring,
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
-      name = "s1_v2_shuffle",
-      strategy = TestStrategy.s1_v2,
+      name = "s2_optimized_v2_shuffle",
+      strategy = TestStrategy.s2_optimized_v2,
       gaParameters = gaParametersWithShuffle,
       scoringFunction = robustScoring,
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
-      name = "s1_v2_optimized_v2",
-      strategy = TestStrategy.s1_v2_optimized_v2,
+      name = "s4_optimized",
+      strategy = TestStrategy.s4_optimized,
       gaParameters = gaParameters,
       scoringFunction = robustScoring,
       testDataSets = MarketDataProvider.majors1h
     ),
     OptimisationRound(
-      name = "s1_v2_optimized_v2_shuffle",
-      strategy = TestStrategy.s1_v2_optimized_v2,
+      name = "s4_optimized_shuffle",
+      strategy = TestStrategy.s4_optimized,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = robustScoring,
+      testDataSets = MarketDataProvider.majors1h
+    ),
+    OptimisationRound(
+      name = "s4_regime_optimized_v2",
+      strategy = TestStrategy.s4_regime_optimized_v2,
+      gaParameters = gaParameters,
+      scoringFunction = robustScoring,
+      testDataSets = MarketDataProvider.majors1h
+    ),
+    OptimisationRound(
+      name = "s4_regime_optimized_v2_shuffle",
+      strategy = TestStrategy.s4_regime_optimized_v2,
       gaParameters = gaParametersWithShuffle,
       scoringFunction = robustScoring,
       testDataSets = MarketDataProvider.majors1h

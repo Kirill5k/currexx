@@ -68,7 +68,7 @@ enum RiskRatio {
 
   def toOption: Option[Double] = this match
     case Defined(value) => Some(value)
-    case _ => None
+    case _              => None
 }
 
 object RiskRatio:
