@@ -63,9 +63,10 @@ final class TestServices[F[_]] private (
 
   def getOrderStats(riskSettings: RiskSettings = RiskSettings()): F[OrderStats] =
     for
-      orders    <- loadAllOrders
-      finalMark <- appState.finalMarkRef.get
-    yield OrderStatsCollector.collect(orders, finalMark, riskSettings)
+      orders     <- loadAllOrders
+      finalMark  <- appState.finalMarkRef.get
+      dataWindow <- appState.dataWindowRef.get
+    yield OrderStatsCollector.collect(orders, finalMark, riskSettings, dataWindow)
 
   private def loadAllOrders: F[List[TradeOrderPlacement]] =
     appState.userIdRef.get.flatMap(userId => tradeService.getAllOrders(userId, SearchParams(None, None, None)))

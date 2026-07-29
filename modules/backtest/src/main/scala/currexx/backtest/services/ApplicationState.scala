@@ -6,7 +6,7 @@ import cats.effect.{Ref, Temporal}
 import cats.effect.std.Queue
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import currexx.backtest.{MarketMark, TestSettings}
+import currexx.backtest.{DataWindow, MarketMark, TestSettings}
 import currexx.core.common.action.Action
 import currexx.core.market.MarketState
 import currexx.core.settings.{SignalSettings, TradeSettings}
@@ -27,6 +27,7 @@ final class ApplicationState[F[_]](
     val clockRef: Ref[F, Option[Instant]],
     val dataRef: Ref[F, Option[MarketTimeSeriesData]],
     val finalMarkRef: Ref[F, Option[MarketMark]],
+    val dataWindowRef: Ref[F, Option[DataWindow]],
     val dispatcherQueue: Queue[F, Action],
     val userIdRef: Ref[F, UserId]
 )(using F: Monad[F]) {
@@ -46,10 +47,12 @@ final class ApplicationState[F[_]](
       price = BigDecimal(currentBar.close),
       observedAt = executionTime.plus(currentData.interval.toDuration)
     )
+    val barWindow = DataWindow(currentBar.time, currentBar.time)
     for
       _ <- finalMarkRef.set(Some(finalMark))
       _ <- dataRef.set(Some(executionData))
       _ <- clockRef.set(Some(executionTime))
+      _ <- dataWindowRef.update(_.fold(Some(barWindow))(window => Some(window.union(barWindow))))
     yield ()
 
   def reset(newSettings: TestSettings): F[Unit] =
@@ -61,6 +64,7 @@ final class ApplicationState[F[_]](
       _ <- clockRef.set(None)
       _ <- dataRef.set(None)
       _ <- finalMarkRef.set(None)
+      _ <- dataWindowRef.set(None)
       _ <- dispatcherQueue.tryTakeN(None).void
       _ <- userIdRef.set(newSettings.userId)
     yield ()
@@ -73,6 +77,7 @@ object ApplicationState {
       clockRef          <- Ref.of[F, Option[Instant]](None)
       dataRef           <- Ref.of[F, Option[MarketTimeSeriesData]](None)
       finalMarkRef      <- Ref.of[F, Option[MarketMark]](None)
+      dataWindowRef     <- Ref.of[F, Option[DataWindow]](None)
       marketStateRef    <- Ref.of[F, MarketState](settings.marketState)
       tradeSettingsRef  <- Ref.of[F, TradeSettings](settings.trade)
       tradeOrdersRef    <- Ref.of[F, ListBuffer[TradeOrderPlacement]](ListBuffer.empty)
@@ -86,6 +91,7 @@ object ApplicationState {
       clockRef = clockRef,
       dataRef = dataRef,
       finalMarkRef = finalMarkRef,
+      dataWindowRef = dataWindowRef,
       dispatcherQueue = dispatcherQueue,
       userIdRef = userIdRef
     )

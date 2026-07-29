@@ -53,6 +53,17 @@ final case class MarketMark(
     observedAt: Instant
 )
 
+/** The span of market data a run was given, as opposed to the span it chose to trade over.
+  *
+  * The two are not the same, and only the first can say whether a run sat out the months at either end. A breakdown of profit by month
+  * derived from the trades alone starts at the first trade and stops at the last, so a candidate that opens nothing until March and nothing
+  * after October has those five months vanish from its record rather than count against it. They are exactly the months worth counting,
+  * because avoiding an unfavourable stretch of a fixed sample is one of the cheapest things for a search to fit.
+  */
+final case class DataWindow(from: Instant, to: Instant):
+  def union(other: DataWindow): DataWindow =
+    DataWindow(if (from.isBefore(other.from)) from else other.from, if (to.isAfter(other.to)) to else other.to)
+
 /** A risk-adjusted return ratio, or the reason there is no number to report.
   *
   * The two undefined cases mean opposite things and must not collapse into a single `None`. A vanished denominator is the best available
@@ -109,7 +120,10 @@ final case class OrderStats(
     maxConsecutiveWins: Int = 0,
     maxConsecutiveLosses: Int = 0,
     forcedClosureCount: Int = 0,
-    invalidOrderCount: Int = 0
+    invalidOrderCount: Int = 0,
+    // The market data the run was given, when the caller knew it. Absent leaves anything measured per period to fall
+    // back on the span of the trades, which cannot see a run that sat out either end of the sample.
+    dataWindow: Option[DataWindow] = None
 ):
   def medianProfitByMonth: BigDecimal = profitByMonth.values.toList.median.roundTo(5)
   def meanProfitByMonth: BigDecimal   = profitByMonth.values.toList.mean.roundTo(5)
@@ -177,7 +191,8 @@ object OrderStats {
   def fromTrades(
       trades: List[CompletedTrade],
       settings: RiskSettings,
-      invalidOrderCount: Int = 0
+      invalidOrderCount: Int = 0,
+      dataWindow: Option[DataWindow] = None
   ): OrderStats = {
     val sortedTrades         = trades.sortBy(_.closedAt)
     val (completed, curve)   = buildEquityCurve(sortedTrades, settings.initialBalance.value)
@@ -214,7 +229,8 @@ object OrderStats {
       maxConsecutiveWins = maxWins,
       maxConsecutiveLosses = maxLosses,
       forcedClosureCount = completed.count(_.forcedClosure),
-      invalidOrderCount = invalidOrderCount
+      invalidOrderCount = invalidOrderCount,
+      dataWindow = dataWindow
     )
   }
 
@@ -234,7 +250,10 @@ object OrderStats {
       settings = stats.map(_.initialBalance).sum match
         case pooled if pooled > 0 => RiskSettings(initialBalance = PosBigDecimal.unsafeFrom(pooled))
         case _                    => RiskSettings(),
-      invalidOrderCount = stats.map(_.invalidOrderCount).sum
+      invalidOrderCount = stats.map(_.invalidOrderCount).sum,
+      // The pooled window has to span every member's, or a month one dataset was given and another was not would be
+      // missing from the pooled record of a run that did cover it.
+      dataWindow = stats.flatMap(_.dataWindow).reduceOption(_.union(_))
     )
 
   private def buildEquityCurve(
@@ -315,7 +334,8 @@ object OrderStatsCollector {
   def collect(
       orders: List[TradeOrderPlacement],
       finalMark: Option[MarketMark] = None,
-      settings: RiskSettings = RiskSettings()
+      settings: RiskSettings = RiskSettings(),
+      dataWindow: Option[DataWindow] = None
   ): OrderStats = {
     val state = orders.foldLeft(CollectionState()) { (state, currentOrder) =>
       val openPosition = state.openPosition.flatMap(placement => asEnter(placement).map(placement -> _))
@@ -352,7 +372,8 @@ object OrderStatsCollector {
     OrderStats.fromTrades(
       trades = state.trades.reverse ::: forcedClosure.toList,
       settings = settings,
-      invalidOrderCount = state.invalidOrderCount
+      invalidOrderCount = state.invalidOrderCount,
+      dataWindow = dataWindow
     )
   }
 
