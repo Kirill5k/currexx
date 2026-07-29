@@ -14,7 +14,7 @@ final case class TestStrategy(
 
 object TestStrategy {
 
-  // median win-to-loss ratio: 4.8381, total profit: 0.79149, total orders: 2251, median profit: 0.13183, median loss: -0.005103
+  // net=5849.53626, closed=2231, forced=4, win=81.22%, exp=2.621935, PF=1.300, DD=1.34%, Sharpe=3.005, gross=8033.44066, costs=2183.9044
   val s1_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -280,7 +280,7 @@ object TestStrategy {
     )
   )
 
-  // median win-to-loss ratio: 8.75000, total profit: 0.12653, total orders: 110, median profit: 0.02099, median loss: -0.0035966666666666663
+  // net=1141.97611, closed=109, forced=0, win=86.24%, exp=10.476845, PF=3.174, DD=0.27%, Sharpe=2.919, gross=1248.19274, costs=106.21663
   val s1_v2 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       // Primary signal: JMA crossover
@@ -349,7 +349,7 @@ object TestStrategy {
 
   // GA-optimized indicator params for s1_v2, re-optimized from s1_v2_optimized (rules unchanged). Best
   // Top-25 member from ga-optimisation-2026-07-14-2343-s1_v2_optimized.md (fitness 0.957191).
-  // median win-to-loss ratio: 2.00000, total profit: 0.99721, total orders: 196, median profit: 0.16303, median loss: -0.005137
+  // net=8544.76614, closed=184, forced=6, win=65.76%, exp=46.438946, PF=3.148, DD=0.77%, Sharpe=2.940, gross=8727.12305, costs=182.35692
   val s1_v2_optimized_v2 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       // Primary signal: JMA crossover
@@ -625,7 +625,7 @@ object TestStrategy {
 
   // GA-optimized indicator params for s1_v2 (rules unchanged). Champion from
   // ga-optimisation-2026-07-27-1852-s1_v2.md (fitness 1.689015).
-  // net=2050.84746, closed=150, forced=1, win=84.67%, exp=13.672316, PF=4.129, DD=0.19%, Sharpe=3.592, gross=2196.37696, costs=145.52950
+  // net=2050.84746, closed=150, forced=1, win= 84.67%, exp=13.672316, PF=4.129, DD=0.19%, Sharpe=3.592, gross=2196.37696, costs=145.52950
   val s1_v2_optimized_v6 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       // Primary signal: JMA crossover
@@ -692,7 +692,7 @@ object TestStrategy {
     )
   )
 
-  // median win-to-loss ratio: 5.901785, total profit: 0.20349, total orders: 652, median profit: 0.04662, median loss: -0.004795
+  // net=1700.76417, closed=643, forced=1, win=79.32%, exp=2.645045, PF=1.335, DD=0.94%, Sharpe=1.966, gross=2333.10508, costs=632.34091
   val s2 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.LinesCrossing(
@@ -750,7 +750,7 @@ object TestStrategy {
 
   // GA-optimized indicator params for s2, re-optimized from s2_optimized (rules unchanged). Best Top-25
   // member from ga-optimisation-2026-07-15-0052-s2_optimized.md (fitness 0.687735).
-  // median win-to-loss ratio: 2.77270, total profit: 0.54006, total orders: 195, median profit: 0.08943, median loss: -0.010073
+  // net=4594.75298, closed=190, forced=5, win=70.53%, exp=24.182910, PF=1.956, DD=1.13%, Sharpe=2.536, gross=4780.60292, costs=185.84994
   val s2_optimized_v2 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.LinesCrossing(
@@ -806,7 +806,7 @@ object TestStrategy {
     )
   )
 
-  // median win-to-loss ratio: 3.6919, total profit: 0.39980, total orders: 267, median profit: 0.05431, median loss: -0.004065
+  // net=3559.10491, closed=258, forced=0, win=75.19%, exp=13.794980, PF=2.467, DD=0.60%, Sharpe=3.479, gross=3811.91334, costs=252.80842
   val s4_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -873,7 +873,7 @@ object TestStrategy {
     )
   )
 
-  // median win-to-loss ratio: 3.67500, total profit: 0.31070, total orders: 165, median profit: 0.04992, median loss: -0.002982
+  // net=2931.48571, closed=164, forced=0, win=78.05%, exp=17.874913, PF=4.105, DD=0.22%, Sharpe=3.795, gross=3091.53751, costs=160.05179
   val s4_regime_optimized_v2 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -949,7 +949,7 @@ object TestStrategy {
 
   // GA-optimized indicator params for s5, re-optimized from the s5 baseline (rules unchanged). Best
   // Top-25 member from ga-optimisation-2026-07-17-1858-s5.md (fitness 0.539268).
-  // median win-to-loss ratio: 3.03330, total profit: 0.32643, total orders: 191, median profit: 0.05944, median loss: -0.003692
+  // net=2897.64330, closed=187, forced=0, win=72.19%, exp=15.495419, PF=2.658, DD=0.45%, Sharpe=2.853, gross=3078.85870, costs=181.21540
   val s5_optimized_v2 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -1056,7 +1056,7 @@ object TestStrategy {
   // variant tested were amputating the fat tail of winning trend trades. Exiting ONLY on a position-gated
   // Ichimoku trend reversal lifts total profit to 0.28206, W/L to 1.22355, and cuts orders 490 -> 156
   // (5 of 6 majors profitable). The Parabolic SAR indicator was consequently removed as dead weight.
-  // median win-to-loss ratio: 1.22355, total profit: 0.28206, total orders: 156, median profit: 0.04487, median loss: -0.00756
+  // net=2306.49103, closed=153, forced=5, win=50.33%, exp=15.075105, PF=1.417, DD=1.95%, Sharpe=1.816, gross=2457.28396, costs=150.79293
   val s12 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -1124,7 +1124,7 @@ object TestStrategy {
 
   // GA-optimized indicator params for s12 (rules unchanged). Best Top-25 member from
   // ga-optimisation-2026-07-05-1349-s12.md (fitness 0.407640).
-  // median win-to-loss ratio: 1.3287, total profit: 0.39205, total orders: 173, median profit: 0.06183, median loss: -0.007400
+  // net=3181.94074, closed=172, forced=5, win=51.74%, exp=18.499655, PF=1.555, DD=1.69%, Sharpe=2.346, gross=3351.48927, costs=169.54853
   val s12_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
