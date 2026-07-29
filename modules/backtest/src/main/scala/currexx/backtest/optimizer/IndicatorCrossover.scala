@@ -70,6 +70,8 @@ object IndicatorCrossover:
             Right(VT.NMA(crossInt(l1, l2), crossInt(sl1, sl2), crossDouble(d1, d2, 0.5), ma1))
           case (VT.WilliamsR(l1), VT.WilliamsR(l2)) =>
             Right(VT.WilliamsR(crossInt(l1, l2, Some(5))))
+          case (VT.ATR(l1), VT.ATR(l2)) =>
+            Right(VT.ATR(crossInt(l1, l2, Some(5))))
           case (VT.ADX(l1), VT.ADX(l2)) =>
             Right(VT.ADX(crossInt(l1, l2, Some(5))))
           case (VT.CCI(l1), VT.CCI(l2)) =>
