@@ -19,11 +19,11 @@ object Parameters {
 }
 
 sealed trait Algorithm[A <: Alg, P <: Parameters[A]]:
-  def optimise[I](target: I, params: P): Free[Op[*, I], EvaluatedPopulation[I]]
+  def optimise[I](target: I, params: P): Free[Op[*, I], ValidatedPopulation[I]]
 
 object Algorithm {
   case object GA extends Algorithm[Alg.GA, Parameters.GA] {
-    override def optimise[I](target: I, params: Parameters.GA): Free[Op[*, I], EvaluatedPopulation[I]] =
+    override def optimise[I](target: I, params: Parameters.GA): Free[Op[*, I], ValidatedPopulation[I]] =
       for
         _           <- Op.DisplayInitial(target, params).freeM
         pop         <- Op.InitPopulation(target, params.populationSize, params.shuffle).freeM
@@ -41,8 +41,13 @@ object Algorithm {
             _         <- Op.DisplayProgress(i, params.maxGen, sortedPop).freeM
           yield sortedPop
         }
-        _ <- Op.DisplayFinal(finalPop).freeM
-      yield finalPop
+        // Validation is the last thing the run does and it happens exactly once, on the population selection has
+        // finished with. Anything earlier would be the search reading the held-out sample, which is the one thing that
+        // stops it being held out. Returning the validated population rather than the evaluated one is what makes a
+        // champion impossible to obtain without the reading that says whether it means anything.
+        validatedPop <- Op.ValidatePopulation(finalPop).freeM
+        _            <- Op.DisplayFinal(validatedPop).freeM
+      yield validatedPop
   }
 
   private def iterate[F[_], A](a: A, n: Int)(f: (A, Int) => Free[F, A]): Free[F, A] =

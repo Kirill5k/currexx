@@ -4,23 +4,24 @@ import cats.effect.IO
 import currexx.backtest.{MarketDataProvider, TestStrategy}
 import kirill5k.common.cats.test.IOWordSpec
 
-class IndicatorEvaluatorSpec extends IOWordSpec {
+class IndicatorObjectiveSpec extends IOWordSpec {
 
   private val strategy = TestStrategy.s1_v2_optimized_v2
   private val scoring  = ScoringFunction.Robust()
 
-  "IndicatorEvaluator.make" should {
+  "IndicatorObjective.make" should {
 
     "hand back a backtest that reproduces the run its fitness came from" in {
       val result = for
-        evaluation <- IndicatorEvaluator.make[IO](
+        objective <- IndicatorObjective.make[IO](
           trainingData = List(MarketDataProvider.majors1h.head),
           strategy = strategy.rules,
           poolSize = 1,
+          shortlistSize = 25,
           scoringFunction = scoring
         )
-        scored <- evaluation.evaluator.evaluateIndividual(strategy.indicator)
-        stats  <- evaluation.backtest(strategy.indicator)
+        scored <- objective.evaluator.evaluateIndividual(strategy.indicator)
+        stats  <- objective.backtest(strategy.indicator)
       yield (scored._2.value, scoring.score(stats))
 
       // The champion report re-runs the winner through this backtest to say whether it satisfies its constraints. If
@@ -37,15 +38,16 @@ class IndicatorEvaluatorSpec extends IOWordSpec {
       // asserting: were the validation run to inherit any of the training run's data the two would silently converge
       // on the same answer, and selection would be ranking finalists on the sample that produced them.
       val result = for
-        evaluation <- IndicatorEvaluator.make[IO](
+        objective <- IndicatorObjective.make[IO](
           trainingData = List(MarketDataProvider.majors1hTraining.head),
           strategy = strategy.rules,
           poolSize = 1,
+          shortlistSize = 25,
           validationData = List(MarketDataProvider.majors1hValidation.head),
           scoringFunction = scoring
         )
-        trained   <- evaluation.backtest(strategy.indicator)
-        validated <- evaluation.validate(strategy.indicator)
+        trained   <- objective.backtest(strategy.indicator)
+        validated <- objective.validate(strategy.indicator)
       yield (trained.flatMap(_.dataWindow), validated.flatMap(_.dataWindow))
 
       result.asserting { case (trained, validated) =>

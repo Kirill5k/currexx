@@ -2,7 +2,7 @@ package currexx.algorithms.progress
 
 import cats.effect.{Async, Ref}
 import cats.syntax.all.*
-import currexx.algorithms.{EvaluatedPopulation, Parameters}
+import currexx.algorithms.{EvaluatedPopulation, Parameters, ValidatedPopulation}
 
 import java.time.Instant
 
@@ -32,14 +32,15 @@ final class LoggingTracker[F[_], I] private (
       Async[F].delay(println(s"$progress$topMembers$stats"))
     }
 
-  override def displayFinal(population: EvaluatedPopulation[I]): F[Unit] =
+  override def displayFinal(population: ValidatedPopulation[I]): F[Unit] =
     for
       now       <- Async[F].realTimeInstant
       startTime <- startTimeRef.get
       duration = startTime.map(start => durationMsg(start, now)).getOrElse("")
-      stats    = statsMsg(population)
-      members  = membersMsg(population, finalTopN)
-      _ <- Async[F].delay(println(s"Final top $finalTopN members:\n$members\n$stats$duration"))
+      stats    = validatedStatsMsg(population)
+      summary  = validationSummaryMsg(population)
+      members  = validatedMembersMsg(population, finalTopN)
+      _ <- Async[F].delay(println(s"$summary\nFinal top $finalTopN members:\n$members\n$stats$duration"))
     yield ()
 
   override def displayNote(title: String, lines: List[String]): F[Unit] =

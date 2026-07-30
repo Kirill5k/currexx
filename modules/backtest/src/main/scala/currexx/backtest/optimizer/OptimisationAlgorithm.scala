@@ -8,7 +8,7 @@ import currexx.algorithms.*
 import scala.util.Random
 
 trait OptimisationAlgorithm[F[_], A <: Alg, P <: Parameters[A], T]:
-  def optimise(target: T, params: P)(using rand: Random): F[EvaluatedPopulation[T]]
+  def optimise(target: T, params: P)(using rand: Random): F[ValidatedPopulation[T]]
 
 object OptimisationAlgorithm:
   def ga[F[_]: Async, T](
@@ -16,11 +16,12 @@ object OptimisationAlgorithm:
       crossover: Crossover[F, T],
       mutator: Mutator[F, T],
       evaluator: Evaluator[F, T],
+      validator: Validator[F, T],
       selector: Selector[F, T],
       elitism: Elitism[F, T],
       progressTracker: Tracker[F, T]
   ): OptimisationAlgorithm[F, Alg.GA, Parameters.GA, T] = new OptimisationAlgorithm[F, Alg.GA, Parameters.GA, T]:
-    override def optimise(target: T, params: Parameters.GA)(using rand: Random): F[EvaluatedPopulation[T]] =
+    override def optimise(target: T, params: Parameters.GA)(using rand: Random): F[ValidatedPopulation[T]] =
       Algorithm.GA
         .optimise[T](target, params)
-        .foldMap(Op.ioInterpreter[F, T](initialiser, crossover, mutator, evaluator, selector, elitism, progressTracker))
+        .foldMap(Op.ioInterpreter[F, T](initialiser, crossover, mutator, evaluator, validator, selector, elitism, progressTracker))

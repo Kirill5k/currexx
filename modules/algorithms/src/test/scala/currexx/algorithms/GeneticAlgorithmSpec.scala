@@ -1,7 +1,7 @@
 package currexx.algorithms
 
 import cats.effect.IO
-import currexx.algorithms.operators.{Crossover, Elitism, Evaluator, Initialiser, Mutator, Selector}
+import currexx.algorithms.operators.{Crossover, Elitism, Evaluator, Initialiser, Mutator, Selector, Validator}
 import currexx.algorithms.progress.Tracker
 import kirill5k.common.cats.test.IOWordSpec
 
@@ -23,15 +23,16 @@ class GeneticAlgorithmSpec extends IOWordSpec {
 
   private def onesIn(individual: Array[Int]): Int = individual.count(_ == 1)
 
-  private def meanOnes(population: EvaluatedPopulation[Array[Int]]): Double =
+  private def meanOnes(population: ValidatedPopulation[Array[Int]]): Double =
     population.map(p => onesIn(p._1).toDouble).sum / population.size
 
-  private def optimise(maxGen: Int)(using rand: Random): IO[EvaluatedPopulation[Array[Int]]] =
+  private def optimise(maxGen: Int)(using rand: Random): IO[ValidatedPopulation[Array[Int]]] =
     for
       initialiser <- Initialiser.simple[IO, Array[Int]](seed => IO(seed.map(_ => rand.nextInt(2))))
       crossover   <- Crossover.threeWaySplit[IO, Int]
       mutator     <- Mutator.bitFlip[IO]
       evaluator   <- Evaluator.cached[IO, Array[Int]](ind => IO.pure(ind -> Fitness(onesIn(ind).toDouble)))
+      validator   <- Validator.none[IO, Array[Int]]
       selector    <- Selector.tournament[IO, Array[Int]]
       elitism     <- Elitism.simple[IO, Array[Int]]
       tracker     <- Tracker.noop[IO, Array[Int]]
@@ -45,7 +46,7 @@ class GeneticAlgorithmSpec extends IOWordSpec {
       )
       result <- Algorithm.GA
         .optimise[Array[Int]](Array.fill(genomeLength)(0), params)
-        .foldMap(Op.ioInterpreter[IO, Array[Int]](initialiser, crossover, mutator, evaluator, selector, elitism, tracker))
+        .foldMap(Op.ioInterpreter[IO, Array[Int]](initialiser, crossover, mutator, evaluator, validator, selector, elitism, tracker))
     yield result
 
   "Algorithm.GA" should {

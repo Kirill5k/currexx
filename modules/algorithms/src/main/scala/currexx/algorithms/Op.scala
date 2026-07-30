@@ -41,15 +41,22 @@ type Population[I]            = Vector[I]
 type EvaluatedPopulation[I]   = Vector[(I, Fitness)]
 type DistributedPopulation[I] = Vector[(I, I)]
 
+/** An individual with the fitness the search ranked it by and the fitness it went on to earn against evidence the search never saw, in that
+  * order. The second is the one worth concluding from; both are kept because it is the pair that says whether a run found anything, and
+  * either alone reads as a result.
+  */
+type ValidatedPopulation[I] = Vector[(I, Fitness, Fitness)]
+
 enum Op[A, I]:
   case DisplayInitial[I](target: I, params: Parameters.GA)                                 extends Op[Unit, I]
   case DisplayProgress[I](iteration: Int, maxGen: Int, population: EvaluatedPopulation[I]) extends Op[Unit, I]
-  case DisplayFinal[I](population: EvaluatedPopulation[I])                                 extends Op[Unit, I]
+  case DisplayFinal[I](population: ValidatedPopulation[I])                                 extends Op[Unit, I]
   case InitPopulation[I](seed: I, size: Int, shuffle: Boolean)                             extends Op[Population[I], I]
   case Cross[I](ind1: I, ind2: I, prob: Double)                                            extends Op[I, I]
   case Mutate[I](ind: I, prob: Double)                                                     extends Op[I, I]
   case EvaluateOne[I](ind: I)                                                              extends Op[(I, Fitness), I]
   case EvaluatePopulation[I](population: Population[I])                                    extends Op[EvaluatedPopulation[I], I]
+  case ValidatePopulation[I](population: EvaluatedPopulation[I])                           extends Op[ValidatedPopulation[I], I]
   case SelectElites[I](population: EvaluatedPopulation[I], popSize: Int, ratio: Double)    extends Op[Population[I], I]
   case SelectPairs[I](population: EvaluatedPopulation[I], limit: Int)                      extends Op[DistributedPopulation[I], I]
   case SortByFitness[I](population: EvaluatedPopulation[I])                                extends Op[EvaluatedPopulation[I], I]
@@ -63,6 +70,7 @@ object Op:
       crossover: Crossover[F, I],
       mutator: Mutator[F, I],
       evaluator: Evaluator[F, I],
+      validator: Validator[F, I],
       selector: Selector[F, I],
       elitism: Elitism[F, I],
       progressTracker: Tracker[F, I]
@@ -87,6 +95,8 @@ object Op:
         case Op.EvaluatePopulation(population) =>
           val parallelism = Math.max(1, Runtime.getRuntime.availableProcessors())
           Stream.emits(population).mapAsync(parallelism)(evaluator.evaluateIndividual).compile.toVector
+        case Op.ValidatePopulation(population) =>
+          validator.validate(population)
         case Op.SelectElites(population, popSize, ratio) =>
           elitism.select(population, popSize * ratio)
         case Op.SelectPairs(population, limit) =>
@@ -102,8 +112,9 @@ object Op:
       crossover: Crossover[F, I],
       mutator: Mutator[F, I],
       evaluator: Evaluator[F, I],
+      validator: Validator[F, I],
       selector: Selector[F, I],
       elitism: Elitism[F, I],
       progressTracker: Tracker[F, I]
   )(using F: Async[F], rand: Random): Op[*, I] ~> F =
-    new OpInterpreter[F, I](initialiser, crossover, mutator, evaluator, selector, elitism, progressTracker)
+    new OpInterpreter[F, I](initialiser, crossover, mutator, evaluator, validator, selector, elitism, progressTracker)

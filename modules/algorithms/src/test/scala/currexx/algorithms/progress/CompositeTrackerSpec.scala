@@ -2,7 +2,7 @@ package currexx.algorithms.progress
 
 import cats.effect.{IO, Ref}
 import kirill5k.common.cats.test.IOWordSpec
-import currexx.algorithms.{EvaluatedPopulation, Parameters}
+import currexx.algorithms.{EvaluatedPopulation, Parameters, ValidatedPopulation}
 
 class CompositeTrackerSpec extends IOWordSpec {
 
@@ -16,13 +16,13 @@ class CompositeTrackerSpec extends IOWordSpec {
         tracker1 = new Tracker[IO, String] {
           override def displayInitial(target: String, params: Parameters.GA): IO[Unit]                                  = ref1.update(_ + 1)
           override def displayProgress(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[String]): IO[Unit] = ref1.update(_ + 1)
-          override def displayFinal(population: EvaluatedPopulation[String]): IO[Unit]                                  = ref1.update(_ + 1)
+          override def displayFinal(population: ValidatedPopulation[String]): IO[Unit]                                  = ref1.update(_ + 1)
           override def displayNote(title: String, lines: List[String]): IO[Unit]                                        = ref1.update(_ + 1)
         }
         tracker2 = new Tracker[IO, String] {
           override def displayInitial(target: String, params: Parameters.GA): IO[Unit]                                  = ref2.update(_ + 1)
           override def displayProgress(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[String]): IO[Unit] = ref2.update(_ + 1)
-          override def displayFinal(population: EvaluatedPopulation[String]): IO[Unit]                                  = ref2.update(_ + 1)
+          override def displayFinal(population: ValidatedPopulation[String]): IO[Unit]                                  = ref2.update(_ + 1)
           override def displayNote(title: String, lines: List[String]): IO[Unit]                                        = ref2.update(_ + 1)
         }
         composite = CompositeTracker.make[IO, String](tracker1, tracker2)

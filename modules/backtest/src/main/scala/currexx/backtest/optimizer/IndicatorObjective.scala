@@ -6,7 +6,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import currexx.algorithms.Fitness
-import currexx.algorithms.operators.Evaluator
+import currexx.algorithms.operators.{Evaluator, Validator}
 import currexx.backtest.MarketDataProvider.Dataset
 import currexx.backtest.services.TestServicesPool
 import currexx.backtest.{MarketDataProvider, OrderStats, TestSettings}
@@ -16,20 +16,22 @@ import currexx.domain.market.MarketTimeSeriesData
 import currexx.domain.signal.Indicator
 import fs2.Stream
 
-object IndicatorEvaluator {
+object IndicatorObjective {
 
-  /** The evaluator a run searches with, together with the two backtests underneath it.
+  /** The two data-bound operators a run searches with, together with the backtests underneath them.
     *
-    * Fitness collapses a run to a single number and throws away the statistics it came from, so a finished search can say nothing about its
-    * own champion beyond its score. Handing back the backtests lets the caller replay one indicator and examine the result properly.
+    * They are built together because they are one thing seen twice: the same simulation, the same strategy and the same pool of services,
+    * run over two halves of the corpus that must not be confused with one another. Constructing the validator anywhere else would mean
+    * handing it a backtest assembled separately, and a validator pointed at the training half is not a validator — it is the search marking
+    * its own work, with nothing in any signature to say so.
     *
-    * They are separate because they are asking different questions of different data. `backtest` is what the search maximises over, so a
-    * score from it says only that a candidate beat the others at fitting the sample every one of them was fitted to. `validate` runs the
-    * same simulation over data no candidate was ever scored against, which is the only reading that is evidence of anything, and is
-    * therefore what a champion should be chosen by.
+    * The raw backtests come back alongside the operators because fitness collapses a run to a single number and throws away the statistics
+    * it came from. A finished search can say nothing about its own champion beyond its score; replaying one indicator is how the result
+    * gets examined properly.
     */
-  final case class Evaluation[F[_]](
+  final case class Operators[F[_]](
       evaluator: Evaluator[F, Indicator],
+      validator: Validator[F, Indicator],
       backtest: Indicator => F[List[OrderStats]],
       validate: Indicator => F[List[OrderStats]]
   )
@@ -38,11 +40,12 @@ object IndicatorEvaluator {
       trainingData: List[Dataset],
       strategy: TradeStrategy,
       poolSize: Int,
+      shortlistSize: Int,
       validationData: List[Dataset] = Nil,
       otherIndicators: List[Indicator] = Nil,
       signalDetector: SignalDetector = SignalDetector.pure,
       scoringFunction: ScoringFunction = ScoringFunction.Robust()
-  ): F[Evaluation[F]] =
+  ): F[Operators[F]] =
     for
       training   <- trainingData.parTraverse(MarketDataProvider.read[F](_).compile.toList)
       validation <- validationData.parTraverse(MarketDataProvider.read[F](_).compile.toList)
@@ -50,8 +53,9 @@ object IndicatorEvaluator {
       pool <- TestServicesPool.make[F](initialSettings, poolSize)
       backtest = backtestOver[F](pool, training, strategy, otherIndicators, signalDetector)
       validate = backtestOver[F](pool, validation, strategy, otherIndicators, signalDetector)
-      eval <- Evaluator.cached[F, Indicator](ind => backtest(ind).map(res => ind -> Fitness(scoringFunction.score(res))))
-    yield Evaluation(eval, backtest, validate)
+      evaluator <- Evaluator.cached[F, Indicator](ind => backtest(ind).map(res => ind -> Fitness(scoringFunction.score(res))))
+      validator <- Validator.shortlisted[F, Indicator](shortlistSize)(ind => validate(ind).map(res => Fitness(scoringFunction.score(res))))
+    yield Operators(evaluator, validator, backtest, validate)
 
   private def backtestOver[F[_]: {Async, Parallel}](
       pool: TestServicesPool[F],

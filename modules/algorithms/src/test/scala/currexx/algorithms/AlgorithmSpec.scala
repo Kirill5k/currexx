@@ -37,6 +37,7 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
           |Evaluate entire population
           |Sorting evaluated population by fitness
           |Iteration 2 of 2
+          |Validate the finished population
           |Final population displayed
           |""".stripMargin
     }
@@ -71,6 +72,9 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
       case Op.SelectPairs(population, limit) =>
         State.modify[List[String]](_ :+ "Distribute population in pairs\n") >>
           State.pure(population.map((i, _) => (i, i)))
+      case Op.ValidatePopulation(population) =>
+        State.modify[List[String]](_ :+ "Validate the finished population\n") >>
+          State.pure(population.map((i, f) => (i, f, f)))
       case Op.SortByFitness(population) =>
         State.modify[List[String]](_ :+ "Sorting evaluated population by fitness\n") >>
           State.pure(population.sortBy(_._2)(using Ordering[Fitness].reverse))

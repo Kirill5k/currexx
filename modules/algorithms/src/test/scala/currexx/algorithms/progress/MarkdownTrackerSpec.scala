@@ -13,6 +13,12 @@ class MarkdownTrackerSpec extends IOWordSpec {
       ("ind1", Fitness(10.0)),
       ("ind2", Fitness(5.0))
     )
+    // The final report is the one place both fitnesses exist, so it renders the pair rather than the training figure
+    // the progress lines carry, and orders on the validation one.
+    val validated = Vector(
+      ("ind1", Fitness(10.0), Fitness(4.0)),
+      ("ind2", Fitness(5.0), Fitness(1.0))
+    )
 
     "write progress to a markdown file in optimisation-results folder" in {
       val resultsDir = Path("optimisation-results")
@@ -22,7 +28,7 @@ class MarkdownTrackerSpec extends IOWordSpec {
         tracker <- MarkdownTracker.make[IO, String](logInterval = 1, showStats = true)
         _       <- tracker.displayInitial("target-ind", params)
         _       <- tracker.displayProgress(1, 10, population)
-        _       <- tracker.displayFinal(population)
+        _       <- tracker.displayFinal(validated)
         _     <- tracker.displayNote("Champion: round-1", List("Fitness: 10.0", "BREACHES 1 constraint(s) despite winning:", "  - too few"))
         files <- filesS.list(resultsDir).compile.toList
         latestFile = files.filter(_.fileName.toString.startsWith("ga-optimisation-")).maxBy(_.toString)
@@ -36,7 +42,10 @@ class MarkdownTrackerSpec extends IOWordSpec {
         content must include("### Generation 1 out of 10")
         content must include("* #1: 10.0 - `ind1`")
         content must include("## Final Results")
-        content must include("Stats: Best=10.0, Avg=7.5, Worst=5.0")
+        content must include("2 finalist(s) validated, 0 of which scored zero")
+        content must include("rank  train#    training  validation  retained  individual")
+        content must include("1       1   10.000000    4.000000     40.0%  ind1")
+        content must include("Stats: Best=4.0, Avg=2.5, Worst=1.0")
         content must include("## Champion: round-1")
         content must include("BREACHES 1 constraint(s) despite winning:\n  - too few")
       }

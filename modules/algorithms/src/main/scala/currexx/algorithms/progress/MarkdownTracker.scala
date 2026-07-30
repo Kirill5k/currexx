@@ -2,7 +2,7 @@ package currexx.algorithms.progress
 
 import cats.effect.{Async, Ref}
 import cats.syntax.all.*
-import currexx.algorithms.{EvaluatedPopulation, Parameters}
+import currexx.algorithms.{EvaluatedPopulation, Parameters, ValidatedPopulation}
 import fs2.Stream
 import fs2.io.file.{Files, Flags, Path}
 
@@ -47,20 +47,27 @@ final class MarkdownTracker[F[_], I] private (
       writeToFile(s"\n$progress$topMembers$stats\n", append = true)
     }
 
-  override def displayFinal(population: EvaluatedPopulation[I]): F[Unit] =
+  override def displayFinal(population: ValidatedPopulation[I]): F[Unit] =
     for
       now       <- F.realTimeInstant
       startTime <- startTimeRef.get
       duration = startTime.map(start => durationMsg(start, now)).getOrElse("")
-      stats    = statsMsg(population)
-      members  = membersMsg(population, finalTopN)
-      content  =
+      stats    = validatedStatsMsg(population)
+      summary  = validationSummaryMsg(population)
+      members  = validatedMembersMsg(population, finalTopN)
+      // Fenced, unlike the progress bullets: the table is column-aligned and markdown would collapse the runs of
+      // spaces that align it.
+      content =
         s"""|
             |## Final Results
             |
+            |$summary
+            |
             |**Top $finalTopN members:**
             |
+            |```
             |$members
+            |```
             |
             |**Stats:**
             |$stats
