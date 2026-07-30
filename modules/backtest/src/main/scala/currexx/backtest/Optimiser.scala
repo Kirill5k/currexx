@@ -47,11 +47,11 @@ object Optimiser extends IOApp.Simple {
   val evaluatorPoolSize = Runtime.getRuntime.availableProcessors()
 
   val gaParameters = Parameters.GA(
-    populationSize = 250,
-    maxGen = 350,
+    populationSize = 300,
+    maxGen = 75,
     crossoverProbability = 0.7,
-    mutationProbability = 0.08,
-    elitismRatio = 0.025,
+    mutationProbability = 0.1,
+    elitismRatio = 0.02,
     shuffle = false
   )
 
