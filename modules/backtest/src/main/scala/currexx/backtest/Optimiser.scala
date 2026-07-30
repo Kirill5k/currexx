@@ -46,55 +46,6 @@ object Optimiser extends IOApp.Simple {
 
   val rounds: List[OptimisationRound] = List(
     OptimisationRound(
-      name = "s1_optimized",
-      strategy = TestStrategy.s1_optimized,
-      gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      testDataSets = MarketDataProvider.majors1h
-    ),
-    OptimisationRound(
-      name = "s1_optimized_shuffle",
-      strategy = TestStrategy.s1_optimized,
-      gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      testDataSets = MarketDataProvider.majors1h
-    ),
-    OptimisationRound(
-      name = "s1_v2",
-      strategy = TestStrategy.s1_v2,
-      gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      testDataSets = MarketDataProvider.majors1h
-    ),
-    OptimisationRound(
-      name = "s1_v2_shuffle",
-      strategy = TestStrategy.s1_v2,
-      gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      testDataSets = MarketDataProvider.majors1h
-    ),
-    OptimisationRound(
-      name = "s1_v2_optimized_v2",
-      strategy = TestStrategy.s1_v2_optimized_v2,
-      gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      testDataSets = MarketDataProvider.majors1h
-    ),
-    OptimisationRound(
-      name = "s1_v2_optimized_v2_shuffle",
-      strategy = TestStrategy.s1_v2_optimized_v2,
-      gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      testDataSets = MarketDataProvider.majors1h
-    ),
-    OptimisationRound(
-      name = "s2",
-      strategy = TestStrategy.s2,
-      gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      testDataSets = MarketDataProvider.majors1h
-    ),
-    OptimisationRound(
       name = "s2_shuffle",
       strategy = TestStrategy.s2,
       gaParameters = gaParametersWithShuffle,
