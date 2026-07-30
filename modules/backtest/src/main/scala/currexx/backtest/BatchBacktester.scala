@@ -30,7 +30,8 @@ object BatchBacktester extends IOApp.Simple {
     "s1_v2_optimized_v3" -> TestStrategy.s1_v2_optimized_v3,
     "s1_v2_optimized_v4" -> TestStrategy.s1_v2_optimized_v4,
     "s1_v2_optimized_v5" -> TestStrategy.s1_v2_optimized_v5,
-    "s1_v2_optimized_v6" -> TestStrategy.s1_v2_optimized_v6
+    "s1_v2_optimized_v6" -> TestStrategy.s1_v2_optimized_v6,
+    "s2_optimized_v3"    -> TestStrategy.s2_optimized_v3
   )
 
   val riskSettings: RiskSettings = RiskSettings()
