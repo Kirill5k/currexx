@@ -34,13 +34,13 @@ object StrategyAnalyser extends IOApp {
   def statsPerPair(ts: TestStrategy): IO[List[(CurrencyPair, OrderStats)]] =
     Stream
       .emits(MarketDataProvider.majors1h)
-      .parEvalMap(6) { filePath =>
-        val cp       = MarketDataProvider.cpFromFilePath(filePath)
+      .parEvalMap(6) { dataset =>
+        val cp       = dataset.currencyPair
         val settings = TestSettings.make(cp, ts.rules, List(ts.indicator))
         for
           services <- TestServices.make[IO](settings)
           _        <- MarketDataProvider
-            .read[IO](filePath)
+            .read[IO](dataset)
             .through(services.processMarketData(SignalDetector.pure))
             .compile
             .drain

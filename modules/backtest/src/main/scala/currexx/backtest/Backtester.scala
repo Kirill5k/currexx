@@ -16,14 +16,14 @@ object Backtester extends IOApp.Simple {
   override val run: IO[Unit] =
     Stream
       .emits(MarketDataProvider.majors1h)
-      .parEvalMap(16) { filePath =>
+      .parEvalMap(16) { dataset =>
         for
-          _ <- IO.println(s"Processing $filePath")
-          cp       = MarketDataProvider.cpFromFilePath(filePath)
+          _ <- IO.println(s"Processing $dataset")
+          cp       = dataset.currencyPair
           settings = TestSettings.make(cp, testStrategy.rules, List(testStrategy.indicator))
           services <- TestServices.make[IO](settings)
           _        <- MarketDataProvider
-            .read[IO](filePath)
+            .read[IO](dataset)
             .through(services.processMarketData(SignalDetector.pure))
             .compile
             .drain

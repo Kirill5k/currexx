@@ -39,13 +39,12 @@ object BatchBacktester extends IOApp.Simple {
   def runOne(name: String, ts: TestStrategy): IO[String] =
     Stream
       .emits(MarketDataProvider.majors1h)
-      .parEvalMap(6) { filePath =>
-        val cp       = MarketDataProvider.cpFromFilePath(filePath)
-        val settings = TestSettings.make(cp, ts.rules, List(ts.indicator))
+      .parEvalMap(6) { dataset =>
+        val settings = TestSettings.make(dataset.currencyPair, ts.rules, List(ts.indicator))
         for
           services <- TestServices.make[IO](settings)
           _        <- MarketDataProvider
-            .read[IO](filePath)
+            .read[IO](dataset)
             .through(services.processMarketData(SignalDetector.pure))
             .compile
             .drain
