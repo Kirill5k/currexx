@@ -53,7 +53,8 @@ object ScoringFunction {
     private val maxComponentScore = 3.0
 
     final case class Config(
-        minClosedTrades: PosInt = 150,
+        // Pooled across every dataset in the run, so ten a month between six pairs is under two per pair-month.
+        minTradesPerMonth: PosInt = 10,
         minProfitableDatasetRatio: PositiveUnitInterval = 2.0 / 3.0,
         minProfitFactor: GreaterThanOne = 1.2,
         maxDrawdownPercent: PosDouble = 15.0,
@@ -90,23 +91,27 @@ object ScoringFunction {
           if (stats.isEmpty) 0.0
           else {
             val portfolio = OrderStats.combine(stats)
-            val discount  = constraints(portfolio, profitableRatio(stats), config).map(_.satisfaction).product
-            if (discount == 0.0) 0.0 else quality(portfolio, config) * discount
+            val months    = coveredMonths(portfolio).size
+            val discount  = constraints(portfolio, months, profitableRatio(stats), config).map(_.satisfaction).product
+            if (discount == 0.0) 0.0 else quality(portfolio, months, config) * discount
           }
 
         override def violations(stats: List[OrderStats]): List[Violation] =
           if (stats.isEmpty) List(Violation("dataset count", "0", "at least 1"))
-          else constraints(OrderStats.combine(stats), profitableRatio(stats), config).flatMap(_.violation)
+          else {
+            val portfolio = OrderStats.combine(stats)
+            constraints(portfolio, coveredMonths(portfolio).size, profitableRatio(stats), config).flatMap(_.violation)
+          }
       }
 
-    private def quality(portfolio: OrderStats, config: Config): Double = {
+    private def quality(portfolio: OrderStats, monthsCovered: Int, config: Config): Double = {
       // A metric whose denominator vanished is undefined rather than bad — no drawdown to recover from, no losing
       // month, no losing trade — so it is credited with its target instead of being scored as zero. The credit is
       // worth only as much as the sample behind it: an absence of drawdown across five trades is evidence of nothing,
       // and all three of these can vanish at once, which would otherwise hand a handful of tiny winning trades 0.65
       // of a full score for free. A thin sample is therefore discounted twice, once here on the unearned portion and
       // again by the sample-size constraint discounting the score as a whole, which is the intent.
-      val confidence = sampleConfidence(portfolio, config)
+      val confidence = sampleConfidence(portfolio, config.minTradesPerMonth, monthsCovered)
 
       def credited(target: Double): Double = target * confidence
 
@@ -129,13 +134,10 @@ object ScoringFunction {
         (0.175 * scaled(expectancyToLoss, config.targetExpectancyToLossRatio.value, maxScore = maxComponentScore))
     }
 
-    private def sampleConfidence(portfolio: OrderStats, config: Config): Double =
-      rampUp(portfolio.total.toDouble, 0.0, config.minClosedTrades.value.toDouble)
-
     private def profitableRatio(stats: List[OrderStats]): Double =
       stats.count(_.totalProfit > 0).toDouble / stats.size
 
-    private def constraints(portfolio: OrderStats, profitableRatio: Double, config: Config): List[Constraint] = {
+    private def constraints(portfolio: OrderStats, monthsCovered: Int, profitableRatio: Double, config: Config): List[Constraint] = {
       // With nothing earned before costs there is no share for them to be a fraction of, so the ratio is pinned at the
       // hard limit, which is where both readings of the constraint want it: a factor of 0.0 and a reported breach.
       val costRatio = if (portfolio.preCostProfit <= 0) BigDecimal(1) else portfolio.totalCosts / portfolio.preCostProfit
@@ -149,8 +151,8 @@ object ScoringFunction {
         Constraint(
           "closed trades",
           portfolio.total.toString,
-          s">= ${config.minClosedTrades.value}",
-          sampleConfidence(portfolio, config)
+          tradeFloorDescription(config.minTradesPerMonth, monthsCovered),
+          sampleConfidence(portfolio, config.minTradesPerMonth, monthsCovered)
         ),
         Constraint(
           "net profit",
@@ -197,24 +199,10 @@ object ScoringFunction {
     private val maxComponentScore = 3.0
 
     final case class Config(
-        // A year of trading across six pairs, so ~2 closed trades per pair-month.
-        //
-        // Deliberately low, and it costs something measurable. Swept against the out-of-sample year, the rank
-        // correlation between this score and what a strategy went on to earn rises with the floor: +0.23 here, +0.46 at
-        // 300, +0.57 at 500, peaking near +0.59 around 750 before falling away past 1000 as the top-ranked candidate
-        // becomes a high-frequency one whose costs eat its gross edge. At 150 the score is no better a predictor than
-        // `Robust` is.
-        //
-        // Set here anyway, because that sweep does not measure what it appears to. It ranks seventeen strategies that
-        // were already chosen, and most of the low-frequency ones happened to fail in this particular year, so a higher
-        // floor scores better largely by down-weighting that group wholesale. A floor high enough to exclude a class of
-        // strategy cannot help choose within it, and a low-frequency strategy is a legitimate thing to be looking for.
-        // What the floor would do inside a search is different again — there it is selection pressure towards trading
-        // more often, which is not what the sweep measured and is the failure mode the cost constraint exists for.
-        //
-        // The consequence to be aware of: at this floor the sample-size discount is satisfied by almost anything, so
-        // the pair-month constraints carry the weight, and those are the ones measured as weak.
-        minClosedTrades: PosInt = 150,
+        // Pooled across every dataset in the run, so ten a month between six pairs is under two per pair-month.
+        // Deliberately low: at this rate the sample-size discount is satisfied by almost anything, leaving the
+        // pair-month constraints below to carry the weight.
+        minTradesPerMonth: PosInt = 10,
         // Calendar months per period.
         //
         // One, and not because thin periods are ideal — at ~2 trades per pair-month, whether a given pair-month made
@@ -395,7 +383,7 @@ object ScoringFunction {
     }
 
     private def quality(portfolio: OrderStats, evidence: Evidence, config: Config): Double = {
-      val confidence = sampleConfidence(portfolio, config)
+      val confidence = sampleConfidence(portfolio, config.minTradesPerMonth, evidence.monthsCovered)
 
       def credited(target: Double): Double = target * confidence
 
@@ -417,18 +405,9 @@ object ScoringFunction {
         (0.150 * scaled(expectancyToLoss, config.targetExpectancyToLossRatio.value, maxScore = maxComponentScore))
     }
 
-    private def sampleConfidence(portfolio: OrderStats, config: Config): Double =
-      rampUp(portfolio.total.toDouble, 0.0, config.minClosedTrades.value.toDouble)
-
     private def profitableRatio(stats: List[OrderStats]): Double =
       stats.count(_.totalProfit > 0).toDouble / stats.size
 
-    /** Every calendar month the data covered, oldest first, including the ones no trade closed in.
-      *
-      * Falls back to the span of the trades when no window was recorded, which is what a caller assembling `OrderStats` by hand supplies.
-      * The fallback is the weaker measurement, because it cannot see a run that sat out either end of the sample; it is here to keep those
-      * callers working, not as an equivalent.
-      */
     /** Groups a monthly series into periods of `periodMonths`, from the start of the window forward so that the periods of every dataset in
       * a run line up with each other.
       *
@@ -447,33 +426,11 @@ object ScoringFunction {
       merged.map(_.sum)
     }
 
-    /** Every calendar month the run is answerable for, oldest first, including the ones no trade closed in.
-      *
-      * That means every month the data covered and every month a trade closed in, which are not the same set in either direction. The
-      * window can reach past the trades, which is the point of having it: a run that sat out the ends of its sample has to answer for those
-      * months. But a trade can also close past the window, because a position still open when the data runs out is liquidated at a mark
-      * stamped one interval after the final bar — so a run whose last bar is the last hour of a month realises that profit in the next one.
-      * Bounding the series by the window alone would drop it from the evidence while `totalProfit` went on counting it, leaving the pooled
-      * constraints and the period constraints disagreeing about what the run earned. Spanning the union is what makes it impossible for
-      * profit to exist outside the record.
-      *
-      * With no window recorded this degenerates to the span of the trades, which is what a caller assembling `OrderStats` by hand supplies.
-      * That is the weaker measurement, because it cannot see a run that sat out either end; it is here to keep those callers working, not
-      * as an equivalent.
+    /** What the run made in each month it is answerable for, oldest first. A month no trade closed in contributes a zero rather than being
+      * absent, which is what stops the breakdown flattering a candidate that traded in a burst.
       */
-    private def monthlyProfits(stats: OrderStats): List[BigDecimal] = {
-      val bounds = stats.completedTrades.map(_.closedAt) ::: stats.dataWindow.toList.flatMap(w => List(w.from, w.to))
-      bounds match
-        case Nil   => Nil
-        case times =>
-          val first = YearMonth.from(times.min.atZone(ZoneOffset.UTC))
-          val last  = YearMonth.from(times.max.atZone(ZoneOffset.UTC))
-          Iterator
-            .iterate(first)(_.plusMonths(1))
-            .takeWhile(!_.isAfter(last))
-            .map(period => stats.profitByMonth.getOrElse(period.toString, BigDecimal(0)))
-            .toList
-    }
+    private def monthlyProfits(stats: OrderStats): List[BigDecimal] =
+      coveredMonths(stats).map(month => stats.profitByMonth.getOrElse(month.toString, BigDecimal(0)))
 
     private def constraints(portfolio: OrderStats, evidence: Evidence, profitableRatio: Double, config: Config): List[Constraint] = {
       val costRatio = if (portfolio.preCostProfit <= 0) BigDecimal(1) else portfolio.totalCosts / portfolio.preCostProfit
@@ -487,8 +444,8 @@ object ScoringFunction {
         Constraint(
           "closed trades",
           portfolio.total.toString,
-          s">= ${config.minClosedTrades.value}",
-          sampleConfidence(portfolio, config)
+          tradeFloorDescription(config.minTradesPerMonth, evidence.monthsCovered),
+          sampleConfidence(portfolio, config.minTradesPerMonth, evidence.monthsCovered)
         ),
         Constraint(
           "months covered",
@@ -561,6 +518,45 @@ object ScoringFunction {
       )
     }
   }
+
+  /** Every calendar month a run is answerable for, oldest first, including the ones no trade closed in.
+    *
+    * That means every month the data covered and every month a trade closed in, which are not the same set in either direction. The window
+    * can reach past the trades, which is the point of having it: a run that sat out the ends of its sample has to answer for those months.
+    * But a trade can also close past the window, because a position still open when the data runs out is liquidated at a mark stamped one
+    * interval after the final bar — so a run whose last bar is the last hour of a month realises that profit in the next one. Bounding the
+    * series by the window alone would drop it from the evidence while `totalProfit` went on counting it, leaving the pooled constraints and
+    * the period constraints disagreeing about what the run earned. Spanning the union is what makes it impossible for profit to exist
+    * outside the record.
+    *
+    * With no window recorded this degenerates to the span of the trades, which is what a caller assembling `OrderStats` by hand supplies.
+    * That is the weaker measurement, because it cannot see a run that sat out either end; it is here to keep those callers working, not as
+    * an equivalent.
+    */
+  private def coveredMonths(stats: OrderStats): List[YearMonth] = {
+    val bounds = stats.completedTrades.map(_.closedAt) ::: stats.dataWindow.toList.flatMap(w => List(w.from, w.to))
+    bounds match
+      case Nil   => Nil
+      case times =>
+        val first = YearMonth.from(times.min.atZone(ZoneOffset.UTC))
+        val last  = YearMonth.from(times.max.atZone(ZoneOffset.UTC))
+        Iterator.iterate(first)(_.plusMonths(1)).takeWhile(!_.isAfter(last)).toList
+  }
+
+  /** The pooled trade count a run of this length was expected to produce, which is what the sample-size ramp measures against.
+    *
+    * Derived from the months the run covered rather than configured as a total, so that it cannot disagree with the length of the window it
+    * is applied to. As a total it did: a figure calibrated against a year silently doubles the frequency it demands the moment that year is
+    * split into halves, which is selection pressure towards trading more often and the failure mode the cost constraint exists to catch.
+    */
+  private def tradeFloor(minTradesPerMonth: PosInt, monthsCovered: Int): Double =
+    minTradesPerMonth.value.toDouble * monthsCovered
+
+  private def sampleConfidence(portfolio: OrderStats, minTradesPerMonth: PosInt, monthsCovered: Int): Double =
+    rampUp(portfolio.total.toDouble, 0.0, tradeFloor(minTradesPerMonth, monthsCovered))
+
+  private def tradeFloorDescription(minTradesPerMonth: PosInt, monthsCovered: Int): String =
+    f">= ${tradeFloor(minTradesPerMonth, monthsCovered)}%.0f (${minTradesPerMonth.value} per month over $monthsCovered months)"
 
   /** 0 at or below `floor`, 1 at or above `target`, linear in between. */
   private def rampUp(value: Double, floor: Double, target: Double): Double =

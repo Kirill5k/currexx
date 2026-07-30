@@ -85,8 +85,17 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       dataWindow = dataWindow
     )
 
+  /** Trades closing ten to the month, which is the rate both scoring functions ask for by default.
+    *
+    * `statsFor` spaces trades evenly, so its default of one a month puts every fixture built that way permanently below the trade floor.
+    * Cases about anything other than sample size need to clear it, and clearing it means trading at the rate rather than reaching some
+    * total: `months * 10` trades three days apart.
+    */
+  private def statsAtFloorRate(pair: CurrencyPair, monthlyProfit: BigDecimal, months: Int): OrderStats =
+    statsFor(pair, List.fill(months * 10)(monthlyProfit / 10), spacing = 3.days)
+
   private val permissiveConfig = ScoringFunction.Robust.Config(
-    minClosedTrades = 1,
+    minTradesPerMonth = 1,
     minProfitableDatasetRatio = 1.0,
     maxDrawdownPercent = 100.0
   )
@@ -97,13 +106,13 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
     }
 
     "assign positive fitness to a robust candidate" in {
-      val stats = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(10))))
+      val stats = pairs.map(pair => statsAtFloorRate(pair, BigDecimal(100), months = 5))
 
       ScoringFunction.Robust().score(stats) must be > 0.0
     }
 
     "credit metrics whose denominator is undefined with their target rather than zero" in {
-      val stats = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(10))))
+      val stats = pairs.map(pair => statsAtFloorRate(pair, BigDecimal(100), months = 5))
 
       // Never a drawdown, never a losing month and never a losing trade, so recovery factor, Sortino and
       // expectancy-to-loss are all undefined and each is worth exactly its target. That leaves net return (150
@@ -114,7 +123,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
 
     "withhold credit for a Sortino ratio that could never be measured" in {
       val scoring = ScoringFunction.Robust()
-      val spread  = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(10))))
+      val spread  = pairs.map(pair => statsAtFloorRate(pair, BigDecimal(100), months = 5))
       val burst   = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(10)), spacing = 1.hour))
 
       // Identical trades, profit and drawdown; the only difference is that the burst closed all 150 of them inside one
@@ -125,26 +134,32 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
     }
 
     "discount the credit for an undefined metric when the sample behind it is thin" in {
-      val stats = pairs.map(pair => statsFor(pair, List.fill(25)(BigDecimal(10))))
+      // Spread thin rather than simply few: 75 closed trades across fifteen months is half the 150 that rate asks of a
+      // run that long, so each of the three undefined metrics is credited half its target and scores 0.5 instead of
+      // 1.0, and the sample-size penalty halves the total again on top. Paying all three in full would hand 0.65 of a
+      // quality score to a candidate that was never really tested.
+      val stats = pairs.map(pair => statsFor(pair, List.fill(25)(BigDecimal(10)), spacing = 18.days))
 
-      // 75 closed trades is half of the 150 the config asks for, so each of the three undefined metrics is credited
-      // half its target and scores 0.5 instead of 1.0, and the sample-size penalty halves the total again on top.
-      // Paying all three in full would hand 0.65 of a quality score to a candidate that was never really tested.
       ScoringFunction.Robust().score(stats) mustBe 0.20625 +- 0.0001
     }
 
     "penalise rather than reject candidates with too few closed trades" in {
+      // Both ran for five months. One traded at the rate asked of it and the other at a third of it.
       val scoring = ScoringFunction.Robust()
-      val few     = pairs.map(pair => statsFor(pair, List.fill(10)(BigDecimal(10))))
-      val enough  = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(10))))
+      val few     = pairs.map(pair => statsFor(pair, List.fill(5)(BigDecimal(10)), spacing = 30.days))
+      val enough  = pairs.map(pair => statsAtFloorRate(pair, BigDecimal(100), months = 5))
 
       scoring.score(few) must be > 0.0
       scoring.score(few) must be < scoring.score(enough)
     }
 
     "increase fitness steadily as a candidate approaches the minimum trade count" in {
+      // A window fixes the run at twelve months however few trades land in it, so the floor stays at 120 across the
+      // whole sweep and the only thing moving is how close each candidate gets to it.
       val scoring = ScoringFunction.Robust()
-      val scores  = List(30, 60, 90, 120, 150).map(count => scoring.score(List(statsFor(pairs.head, List.fill(count)(BigDecimal(10))))))
+      val scores  = List(30, 60, 90, 120).map { count =>
+        scoring.score(List(statsFor(pairs.head, List.fill(count)(BigDecimal(10)), spacing = 3.days, dataWindow = fullYear)))
+      }
 
       // The whole point of ramping instead of gating: every one of these used to score exactly 0.0, leaving
       // selection with nothing to rank.
@@ -183,10 +198,8 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
 
     "penalise candidates above the maximum drawdown" in {
       val stats  = List(statsFor(pairs.head, List(BigDecimal(100), BigDecimal(-200), BigDecimal(200)), initialBalance = BigDecimal(1000)))
-      val config = permissiveConfig.copy(minClosedTrades = 3)
-
-      val within = ScoringFunction.Robust(config).score(stats)
-      val over   = ScoringFunction.Robust(config.copy(maxDrawdownPercent = 15.0)).score(stats)
+      val within = ScoringFunction.Robust(permissiveConfig).score(stats)
+      val over   = ScoringFunction.Robust(permissiveConfig.copy(maxDrawdownPercent = 15.0)).score(stats)
 
       over must be > 0.0
       over must be < within
@@ -198,10 +211,8 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
         statsFor(pairs(1), List(BigDecimal(-10))),
         statsFor(pairs(2), List(BigDecimal(-10)))
       )
-      val config = permissiveConfig.copy(minClosedTrades = 3)
-
-      val met       = ScoringFunction.Robust(config.copy(minProfitableDatasetRatio = 1.0 / 3.0)).score(stats)
-      val tooNarrow = ScoringFunction.Robust(config.copy(minProfitableDatasetRatio = 2.0 / 3.0)).score(stats)
+      val met       = ScoringFunction.Robust(permissiveConfig.copy(minProfitableDatasetRatio = 1.0 / 3.0)).score(stats)
+      val tooNarrow = ScoringFunction.Robust(permissiveConfig.copy(minProfitableDatasetRatio = 2.0 / 3.0)).score(stats)
 
       tooNarrow must be > 0.0
       tooNarrow must be < met
@@ -220,20 +231,20 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
     "favor stronger return and recovery when candidates are otherwise alike" in {
       val weaker   = List(statsFor(pairs.head, List(BigDecimal(20), BigDecimal(-10), BigDecimal(20))))
       val stronger = List(statsFor(pairs.head, List(BigDecimal(100), BigDecimal(-10), BigDecimal(100))))
-      val scoring  = ScoringFunction.Robust(permissiveConfig.copy(minClosedTrades = 3))
+      val scoring  = ScoringFunction.Robust(permissiveConfig)
 
       scoring.score(stronger) must be > scoring.score(weaker)
     }
 
     "allow exceptional candidates to exceed a fitness of one" in {
-      val stats = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(1000))))
+      val stats = pairs.map(pair => statsAtFloorRate(pair, BigDecimal(10000), months = 5))
 
       ScoringFunction.Robust().score(stats) must be > 1.0
     }
 
     "bound a runaway metric so a single axis cannot dominate fitness" in {
-      val strong  = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(1000))))
-      val extreme = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(1000000))))
+      val strong  = pairs.map(pair => statsAtFloorRate(pair, BigDecimal(10000), months = 5))
+      val extreme = pairs.map(pair => statsAtFloorRate(pair, BigDecimal(10000000), months = 5))
       val scoring = ScoringFunction.Robust()
 
       // A 1000x jump on the net-return axis buys about 0.03 of fitness, because the component is already deep into
@@ -245,9 +256,9 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
     }
 
     "keep ranking candidates a hard ceiling would have scored identically" in {
-      val good   = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(200))))
-      val better = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(400))))
-      val best   = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(800))))
+      val good   = pairs.map(pair => statsAtFloorRate(pair, BigDecimal(2000), months = 5))
+      val better = pairs.map(pair => statsAtFloorRate(pair, BigDecimal(4000), months = 5))
+      val best   = pairs.map(pair => statsAtFloorRate(pair, BigDecimal(8000), months = 5))
 
       // Net returns of 1.0, 2.0 and 4.0 against a 0.1 target are all past the point where a ceiling of
       // maxComponentScore used to flatten the component, which handed all three the same fitness of 1.7 and left
@@ -260,10 +271,12 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
   }
 
   "ScoringFunction.Consistent" should {
-    // Enough trades and periods by default that the sample-size and period-count ramps stay out of the way, leaving
-    // whichever consistency constraint a case is about as the only thing moving the score.
+    // One a month, which the fixtures below meet by trading once a month, so the sample-size and period-count ramps
+    // stay out of the way and whichever consistency constraint a case is about is the only thing moving the score.
+    // Cases that widen the window past the months traded have to trade denser than this to keep that true, since the
+    // added months raise the floor.
     val permissive = ScoringFunction.Consistent.Config(
-      minClosedTrades = 1,
+      minTradesPerMonth = 1,
       minMonthsCovered = 1,
       minProfitableDatasetRatio = 1.0,
       maxDrawdownPercent = 100.0
@@ -277,6 +290,22 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       val stats = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(10))))
 
       ScoringFunction.Consistent().score(stats) must be > 0.0
+    }
+
+    "scale the trade floor with the length of the run rather than demanding a fixed total" in {
+      // Both candidates traded at exactly one a month, so both fall equally short of a rate of two and neither is
+      // preferred for having been handed a longer window. A fixed total would have demanded as much of the six-month
+      // run as of the twelve-month one, which is the frequency requirement silently doubling whenever the data is
+      // halved — and halving the data is exactly what splitting a year into a training and a validation half does.
+      val scoring      = ScoringFunction.Consistent(permissive.copy(minTradesPerMonth = 2))
+      val sixMonths    = List(statsFor(pairs.head, List.fill(6)(BigDecimal(40))))
+      val twelveMonths = List(statsFor(pairs.head, List.fill(12)(BigDecimal(40))))
+
+      def tradeFloor(stats: List[OrderStats]): Option[String] =
+        scoring.violations(stats).find(_.constraint == "closed trades").map(_.required)
+
+      tradeFloor(sixMonths) mustBe Some(">= 12 (2 per month over 6 months)")
+      tradeFloor(twelveMonths) mustBe Some(">= 24 (2 per month over 12 months)")
     }
 
     "reject a candidate whose one profitable period pays for several losing ones" in {
@@ -358,10 +387,14 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       // .sortinoRatio cannot separate them: profitByMonth has no key for a month nothing closed in, so it measures
       // dispersion across the eight traded months either way, and disagrees with every constraint on this object about
       // what the run was.
-      val trades    = BigDecimal(-10) :: List.fill(7)(BigDecimal(40))
+      //
+      // Two trades a month rather than one, so that the four months the window adds cannot take the sample-size ramp
+      // down with them: at one a month the ramp would fall in the same direction as the axis under test and the
+      // assertion would hold without the Sortino difference contributing anything.
+      val trades    = List.fill(2)(BigDecimal(-10)) ::: List.fill(14)(BigDecimal(40))
       val scoring   = ScoringFunction.Consistent(permissive.copy(minProfitablePeriodRatio = 0.01))
-      val eightBusy = List(statsFor(pairs.head, trades))
-      val fourIdle  = List(statsFor(pairs.head, trades, dataWindow = fullYear))
+      val eightBusy = List(statsFor(pairs.head, trades, spacing = 16.days))
+      val fourIdle  = List(statsFor(pairs.head, trades, spacing = 16.days, dataWindow = fullYear))
 
       scoring.score(fourIdle) must be < scoring.score(eightBusy)
     }
@@ -445,7 +478,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
 
   "ScoringFunction.violations" should {
     "report nothing when every constraint is satisfied" in {
-      val stats = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(10))))
+      val stats = pairs.map(pair => statsAtFloorRate(pair, BigDecimal(100), months = 5))
 
       ScoringFunction.Robust().violations(stats) mustBe empty
     }
