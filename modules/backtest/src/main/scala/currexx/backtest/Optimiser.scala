@@ -25,18 +25,6 @@ final case class OptimisationRound(
     scoringFunction: ScoringFunction,
     trainingDataSets: List[Dataset],
     validationDataSets: List[Dataset],
-    /** How many of the finished population are replayed against `validationDataSets` and ranked on it.
-      *
-      * Small on purpose, and the reason the whole arrangement works. A run scores on the order of 10^5 candidates against its training
-      * data, and the best of 10^5 noisy readings of one sample is a large number whatever the scoring function is — which is why the winner
-      * of a search is not evidence. Ranking a shortlist of this size on data the search never saw is the same trick played at a scale where
-      * it costs almost nothing: the luckiest of 25 is barely luckier than the median of 25.
-      *
-      * Raising it is not free. Every extra finalist is another draw against the validation set, and the set is only as good as the number
-      * of times it has been consulted; take it far enough and the validation data has been searched over too, just more slowly. It belongs
-      * to the round rather than to the optimiser because that budget is spent against a particular validation set — two rounds sharing one
-      * set are consulting it between them, and only a per-round figure makes that visible where it is decided.
-      */
     shortlistSize: Int = 25
 )
 
@@ -179,9 +167,6 @@ object Optimiser extends IOApp.Simple {
     population.headOption match
       case None                   => tracker.displayNote(title, List("No candidates were evaluated."))
       case Some((champion, _, _)) =>
-        // `ValidatedPopulation` carries the two fitnesses and nothing else, so which constraints the champion breached
-        // on validation data is re-derived from one more replay rather than threaded through the population as a third
-        // element nothing but this report would read. One backtest, against a search that spent tens of thousands.
         validate(champion)
           .map(round.scoringFunction.violations)
           .flatMap(breaches => tracker.displayNote(title, verdict(round, population, breaches)))

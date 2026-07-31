@@ -18,17 +18,6 @@ import fs2.Stream
 
 object IndicatorObjective {
 
-  /** The two data-bound operators a run searches with, together with the backtests underneath them.
-    *
-    * They are built together because they are one thing seen twice: the same simulation, the same strategy and the same pool of services,
-    * run over two halves of the corpus that must not be confused with one another. Constructing the validator anywhere else would mean
-    * handing it a backtest assembled separately, and a validator pointed at the training half is not a validator — it is the search marking
-    * its own work, with nothing in any signature to say so.
-    *
-    * The raw backtests come back alongside the operators because fitness collapses a run to a single number and throws away the statistics
-    * it came from. A finished search can say nothing about its own champion beyond its score; replaying one indicator is how the result
-    * gets examined properly.
-    */
   final case class Operators[F[_]](
       evaluator: Evaluator[F, Indicator],
       validator: Validator[F, Indicator],
