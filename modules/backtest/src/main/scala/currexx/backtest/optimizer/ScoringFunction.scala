@@ -53,8 +53,16 @@ object ScoringFunction {
     private val maxComponentScore = 3.0
 
     final case class Config(
-        // Pooled across every dataset in the run, so ten a month between six pairs is under two per pair-month.
-        minTradesPerMonth: PosInt = 10,
+        // Per pair per month, multiplied up by `tradeFloor` into the pooled total the run has to reach, so that the
+        // threshold keeps its meaning however long the window and however many datasets the corpus holds. It was a
+        // pooled figure of ten, which over the six majors and their six-month training half meant under two per
+        // pair-month, and meant something different again the moment either number changed.
+        //
+        // Five, so that a month holds enough trades for the monthly return series the Sortino ratio is measured over
+        // to be something other than noise. Far above it the only candidates left are the ones trading often enough
+        // for costs to consume the edge, which is what maxCostToPreCostProfitRatio is left to catch; the two pull
+        // against each other on purpose.
+        minTradesPerMonth: PosInt = 5,
         minProfitableDatasetRatio: PositiveUnitInterval = 2.0 / 3.0,
         minProfitFactor: GreaterThanOne = 1.2,
         maxDrawdownPercent: PosDouble = 15.0,
@@ -92,26 +100,26 @@ object ScoringFunction {
           else {
             val portfolio = OrderStats.combine(stats)
             val months    = coveredMonths(portfolio).size
-            val discount  = constraints(portfolio, months, profitableRatio(stats), config).map(_.satisfaction).product
-            if (discount == 0.0) 0.0 else quality(portfolio, months, config) * discount
+            val discount  = constraints(portfolio, months, stats.size, profitableRatio(stats), config).map(_.satisfaction).product
+            if (discount == 0.0) 0.0 else quality(portfolio, months, stats.size, config) * discount
           }
 
         override def violations(stats: List[OrderStats]): List[Violation] =
           if (stats.isEmpty) List(Violation("dataset count", "0", "at least 1"))
           else {
             val portfolio = OrderStats.combine(stats)
-            constraints(portfolio, coveredMonths(portfolio).size, profitableRatio(stats), config).flatMap(_.violation)
+            constraints(portfolio, coveredMonths(portfolio).size, stats.size, profitableRatio(stats), config).flatMap(_.violation)
           }
       }
 
-    private def quality(portfolio: OrderStats, monthsCovered: Int, config: Config): Double = {
+    private def quality(portfolio: OrderStats, monthsCovered: Int, datasetCount: Int, config: Config): Double = {
       // A metric whose denominator vanished is undefined rather than bad — no drawdown to recover from, no losing
       // month, no losing trade — so it is credited with its target instead of being scored as zero. The credit is
       // worth only as much as the sample behind it: an absence of drawdown across five trades is evidence of nothing,
       // and all three of these can vanish at once, which would otherwise hand a handful of tiny winning trades 0.65
       // of a full score for free. A thin sample is therefore discounted twice, once here on the unearned portion and
       // again by the sample-size constraint discounting the score as a whole, which is the intent.
-      val confidence = sampleConfidence(portfolio, config.minTradesPerMonth, monthsCovered)
+      val confidence = sampleConfidence(portfolio, config.minTradesPerMonth, monthsCovered, datasetCount)
 
       def credited(target: Double): Double = target * confidence
 
@@ -137,7 +145,13 @@ object ScoringFunction {
     private def profitableRatio(stats: List[OrderStats]): Double =
       stats.count(_.totalProfit > 0).toDouble / stats.size
 
-    private def constraints(portfolio: OrderStats, monthsCovered: Int, profitableRatio: Double, config: Config): List[Constraint] = {
+    private def constraints(
+        portfolio: OrderStats,
+        monthsCovered: Int,
+        datasetCount: Int,
+        profitableRatio: Double,
+        config: Config
+    ): List[Constraint] = {
       // With nothing earned before costs there is no share for them to be a fraction of, so the ratio is pinned at the
       // hard limit, which is where both readings of the constraint want it: a factor of 0.0 and a reported breach.
       val costRatio = if (portfolio.preCostProfit <= 0) BigDecimal(1) else portfolio.totalCosts / portfolio.preCostProfit
@@ -151,8 +165,8 @@ object ScoringFunction {
         Constraint(
           "closed trades",
           portfolio.total.toString,
-          tradeFloorDescription(config.minTradesPerMonth, monthsCovered),
-          sampleConfidence(portfolio, config.minTradesPerMonth, monthsCovered)
+          tradeFloorDescription(config.minTradesPerMonth, monthsCovered, datasetCount),
+          sampleConfidence(portfolio, config.minTradesPerMonth, monthsCovered, datasetCount)
         ),
         Constraint(
           "net profit",
@@ -199,10 +213,18 @@ object ScoringFunction {
     private val maxComponentScore = 3.0
 
     final case class Config(
-        // Pooled across every dataset in the run, so ten a month between six pairs is under two per pair-month.
-        // Deliberately low: at this rate the sample-size discount is satisfied by almost anything, leaving the
-        // pair-month constraints below to carry the weight.
-        minTradesPerMonth: PosInt = 10,
+        // Per pair per month, multiplied up by `tradeFloor` into the pooled total the run has to reach, so that the
+        // threshold keeps its meaning however long the window and however many datasets the corpus holds. It was a
+        // pooled figure of ten, which over the six majors and their six-month training half meant under two per
+        // pair-month, and meant something different again the moment either number changed.
+        //
+        // Five, because every constraint below reads the record a month at a time, and the sign of a pair-month
+        // holding two trades is close to a coin flip: at that rate the profitable-pair-month ratio and the pair-month
+        // profit factor are counting noise whatever thresholds they are given, and the sample-size discount that was
+        // supposed to withhold judgement until there was a sample is satisfied by almost anything. Far above it the
+        // only candidates left are the ones trading often enough for costs to consume the edge, which is what
+        // maxCostToPreCostProfitRatio is left to catch; the two pull against each other on purpose.
+        minTradesPerMonth: PosInt = 5,
         // Calendar months per period.
         //
         // One, and not because thin periods are ideal — at ~2 trades per pair-month, whether a given pair-month made
@@ -282,6 +304,11 @@ object ScoringFunction {
       * asking about.
       */
     final private case class Evidence(perDataset: List[Series], pooled: Series, pooledBalance: BigDecimal, monthsCovered: Int) {
+
+      /** How many datasets the pooled figures were pooled over, which the trade floor needs so that widening the corpus cannot weaken it.
+        */
+      val datasetCount: Int = perDataset.size
+
       private val pairMonths: List[BigDecimal] = perDataset.flatMap(_.profits)
       private val gain: BigDecimal             = pairMonths.filter(_ > 0).sum
       private val loss: BigDecimal             = pairMonths.filter(_ < 0).map(_.abs).sum
@@ -383,7 +410,7 @@ object ScoringFunction {
     }
 
     private def quality(portfolio: OrderStats, evidence: Evidence, config: Config): Double = {
-      val confidence = sampleConfidence(portfolio, config.minTradesPerMonth, evidence.monthsCovered)
+      val confidence = sampleConfidence(portfolio, config.minTradesPerMonth, evidence.monthsCovered, evidence.datasetCount)
 
       def credited(target: Double): Double = target * confidence
 
@@ -444,8 +471,8 @@ object ScoringFunction {
         Constraint(
           "closed trades",
           portfolio.total.toString,
-          tradeFloorDescription(config.minTradesPerMonth, evidence.monthsCovered),
-          sampleConfidence(portfolio, config.minTradesPerMonth, evidence.monthsCovered)
+          tradeFloorDescription(config.minTradesPerMonth, evidence.monthsCovered, evidence.datasetCount),
+          sampleConfidence(portfolio, config.minTradesPerMonth, evidence.monthsCovered, evidence.datasetCount)
         ),
         Constraint(
           "months covered",
@@ -543,20 +570,26 @@ object ScoringFunction {
         Iterator.iterate(first)(_.plusMonths(1)).takeWhile(!_.isAfter(last)).toList
   }
 
-  /** The pooled trade count a run of this length was expected to produce, which is what the sample-size ramp measures against.
+  /** The pooled trade count a run of this shape was expected to produce, which is what the sample-size ramp measures against.
     *
-    * Derived from the months the run covered rather than configured as a total, so that it cannot disagree with the length of the window it
-    * is applied to. As a total it did: a figure calibrated against a year silently doubles the frequency it demands the moment that year is
-    * split into halves, which is selection pressure towards trading more often and the failure mode the cost constraint exists to catch.
+    * Derived from both the months the run covered and the datasets it was run against, rather than configured as a total, so that it cannot
+    * disagree with the shape of the corpus it is applied to. As a total it did, in both directions, because the count it is compared
+    * against is pooled over every dataset and every month while a fixed floor is pooled over neither.
+    *
+    * A figure calibrated against a year silently doubles the frequency it demands the moment that year is split into halves, which is
+    * selection pressure towards trading more often and the failure mode the cost constraint exists to catch. A figure calibrated against
+    * six pairs silently halves it the moment six become twelve, which is the only sample-size guard there is weakening by exactly the
+    * factor the corpus was widened by — at the one moment the corpus was widened in order to strengthen it.
     */
-  private def tradeFloor(minTradesPerMonth: PosInt, monthsCovered: Int): Double =
-    minTradesPerMonth.value.toDouble * monthsCovered
+  private def tradeFloor(minTradesPerMonth: PosInt, monthsCovered: Int, datasetCount: Int): Double =
+    minTradesPerMonth.value.toDouble * monthsCovered * datasetCount
 
-  private def sampleConfidence(portfolio: OrderStats, minTradesPerMonth: PosInt, monthsCovered: Int): Double =
-    rampUp(portfolio.total.toDouble, 0.0, tradeFloor(minTradesPerMonth, monthsCovered))
+  private def sampleConfidence(portfolio: OrderStats, minTradesPerMonth: PosInt, monthsCovered: Int, datasetCount: Int): Double =
+    rampUp(portfolio.total.toDouble, 0.0, tradeFloor(minTradesPerMonth, monthsCovered, datasetCount))
 
-  private def tradeFloorDescription(minTradesPerMonth: PosInt, monthsCovered: Int): String =
-    f">= ${tradeFloor(minTradesPerMonth, monthsCovered)}%.0f (${minTradesPerMonth.value} per month over $monthsCovered months)"
+  private def tradeFloorDescription(minTradesPerMonth: PosInt, monthsCovered: Int, datasetCount: Int): String =
+    f">= ${tradeFloor(minTradesPerMonth, monthsCovered, datasetCount)}%.0f " +
+      f"(${minTradesPerMonth.value} per pair-month over $monthsCovered months x $datasetCount pairs)"
 
   /** 0 at or below `floor`, 1 at or above `target`, linear in between. */
   private def rampUp(value: Double, floor: Double, target: Double): Double =

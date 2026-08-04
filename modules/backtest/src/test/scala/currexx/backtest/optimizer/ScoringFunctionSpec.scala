@@ -134,13 +134,13 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
     }
 
     "discount the credit for an undefined metric when the sample behind it is thin" in {
-      // Spread thin rather than simply few: 75 closed trades across fifteen months is half the 150 that rate asks of a
-      // run that long, so each of the three undefined metrics is credited half its target and scores 0.5 instead of
-      // 1.0, and the sample-size penalty halves the total again on top. Paying all three in full would hand 0.65 of a
-      // quality score to a candidate that was never really tested.
-      val stats = pairs.map(pair => statsFor(pair, List.fill(25)(BigDecimal(10)), spacing = 18.days))
+      // Spread thin rather than simply few: 90 closed trades across twelve months is half the 180 that rate asks of
+      // three pairs over a run that long, so each of the three undefined metrics is credited half its target and
+      // scores 0.5 instead of 1.0, and the sample-size penalty halves the total again on top. Paying all three in full
+      // would hand 0.65 of a quality score to a candidate that was never really tested.
+      val stats = pairs.map(pair => statsFor(pair, List.fill(30)(BigDecimal(10)), spacing = 12.days))
 
-      ScoringFunction.Robust().score(stats) mustBe 0.20625 +- 0.0001
+      ScoringFunction.Robust().score(stats) mustBe 0.215 +- 0.0001
     }
 
     "penalise rather than reject candidates with too few closed trades" in {
@@ -155,8 +155,9 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
 
     "increase fitness steadily as a candidate approaches the minimum trade count" in {
       // A window fixes the run at twelve months however few trades land in it, so the floor stays at 120 across the
-      // whole sweep and the only thing moving is how close each candidate gets to it.
-      val scoring = ScoringFunction.Robust()
+      // whole sweep and the only thing moving is how close each candidate gets to it. The rate is pinned rather than
+      // defaulted because one dataset at the default of two would put a floor of 24 below every count in the sweep.
+      val scoring = ScoringFunction.Robust(ScoringFunction.Robust.Config(minTradesPerMonth = 10))
       val scores  = List(30, 60, 90, 120).map { count =>
         scoring.score(List(statsFor(pairs.head, List.fill(count)(BigDecimal(10)), spacing = 3.days, dataWindow = fullYear)))
       }
@@ -304,8 +305,25 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       def tradeFloor(stats: List[OrderStats]): Option[String] =
         scoring.violations(stats).find(_.constraint == "closed trades").map(_.required)
 
-      tradeFloor(sixMonths) mustBe Some(">= 12 (2 per month over 6 months)")
-      tradeFloor(twelveMonths) mustBe Some(">= 24 (2 per month over 12 months)")
+      tradeFloor(sixMonths) mustBe Some(">= 12 (2 per pair-month over 6 months x 1 pairs)")
+      tradeFloor(twelveMonths) mustBe Some(">= 24 (2 per pair-month over 12 months x 1 pairs)")
+    }
+
+    "scale the trade floor with the number of datasets rather than demanding a fixed pooled total" in {
+      // The count the floor is compared against is pooled over every dataset, so a floor that ignores how many there
+      // are asks exactly as much of three pairs as of one. Both candidates here trade at the same rate per pair and
+      // fall equally short of it; without the dataset term the three-pair run would clear a floor built for one and
+      // the only sample-size guard there is would weaken by the factor the corpus was widened by — at the one moment
+      // it was widened in order to strengthen it.
+      val scoring    = ScoringFunction.Consistent(permissive.copy(minTradesPerMonth = 2))
+      val onePair    = List(statsFor(pairs.head, List.fill(6)(BigDecimal(40))))
+      val threePairs = pairs.map(pair => statsFor(pair, List.fill(6)(BigDecimal(40))))
+
+      def tradeFloor(stats: List[OrderStats]): Option[String] =
+        scoring.violations(stats).find(_.constraint == "closed trades").map(_.required)
+
+      tradeFloor(onePair) mustBe Some(">= 12 (2 per pair-month over 6 months x 1 pairs)")
+      tradeFloor(threePairs) mustBe Some(">= 36 (2 per pair-month over 6 months x 3 pairs)")
     }
 
     "reject a candidate whose one profitable period pays for several losing ones" in {
