@@ -5,7 +5,7 @@ import cats.syntax.foldable.*
 import currexx.algorithms.{Parameters, ValidatedPopulation}
 import currexx.algorithms.operators.{Elitism, Selector}
 import currexx.algorithms.progress.Tracker
-import currexx.backtest.MarketDataProvider.Dataset
+import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.optimizer.{
   IndicatorCrossover,
   IndicatorInitialiser,
@@ -23,8 +23,7 @@ final case class OptimisationRound(
     strategy: TestStrategy,
     gaParameters: Parameters.GA,
     scoringFunction: ScoringFunction,
-    trainingDataSets: List[Dataset],
-    validationDataSets: List[Dataset],
+    corpus: Corpus = MarketDataProvider.majors1hCorpus,
     shortlistSize: Int = 25
 )
 
@@ -52,177 +51,121 @@ object Optimiser extends IOApp.Simple {
       name = "s1_optimized",
       strategy = TestStrategy.s1_optimized,
       gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s1_optimized_shuffle",
       strategy = TestStrategy.s1_optimized,
       gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s1_v2",
       strategy = TestStrategy.s1_v2,
       gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s1_v2_shuffle",
       strategy = TestStrategy.s1_v2,
       gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s1_v2_optimized_v2",
       strategy = TestStrategy.s1_v2_optimized_v2,
       gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s1_v2_optimized_v2_shuffle",
       strategy = TestStrategy.s1_v2_optimized_v2,
       gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s2",
       strategy = TestStrategy.s2,
       gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s2_shuffle",
       strategy = TestStrategy.s2,
       gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s2_optimized_v2",
       strategy = TestStrategy.s2_optimized_v2,
       gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s2_optimized_v2_shuffle",
       strategy = TestStrategy.s2_optimized_v2,
       gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s4_optimized",
       strategy = TestStrategy.s4_optimized,
       gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s4_optimized_shuffle",
       strategy = TestStrategy.s4_optimized,
       gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s4_regime_optimized_v2",
       strategy = TestStrategy.s4_regime_optimized_v2,
       gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s4_regime_optimized_v2_shuffle",
       strategy = TestStrategy.s4_regime_optimized_v2,
       gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s5_optimized_v2",
       strategy = TestStrategy.s5_optimized_v2,
       gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s5_optimized_v2_shuffle",
       strategy = TestStrategy.s5_optimized_v2,
       gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
-    ),
-    OptimisationRound(
-      name = "s5_optimized_v2",
-      strategy = TestStrategy.s5_optimized_v2,
-      gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
-    ),
-    OptimisationRound(
-      name = "s5_optimized_v2_shuffle",
-      strategy = TestStrategy.s5_optimized_v2,
-      gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s12",
       strategy = TestStrategy.s12,
       gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s12_shuffle",
       strategy = TestStrategy.s12,
       gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s12_optimized",
       strategy = TestStrategy.s12_optimized,
       gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s12_optimized_shuffle",
       strategy = TestStrategy.s12_optimized,
       gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      trainingDataSets = MarketDataProvider.majors1hTraining,
-      validationDataSets = MarketDataProvider.majors1hValidation
+      scoringFunction = consistentScoring
     )
   )
 
@@ -235,11 +178,10 @@ object Optimiser extends IOApp.Simple {
         sel   <- Selector.tournament[IO, Indicator]
         elit  <- Elitism.simple[IO, Indicator]
         obj   <- IndicatorObjective.make[IO](
-          trainingData = round.trainingDataSets,
+          corpus = round.corpus,
           strategy = round.strategy.rules,
           poolSize = evaluatorPoolSize,
           shortlistSize = round.shortlistSize,
-          validationData = round.validationDataSets,
           scoringFunction = round.scoringFunction
         )
         markDownProg <- Tracker.markdown[IO, Indicator](
@@ -309,11 +251,7 @@ object Optimiser extends IOApp.Simple {
     val retained                                         =
       if (championTraining.value > 0.0) f"${championValidation.value / championTraining.value * 100}%.1f%%" else "n/a"
 
-    val datasets = List(
-      s"Trained on ${round.trainingDataSets.size} dataset(s): ${round.trainingDataSets.mkString(", ")}",
-      s"Validated on ${round.validationDataSets.size} dataset(s): ${round.validationDataSets.mkString(", ")}",
-      ""
-    )
+    val datasets = round.corpus.describe :+ ""
 
     val outcome =
       if (championValidation.value <= 0.0)

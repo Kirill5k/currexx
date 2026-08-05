@@ -7,7 +7,8 @@ import currexx.backtest.MarketDataProvider.Dataset
 import currexx.domain.market.{CurrencyPair, Interval, PriceRange}
 import kirill5k.common.cats.test.IOWordSpec
 
-import java.time.Instant
+import java.time.temporal.ChronoUnit
+import java.time.{Instant, ZoneOffset}
 
 class MarketDataProviderSpec extends IOWordSpec {
 
@@ -24,8 +25,11 @@ class MarketDataProviderSpec extends IOWordSpec {
   private def tradedBars(dataset: Dataset): IO[List[Instant]] =
     MarketDataProvider.read[IO](dataset).compile.toList.map(_.map(_.latestTime))
 
+  /** The calendar months a run of bars touched, oldest first. */
+  private def monthsOf(bars: List[Instant]): List[String] = bars.map(_.toString.take(7)).distinct.sorted
+
   /** An export and what its first bar and length are, so that every export is held to the same expectations. */
-  private final case class Export(filePath: String, firstBar: Instant, firstClose: Double, bars: Int)
+  final private case class Export(filePath: String, firstBar: Instant, firstClose: Double, bars: Int)
 
   private val exports = List(
     Export("eur-usd-1h-1year.csv", Instant.parse("2024-07-01T00:00:00Z"), 1.07456, 6113),
@@ -69,41 +73,93 @@ class MarketDataProviderSpec extends IOWordSpec {
         }
   }
 
-  "MarketDataProvider training and validation segments" should {
+  "MarketDataProvider search folds" should {
 
-    "split the older export into two halves that share no bar" in
-      // A single bar in both halves is a single bar of the champion's evidence that the search was allowed to fit, and
-      // there is nothing downstream that would notice.
-      (tradedBars(MarketDataProvider.majors1hTraining.head), tradedBars(MarketDataProvider.majors1hValidation.head)).parTupled
-        .asserting { case (training, validation) =>
-          training.toSet.intersect(validation.toSet) mustBe empty
-          training.max.isBefore(validation.min) mustBe true
+    "carve the corpus into segments that share no bar" in
+      // A single bar in two folds is one stretch of market counted twice in the aggregate, and a candidate fitted to it
+      // rewarded twice. A single bar shared with the validation segment is a bar of the champion's evidence that the
+      // search was allowed to fit, and there is nothing downstream that would notice either.
+      (MarketDataProvider.majors1hSearchFolds.map(_.head) :+ MarketDataProvider.majors1hValidationFold.head)
+        .parTraverse(tradedBars)
+        .asserting { segments =>
+          segments.combinations(2).foreach(pair => pair.head.toSet.intersect(pair.last.toSet) mustBe empty)
+          segments.sliding(2).foreach {
+            case List(earlier, later) => earlier.max.isBefore(later.min) mustBe true
+            case _                    => succeed
+          }
+          succeed
         }
 
-    "give each half the six calendar months it is scored over" in {
-      // Six because the consistency thresholds a candidate is scored against are counted in months, and a validation
-      // half shorter than `minMonthsCovered` would report a breach against every candidate alike.
-      val monthsOf = (bars: List[Instant]) => bars.map(_.toString.take(7)).distinct.sorted
-
-      (tradedBars(MarketDataProvider.majors1hTraining.head), tradedBars(MarketDataProvider.majors1hValidation.head)).parTupled
-        .asserting { case (training, validation) =>
-          monthsOf(training) mustBe List("2024-07", "2024-08", "2024-09", "2024-10", "2024-11", "2024-12")
-          monthsOf(validation) mustBe List("2025-01", "2025-02", "2025-03", "2025-04", "2025-05", "2025-06")
+    "give every segment the calendar months it is scored over" in
+      // Every consistency threshold is counted in months, so each of them is measured on less as a segment shortens.
+      // Four, which divides a twelve-month export into exactly three folds and gives the validation segment the same
+      // length, so the thresholds mean the same thing on both.
+      (MarketDataProvider.majors1hSearchFolds.map(_.head) :+ MarketDataProvider.majors1hValidationFold.head)
+        .parTraverse(dataset => tradedBars(dataset).map(monthsOf))
+        .asserting { segments =>
+          segments mustBe List(
+            List("2024-07", "2024-08", "2024-09", "2024-10"),
+            List("2024-11", "2024-12", "2025-01", "2025-02"),
+            List("2025-03", "2025-04", "2025-05", "2025-06"),
+            List("2025-08", "2025-09", "2025-10", "2025-11")
+          )
         }
-    }
 
-    "carry the bars preceding a segment into it as history rather than spending its own on warm-up" in {
-      // The validation half opens on the first bar of January with a hundred bars of December already behind it, so a
-      // candidate is judged on every month it was given. Filtering rows before the windows were formed would instead
-      // start it a hundred bars into January, and the same bar would produce different indicator values depending on
-      // which segment it had been read into.
-      val dataset = MarketDataProvider.majors1hValidation.head
-
-      MarketDataProvider.read[IO](dataset).head.compile.lastOrError.asserting { first =>
-        first.latestTime.toString must startWith("2025-01-01")
-        first.prices.size mustBe 100
-        first.prices.last.time.isBefore(Instant.parse("2025-01-01T00:00:00Z")) mustBe true
+    "hold back a segment that the search never reads" in
+      // The folds are scored against and the validation segment ranks the shortlist, so both are spent by the time a
+      // round ends. This is what is left to say whether the champion generalises, and it only says it once.
+      tradedBars(MarketDataProvider.majors1hHoldout.head).map(monthsOf).asserting {
+        _ mustBe List("2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06")
       }
+
+    "open every segment that has history behind it on its own first month" in {
+      // The defect this exists to catch is silent. `read` windows the whole file and keeps the windows whose newest bar
+      // lands in the segment, so a segment starting mid-file inherits its 99 bars of history free and is offered every
+      // bar it owns. Lose that and it would spend its own first hundred bars becoming a window instead, and the month
+      // labels above could not tell: the truncated month is still the month it always was, and `coveredMonths` bills it
+      // in full either way. Every scored segment but the oldest fold starts mid-file; that one is asserted below.
+      val scored = MarketDataProvider.majors1hSearchFolds.tail.map(_.head) :::
+        List(MarketDataProvider.majors1hValidationFold.head, MarketDataProvider.majors1hHoldout.head)
+
+      scored
+        .parTraverse(dataset => MarketDataProvider.read[IO](dataset).head.compile.lastOrError.map(dataset -> _))
+        .asserting { opened =>
+          opened.foreach { case (dataset, first) =>
+            val segmentStart = dataset.range.get.from.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant
+            withClue(s"$dataset: ") {
+              // A full window, drawn from before the segment rather than out of it.
+              first.prices.size mustBe 100
+              first.prices.last.time.isBefore(segmentStart) mustBe true
+              // And the first bar actually offered is the segment's own opening bar, not one a week into it. Three days
+              // of slack because a month can open on a weekend, when the market is shut and the export has no rows.
+              first.latestTime.isBefore(segmentStart.plus(3, ChronoUnit.DAYS)) mustBe true
+            }
+          }
+          succeed
+        }
     }
+
+    "spend the oldest fold's first hundred bars on its first window rather than a month of the export" in
+      // The accepted cost of scoring all twelve months: the first fold opens on the file's first bar, so it has no
+      // history to inherit and its first hundred bars — five days of July, which `coveredMonths` still bills as a whole
+      // month — never reach a strategy. The alternative is handing a whole month of a twelve-month export to warm-up for
+      // the sake of the 99 bars `read` actually needs, which costs a quarter of a fold to save five days of one.
+      //
+      // It is tolerable only here: it understates rather than flatters, and it lands on a search fold. On the segment
+      // that ranks the shortlist it would bias the one measurement the whole split exists to keep clean, which is why
+      // the validation fold still opens a month into its own file.
+      MarketDataProvider.majors1hSearchFolds.head
+        .parTraverse(dataset => MarketDataProvider.read[IO](dataset).head.compile.lastOrError.map(dataset -> _))
+        .asserting { opened =>
+          opened.foreach { case (dataset, first) =>
+            withClue(s"$dataset: ") {
+              first.prices.size mustBe 100
+              // Every bar of the window comes out of the fold itself, there being nothing before it.
+              first.prices.last.time mustBe Instant.parse("2024-07-01T00:00:00Z")
+              first.latestTime mustBe Instant.parse("2024-07-05T03:00:00Z")
+            }
+          }
+          succeed
+        }
   }
 }

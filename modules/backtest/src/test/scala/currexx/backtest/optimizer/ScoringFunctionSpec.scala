@@ -329,7 +329,8 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
     "reject a candidate whose one profitable period pays for several losing ones" in {
       // Eleven months losing 10 each and a twelfth making 500: net profit of 390 across the year, a profit factor
       // above 4, and every pooled figure Robust reads looks healthy. Judged period by period it is one win against
-      // eleven losses, which is the shape this scoring function exists to refuse.
+      // eleven losses, which is the shape this scoring function exists to refuse. The median period is what refuses it —
+      // concentration only discounts, so a single winning month cannot be disqualifying on its own.
       val compensated = List(statsFor(pairs.head, List.fill(11)(BigDecimal(-10)) :+ BigDecimal(500)))
       val steady      = List(statsFor(pairs.head, List.fill(12)(BigDecimal(30))))
 
@@ -358,7 +359,8 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
 
     "penalise profit concentrated in a single period" in {
       // Nine profitable months out of twelve either way, so the profitable-period ratio and the median are identical;
-      // the only difference is how much of the winnings the best month accounts for.
+      // the only difference is how much of the winnings the best month accounts for. It discounts and never disqualifies:
+      // total concentration costs half the score, not all of it.
       val spread       = List(statsFor(pairs.head, List.fill(3)(BigDecimal(-5)) ::: List.fill(9)(BigDecimal(40))))
       val concentrated = List(statsFor(pairs.head, List.fill(3)(BigDecimal(-5)) ::: (List.fill(8)(BigDecimal(5)) :+ BigDecimal(320))))
       val scoring      = ScoringFunction.Consistent(permissive)
@@ -366,6 +368,31 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       scoring.score(concentrated) must be > 0.0
       scoring.score(concentrated) must be < scoring.score(spread)
       scoring.violations(concentrated).map(_.constraint) must contain("most concentrated pair's best month")
+    }
+
+    "discount rather than annihilate a candidate carried by one period in one pair" in {
+      // The shape that made every promoted strategy score exactly zero. A pair with one winning period has a share of
+      // 1.0 and no way to do better, so zeroing there wiped the whole fold on the strength of one pair out of six — and
+      // through the product over folds, the whole run.
+      val scoring  = ScoringFunction.Consistent(permissive)
+      val steady   = pairs.take(2).map(pair => statsFor(pair, List.fill(6)(BigDecimal(40))))
+      val oneMonth =
+        statsFor(pairs(2), List(BigDecimal(-1), BigDecimal(-1), BigDecimal(30), BigDecimal(-1), BigDecimal(-1), BigDecimal(-1)))
+
+      scoring.score(steady :+ oneMonth) must be > 0.0
+      scoring.violations(steady :+ oneMonth).map(_.constraint) must contain("most concentrated pair's best month")
+    }
+
+    "scale the concentration limit to the periods there were" in {
+      // The same 0.75 share of the winnings in the best period. Over twelve months that is one month carrying the pair;
+      // over three it is barely worse than the 0.333 an even split forces, and a limit calibrated on a year would reject
+      // every candidate a three-month fold could produce.
+      val scoring      = ScoringFunction.Consistent(permissive)
+      val threeMonths  = List(statsFor(pairs.head, List(BigDecimal(10), BigDecimal(30), BigDecimal(-1))))
+      val twelveMonths = List(statsFor(pairs.head, List.fill(5)(BigDecimal(-2)) ::: (List.fill(6)(BigDecimal(20)) :+ BigDecimal(360))))
+
+      scoring.violations(threeMonths).map(_.constraint) must not contain "most concentrated pair's best month"
+      scoring.violations(twelveMonths).map(_.constraint) must contain("most concentrated pair's best month")
     }
 
     "count the periods a candidate traded through, not the ones it traded in" in {
@@ -437,6 +464,26 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       scoring.violations(liquidatedOut).map(_.constraint) must contain("profitable pair-months")
     }
 
+    "bill the trade floor for the months of data, not the month a final position spilled into" in {
+      // The other half of the case above. The profit series has to span April, because that is where the liquidated
+      // position realised its loss; the trade floor must not, or three months of data are billed for a fourth month's
+      // trades. The second assertion is the one that matters: it pins that "months covered" still reads the union, so the
+      // two month counts cannot later be collapsed back into one.
+      val window  = Some(DataWindow(start, Instant.parse("2025-03-31T23:00:00Z")))
+      val scoring = ScoringFunction.Consistent(permissive.copy(minTradesPerMonth = 10, minMonthsCovered = 20))
+      val trades  = List(
+        BigDecimal(40)  -> Instant.parse("2025-01-15T00:00:00Z"),
+        BigDecimal(40)  -> Instant.parse("2025-02-15T00:00:00Z"),
+        BigDecimal(40)  -> Instant.parse("2025-03-15T00:00:00Z"),
+        BigDecimal(-30) -> Instant.parse("2025-04-01T00:01:40Z")
+      )
+      val stats = List(statsClosingAt(pairs.head, trades, window))
+
+      scoring.violations(stats).find(_.constraint == "closed trades").map(_.required) mustBe
+        Some(">= 30 (10 per pair-month over 3 months x 1 pairs)")
+      scoring.violations(stats).find(_.constraint == "months covered").map(_.actual) mustBe Some("4 months")
+    }
+
     "merge a part-period remainder into the last full period rather than scoring it as a period" in {
       // Thirteen months at three months to the period leaves one month over. Standing alone that month is a period
       // holding a third of the profit a period is measured against, and here it is also the only losing month: as its
@@ -454,7 +501,8 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       // Pooled, every month of the year made 10 and the record is spotless. Pair by pair, half of the twenty-four
       // pair-months lost money: one pair earned steadily and the other bled steadily, and pooling before splitting into
       // months is what hides it. The dataset constraint does not catch this, because it only asks whether each pair's
-      // year was profitable overall, which is a much weaker question.
+      // year was profitable overall, which is a much weaker question. The bleeding pair never won a month, so it has no
+      // concentration to report — an absence of winnings is not a concentrated one.
       val scoring    = ScoringFunction.Consistent(permissive.copy(minProfitableDatasetRatio = 0.5))
       val offsetting = List(
         statsFor(pairs(0), List.fill(12)(BigDecimal(50))),
@@ -465,8 +513,10 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
         statsFor(pairs(1), List.fill(12)(BigDecimal(10)))
       )
 
+      scoring.score(offsetting) must be > 0.0
       scoring.score(offsetting) must be < scoring.score(bothSteady)
       scoring.violations(offsetting).map(_.constraint) must contain("profitable pair-months")
+      scoring.violations(offsetting).map(_.constraint) must not contain "most concentrated pair's best month"
       scoring.violations(bothSteady).map(_.constraint) must not contain "profitable pair-months"
     }
 

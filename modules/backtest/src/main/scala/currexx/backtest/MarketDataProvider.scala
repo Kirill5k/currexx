@@ -12,9 +12,8 @@ object MarketDataProvider:
 
   /** A half-open span of calendar months, `[from, until)`, used to carve one export into disjoint segments.
     *
-    * Months rather than instants because everything downstream that judges consistency counts calendar months, so a boundary falling
-    * mid-month would hand the segments either side of it a stub month that was never offered a full month's trading and is then scored as
-    * though it had been.
+    * Months rather than instants because everything downstream counts calendar months: a mid-month boundary would hand the segments either
+    * side of it a stub month, scored as though it had been offered a full month's trading.
     */
   final case class DateRange(from: YearMonth, until: YearMonth) {
     private val fromTime  = from.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant
@@ -26,13 +25,35 @@ object MarketDataProvider:
 
   /** One export, optionally narrowed to a segment of it.
     *
-    * The segment travels with the path rather than being applied by the caller, because the whole point of the split is that a search must
-    * not see the data its champion is judged on. A `List[String]` of paths cannot express which part of a file a run is entitled to, so
-    * nothing stops the wrong slice being passed; this can only be got wrong by naming the wrong value.
+    * The segment travels with the path rather than being applied by the caller: a bare `List[String]` cannot express which part of a file a
+    * run is entitled to, so nothing would stop a search seeing the data its champion is judged on.
     */
   final case class Dataset(filePath: String, range: Option[DateRange] = None) {
-    def currencyPair: CurrencyPair = cpFromFilePath(filePath)
-    override def toString: String  = range.fold(filePath)(r => s"$filePath[$r]")
+    def currencyPair: CurrencyPair = {
+      val cpStr = filePath.slice(0, 7).replaceAll("-", "").toUpperCase()
+      CurrencyPair.from(cpStr).toOption.getOrElse(throw new IllegalArgumentException(s"Invalid currency pair in file path: $filePath"))
+    }
+    def interval: Interval        = if (filePath.contains("1h")) Interval.H1 else Interval.D1
+    override def toString: String = range.fold(filePath)(r => s"$filePath[$r]")
+  }
+
+  /** The data one search is entitled to: the segments it may score against, and the one segment its finalists are ranked on.
+    *
+    * The two travel together because the split between them is the only thing that makes a champion's validation figure mean anything, and
+    * a caller holding them as separate arguments can pass the same segments twice — a search scored on its own ranking data, then reported
+    * as though it had been held out.
+    *
+    * The holdout is deliberately not here. Anything a search is handed is something a search can read, and the holdout is only worth having
+    * for as long as nothing has selected against it.
+    */
+  final case class Corpus(searchFolds: List[List[Dataset]], validationFold: List[Dataset] = Nil) {
+    def foldCount: Int = searchFolds.size
+
+    /** How a round's corpus is written into its report, so the shape of a split is described where the split is defined. */
+    def describe: List[String] =
+      searchFolds.zipWithIndex.map { case (fold, index) =>
+        s"Searched fold ${index + 1} of $foldCount, ${fold.size} dataset(s): ${fold.mkString(", ")}"
+      } :+ s"Ranked finalists on ${validationFold.size} dataset(s): ${validationFold.mkString(", ")}"
   }
 
   private val majorFiles1h = List(
@@ -65,22 +86,60 @@ object MarketDataProvider:
     */
   val majors1h_202507_202606: List[Dataset] = majorFiles1h_202507_202606.map(Dataset(_))
 
-  // The older export split down the middle, six months each way. July 2024 is a partial month, because the data starts
-  // on the 7th; it is left in the training half, where a short month costs nothing, rather than in the half that has to
-  // answer for what it earned per month.
-  private val trainingRange   = DateRange(YearMonth.of(2024, 7), YearMonth.of(2025, 1))
-  private val validationRange = DateRange(YearMonth.of(2025, 1), YearMonth.of(2025, 7))
-
-  /** The half a search is allowed to score against. */
-  val majors1hTraining: List[Dataset] = majorFiles1h.map(f => Dataset(f, Some(trainingRange)))
-
-  /** The half a search's finalists are ranked on, having never been scored against during the search itself.
+  /** How many calendar months one scored segment holds.
     *
-    * Six months rather than a token slice, so that the same consistency thresholds a candidate was scored against still mean something
-    * here: a validation segment shorter than `minMonthsCovered` would discount every candidate identically and report a breach none of them
-    * could have avoided.
+    * Four, which divides each twelve-month export into exactly three folds. Every consistency threshold is counted in months, so a shorter
+    * segment measures each of them on less: at three months a pair contributes only three monthly buckets, and the counting statistics over
+    * so few are nothing like the same statistics over a year.
     */
-  val majors1hValidation: List[Dataset] = majorFiles1h.map(f => Dataset(f, Some(validationRange)))
+  val segmentMonths: Int = 4
+
+  /** One export carved into contiguous segments of `segmentMonths`, oldest first, each carrying every pair.
+    *
+    * Non-overlapping, because the segments are meant to be separate pieces of evidence: a bar in two of them is one stretch of market
+    * counted twice, and a candidate fitted to it rewarded twice.
+    */
+  private def segmentsOf(files: List[String], from: YearMonth, until: YearMonth): List[List[Dataset]] =
+    Iterator
+      .iterate(from)(_.plusMonths(segmentMonths))
+      .takeWhile(start => !start.plusMonths(segmentMonths).isAfter(until))
+      .map(start => files.map(f => Dataset(f, Some(DateRange(start, start.plusMonths(segmentMonths))))))
+      .toList
+
+  /** The segments a search is allowed to score against, oldest first: the whole of the older export, three folds of four months.
+    *
+    * More than one on purpose. A candidate scored on a single stretch of market can win by fitting that stretch, and nothing in the fitness
+    * tells that apart from an edge; scored across time-disjoint stretches it has to hold up in each. This does not make the fitness
+    * out-of-sample — anything a search scores against is in-sample by definition — it makes one a single well-fitted regime cannot satisfy.
+    *
+    * The first fold opens on the file's first bar, so its first hundred bars are spent forming the first window and never offered, while
+    * `coveredMonths` still bills that month whole. Five days of a four-month fold, and the alternative is giving a whole month of a
+    * twelve-month export to warm-up — `read` needs exactly 99 bars of history and every window it emits holds 100.
+    */
+  val majors1hSearchFolds: List[List[Dataset]] = segmentsOf(majorFiles1h, YearMonth.of(2024, 7), YearMonth.of(2025, 7))
+
+  /** The segment a search's finalists are ranked on, having never been scored against during the search itself.
+    *
+    * Drawn from the newer export, so it is a later regime than any fold rather than a later slice of the same one, and the same length as a
+    * fold, so the month-counted thresholds mean the same thing on both and training and validation fitness stay comparable. It opens a
+    * month into its file, so `read` hands it a full window of prior history.
+    */
+  val majors1hValidationFold: List[Dataset] = {
+    val start = YearMonth.of(2025, 8)
+    segmentsOf(majorFiles1h_202507_202606, start, start.plusMonths(segmentMonths)).head
+  }
+
+  /** The split every round searches against, which is why no round names its own. */
+  val majors1hCorpus: Corpus = Corpus(majors1hSearchFolds, majors1hValidationFold)
+
+  /** The last seven months, which nothing in `Optimiser` reads.
+    *
+    * The folds and the validation segment are both spent by the time a round finishes, so neither can say whether the champion generalises.
+    * This is what is left to say it, and it says it once: measuring a strategy here is fine, choosing between strategies here is selection,
+    * and there is no more data to check that against.
+    */
+  val majors1hHoldout: List[Dataset] =
+    majorFiles1h_202507_202606.map(f => Dataset(f, Some(DateRange(YearMonth.of(2025, 12), YearMonth.of(2026, 7)))))
 
   /** The two CSV exports under resources, which differ in three ways at once.
     *
@@ -105,15 +164,8 @@ object MarketDataProvider:
   // rather than the other way round keeps a backtest over the old files reporting exactly the numbers it always has.
   private val utcVolumeToLegacyScale = 1_000_000.0
 
-  def cpFromFilePath(filePath: String): CurrencyPair =
-    val cpStr = filePath.slice(0, 7).replaceAll("-", "").toUpperCase()
-    CurrencyPair.from(cpStr).toOption.getOrElse(throw new IllegalArgumentException(s"Invalid currency pair in file path: $filePath"))
-
-  def read[F[_]: Async](dataset: Dataset): Stream[F, MarketTimeSeriesData] = {
-    val filePath = dataset.filePath
-    val interval = if (filePath.contains("1h")) Interval.H1 else Interval.D1
-    val cp       = cpFromFilePath(filePath)
-    readClassResource[F, MarketDataProvider.type](s"/$filePath")
+  def read[F[_]: Async](dataset: Dataset): Stream[F, MarketTimeSeriesData] =
+    readClassResource[F, MarketDataProvider.type](s"/${dataset.filePath}")
       .through(text.utf8.decode)
       .through(text.lines)
       .drop(1)
@@ -131,10 +183,9 @@ object MarketDataProvider:
         )
       }
       .sliding(100)
-      .map(_.toNel.map(prices => MarketTimeSeriesData(cp, interval, prices.reverse, "csv")))
+      .map(_.toNel.map(prices => MarketTimeSeriesData(dataset.currencyPair, dataset.interval, prices.reverse, "csv")))
       .unNone
       .filter(data => dataset.range.forall(_.contains(data.latestTime)))
-  }
 
   private def parseDateTime(dateTimeStr: String, format: CsvFormat): Instant =
     format match
