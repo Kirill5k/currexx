@@ -36,7 +36,11 @@ object IndicatorInitialiser:
         case Indicator.TrendChangeDetection(vs, vt) =>
           Indicator.TrendChangeDetection(vs, randomiseVt(vt))
         case Indicator.ThresholdCrossing(vs, vt, _, _) =>
-          Indicator.ThresholdCrossing(vs, randomiseVt(vt), rand.nextInt(49) + 50, rand.nextInt(49) + 1)
+          val randomisedVt = randomiseVt(vt)
+          val band         = ThresholdBounds.of(randomisedVt)
+          val ub           = band.upperMin + rand.nextDouble() * (band.upperMax - band.upperMin)
+          val lb           = band.lowerMin + rand.nextDouble() * (ub - band.lowerMin)
+          Indicator.ThresholdCrossing(vs, randomisedVt, band.snap(ub), band.snap(lb))
         case Indicator.LinesCrossing(vs, vt1, vt2) =>
           Indicator.LinesCrossing(vs, randomiseVt(vt1), randomiseVt(vt2))
         case Indicator.KeltnerChannel(vs, md, atrL, atrR) =>

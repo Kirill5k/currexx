@@ -115,9 +115,9 @@ object IndicatorCrossover:
           case (Indicator.ThresholdCrossing(s, t1, ub1, lb1), Indicator.ThresholdCrossing(_, t2, ub2, lb2)) =>
             crossVt(t1, t2)
               .map { t =>
-                // Ensure proper threshold bounds: lb <= ub and both in [0, 100]
-                val crossedUb          = math.max(0, math.min(100, crossInt(ub1.toInt, ub2.toInt)))
-                val crossedLb          = math.max(0, math.min(100, crossInt(lb1.toInt, lb2.toInt)))
+                val band               = ThresholdBounds.of(t)
+                val crossedUb          = crossDouble(ub1, ub2, band.step)
+                val crossedLb          = crossDouble(lb1, lb2, band.step)
                 val (finalLb, finalUb) = if (crossedLb > crossedUb) (crossedUb, crossedLb) else (crossedLb, crossedUb)
                 Indicator.ThresholdCrossing(s, t, finalUb, finalLb)
               }

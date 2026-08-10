@@ -84,9 +84,11 @@ object IndicatorMutator {
           case Indicator.TrendChangeDetection(vs, vt) =>
             Indicator.TrendChangeDetection(vs, mutVt(vt))
           case Indicator.ThresholdCrossing(vs, vt, ub, lb) =>
-            val mutatedUb = mutDouble(ub, 50.0, 95.0, 1.0)
-            val mutatedLb = mutDouble(lb, 5.0, mutatedUb, 1.0)
-            Indicator.ThresholdCrossing(vs, mutVt(vt), mutatedUb, mutatedLb)
+            val mutatedVt = mutVt(vt)
+            val band      = ThresholdBounds.of(mutatedVt)
+            val mutatedUb = mutDouble(ub, band.upperMin, band.upperMax, band.step)
+            val mutatedLb = mutDouble(lb, band.lowerMin, mutatedUb, band.step)
+            Indicator.ThresholdCrossing(vs, mutatedVt, mutatedUb, mutatedLb)
           case Indicator.LinesCrossing(vs, vt1, vt2) =>
             Indicator.LinesCrossing(vs, mutVt(vt1), mutVt(vt2))
           case Indicator.KeltnerChannel(vs, md, atrL, atrM) =>
