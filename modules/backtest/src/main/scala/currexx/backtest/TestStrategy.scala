@@ -12,17 +12,29 @@ final case class TestStrategy(
     rules: TradeStrategy
 ) derives Codec.AsObject
 
+/** The strategies worth measuring, and what each one actually scored.
+  *
+  * Every val carries two metrics lines because one number cannot say whether a strategy works. `majors1h` is the corpus the GA searched
+  * against, so for anything named `_optimized` it reports fit to the data that chose it and is not evidence of an edge.
+  * `majors1h_202507_202606` is the later export, which no search scored against; that is the line to read. Where the two disagree sharply
+  * the strategy is fitted, not skilled — the clearest case here is s4_regime_optimized, PF 4.013 in-sample against 0.623 out.
+  *
+  * Version suffixes are contiguous within each family and ordered by out-of-sample net, best first, so `sN_optimized` beats
+  * `sN_optimized_v2`. They were renumbered when the catalogue was pruned, so a champion's version here need not match the label in the
+  * `ga-optimisation-*.md` report it came from; the report filename in each comment is the stable link back.
+  */
 object TestStrategy {
-  
-  // GA-optimized indicator params for s1_v2_optimized_v2 (rules unchanged). Champion from
+
+  // GA-optimized indicator params for s1_v2_optimized_v2, which is no longer in this catalogue (rules unchanged). Champion from
   // ga-optimisation-2026-08-08-1409-s1_v2_optimized_v2_shuffle.md (training 1.157784 -> validation 0.053450, shuffled GA).
   // BREACHES 4 constraint(s) on validation data:
   //   - profitable pair-months is 0.500, required >= 0.550
   //   - most concentrated pair's best month is 1.000, required <= 0.738 (0.700 scaled to 5 periods)
   //   - pair-month profit factor is 1.239396792464384156770483855333763, required >= 1.3
   //   - profit factor is 1.09198, required >= 1.2
-  // net=1915.81314, closed=640, forced=6, win=44.22%, exp=2.993458, PF=1.168, DD=1.45%, Sharpe=1.118, gross=2556.29691, costs=640.48377
-  val s1_v2_optimized_v8 = TestStrategy(
+  // majors1h (searched):     net=6648.19399, closed=696, forced=6, win=48.56%, exp=9.552003, PF=1.619, DD=1.14%, Sharpe=3.872
+  // majors1h_202507_202606:  net=1915.81314, closed=640, forced=6, win=44.22%, exp=2.993458, PF=1.168, DD=1.45%, Sharpe=1.118
+  val s1_v2_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       // Primary signal: JMA crossover
       Indicator.LinesCrossing(
@@ -88,14 +100,15 @@ object TestStrategy {
     )
   )
 
-  // GA-optimized indicator params for s2 (rules unchanged). Champion from
+  // GA-optimized indicator params for s2, which is no longer in this catalogue (rules unchanged). Champion from
   // ga-optimisation-2026-08-03-1755-s2.md (training 2.047228 -> validation 0.063279).
   // BREACHES 3 constraint(s) on validation data:
   //   - pair-month profit factor is 1.224584358662623739024413542690434, required >= 1.3
   //   - profit factor is 1.08474, required >= 1.2
   //   - profitable datasets is 0.333, required >= 0.667
-  // net=4882.14619, closed=602, forced=3, win=71.26%, exp=8.109877, PF=1.623, DD=1.65%, Sharpe=2.765, gross=5467.55058, costs=585.40439
-  val s2_optimized_v4 = TestStrategy(
+  // majors1h (searched):     net=4882.14619, closed=602, forced=3, win=71.26%, exp=8.109877, PF=1.623, DD=1.65%, Sharpe=2.765
+  // majors1h_202507_202606:  net=979.82518, closed=527, forced=2, win=69.26%, exp=1.859251, PF=1.118, DD=1.76%, Sharpe=0.581
+  val s2_optimized_v2 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.LinesCrossing(
         source = ValueSource.HLC3,
@@ -149,12 +162,13 @@ object TestStrategy {
       )
     )
   )
-  
-  // GA-optimized indicator params for s2 (rules unchanged). Champion from
+
+  // GA-optimized indicator params for s2, which is no longer in this catalogue (rules unchanged). Champion from
   // ga-optimisation-2026-08-08-1436-s2_shuffle.md (training 1.499322 -> validation 0.973937, shuffled GA).
-  // Satisfies every constraint on validation data.
-  // net=3386.47604, closed=602, forced=5, win=38.70%, exp=5.625375, PF=1.335, DD=1.71%, Sharpe=1.722, gross=3988.40715, costs=601.93111
-  val s2_optimized_v5 = TestStrategy(
+  // Satisfies every constraint on validation data. Best out-of-sample result in the catalogue.
+  // majors1h (searched):     net=7644.55357, closed=638, forced=6, win=40.13%, exp=11.982059, PF=1.727, DD=1.31%, Sharpe=4.780
+  // majors1h_202507_202606:  net=3386.47604, closed=602, forced=5, win=38.70%, exp=5.625375, PF=1.335, DD=1.71%, Sharpe=1.722
+  val s2_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.LinesCrossing(
         source = ValueSource.HLC3,
@@ -209,7 +223,9 @@ object TestStrategy {
     )
   )
 
-  // net=3559.10491, closed=258, forced=0, win=75.19%, exp=13.794980, PF=2.467, DD=0.60%, Sharpe=3.479, gross=3811.91334, costs=252.80842
+  // Baseline kept for lineage — the two vals below are GA descendants of it. Loses money out of sample, so it is not in BatchBacktester.
+  // majors1h (searched):     net=3749.11726, closed=249, forced=3, win=76.31%, exp=15.056696, PF=2.642, DD=0.59%, Sharpe=3.718
+  // majors1h_202507_202606:  net=-304.99815, closed=266, forced=1, win=66.54%, exp=-1.146610, PF=0.925, DD=1.30%, Sharpe=-0.308
   val s4_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -279,7 +295,8 @@ object TestStrategy {
   // GA-optimized indicator params for s4_optimized (rules unchanged). Champion from
   // ga-optimisation-2026-08-03-1820-s4_optimized.md (training 1.658671 -> validation 1.675786).
   // Satisfies every constraint on validation data.
-  // net=3649.62245, closed=225, forced=3, win=76.44%, exp=16.220544, PF=2.899, DD=0.46%, Sharpe=4.488, gross=3870.90817, costs=221.28573
+  // majors1h (searched):     net=3649.62245, closed=225, forced=3, win=76.44%, exp=16.220544, PF=2.899, DD=0.46%, Sharpe=4.488
+  // majors1h_202507_202606:  net=300.43917, closed=244, forced=1, win=69.26%, exp=1.231308, PF=1.092, DD=1.32%, Sharpe=0.309
   val s4_optimized_v2 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -355,7 +372,9 @@ object TestStrategy {
   //   - profit factor is 1.09087, required >= 1.2
   //   - costs as a share of gross profit is 0.437, required <= 0.400
   //   - profitable datasets is 0.333, required >= 0.667
-  // net=2215.86261, closed=485, forced=2, win=54.43%, exp=4.568789, PF=1.428, DD=1.26%, Sharpe=1.743, gross=2687.49935, costs=471.63674
+  // Not in BatchBacktester, though it out-earns s4_optimized_v2 out of sample (+486 vs +300) on nearly double the trades.
+  // majors1h (searched):     net=2215.86261, closed=485, forced=2, win=54.43%, exp=4.568789, PF=1.428, DD=1.26%, Sharpe=1.743
+  // majors1h_202507_202606:  net=486.01765, closed=497, forced=0, win=51.91%, exp=0.977903, PF=1.081, DD=1.95%, Sharpe=0.363
   val s4_optimized_v3 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -422,8 +441,11 @@ object TestStrategy {
     )
   )
 
-  // net=2931.48571, closed=164, forced=0, win=78.05%, exp=17.874913, PF=4.105, DD=0.22%, Sharpe=3.795, gross=3091.53751, costs=160.05179
-  val s4_regime_optimized_v2 = TestStrategy(
+  // Baseline kept for lineage — s4_regime_optimized_v2 below is its GA descendant. Not in BatchBacktester.
+  // The sharpest overfit in the catalogue: PF 4.013 on the corpus that chose it collapses to 0.623 on the later year.
+  // majors1h (searched):     net=2924.93376, closed=165, forced=1, win=77.58%, exp=17.726871, PF=4.013, DD=0.21%, Sharpe=3.856
+  // majors1h_202507_202606:  net=-1018.22412, closed=166, forced=0, win=56.63%, exp=-6.133880, PF=0.623, DD=2.05%, Sharpe=-1.272
+  val s4_regime_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
         source = ValueSource.HLC3,
@@ -495,14 +517,15 @@ object TestStrategy {
       )
     )
   )
-  
-  // GA-optimized indicator params for s4_regime_optimized_v2 (rules unchanged). Champion from
+
+  // GA-optimized indicator params for s4_regime_optimized (rules unchanged). Champion from
   // ga-optimisation-2026-08-08-1546-s4_regime_optimized_v2.md (training 0.773123 -> validation 0.687602).
   // BREACHES 2 constraint(s) on validation data:
   //   - closed trades is 103, required >= 120 (5 per pair-month over 4 months x 6 pairs)
   //   - most concentrated pair's best month is 0.756, required <= 0.755 (0.700 scaled to 4 periods)
-  // net=156.64307, closed=289, forced=0, win=50.52%, exp=0.542018, PF=1.049, DD=1.34%, Sharpe=0.232, gross=445.01671, costs=288.37364
-  val s4_regime_optimized_v4 = TestStrategy(
+  // majors1h (searched):     net=2312.35834, closed=269, forced=0, win=62.45%, exp=8.596128, PF=1.834, DD=0.42%, Sharpe=2.769
+  // majors1h_202507_202606:  net=156.64307, closed=289, forced=0, win=50.52%, exp=0.542018, PF=1.049, DD=1.34%, Sharpe=0.232
+  val s4_regime_optimized_v2 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
         source = ValueSource.HLC3,
@@ -574,16 +597,18 @@ object TestStrategy {
       )
     )
   )
-  
-  // GA-optimized indicator params for s5_optimized_v2 (rules unchanged). Champion from
+
+  // GA-optimized indicator params for s5_optimized_v2, which is no longer in this catalogue (rules unchanged). Champion from
   // ga-optimisation-2026-08-08-1634-s5_optimized_v2.md (training 0.660687 -> validation 0.038808).
   // BREACHES 4 constraint(s) on validation data:
   //   - most concentrated pair's best month is 1.000, required <= 0.738 (0.700 scaled to 5 periods)
   //   - pair-month profit factor is 1.223093031403288088998350627052696, required >= 1.3
   //   - profit factor is 1.07928, required >= 1.2
   //   - costs as a share of gross profit is 0.481, required <= 0.400
-  // net=705.14380, closed=318, forced=0, win=66.67%, exp=2.217433, PF=1.161, DD=1.08%, Sharpe=1.084, gross=1021.57704, costs=316.43324
-  val s5_optimized_v3 = TestStrategy(
+  // Gives up a little in-sample against the s5_optimized_v2 it replaced (2614 vs 2705) and nearly triples it out of sample (705 vs 247).
+  // majors1h (searched):     net=2614.14803, closed=316, forced=2, win=69.62%, exp=8.272620, PF=1.774, DD=0.52%, Sharpe=3.024
+  // majors1h_202507_202606:  net=705.14380, closed=318, forced=0, win=66.67%, exp=2.217433, PF=1.161, DD=1.08%, Sharpe=1.084
+  val s5_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
         source = ValueSource.HLC3,
@@ -689,7 +714,13 @@ object TestStrategy {
   // variant tested were amputating the fat tail of winning trend trades. Exiting ONLY on a position-gated
   // Ichimoku trend reversal lifts total profit to 0.28206, W/L to 1.22355, and cuts orders 490 -> 156
   // (5 of 6 majors profitable). The Parabolic SAR indicator was consequently removed as dead weight.
-  // net=2306.49103, closed=153, forced=5, win=50.33%, exp=15.075105, PF=1.417, DD=1.95%, Sharpe=1.816, gross=2457.28396, costs=150.79293
+  // The W/L and total-profit figures above predate the current cost and risk model and are not comparable to the metrics below.
+  //
+  // Kept for structural coverage: this is the only strategy in the catalogue that reads volume. It does not currently pay for itself out of
+  // sample, and cannot be optimised until the ThresholdCrossing boundary ranges are made indicator-aware — see the note on the CMF
+  // rounds in Optimiser.scala.
+  // majors1h (searched):     net=2885.12973, closed=152, forced=5, win=51.97%, exp=18.981117, PF=1.534, DD=1.95%, Sharpe=2.045
+  // majors1h_202507_202606:  net=-1413.68208, closed=129, forced=3, win=48.06%, exp=-10.958776, PF=0.750, DD=3.13%, Sharpe=-1.187
   val s12 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
@@ -756,8 +787,10 @@ object TestStrategy {
   )
 
   // GA-optimized indicator params for s12 (rules unchanged). Best Top-25 member from
-  // ga-optimisation-2026-07-05-1349-s12.md (fitness 0.407640).
-  // net=3181.94074, closed=172, forced=5, win=51.74%, exp=18.499655, PF=1.555, DD=1.69%, Sharpe=2.346, gross=3351.48927, costs=169.54853
+  // ga-optimisation-2026-07-05-1349-s12.md (fitness 0.407640, single-score format predating the training/validation split).
+  // Kept alongside s12 for volume coverage; like s12 it is unprofitable out of sample.
+  // majors1h (searched):     net=3800.76555, closed=168, forced=5, win=54.17%, exp=22.623604, PF=1.702, DD=1.68%, Sharpe=2.726
+  // majors1h_202507_202606:  net=-1918.87451, closed=155, forced=4, win=43.23%, exp=-12.379836, PF=0.714, DD=3.69%, Sharpe=-1.595
   val s12_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(

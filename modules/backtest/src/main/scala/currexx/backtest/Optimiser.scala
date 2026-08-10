@@ -46,16 +46,79 @@ object Optimiser extends IOApp.Simple {
 
   val consistentScoring: ScoringFunction = ScoringFunction.Consistent()
 
+  /** The catalogue as it currently stands, each strategy searched twice — once in file order, once shuffled.
+    *
+    * Both are kept because shuffling has earned its place rather than because it is symmetrical: the two best champions this catalogue
+    * holds, s2_optimized and s1_v2_optimized, both came out of shuffled rounds, while their unshuffled twins produced champions that lose
+    * money on the later year.
+    *
+    * Ordered by out-of-sample net, best first. A full pass is long enough that it is routinely interrupted, and this way the strategies
+    * most worth improving are the ones already done when it is.
+    *
+    * The two s12 rounds will find nothing until the mutator is fixed. `IndicatorMutator` clamps every ThresholdCrossing boundary to ub
+    * 50..95 / lb 5..ub and `IndicatorInitialiser` seeds them in the same percentage range, regardless of what the transformation produces.
+    * CMF is bounded near +/-1, so every candidate these operators generate has thresholds CMF cannot cross: the momentum zone never fires,
+    * no trades are opened, and fitness is zero by construction. That is why all four s12 rounds of 2026-08-08 reported NOTHING SELECTED,
+    * and why running them again unchanged would only reproduce it.
+    */
   val rounds: List[OptimisationRound] = List(
     OptimisationRound(
-      name = "s4_optimized",
-      strategy = TestStrategy.s4_optimized,
+      name = "s2_optimized",
+      strategy = TestStrategy.s2_optimized,
       gaParameters = gaParameters,
       scoringFunction = consistentScoring
     ),
     OptimisationRound(
-      name = "s4_optimized_shuffle",
-      strategy = TestStrategy.s4_optimized,
+      name = "s2_optimized_shuffle",
+      strategy = TestStrategy.s2_optimized,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s1_v2_optimized",
+      strategy = TestStrategy.s1_v2_optimized,
+      gaParameters = gaParameters,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s1_v2_optimized_shuffle",
+      strategy = TestStrategy.s1_v2_optimized,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s2_optimized_v2",
+      strategy = TestStrategy.s2_optimized_v2,
+      gaParameters = gaParameters,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s2_optimized_v2_shuffle",
+      strategy = TestStrategy.s2_optimized_v2,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s5_optimized",
+      strategy = TestStrategy.s5_optimized,
+      gaParameters = gaParameters,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s5_optimized_shuffle",
+      strategy = TestStrategy.s5_optimized,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s4_optimized_v2",
+      strategy = TestStrategy.s4_optimized_v2,
+      gaParameters = gaParameters,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s4_optimized_v2_shuffle",
+      strategy = TestStrategy.s4_optimized_v2,
       gaParameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring
     ),
