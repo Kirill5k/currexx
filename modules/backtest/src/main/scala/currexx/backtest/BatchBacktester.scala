@@ -11,30 +11,15 @@ object BatchBacktester extends IOApp.Simple {
   inline given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
   val strategies: List[(String, TestStrategy)] = List(
-    "s1_v2_optimized_v2" -> TestStrategy.s1_v2_optimized_v2,
-    "s12_optimized"      -> TestStrategy.s12_optimized,
-    "s4_optimized"       -> TestStrategy.s4_optimized,
-    "s5_optimized_v2"    -> TestStrategy.s5_optimized_v2,
+    "s2_optimized_v5"    -> TestStrategy.s2_optimized_v5,
+    "s1_v2_optimized_v8" -> TestStrategy.s1_v2_optimized_v8,
+    "s5_optimized_v3" -> TestStrategy.s5_optimized_v3,
+    "s2_optimized_v4"    -> TestStrategy.s2_optimized_v4,
 
-    "s4_regime_optimized_v2" -> TestStrategy.s4_regime_optimized_v2,
-    "s1_v2"                  -> TestStrategy.s1_v2,
-
-    "s1_optimized"    -> TestStrategy.s1_optimized,
-    "s2"              -> TestStrategy.s2,
-    "s2_optimized_v2" -> TestStrategy.s2_optimized_v2,
-    "s12"             -> TestStrategy.s12,
-
-    "s1_optimized_v2"        -> TestStrategy.s1_optimized_v2,
-    "s1_optimized_v3"        -> TestStrategy.s1_optimized_v3,
-    "s1_v2_optimized"        -> TestStrategy.s1_v2_optimized,
-    "s1_v2_optimized_v3"     -> TestStrategy.s1_v2_optimized_v3,
-    "s1_v2_optimized_v4"     -> TestStrategy.s1_v2_optimized_v4,
-    "s2_optimized"           -> TestStrategy.s2_optimized,
-    "s2_optimized_v3"        -> TestStrategy.s2_optimized_v3,
-    "s2_optimized_v4"        -> TestStrategy.s2_optimized_v4,
-    "s4_optimized_v2"        -> TestStrategy.s4_optimized_v2,
-    "s4_optimized_v3"        -> TestStrategy.s4_optimized_v3,
-    "s4_regime_optimized_v3" -> TestStrategy.s4_regime_optimized_v3
+    "s12_optimized"   -> TestStrategy.s12_optimized,
+    "s4_optimized_v2" -> TestStrategy.s4_optimized_v2,
+    "s4_regime_optimized_v4" -> TestStrategy.s4_regime_optimized_v4,
+    "s12" -> TestStrategy.s12,
   )
 
   val riskSettings: RiskSettings = RiskSettings()

@@ -7,7 +7,7 @@ import kirill5k.common.cats.test.IOWordSpec
 
 class IndicatorObjectiveSpec extends IOWordSpec {
 
-  private val strategy = TestStrategy.s1_v2_optimized_v2
+  private val strategy = TestStrategy.s12
   private val scoring  = ScoringFunction.Robust()
 
   /** The real split narrowed to one pair per segment, so these cases turn on the fold structure rather than on six files of each. */
