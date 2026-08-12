@@ -184,6 +184,7 @@ object Optimiser extends IOApp.Simple {
           finalTopN = round.shortlistSize
         )
         loggingProg <- Tracker.logging[IO, Indicator](
+          label = round.name,
           logInterval = 10,
           showTopMember = true,
           showTopN = 3,

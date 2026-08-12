@@ -7,6 +7,7 @@ import currexx.algorithms.{EvaluatedPopulation, Parameters, ValidatedPopulation}
 import java.time.Instant
 
 final class LoggingTracker[F[_], I] private (
+    label: String,
     startTimeRef: Ref[F, Option[Instant]],
     logInterval: Int,
     showTopMember: Boolean,
@@ -21,7 +22,8 @@ final class LoggingTracker[F[_], I] private (
     for
       now <- Async[F].realTimeInstant
       _   <- startTimeRef.set(Some(now))
-      _   <- Async[F].delay(println(s"Starting GA at $now\nTarget: $target\nParameters: $params"))
+      header = s"Starting GA${if (label.nonEmpty) s" round $label" else ""} at $now"
+      _ <- Async[F].delay(println(s"$header\nTarget: $target\nParameters: $params"))
     yield ()
 
   override def displayProgress(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[I]): F[Unit] =
@@ -40,7 +42,7 @@ final class LoggingTracker[F[_], I] private (
       stats    = validatedStatsMsg(population)
       summary  = validationSummaryMsg(population)
       members  = validatedMembersMsg(population, finalTopN)
-      _ <- Async[F].delay(println(s"$summary\nFinal top $finalTopN members:\n$members\n$stats$duration"))
+      _ <- Async[F].delay(println(s"$summary\nFinal top $finalTopN members:\n$members\n$stats$duration\n"))
     yield ()
 
   override def displayNote(title: String, lines: List[String]): F[Unit] =
@@ -48,6 +50,7 @@ final class LoggingTracker[F[_], I] private (
 
 object LoggingTracker:
   def make[F[_]: Async, I](
+      label: String = "",
       logInterval: Int = 10,
       showTopMember: Boolean = true,
       showTopN: Int = 1,
@@ -57,5 +60,5 @@ object LoggingTracker:
     Ref
       .of[F, Option[Instant]](None)
       .map { startTimeRef =>
-        new LoggingTracker[F, I](startTimeRef, logInterval, showTopMember, showTopN, showStats, finalTopN)
+        new LoggingTracker[F, I](label, startTimeRef, logInterval, showTopMember, showTopN, showStats, finalTopN)
       }
