@@ -9,8 +9,8 @@ import scala.util.Random
 
 class ThresholdBoundsSpec extends IOWordSpec {
 
-  private def cmf(ub: Double, lb: Double)  = Indicator.ThresholdCrossing(ValueSource.Close, ValueTransformation.CMF(20), ub, lb)
-  private def rsx(ub: Double, lb: Double)  = Indicator.ThresholdCrossing(ValueSource.Close, ValueTransformation.RSX(16), ub, lb)
+  private def cmf(ub: Double, lb: Double) = Indicator.ThresholdCrossing(ValueSource.Close, ValueTransformation.CMF(20), ub, lb)
+  private def rsx(ub: Double, lb: Double) = Indicator.ThresholdCrossing(ValueSource.Close, ValueTransformation.RSX(16), ub, lb)
 
   private def boundsOf(ind: Indicator): (Double, Double) = ind match
     case Indicator.ThresholdCrossing(_, _, ub, lb) => (ub, lb)
@@ -43,8 +43,24 @@ class ThresholdBoundsSpec extends IOWordSpec {
           withClue(s"ub=$ub lb=$lb: ") {
             (ub >= -1.0 && ub <= 1.0) mustBe true
             (lb >= -1.0 && lb <= 1.0) mustBe true
+            (ub >= 0.0) mustBe true
+            (lb <= 0.0) mustBe true
             (lb <= ub) mustBe true
           }
+        }
+      }
+
+      "repair a lower boundary on the wrong side of zero even when mutation does not fire" in {
+        given Random = Random(42)
+
+        val result = for
+          mutator <- IndicatorMutator.make[IO]
+          mutated <- mutator.mutate(cmf(0.17, 0.40), 0.0d)
+        yield boundsOf(mutated)
+
+        result.asserting { (ub, lb) =>
+          ub mustBe 0.17
+          lb mustBe 0.0
         }
       }
 
@@ -79,7 +95,7 @@ class ThresholdBoundsSpec extends IOWordSpec {
         result.asserting { bounds =>
           withClue(s"$bounds: ") {
             bounds.forall((ub, _) => ub >= 50.0 && ub <= 95.0) mustBe true
-            bounds.forall((_, lb) => lb >= 5.0) mustBe true
+            bounds.forall((_, lb) => lb >= 5.0 && lb <= 50.0) mustBe true
             bounds.forall((ub, lb) => lb <= ub) mustBe true
           }
         }
@@ -100,6 +116,7 @@ class ThresholdBoundsSpec extends IOWordSpec {
           withClue(s"$bounds: ") {
             bounds.forall((ub, _) => ub >= 0.17 && ub <= 0.25) mustBe true
             bounds.forall((_, lb) => lb >= -0.30 && lb <= -0.17) mustBe true
+            bounds.forall((ub, lb) => ub >= 0.0 && lb <= 0.0) mustBe true
           }
         }
       }
@@ -119,6 +136,7 @@ class ThresholdBoundsSpec extends IOWordSpec {
           withClue(s"$bounds: ") {
             bounds.size mustBe 200
             bounds.forall((ub, lb) => ub >= -1.0 && ub <= 1.0 && lb >= -1.0 && lb <= 1.0) mustBe true
+            bounds.forall((ub, lb) => ub >= 0.0 && lb <= 0.0) mustBe true
             bounds.forall((ub, lb) => lb <= ub) mustBe true
             bounds.forall((ub, lb) => firesSomewhereOn(cmfSweep, ub, lb)) mustBe true
           }
@@ -126,10 +144,33 @@ class ThresholdBoundsSpec extends IOWordSpec {
       }
     }
 
+    "initialising a percentage-oscillator threshold population" should {
+
+      "keep the lower boundary in the lower half of the oscillator range" in {
+        given Random = Random(17)
+
+        val result = for
+          initialiser <- IndicatorInitialiser.make[IO]
+          population  <- initialiser.initialisePopulation(rsx(70.0, 30.0), 200, shuffle = true)
+        yield population.map(boundsOf).toList
+
+        result.asserting { bounds =>
+          withClue(s"$bounds: ") {
+            bounds.forall((ub, lb) => ub >= 50.0 && ub <= 95.0 && lb >= 5.0 && lb <= 50.0) mustBe true
+          }
+        }
+      }
+    }
+
     "of" should {
 
-      "read a sequence by the transformation it ends with" in {
+      "let a range-establishing final transformation replace its input range" in {
         val sequenced = ValueTransformation.sequenced(ValueTransformation.SMA(5), ValueTransformation.CMF(20))
+        ThresholdBounds.of(sequenced) mustBe ThresholdBounds.of(ValueTransformation.CMF(20))
+      }
+
+      "preserve a CMF range through trailing smoothing" in {
+        val sequenced = ValueTransformation.sequenced(ValueTransformation.CMF(20), ValueTransformation.SMA(5))
         ThresholdBounds.of(sequenced) mustBe ThresholdBounds.of(ValueTransformation.CMF(20))
       }
 
@@ -138,6 +179,7 @@ class ThresholdBoundsSpec extends IOWordSpec {
         band.upperMin mustBe 50.0
         band.upperMax mustBe 95.0
         band.lowerMin mustBe 5.0
+        band.lowerMax mustBe 50.0
         band.step mustBe 1.0
       }
     }

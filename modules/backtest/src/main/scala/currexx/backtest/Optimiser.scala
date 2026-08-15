@@ -54,12 +54,6 @@ object Optimiser extends IOApp.Simple {
     *
     * Ordered by out-of-sample net, best first. A full pass is long enough that it is routinely interrupted, and this way the strategies
     * most worth improving are the ones already done when it is.
-    *
-    * The two s12 rounds will find nothing until the mutator is fixed. `IndicatorMutator` clamps every ThresholdCrossing boundary to ub
-    * 50..95 / lb 5..ub and `IndicatorInitialiser` seeds them in the same percentage range, regardless of what the transformation produces.
-    * CMF is bounded near +/-1, so every candidate these operators generate has thresholds CMF cannot cross: the momentum zone never fires,
-    * no trades are opened, and fitness is zero by construction. That is why all four s12 rounds of 2026-08-08 reported NOTHING SELECTED,
-    * and why running them again unchanged would only reproduce it.
     */
   val rounds: List[OptimisationRound] = List(
     OptimisationRound(

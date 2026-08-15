@@ -115,11 +115,10 @@ object IndicatorCrossover:
           case (Indicator.ThresholdCrossing(s, t1, ub1, lb1), Indicator.ThresholdCrossing(_, t2, ub2, lb2)) =>
             crossVt(t1, t2)
               .map { t =>
-                val band               = ThresholdBounds.of(t)
-                val crossedUb          = crossDouble(ub1, ub2, band.step)
-                val crossedLb          = crossDouble(lb1, lb2, band.step)
-                val (finalLb, finalUb) = if (crossedLb > crossedUb) (crossedUb, crossedLb) else (crossedLb, crossedUb)
-                Indicator.ThresholdCrossing(s, t, finalUb, finalLb)
+                val band      = ThresholdBounds.of(t)
+                val crossedUb = band.clampUpper(crossDouble(ub1, ub2, band.step))
+                val crossedLb = band.clampLower(crossDouble(lb1, lb2, band.step))
+                Indicator.ThresholdCrossing(s, t, crossedUb, crossedLb)
               }
           case (Indicator.KeltnerChannel(vs, md1, al, ar), Indicator.KeltnerChannel(_, md2, _, _)) =>
             crossVt(md1, md2).map(md => Indicator.KeltnerChannel(vs, md, al, ar))

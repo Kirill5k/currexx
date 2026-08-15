@@ -716,9 +716,9 @@ object TestStrategy {
   // (5 of 6 majors profitable). The Parabolic SAR indicator was consequently removed as dead weight.
   // The W/L and total-profit figures above predate the current cost and risk model and are not comparable to the metrics below.
   //
-  // Kept for structural coverage: this is the only strategy in the catalogue that reads volume. It does not currently pay for itself out of
-  // sample, and cannot be optimised until the ThresholdCrossing boundary ranges are made indicator-aware — see the note on the CMF
-  // rounds in Optimiser.scala.
+  // Kept for structural coverage: this is the only strategy in the catalogue that reads volume. Its historical out-of-sample result is
+  // negative, while the four 2026-08-08 optimisation reports used the old percentage-only CMF threshold search. Threshold bounds are now
+  // transformation-aware, so s12 needs a fresh optimisation before its current searchability can be assessed.
   // majors1h (searched):     net=2885.12973, closed=152, forced=5, win=51.97%, exp=18.981117, PF=1.534, DD=1.95%, Sharpe=2.045
   // majors1h_202507_202606:  net=-1413.68208, closed=129, forced=3, win=48.06%, exp=-10.958776, PF=0.750, DD=3.13%, Sharpe=-1.187
   val s12 = TestStrategy(

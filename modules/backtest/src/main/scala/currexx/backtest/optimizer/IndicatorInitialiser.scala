@@ -39,7 +39,7 @@ object IndicatorInitialiser:
           val randomisedVt = randomiseVt(vt)
           val band         = ThresholdBounds.of(randomisedVt)
           val ub           = band.upperMin + rand.nextDouble() * (band.upperMax - band.upperMin)
-          val lb           = band.lowerMin + rand.nextDouble() * (ub - band.lowerMin)
+          val lb           = band.lowerMin + rand.nextDouble() * (band.lowerMax - band.lowerMin)
           Indicator.ThresholdCrossing(vs, randomisedVt, band.snap(ub), band.snap(lb))
         case Indicator.LinesCrossing(vs, vt1, vt2) =>
           Indicator.LinesCrossing(vs, randomiseVt(vt1), randomiseVt(vt2))

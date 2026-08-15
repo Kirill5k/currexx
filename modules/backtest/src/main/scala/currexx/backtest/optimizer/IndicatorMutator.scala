@@ -86,8 +86,8 @@ object IndicatorMutator {
           case Indicator.ThresholdCrossing(vs, vt, ub, lb) =>
             val mutatedVt = mutVt(vt)
             val band      = ThresholdBounds.of(mutatedVt)
-            val mutatedUb = mutDouble(ub, band.upperMin, band.upperMax, band.step)
-            val mutatedLb = mutDouble(lb, band.lowerMin, mutatedUb, band.step)
+            val mutatedUb = band.clampUpper(mutDouble(ub, band.upperMin, band.upperMax, band.step))
+            val mutatedLb = band.clampLower(mutDouble(lb, band.lowerMin, band.lowerMax, band.step))
             Indicator.ThresholdCrossing(vs, mutatedVt, mutatedUb, mutatedLb)
           case Indicator.LinesCrossing(vs, vt1, vt2) =>
             Indicator.LinesCrossing(vs, mutVt(vt1), mutVt(vt2))
