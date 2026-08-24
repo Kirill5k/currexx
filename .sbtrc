@@ -1,3 +1,4 @@
 alias fmt = ; scalafmtAll ; scalafmtSbt
+alias cleanAll = ; clearCaches ; cleanFiles ; clean ; cleanFull
 alias fmtcheck = ; scalafmtCheck ; test:scalafmtCheck; scalafmtSbtCheck
 alias libUpdates = ; dependencyUpdates; reload plugins; dependencyUpdates ; reload return;
