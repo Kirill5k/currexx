@@ -56,6 +56,15 @@ object MarketDataProvider:
       } :+ s"Ranked finalists on ${validationFold.size} dataset(s): ${validationFold.mkString(", ")}"
   }
 
+  private val majorFiles1h_202307_202406 = List(
+    "aud-usd-1h-1year-2023-07-2024-06.csv",
+    "eur-usd-1h-1year-2023-07-2024-06.csv",
+    "gbp-usd-1h-1year-2023-07-2024-06.csv",
+    "nzd-usd-1h-1year-2023-07-2024-06.csv",
+    "usd-cad-1h-1year-2023-07-2024-06.csv",
+    "usd-chf-1h-1year-2023-07-2024-06.csv"
+  )
+
   private val majorFiles1h = List(
     "aud-usd-1h-1year.csv",
     "eur-usd-1h-1year.csv",
@@ -74,15 +83,26 @@ object MarketDataProvider:
     "usd-chf-1h-1year-2025-07-2026-06.csv"
   )
 
-  /** The whole of the older export, 2024-07 to 2025-07. Fine for measuring a strategy that already exists; not for choosing one, since a
+  /** The whole of the oldest export, 2023-07 to 2024-06. Searched, like `majors1h`. */
+  val majors1h_202307_202406: List[Dataset] = majorFiles1h_202307_202406.map(Dataset(_))
+
+  /** The whole of the middle export, 2024-07 to 2025-07. Fine for measuring a strategy that already exists; not for choosing one, since a
     * search that scores against this has nothing left to be checked against.
     */
   val majors1h: List[Dataset] = majorFiles1h.map(Dataset(_))
 
-  /** The whole of the newer export, 2025-07 to 2026-06: the test set.
+  /** Everything the search folds cover, as whole files rather than segments: both older exports, 2023-07 to 2025-07.
     *
-    * Reserved for the final go/no-go on a strategy that has already been chosen. Selecting on it — picking between candidates by how they
-    * score here, even once — spends it, and there is no third year to replace it with.
+    * What "in sample" means once the folds span two exports. Measuring over either export alone would report half the data a champion was
+    * chosen on and label it as all of it, which is the mislabelling this exists to prevent.
+    */
+  val majors1hSearched: List[Dataset] = majors1h_202307_202406 ::: majors1h
+
+  /** The whole of the newest export, 2025-07 to 2026-06.
+    *
+    * Not the test set, despite reading like one: `majors1hValidationFold` is carved out of it, so four of these twelve months are what
+    * every champion's finalist ranking selected on. Measuring here mixes those four months in with the eight nobody has touched and reports
+    * the blend as out-of-sample. `majors1hHoldout` is the part that is actually untouched, and is what reporting should use.
     */
   val majors1h_202507_202606: List[Dataset] = majorFiles1h_202507_202606.map(Dataset(_))
 
@@ -106,17 +126,27 @@ object MarketDataProvider:
       .map(start => files.map(f => Dataset(f, Some(DateRange(start, start.plusMonths(segmentMonths))))))
       .toList
 
-  /** The segments a search is allowed to score against, oldest first: the whole of the older export, three folds of four months.
+  /** The segments a search is allowed to score against, oldest first: both older exports, six folds of four months spanning two years.
     *
     * More than one on purpose. A candidate scored on a single stretch of market can win by fitting that stretch, and nothing in the fitness
     * tells that apart from an edge; scored across time-disjoint stretches it has to hold up in each. This does not make the fitness
     * out-of-sample — anything a search scores against is in-sample by definition — it makes one a single well-fitted regime cannot satisfy.
     *
-    * The first fold opens on the file's first bar, so its first hundred bars are spent forming the first window and never offered, while
-    * `coveredMonths` still bills that month whole. Five days of a four-month fold, and the alternative is giving a whole month of a
-    * twelve-month export to warm-up — `read` needs exactly 99 bars of history and every window it emits holds 100.
+    * Six rather than three because three did not refuse enough. Over one contiguous year the folds are three slices of one regime, and the
+    * 2026-08-24/25 rounds show what that buys: a median of 23% of the training score retained on validation, six of sixteen rounds finding
+    * nothing above zero at all. `FoldAggregation` is a geometric mean that zeroes if any fold fails, so folds are an AND — spanning them
+    * across two years asks a candidate to hold up in two regimes rather than in three views of one.
+    *
+    * Each export is segmented on its own boundaries rather than as one continuous span, because the two are separate files: a fold may not
+    * straddle them. Both are exactly twelve months, so each divides into three whole folds with no remainder.
+    *
+    * The first fold of each export opens on that file's first bar, so its first hundred bars are spent forming the first window and never
+    * offered, while `coveredMonths` still bills that month whole. Five days of a four-month fold, and the alternative is giving a whole
+    * month of a twelve-month export to warm-up — `read` needs exactly 99 bars of history and every window it emits holds 100.
     */
-  val majors1hSearchFolds: List[List[Dataset]] = segmentsOf(majorFiles1h, YearMonth.of(2024, 7), YearMonth.of(2025, 7))
+  val majors1hSearchFolds: List[List[Dataset]] =
+    segmentsOf(majorFiles1h_202307_202406, YearMonth.of(2023, 7), YearMonth.of(2024, 7)) :::
+      segmentsOf(majorFiles1h, YearMonth.of(2024, 7), YearMonth.of(2025, 7))
 
   /** The segment a search's finalists are ranked on, having never been scored against during the search itself.
     *

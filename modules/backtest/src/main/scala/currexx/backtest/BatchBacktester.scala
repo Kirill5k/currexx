@@ -35,9 +35,9 @@ object BatchBacktester extends IOApp.Simple {
 
   val riskSettings: RiskSettings = RiskSettings()
 
-  def runOne(name: String, ts: TestStrategy): IO[String] =
+  def runOne(name: String, ts: TestStrategy, datasets: List[MarketDataProvider.Dataset]): IO[String] =
     Stream
-      .emits(MarketDataProvider.majors1h)
+      .emits(datasets)
       .parEvalMap(6) { dataset =>
         val settings = TestSettings.make(dataset.currencyPair, ts.rules, List(ts.indicator))
         for
@@ -64,19 +64,25 @@ object BatchBacktester extends IOApp.Simple {
           f"costs=${portfolio.totalCosts}%9.5f"
       }
 
-  override val run: IO[Unit] =
-    strategies
-      .foldLeft(IO.pure(List.empty[String])) { (acc, kv) =>
-        acc.flatMap(lines => runOne(kv._1, kv._2).map(l => lines :+ l))
-      }
-      .flatMap(lines => IO.println("\n===== BATCH RESULTS =====\n" + lines.mkString("\n")))
-      .flatMap(_ =>
-        IO.println("""
+  override val run: IO[Unit] = List(
+    "searched 2023-07..2025-07 (24 months, in sample)"    -> MarketDataProvider.majors1hSearched,
+    "holdout 2025-12..2026-06 (7 months, never selected)" -> MarketDataProvider.majors1hHoldout
+  ).foldLeft(IO.pure(List.empty[String])) { case (acc, (label, datasets)) =>
+    acc.flatMap { sections =>
+      strategies
+        .foldLeft(IO.pure(List.empty[String])) { (lines, kv) =>
+          lines.flatMap(ls => runOne(kv._1, kv._2, datasets).map(l => ls :+ l))
+        }
+        .map(lines => sections :+ s"--- $label ---\n${lines.mkString("\n")}")
+    }
+  }.flatMap(sections => IO.println("\n===== BATCH RESULTS =====\n\n" + sections.mkString("\n\n")))
+    .flatMap(_ =>
+      IO.println("""
           |forced - positions still open when the data ran out, liquidated at the final mark price
           |exp - expectancy - Average net profit per closed trade
           |PF - profit factor - Relationship between winning and losing closed trades (1.5 means $1.50 won for every $1 lost)
           |DD - drawdown - Maximum percentage of the portfolio that was lost during the period
           |sharpe - Risk-adjusted performance calculated from monthly equity returns and annualized. Higher means returns were more consistent
           |""".stripMargin)
-      )
+    )
 }

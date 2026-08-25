@@ -32,6 +32,7 @@ class MarketDataProviderSpec extends IOWordSpec {
   final private case class Export(filePath: String, firstBar: Instant, firstClose: Double, bars: Int)
 
   private val exports = List(
+    Export("eur-usd-1h-1year-2023-07-2024-06.csv", Instant.parse("2023-07-02T21:00:00Z"), 1.09089, 6204),
     Export("eur-usd-1h-1year.csv", Instant.parse("2024-07-01T00:00:00Z"), 1.07456, 6113),
     Export("eur-usd-1h-1year-2025-07-2026-06.csv", Instant.parse("2025-07-01T00:00:00Z"), 1.17973, 6226)
   )
@@ -93,11 +94,15 @@ class MarketDataProviderSpec extends IOWordSpec {
     "give every segment the calendar months it is scored over" in
       // Every consistency threshold is counted in months, so each of them is measured on less as a segment shortens.
       // Four, which divides a twelve-month export into exactly three folds and gives the validation segment the same
-      // length, so the thresholds mean the same thing on both.
+      // length, so the thresholds mean the same thing on both. Six folds, because the search spans two exports: three
+      // months of 2023-07..2024-06 followed by three of 2024-07..2025-07, contiguous across the boundary between them.
       (MarketDataProvider.majors1hSearchFolds.map(_.head) :+ MarketDataProvider.majors1hValidationFold.head)
         .parTraverse(dataset => tradedBars(dataset).map(monthsOf))
         .asserting { segments =>
           segments mustBe List(
+            List("2023-07", "2023-08", "2023-09", "2023-10"),
+            List("2023-11", "2023-12", "2024-01", "2024-02"),
+            List("2024-03", "2024-04", "2024-05", "2024-06"),
             List("2024-07", "2024-08", "2024-09", "2024-10"),
             List("2024-11", "2024-12", "2025-01", "2025-02"),
             List("2025-03", "2025-04", "2025-05", "2025-06"),
@@ -117,9 +122,12 @@ class MarketDataProviderSpec extends IOWordSpec {
       // lands in the segment, so a segment starting mid-file inherits its 99 bars of history free and is offered every
       // bar it owns. Lose that and it would spend its own first hundred bars becoming a window instead, and the month
       // labels above could not tell: the truncated month is still the month it always was, and `coveredMonths` bills it
-      // in full either way. Every scored segment but the oldest fold starts mid-file; that one is asserted below.
-      val scored = MarketDataProvider.majors1hSearchFolds.tail.map(_.head) :::
-        List(MarketDataProvider.majors1hValidationFold.head, MarketDataProvider.majors1hHoldout.head)
+      // in full either way. Every scored segment starts mid-file except the first fold of each export, which has nothing
+      // before it to inherit; those two are asserted below.
+      val opensItsOwnExport = Set(0, 3)
+      val scored            = MarketDataProvider.majors1hSearchFolds.zipWithIndex.collect {
+        case (fold, index) if !opensItsOwnExport(index) => fold.head
+      } ::: List(MarketDataProvider.majors1hValidationFold.head, MarketDataProvider.majors1hHoldout.head)
 
       scored
         .parTraverse(dataset => MarketDataProvider.read[IO](dataset).head.compile.lastOrError.map(dataset -> _))
@@ -139,27 +147,35 @@ class MarketDataProviderSpec extends IOWordSpec {
         }
     }
 
-    "spend the oldest fold's first hundred bars on its first window rather than a month of the export" in
-      // The accepted cost of scoring all twelve months: the first fold opens on the file's first bar, so it has no
-      // history to inherit and its first hundred bars — five days of July, which `coveredMonths` still bills as a whole
-      // month — never reach a strategy. The alternative is handing a whole month of a twelve-month export to warm-up for
-      // the sake of the 99 bars `read` actually needs, which costs a quarter of a fold to save five days of one.
+    "spend each export's opening fold's first hundred bars on its first window rather than a month of the export" in
+      // The accepted cost of scoring all twelve months of an export: its opening fold starts on the file's first bar, so
+      // it has no history to inherit and its first hundred bars — five days, which `coveredMonths` still bills as a
+      // whole month — never reach a strategy. The alternative is handing a whole month of a twelve-month export to
+      // warm-up for the sake of the 99 bars `read` actually needs, which costs a quarter of a fold to save five days.
       //
-      // It is tolerable only here: it understates rather than flatters, and it lands on a search fold. On the segment
-      // that ranks the shortlist it would bias the one measurement the whole split exists to keep clean, which is why
-      // the validation fold still opens a month into its own file.
-      MarketDataProvider.majors1hSearchFolds.head
-        .parTraverse(dataset => MarketDataProvider.read[IO](dataset).head.compile.lastOrError.map(dataset -> _))
-        .asserting { opened =>
+      // Paid twice now rather than once, the search folds spanning two exports: folds 1 and 4 each open their own file.
+      // Still tolerable, and for the same two reasons: it understates rather than flatters, and it lands on search
+      // folds. On the segment that ranks the shortlist it would bias the one measurement the whole split exists to keep
+      // clean, which is why the validation fold still opens a month into its own file.
+      List(
+        MarketDataProvider.majors1hSearchFolds.head -> ("2023-07-02T21:00:00Z", "2023-07-07T00:00:00Z"),
+        MarketDataProvider.majors1hSearchFolds(3)   -> ("2024-07-01T00:00:00Z", "2024-07-05T03:00:00Z")
+      ).parTraverse { case (fold, (oldest, latest)) =>
+        fold
+          .parTraverse(dataset => MarketDataProvider.read[IO](dataset).head.compile.lastOrError.map(dataset -> _))
+          .map(opened => (opened, oldest, latest))
+      }.asserting { folds =>
+        folds.foreach { case (opened, oldest, latest) =>
           opened.foreach { case (dataset, first) =>
             withClue(s"$dataset: ") {
               first.prices.size mustBe 100
               // Every bar of the window comes out of the fold itself, there being nothing before it.
-              first.prices.last.time mustBe Instant.parse("2024-07-01T00:00:00Z")
-              first.latestTime mustBe Instant.parse("2024-07-05T03:00:00Z")
+              first.prices.last.time mustBe Instant.parse(oldest)
+              first.latestTime mustBe Instant.parse(latest)
             }
           }
-          succeed
         }
+        succeed
+      }
   }
 }
