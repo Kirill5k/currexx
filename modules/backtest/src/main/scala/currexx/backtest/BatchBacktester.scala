@@ -65,6 +65,7 @@ object BatchBacktester extends IOApp.Simple {
       }
 
   override val run: IO[Unit] = List(
+    "majors 1h 2024-07..2025-07 (12 months, original sample)"    -> MarketDataProvider.majors1hSearched,
     "searched 2023-07..2025-07 (24 months, in sample)"    -> MarketDataProvider.majors1hSearched,
     "holdout 2025-12..2026-06 (7 months, never selected)" -> MarketDataProvider.majors1hHoldout
   ).foldLeft(IO.pure(List.empty[String])) { case (acc, (label, datasets)) =>
