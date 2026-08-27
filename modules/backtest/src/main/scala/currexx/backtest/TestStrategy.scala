@@ -34,6 +34,18 @@ final case class TestStrategy(
   * was pruned, and the 2026-08-24/25 champions were then appended to the next free number in each family, so the ordering holds only among
   * the vals that predate them — `s2_optimized_v3` has the best out-of-sample net here despite its suffix. A champion's version need not
   * match the label in the `ga-optimisation-*.md` report it came from either; the report filename in each comment is the stable link back.
+  *
+  * The thirteen vals from the 2026-08-25/26 rounds are numbered by descending validation fitness within each family rather than appended in
+  * report order, and where two bases share one namespace — `s2_optimized`/`s2_optimized_v2`, `s12`/`s12_optimized` — that ordering runs
+  * across both, so a suffix there says which champion the GA preferred and nothing about which is better.
+  *
+  * That batch is worth reading as one result rather than thirteen. Of the fourteen champions its sixteen rounds selected, three beat the
+  * base they were optimised from on the holdout and six lose money there; nine had a training fitness of exactly 0.000000, meaning the six
+  * search folds scored them at zero and the four-month validation fold ranked them alone. The ranking it produced is close to inverted: the
+  * highest validation fitness of the batch and its only clean constraint verdict went to `s2_optimized_v7`, which returns a quarter of its
+  * base's holdout net, while `s5_optimized_v3` — ninth by fitness, five constraints breached — posts the best holdout profit factor and
+  * Sharpe in this file. Two further rounds selected nothing at all. Treat a validation figure from these rounds as a filter that rejects,
+  * not as a ranking, and read the holdout column.
   */
 object TestStrategy {
 
@@ -335,200 +347,6 @@ object TestStrategy {
       Indicator.VolatilityRegimeDetection(
         atrLength = 37,
         smoothingType = ValueTransformation.SMA(length = 35)
-      )
-    ),
-    rules = TradeStrategy(
-      openRules = List(
-        Rule(
-          action = TradeAction.OpenLong,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.upwardCrossover,
-            Rule.Condition.volatilityIsLow,
-            Rule.Condition.Not(Rule.Condition.momentumIsInOverbought)
-          )
-        ),
-        Rule(
-          action = TradeAction.OpenShort,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.downwardCrossover,
-            Rule.Condition.volatilityIsLow,
-            Rule.Condition.Not(Rule.Condition.momentumIsInOversold)
-          )
-        )
-      ),
-      closeRules = List(
-        Rule(
-          action = TradeAction.ClosePosition,
-          conditions = Rule.Condition.anyOf(
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsBuy,
-              Rule.Condition.momentumEnteredOverbought
-            ),
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsSell,
-              Rule.Condition.momentumEnteredOversold
-            )
-          )
-        )
-      )
-    )
-  )
-
-  // GA-optimized indicator params for s2_optimized (rules unchanged). Champion from
-  // ga-optimisation-2026-08-24-1827-s2_optimized_shuffle.md (training 1.352316 -> validation 0.312456, retaining 23.1%, shuffled GA).
-  // BREACHES 2 constraint(s) on validation data:
-  //   - profitable pair-months is 0.533, required >= 0.550
-  //   - most concentrated pair's best month is 1.000, required <= 0.738 (0.700 scaled to 5 periods)
-  // Trades far more than s2_optimized (1938 vs 1218 in sample) for less than half its holdout net (1123 vs 2480) — the extra volume is
-  // mostly cost: 1913 of 7311 gross in sample.
-  // searched 2023-07..2025-07: net=5398.00328, closed=1938, forced=11, win=42.16%, exp=2.785347, PF=1.190, DD=2.51%, Sharpe=1.297
-  // holdout 2025-12..2026-06:  net=1122.85657, closed=551, forced=5, win=42.29%, exp=2.037852, PF=1.139, DD=2.06%, Sharpe=1.113
-  val s2_optimized_v4 = TestStrategy(
-    indicator = Indicator.compositeAnyOf(
-      Indicator.LinesCrossing(
-        source = ValueSource.HLC3,
-        line1Transformation = ValueTransformation.JMA(length = 22, phase = 47, power = 2),
-        line2Transformation = ValueTransformation.JMA(length = 29, phase = 1, power = 2)
-      ),
-      Indicator.ThresholdCrossing(
-        source = ValueSource.Close,
-        transformation = ValueTransformation.RSX(length = 19),
-        upperBoundary = 70.0,
-        lowerBoundary = 25.0
-      ),
-      Indicator.VolatilityRegimeDetection(
-        atrLength = 37,
-        smoothingType = ValueTransformation.SMA(length = 35)
-      )
-    ),
-    rules = TradeStrategy(
-      openRules = List(
-        Rule(
-          action = TradeAction.OpenLong,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.upwardCrossover,
-            Rule.Condition.volatilityIsLow,
-            Rule.Condition.Not(Rule.Condition.momentumIsInOverbought)
-          )
-        ),
-        Rule(
-          action = TradeAction.OpenShort,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.downwardCrossover,
-            Rule.Condition.volatilityIsLow,
-            Rule.Condition.Not(Rule.Condition.momentumIsInOversold)
-          )
-        )
-      ),
-      closeRules = List(
-        Rule(
-          action = TradeAction.ClosePosition,
-          conditions = Rule.Condition.anyOf(
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsBuy,
-              Rule.Condition.momentumEnteredOverbought
-            ),
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsSell,
-              Rule.Condition.momentumEnteredOversold
-            )
-          )
-        )
-      )
-    )
-  )
-
-  // GA-optimized indicator params for s2_optimized_v2 (rules unchanged). Champion from
-  // ga-optimisation-2026-08-24-1948-s2_optimized_v2_shuffle.md (training 1.358189 -> validation 0.311945, retaining 23.0%, shuffled GA).
-  // BREACHES 2 constraint(s) on validation data:
-  //   - profitable pair-months is 0.433, required >= 0.550
-  //   - most concentrated pair's best month is 1.000, required <= 0.738 (0.700 scaled to 5 periods)
-  // Beats its s2_optimized_v2 base on the holdout (1016 vs 796) and loses to it in sample, on 1892 trades against 1124 and at the worst
-  // holdout drawdown in the catalogue, 2.90%.
-  // searched 2023-07..2025-07: net=5615.41274, closed=1892, forced=12, win=41.49%, exp=2.967977, PF=1.197, DD=2.07%, Sharpe=1.361
-  // holdout 2025-12..2026-06:  net=1016.36311, closed=561, forced=5, win=41.36%, exp=1.811699, PF=1.115, DD=2.90%, Sharpe=1.020
-  val s2_optimized_v5 = TestStrategy(
-    indicator = Indicator.compositeAnyOf(
-      Indicator.LinesCrossing(
-        source = ValueSource.HLC3,
-        line1Transformation = ValueTransformation.JMA(length = 28, phase = 41, power = 3),
-        line2Transformation = ValueTransformation.JMA(length = 33, phase = -14, power = 2)
-      ),
-      Indicator.ThresholdCrossing(
-        source = ValueSource.Close,
-        transformation = ValueTransformation.RSX(length = 20),
-        upperBoundary = 72.0,
-        lowerBoundary = 24.0
-      ),
-      Indicator.VolatilityRegimeDetection(
-        atrLength = 41,
-        smoothingType = ValueTransformation.SMA(length = 29)
-      )
-    ),
-    rules = TradeStrategy(
-      openRules = List(
-        Rule(
-          action = TradeAction.OpenLong,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.upwardCrossover,
-            Rule.Condition.volatilityIsLow,
-            Rule.Condition.Not(Rule.Condition.momentumIsInOverbought)
-          )
-        ),
-        Rule(
-          action = TradeAction.OpenShort,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.downwardCrossover,
-            Rule.Condition.volatilityIsLow,
-            Rule.Condition.Not(Rule.Condition.momentumIsInOversold)
-          )
-        )
-      ),
-      closeRules = List(
-        Rule(
-          action = TradeAction.ClosePosition,
-          conditions = Rule.Condition.anyOf(
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsBuy,
-              Rule.Condition.momentumEnteredOverbought
-            ),
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsSell,
-              Rule.Condition.momentumEnteredOversold
-            )
-          )
-        )
-      )
-    )
-  )
-
-  // GA-optimized indicator params for s2_optimized_v2 (rules unchanged). Champion from
-  // ga-optimisation-2026-08-24-1910-s2_optimized_v2.md (training 0.758049 -> validation 0.008849, retaining 1.2%).
-  // Retained almost nothing of its training score, so the search found nothing here that survives outside its own sample.
-  // BREACHES 3 constraint(s) on validation data:
-  //   - pair-month profit factor is 1.080926847720823257065371121911642, required >= 1.3
-  //   - profit factor is 1.05023, required >= 1.2
-  //   - costs as a share of gross profit is 0.567, required <= 0.400
-  // Highest in-sample net of the whole s2 family (6308) and below its own s2_optimized_v2 base on the holdout (738 vs 796): the shape the
-  // 1.2% retention predicted, and the earlier contaminated measurement had it the other way round.
-  // searched 2023-07..2025-07: net=6307.72496, closed=1057, forced=6, win=70.29%, exp=5.967573, PF=1.417, DD=1.33%, Sharpe=2.070
-  // holdout 2025-12..2026-06:  net=738.35880, closed=289, forced=2, win=71.28%, exp=2.554875, PF=1.164, DD=1.12%, Sharpe=0.975
-  val s2_optimized_v6 = TestStrategy(
-    indicator = Indicator.compositeAnyOf(
-      Indicator.LinesCrossing(
-        source = ValueSource.HLC3,
-        line1Transformation = ValueTransformation.JMA(length = 38, phase = -39, power = 1),
-        line2Transformation = ValueTransformation.JMA(length = 24, phase = 13, power = 6)
-      ),
-      Indicator.ThresholdCrossing(
-        source = ValueSource.Close,
-        transformation = ValueTransformation.RSX(length = 18),
-        upperBoundary = 58.0,
-        lowerBoundary = 9.0
-      ),
-      Indicator.VolatilityRegimeDetection(
-        atrLength = 7,
-        smoothingType = ValueTransformation.SMA(length = 7)
       )
     ),
     rules = TradeStrategy(
@@ -1022,90 +840,6 @@ object TestStrategy {
     )
   )
 
-  // GA-optimized indicator params for s4_regime_optimized_v2 (rules unchanged). Champion from
-  // ga-optimisation-2026-08-24-2125-s4_regime_optimized_v2.md (training 0.542873 -> validation 0.671006, retaining 123.6%).
-  // The only champion of the 2026-08-24 batch to score higher on validation than on the folds it was searched against.
-  // BREACHES 2 constraint(s) on validation data:
-  //   - closed trades is 111, required >= 120 (5 per pair-month over 4 months x 6 pairs)
-  //   - most concentrated pair's best month is 0.938, required <= 0.755 (0.700 scaled to 4 periods)
-  // Loses money on the holdout (-329), as does the s4_regime_optimized_v2 it came from (-224) and the s4_regime_optimized both descend from
-  // (-520). The earlier contaminated measurement showed all three as marginally positive; on data nothing selected on, the whole
-  // regime-gated line is unprofitable and none of it belongs in BatchBacktester on merit.
-  // searched 2023-07..2025-07: net=1405.00047, closed=560, forced=0, win=56.43%, exp=2.508929, PF=1.214, DD=0.90%, Sharpe=0.891
-  // holdout 2025-12..2026-06:  net=-328.61663, closed=171, forced=0, win=46.78%, exp=-1.921735, PF=0.846, DD=1.45%, Sharpe=-0.662
-  val s4_regime_optimized_v3 = TestStrategy(
-    indicator = Indicator.compositeAnyOf(
-      Indicator.TrendChangeDetection(
-        source = ValueSource.HLC3,
-        transformation = ValueTransformation.JMA(length = 50, phase = -19, power = 2)
-      ),
-      Indicator.KeltnerChannel(
-        source = ValueSource.Close,
-        middleBand = ValueTransformation.EMA(length = 28),
-        atrLength = 31,
-        atrMultiplier = 1.6
-      ),
-      Indicator.ThresholdCrossing(
-        source = ValueSource.Close,
-        transformation = ValueTransformation.RSX(length = 23),
-        upperBoundary = 66.0,
-        lowerBoundary = 34.0
-      ),
-      Indicator.VolatilityRegimeDetection(
-        atrLength = 22,
-        smoothingType = ValueTransformation.SMA(length = 55)
-      ),
-      Indicator.ValueTracking(
-        role = ValueRole.TrendStrength,
-        source = ValueSource.Close,
-        transformation = ValueTransformation.ADX(length = 14)
-      )
-    ),
-    rules = TradeStrategy(
-      openRules = List(
-        Rule(
-          action = TradeAction.OpenLong,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.NoPosition,
-            Rule.Condition.trendIsUpward,
-            Rule.Condition.TrendActiveFor(1.hour),
-            Rule.Condition.volatilityIsLow,
-            Rule.Condition.UpperBandCrossed(Direction.Upward),
-            Rule.Condition.ValueIs(ValueRole.TrendStrength, Rule.Operator.GreaterThan, 25.0) // regime gate
-          )
-        ),
-        Rule(
-          action = TradeAction.OpenShort,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.NoPosition,
-            Rule.Condition.trendIsDownward,
-            Rule.Condition.TrendActiveFor(1.hour),
-            Rule.Condition.volatilityIsLow,
-            Rule.Condition.LowerBandCrossed(Direction.Downward),
-            Rule.Condition.ValueIs(ValueRole.TrendStrength, Rule.Operator.GreaterThan, 25.0) // regime gate
-          )
-        )
-      ),
-      closeRules = List(
-        Rule(
-          action = TradeAction.ClosePosition,
-          conditions = Rule.Condition.anyOf(
-            Rule.Condition.TrendChangedTo(Direction.Downward),
-            Rule.Condition.TrendChangedTo(Direction.Upward),
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsBuy,
-              Rule.Condition.momentumEnteredOverbought
-            ),
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsSell,
-              Rule.Condition.momentumEnteredOversold
-            )
-          )
-        )
-      )
-    )
-  )
-
   // GA-optimized indicator params for s5_optimized_v2, which is no longer in this catalogue (rules unchanged). Champion from
   // ga-optimisation-2026-08-08-1634-s5_optimized_v2.md (training 0.660687 -> validation 0.038808).
   // BREACHES 4 constraint(s) on validation data:
@@ -1213,35 +947,37 @@ object TestStrategy {
   )
 
   // GA-optimized indicator params for s5_optimized (rules unchanged). Champion from
-  // ga-optimisation-2026-08-24-2000-s5_optimized.md (training 0.963309 -> validation 0.000000, retaining 0.0%).
-  // Selected only because its validation score rounds to zero from above rather than being zero; the round found nothing that holds up
-  // outside its own folds, and every consistency constraint fails.
+  // ga-optimisation-2026-08-25-2011-s5_optimized.md (training 0.387064 -> validation 0.106525, retaining 27.5%).
+  // The only s5 champion of the 2026-08-25/26 batch: the shuffled twin
+  // (ga-optimisation-2026-08-26-0747-s5_optimized_shuffle.md) had no finalist score above zero on validation and selected nothing.
   // BREACHES 5 constraint(s) on validation data:
-  //   - profitable pair-months is 0.440, required >= 0.550
+  //   - closed trades is 97, required >= 120 (5 per pair-month over 4 months x 6 pairs)
+  //   - profitable pair-months is 0.519, required >= 0.550
   //   - most concentrated pair's best month is 1.000, required <= 0.738 (0.700 scaled to 5 periods)
-  //   - pair-month profit factor is 1.002557000513026028408320455552660, required >= 1.3
-  //   - profit factor is 1.00098, required >= 1.2
-  //   - costs as a share of gross profit is 0.986, required <= 0.400
-  // Beats the s5_optimized it came from on both corpora — 4189 vs 3089 in sample, 857 vs 705 on the holdout, at a better PF and Sharpe on
-  // each. Its GA fitness said the opposite: 0.0% retention, five breached constraints, selected only because its validation score rounds to
-  // zero from above. The cleanest example in this catalogue of the validation fold being too small a sample to trust on its own.
-  // searched 2023-07..2025-07: net=4188.72153, closed=666, forced=6, win=67.72%, exp=6.289372, PF=1.514, DD=0.62%, Sharpe=2.175
-  // holdout 2025-12..2026-06:  net=856.74552, closed=180, forced=0, win=67.22%, exp=4.759697, PF=1.376, DD=0.83%, Sharpe=2.080
-  val s5_optimized_v2 = TestStrategy(
+  //   - pair-month profit factor is 1.229396636418566559057141030972838, required >= 1.3
+  //   - profit factor is 1.13760, required >= 1.2
+  // The best champion this batch produced, and on the holdout the best profit factor (2.079) and Sharpe (4.131) in the catalogue, at a
+  // 0.49% drawdown. Beats the s5_optimized it came from on both corpora — 4222 vs 3089 in sample, 1607 vs 705 out — and its holdout PF is
+  // higher than its in-sample PF, so the improvement is not a fit to the folds.
+  // Its GA fitness said none of this: 0.106525 on validation with five breached constraints, ninth of the fourteen champions measured. The
+  // same lesson s5_optimized_v2 taught in the previous batch, from the same base.
+  // searched 2023-07..2025-07: net=4221.68925, closed=528, forced=4, win=67.05%, exp=7.995624, PF=1.721, DD=0.35%, Sharpe=3.063
+  // holdout 2025-12..2026-06:  net=1607.43953, closed=149, forced=0, win=70.47%, exp=10.788185, PF=2.079, DD=0.49%, Sharpe=4.131
+  val s5_optimized_v3 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
         source = ValueSource.HLC3,
-        transformation = ValueTransformation.JMA(length = 42, phase = -7, power = 1)
+        transformation = ValueTransformation.JMA(length = 50, phase = -6, power = 1)
       ),
       Indicator.BollingerBands(
         source = ValueSource.Close,
-        middleBand = ValueTransformation.SMA(length = 49),
-        stdDevLength = 39,
-        stdDevMultiplier = 2.7
+        middleBand = ValueTransformation.SMA(length = 35),
+        stdDevLength = 41,
+        stdDevMultiplier = 2.6
       ),
       Indicator.VolatilityRegimeDetection(
-        atrLength = 24,
-        smoothingType = ValueTransformation.SMA(length = 49)
+        atrLength = 28,
+        smoothingType = ValueTransformation.SMA(length = 63)
       ),
       Indicator.ThresholdCrossing(
         source = ValueSource.Close,
@@ -1252,7 +988,7 @@ object TestStrategy {
       Indicator.ValueTracking(
         role = ValueRole.Momentum,
         source = ValueSource.Close,
-        transformation = ValueTransformation.RSX(length = 6)
+        transformation = ValueTransformation.RSX(length = 8)
       )
     ),
     rules = TradeStrategy(
@@ -1446,149 +1182,6 @@ object TestStrategy {
             Rule.Condition.trendIsDownward,
             Rule.Condition.TrendActiveFor(1.hour),
             Rule.Condition.momentumEnteredOversold, // CMF crossed below -0.17
-            Rule.Condition.volatilityIsLow
-          )
-        )
-      ),
-      closeRules = List(
-        Rule(
-          action = TradeAction.ClosePosition,
-          conditions = Rule.Condition.anyOf(
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsBuy,
-              Rule.Condition.TrendChangedTo(Direction.Downward)
-            ),
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsSell,
-              Rule.Condition.TrendChangedTo(Direction.Upward)
-            )
-          )
-        )
-      )
-    )
-  )
-
-  // GA-optimized indicator params for s12 (rules unchanged). Champion from
-  // ga-optimisation-2026-08-25-0148-s12_shuffle.md (training 0.451368 -> validation 0.101959, retaining 22.6%, shuffled GA).
-  // First s12 champion found since threshold bounds became transformation-aware, so this is the first honest read on s12's searchability.
-  // BREACHES 4 constraint(s) on validation data:
-  //   - closed trades is 70, required >= 120 (5 per pair-month over 4 months x 6 pairs)
-  //   - profitable pair-months is 0.536, required >= 0.550
-  //   - most concentrated pair's best month is 1.000, required <= 0.738 (0.700 scaled to 5 periods)
-  //   - profit factor is 1.19757, required >= 1.2
-  // Loses more on the holdout than the s12 it came from (-291 vs -79) despite a higher in-sample net. The contaminated measurement had this
-  // as a large improvement on s12; on clean data it is a regression.
-  // searched 2023-07..2025-07: net=1916.93620, closed=339, forced=6, win=42.77%, exp=5.654679, PF=1.214, DD=2.11%, Sharpe=0.597
-  // holdout 2025-12..2026-06:  net=-291.10970, closed=100, forced=1, win=46.00%, exp=-2.911097, PF=0.893, DD=0.84%, Sharpe=-0.574
-  val s12_optimized_v2 = TestStrategy(
-    indicator = Indicator.compositeAnyOf(
-      Indicator.TrendChangeDetection(
-        source = ValueSource.HLC3,
-        transformation = ValueTransformation.IchimokuKijunSen(length = 23)
-      ),
-      Indicator.ThresholdCrossing(
-        source = ValueSource.Close,
-        transformation = ValueTransformation.CMF(length = 18),
-        upperBoundary = 0.28,
-        lowerBoundary = -0.18
-      ),
-      Indicator.VolatilityRegimeDetection(
-        atrLength = 32,
-        smoothingType = ValueTransformation.SMA(length = 42)
-      )
-    ),
-    rules = TradeStrategy(
-      openRules = List(
-        Rule(
-          action = TradeAction.OpenLong,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.NoPosition,
-            Rule.Condition.trendIsUpward,
-            Rule.Condition.TrendActiveFor(1.hour),
-            Rule.Condition.momentumEnteredOverbought, // CMF crossed above +0.28
-            Rule.Condition.volatilityIsLow
-          )
-        ),
-        Rule(
-          action = TradeAction.OpenShort,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.NoPosition,
-            Rule.Condition.trendIsDownward,
-            Rule.Condition.TrendActiveFor(1.hour),
-            Rule.Condition.momentumEnteredOversold, // CMF crossed below -0.18
-            Rule.Condition.volatilityIsLow
-          )
-        )
-      ),
-      closeRules = List(
-        Rule(
-          action = TradeAction.ClosePosition,
-          conditions = Rule.Condition.anyOf(
-            // Ride the trend; exit only when the Ichimoku trend reverses against the position.
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsBuy,
-              Rule.Condition.TrendChangedTo(Direction.Downward)
-            ),
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsSell,
-              Rule.Condition.TrendChangedTo(Direction.Upward)
-            )
-          )
-        )
-      )
-    )
-  )
-
-  // GA-optimized indicator params for s12_optimized (rules unchanged). Champion from
-  // ga-optimisation-2026-08-25-0808-s12_optimized_shuffle.md (training 0.682651 -> validation 0.000044, retaining 0.0%, shuffled GA).
-  // Selected only because its validation score is non-zero rather than zero; the round found nothing that holds up outside its own folds.
-  // BREACHES 6 constraint(s) on validation data:
-  //   - profitable pair-months is 0.444, required >= 0.550
-  //   - most concentrated pair's best month is 1.000, required <= 0.738 (0.700 scaled to 5 periods)
-  //   - pair-month profit factor is 1.021028615269642604539967629157884, required >= 1.3
-  //   - profit factor is 1.01217, required >= 1.2
-  //   - costs as a share of gross profit is 0.851, required <= 0.400
-  //   - profitable datasets is 0.500, required >= 0.667
-  // Barely improves on the s12_optimized it came from (-736 vs -767 on the holdout) for more than double the trades. The worst holdout
-  // profit factor of the s12 family bar s12_optimized itself, and like all of it, loss-making.
-  // searched 2023-07..2025-07: net=1351.81190, closed=682, forced=3, win=42.38%, exp=1.982129, PF=1.110, DD=1.68%, Sharpe=0.498
-  // holdout 2025-12..2026-06:  net=-736.12992, closed=198, forced=0, win=42.42%, exp=-3.717828, PF=0.826, DD=2.19%, Sharpe=-1.020
-  val s12_optimized_v3 = TestStrategy(
-    indicator = Indicator.compositeAnyOf(
-      Indicator.TrendChangeDetection(
-        source = ValueSource.HLC3,
-        transformation = ValueTransformation.IchimokuKijunSen(length = 13)
-      ),
-      Indicator.ThresholdCrossing(
-        source = ValueSource.Close,
-        transformation = ValueTransformation.CMF(length = 13),
-        upperBoundary = 0.26,
-        lowerBoundary = -0.24
-      ),
-      Indicator.VolatilityRegimeDetection(
-        atrLength = 26,
-        smoothingType = ValueTransformation.SMA(length = 11)
-      )
-    ),
-    rules = TradeStrategy(
-      openRules = List(
-        Rule(
-          action = TradeAction.OpenLong,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.NoPosition,
-            Rule.Condition.trendIsUpward,
-            Rule.Condition.TrendActiveFor(1.hour),
-            Rule.Condition.momentumEnteredOverbought, // CMF crossed above +0.26
-            Rule.Condition.volatilityIsLow
-          )
-        ),
-        Rule(
-          action = TradeAction.OpenShort,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.NoPosition,
-            Rule.Condition.trendIsDownward,
-            Rule.Condition.TrendActiveFor(1.hour),
-            Rule.Condition.momentumEnteredOversold, // CMF crossed below -0.24
             Rule.Condition.volatilityIsLow
           )
         )

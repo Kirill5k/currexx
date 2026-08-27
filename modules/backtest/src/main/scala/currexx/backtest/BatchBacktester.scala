@@ -22,15 +22,10 @@ object BatchBacktester extends IOApp.Simple {
     "s12"                    -> TestStrategy.s12,
 
     "s2_optimized_v3"        -> TestStrategy.s2_optimized_v3,
-    "s2_optimized_v4"        -> TestStrategy.s2_optimized_v4,
-    "s2_optimized_v5"        -> TestStrategy.s2_optimized_v5,
-    "s2_optimized_v6"        -> TestStrategy.s2_optimized_v6,
     "s1_v2_optimized_v2"     -> TestStrategy.s1_v2_optimized_v2,
     "s4_optimized_v4"        -> TestStrategy.s4_optimized_v4,
-    "s4_regime_optimized_v3" -> TestStrategy.s4_regime_optimized_v3,
-    "s5_optimized_v2"        -> TestStrategy.s5_optimized_v2,
-    "s12_optimized_v2"       -> TestStrategy.s12_optimized_v2,
-    "s12_optimized_v3"       -> TestStrategy.s12_optimized_v3
+
+    "s5_optimized_v3"        -> TestStrategy.s5_optimized_v3
   )
 
   val riskSettings: RiskSettings = RiskSettings()
@@ -65,9 +60,9 @@ object BatchBacktester extends IOApp.Simple {
       }
 
   override val run: IO[Unit] = List(
-    "majors 1h 2024-07..2025-07 (12 months, original sample)"    -> MarketDataProvider.majors1hSearched,
-    "searched 2023-07..2025-07 (24 months, in sample)"    -> MarketDataProvider.majors1hSearched,
-    "holdout 2025-12..2026-06 (7 months, never selected)" -> MarketDataProvider.majors1hHoldout
+    "majors 1h 2024-07..2025-07 (12 months, original sample)" -> MarketDataProvider.majors1h,
+    "searched 2023-07..2025-07 (24 months, in sample)"        -> MarketDataProvider.majors1hSearched,
+    "holdout 2025-12..2026-06 (7 months, never selected)"     -> MarketDataProvider.majors1hHoldout
   ).foldLeft(IO.pure(List.empty[String])) { case (acc, (label, datasets)) =>
     acc.flatMap { sections =>
       strategies
