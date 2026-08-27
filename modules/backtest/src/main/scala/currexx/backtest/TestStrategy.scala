@@ -49,81 +49,6 @@ final case class TestStrategy(
   */
 object TestStrategy {
 
-  // GA-optimized indicator params for s1_v2_optimized_v2, which is no longer in this catalogue (rules unchanged). Champion from
-  // ga-optimisation-2026-08-08-1409-s1_v2_optimized_v2_shuffle.md (training 1.157784 -> validation 0.053450, shuffled GA).
-  // BREACHES 4 constraint(s) on validation data:
-  //   - profitable pair-months is 0.500, required >= 0.550
-  //   - most concentrated pair's best month is 1.000, required <= 0.738 (0.700 scaled to 5 periods)
-  //   - pair-month profit factor is 1.239396792464384156770483855333763, required >= 1.3
-  //   - profit factor is 1.09198, required >= 1.2
-  // searched 2023-07..2025-07: net=5716.99531, closed=1291, forced=12, win=48.03%, exp=4.428346, PF=1.242, DD=1.40%, Sharpe=1.460
-  // holdout 2025-12..2026-06:  net=1250.85597, closed=364, forced=6, win=46.43%, exp=3.436417, PF=1.194, DD=1.23%, Sharpe=1.107
-  val s1_v2_optimized = TestStrategy(
-    indicator = Indicator.compositeAnyOf(
-      // Primary signal: JMA crossover
-      Indicator.LinesCrossing(
-        source = ValueSource.HLC3,
-        line1Transformation = ValueTransformation.JMA(length = 32, phase = 11, power = 5),
-        line2Transformation = ValueTransformation.JMA(length = 29, phase = 1, power = 2)
-      ),
-      // Momentum filter
-      Indicator.ThresholdCrossing(
-        source = ValueSource.Close,
-        transformation = ValueTransformation.RSX(length = 22),
-        upperBoundary = 69.0,
-        lowerBoundary = 26.0
-      ),
-      // Momentum tracking
-      Indicator.ValueTracking(
-        role = ValueRole.Momentum,
-        source = ValueSource.Close,
-        transformation = ValueTransformation.RSX(length = 15)
-      ),
-      // Volatility filter
-      Indicator.VolatilityRegimeDetection(
-        atrLength = 27,
-        smoothingType = ValueTransformation.SMA(length = 35)
-      )
-    ),
-    rules = TradeStrategy(
-      openRules = List(
-        Rule(
-          action = TradeAction.OpenLong,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.upwardCrossover,
-            Rule.Condition.volatilityIsLow,
-            Rule.Condition.MomentumIs(Direction.Upward),
-            Rule.Condition.Not(Rule.Condition.momentumIsInOverbought)
-          )
-        ),
-        Rule(
-          action = TradeAction.OpenShort,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.downwardCrossover,
-            Rule.Condition.volatilityIsLow,
-            Rule.Condition.MomentumIs(Direction.Downward),
-            Rule.Condition.Not(Rule.Condition.momentumIsInOversold)
-          )
-        )
-      ),
-      closeRules = List(
-        Rule(
-          action = TradeAction.ClosePosition,
-          conditions = Rule.Condition.anyOf(
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsBuy,
-              Rule.Condition.momentumEnteredOverbought
-            ),
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsSell,
-              Rule.Condition.momentumEnteredOversold
-            )
-          )
-        )
-      )
-    )
-  )
-
   // GA-optimized indicator params for s1_v2_optimized (rules unchanged). Champion from
   // ga-optimisation-2026-08-24-1855-s1_v2_optimized_shuffle.md (training 1.622058 -> validation 0.125887, retaining 7.8%, shuffled GA).
   // BREACHES 3 constraint(s) on validation data:
@@ -133,7 +58,7 @@ object TestStrategy {
   // Beats the s1_v2_optimized it came from on both corpora (1536 vs 1251 on the holdout) at a lower drawdown, despite the breaches above.
   // searched 2023-07..2025-07: net=6285.64646, closed=1259, forced=10, win=45.75%, exp=4.992571, PF=1.259, DD=1.79%, Sharpe=1.597
   // holdout 2025-12..2026-06:  net=1535.84151, closed=382, forced=6, win=45.55%, exp=4.020528, PF=1.242, DD=0.85%, Sharpe=1.548
-  val s1_v2_optimized_v2 = TestStrategy(
+  val s1_v2_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       // Primary signal: JMA crossover
       Indicator.LinesCrossing(
