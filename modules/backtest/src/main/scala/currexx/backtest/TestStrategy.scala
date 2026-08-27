@@ -18,44 +18,46 @@ final case class TestStrategy(
   * the GA folds cover, so for anything named `_optimized` it reports fit to the data that chose it and is not evidence of an edge.
   * `holdout 2025-12..2026-06` is the seven months nothing has ever scored or selected against; that is the line to read. Where the two
   * disagree sharply the strategy is fitted, not skilled — the clearest case here is s4_regime_optimized, PF 1.894 in-sample against 0.595
-  * out, on a corpus where its whole family loses money.
+  * out, on a corpus where its whole family loses money. `BatchBacktester` prints a third section for the original twelve-month sample; it
+  * is a subset of `searched` and is deliberately not recorded per val.
   *
   * Read the holdout column across strategies, not as a forecast. Its net figures cover seven months against the searched column's
-  * twenty-four, so they are not comparable to each other, and eighteen of twenty-one vals post a lower profit factor there than in sample —
+  * twenty-four, so they are not comparable to each other, and nine of the thirteen vals post a lower profit factor there than in sample —
   * the usual overfitting story, but it also means the level of the whole column is a property of those seven months. What it supports is
   * ranking strategies against each other on data none of them was selected on. What it does not support is expecting those numbers forward.
   *
-  * Both lines were re-measured on 2026-08-25 when the folds went from three to six and reporting moved to the holdout. They are not
-  * comparable to figures quoted in commit history or in `ga-optimisation-*.md` reports before that date: the earlier "searched" column was
-  * one year rather than two, and the earlier out-of-sample column was the whole newer export, a third of which is the validation fold every
-  * champion's finalist ranking selected on.
+  * The four exceptions, whose holdout profit factor beats their in-sample one, are s2_optimized, s2_optimized_v3, s4_optimized_v4 and
+  * s5_optimized_v2 — and three of those four lead the catalogue on holdout net. That is the pattern worth trusting: a strategy holding up
+  * better on data nobody selected it on than on the data that chose it was not fitted to the folds.
   *
-  * Version suffixes are contiguous within each family but no longer rank it. They were renumbered by out-of-sample net when the catalogue
-  * was pruned, and the 2026-08-24/25 champions were then appended to the next free number in each family, so the ordering holds only among
-  * the vals that predate them — `s2_optimized_v3` has the best out-of-sample net here despite its suffix. A champion's version need not
-  * match the label in the `ga-optimisation-*.md` report it came from either; the report filename in each comment is the stable link back.
+  * Both lines were re-measured on 2026-08-25 when the folds went from three to six and reporting moved to the holdout, and re-verified
+  * unchanged on 2026-08-27. They are not comparable to figures quoted in commit history or in `ga-optimisation-*.md` reports before
+  * 2026-08-25: the earlier "searched" column was one year rather than two, and the earlier out-of-sample column was the whole newer export,
+  * a third of which is the validation fold every champion's finalist ranking selected on.
   *
-  * The thirteen vals from the 2026-08-25/26 rounds are numbered by descending validation fitness within each family rather than appended in
-  * report order, and where two bases share one namespace — `s2_optimized`/`s2_optimized_v2`, `s12`/`s12_optimized` — that ordering runs
-  * across both, so a suffix there says which champion the GA preferred and nothing about which is better.
+  * Version suffixes neither rank a family nor run contiguously within one. The catalogue was pruned to its measured winners on 2026-08-27,
+  * and where a GA descendant beat the base it came from, the descendant was promoted into the base's name and the base deleted — so
+  * `s1_v2_optimized` here is the champion of ga-optimisation-2026-08-24-1855, not the val that report was searching. The same prune left
+  * `s5_optimized_v2` as the only member of its family, with no `s5_optimized` above it. A suffix therefore records only that a val once
+  * needed distinguishing from something; the report filename in each comment is the stable link back, and the holdout line is the ranking.
   *
-  * That batch is worth reading as one result rather than thirteen. Of the fourteen champions its sixteen rounds selected, three beat the
-  * base they were optimised from on the holdout and six lose money there; nine had a training fitness of exactly 0.000000, meaning the six
-  * search folds scored them at zero and the four-month validation fold ranked them alone. The ranking it produced is close to inverted: the
-  * highest validation fitness of the batch and its only clean constraint verdict went to `s2_optimized_v7`, which returns a quarter of its
-  * base's holdout net, while `s5_optimized_v3` — ninth by fitness, five constraints breached — posts the best holdout profit factor and
-  * Sharpe in this file. Two further rounds selected nothing at all. Treat a validation figure from these rounds as a filter that rejects,
-  * not as a ranking, and read the holdout column.
+  * One val survives the sixteen rounds of 2026-08-25/26: s5_optimized_v2, which ranked ninth of the fourteen champions those rounds
+  * selected and breached five constraints, and which now posts the best holdout profit factor and Sharpe in this file. Of the other
+  * thirteen, two beat the base they came from and the rest were deleted; nine had a training fitness of exactly 0.000000, meaning the six
+  * search folds scored them at zero and the four-month validation fold ranked them alone, and the round with the highest validation fitness
+  * and the only clean constraint verdict of the batch returned a quarter of its base's holdout net. Two rounds selected nothing at all.
+  * Treat a validation figure from that generation of rounds as a filter that rejects, not as a ranking.
   */
 object TestStrategy {
 
-  // GA-optimized indicator params for s1_v2_optimized (rules unchanged). Champion from
+  // GA-optimized indicator params for s1_v2_optimized, which is no longer in this catalogue (rules unchanged). Champion from
   // ga-optimisation-2026-08-24-1855-s1_v2_optimized_shuffle.md (training 1.622058 -> validation 0.125887, retaining 7.8%, shuffled GA).
   // BREACHES 3 constraint(s) on validation data:
   //   - profitable pair-months is 0.533, required >= 0.550
   //   - most concentrated pair's best month is 1.000, required <= 0.738 (0.700 scaled to 5 periods)
   //   - profit factor is 1.11609, required >= 1.2
-  // Beats the s1_v2_optimized it came from on both corpora (1536 vs 1251 on the holdout) at a lower drawdown, despite the breaches above.
+  // Promoted into its base's name on 2026-08-27, having beaten it on both corpora (1536 vs 1251 on the holdout) at a lower drawdown,
+  // despite the breaches above.
   // searched 2023-07..2025-07: net=6285.64646, closed=1259, forced=10, win=45.75%, exp=4.992571, PF=1.259, DD=1.79%, Sharpe=1.597
   // holdout 2025-12..2026-06:  net=1535.84151, closed=382, forced=6, win=45.55%, exp=4.020528, PF=1.242, DD=0.85%, Sharpe=1.548
   val s1_v2_optimized = TestStrategy(
@@ -251,7 +253,8 @@ object TestStrategy {
   // GA-optimized indicator params for s2_optimized (rules unchanged). Champion from
   // ga-optimisation-2026-08-24-1811-s2_optimized.md (training 1.430220 -> validation 1.043568, retaining 73.0%).
   // Satisfies every constraint on validation data — the only champion of the 2026-08-24/25 batch that does.
-  // Best holdout net and Sharpe in the catalogue: beats s2_optimized on data neither was selected on (2660 vs 2480, Sharpe 2.628 vs 2.142)
+  // Best holdout net in the catalogue, and second-best Sharpe behind s5_optimized_v2: it beats s2_optimized on data neither was selected on
+  // (2660 vs 2480, Sharpe 2.628 vs 2.142)
   // while giving up in-sample net to it (4923 vs 5826). The margin on net is 7%, thin enough that the Sharpe gap is the better reason to
   // prefer it.
   // searched 2023-07..2025-07: net=4922.55728, closed=1203, forced=12, win=37.82%, exp=4.091901, PF=1.219, DD=1.98%, Sharpe=1.183
@@ -536,9 +539,9 @@ object TestStrategy {
   // BREACHES 1 constraint(s) on validation data:
   //   - most concentrated pair's best month is 0.776, required <= 0.755 (0.700 scaled to 4 periods)
   // The most interesting result of the batch. It gives up most of its in-sample net against s4_optimized_v2 (1281 vs 3436) and beats it on
-  // the holdout (1080 vs 623), where it posts the best profit factor in the catalogue (1.565) and the second-best Sharpe (2.189) at a 0.72%
-  // drawdown.
-  // One of only three vals whose profit factor is higher on the holdout than in sample, and by far the widest gap of them (1.155 -> 1.565):
+  // the holdout (1080 vs 623), where it posts the second-best profit factor in the catalogue (1.565, behind s5_optimized_v2) and the
+  // third-best Sharpe (2.189) at a 0.72% drawdown.
+  // One of only four vals whose profit factor is higher on the holdout than in sample, and by far the widest gap of them (1.155 -> 1.565):
   // whatever the GA found here, it was not a fit to the folds.
   // searched 2023-07..2025-07: net=1281.32473, closed=788, forced=2, win=57.11%, exp=1.626047, PF=1.155, DD=1.25%, Sharpe=0.669
   // holdout 2025-12..2026-06:  net=1079.89722, closed=210, forced=0, win=61.43%, exp=5.142368, PF=1.565, DD=0.72%, Sharpe=2.189
@@ -765,7 +768,7 @@ object TestStrategy {
     )
   )
 
-  // GA-optimized indicator params for s5_optimized (rules unchanged). Champion from
+  // GA-optimized indicator params for s5_optimized, which is no longer in this catalogue (rules unchanged). Champion from
   // ga-optimisation-2026-08-25-2011-s5_optimized.md (training 0.387064 -> validation 0.106525, retaining 27.5%).
   // The only s5 champion of the 2026-08-25/26 batch: the shuffled twin
   // (ga-optimisation-2026-08-26-0747-s5_optimized_shuffle.md) had no finalist score above zero on validation and selected nothing.
@@ -776,10 +779,11 @@ object TestStrategy {
   //   - pair-month profit factor is 1.229396636418566559057141030972838, required >= 1.3
   //   - profit factor is 1.13760, required >= 1.2
   // The best champion this batch produced, and on the holdout the best profit factor (2.079) and Sharpe (4.131) in the catalogue, at a
-  // 0.49% drawdown. Beats the s5_optimized it came from on both corpora — 4222 vs 3089 in sample, 1607 vs 705 out — and its holdout PF is
-  // higher than its in-sample PF, so the improvement is not a fit to the folds.
+  // 0.49% drawdown. Beat the s5_optimized it came from on both corpora — 4222 vs 3089 in sample, 1607 vs 705 out — and its holdout PF is
+  // higher than its in-sample PF, so the improvement is not a fit to the folds. It kept its `_v2` suffix when that base was deleted, and is
+  // now the only member of its family.
   // Its GA fitness said none of this: 0.106525 on validation with five breached constraints, ninth of the fourteen champions measured. The
-  // same lesson s5_optimized_v2 taught in the previous batch, from the same base.
+  // previous batch's s5 champion taught the same lesson from the same base, which makes this the s5 family's pattern rather than one fluke.
   // searched 2023-07..2025-07: net=4221.68925, closed=528, forced=4, win=67.05%, exp=7.995624, PF=1.721, DD=0.35%, Sharpe=3.063
   // holdout 2025-12..2026-06:  net=1607.43953, closed=149, forced=0, win=70.47%, exp=10.788185, PF=2.079, DD=0.49%, Sharpe=4.131
   val s5_optimized_v2 = TestStrategy(

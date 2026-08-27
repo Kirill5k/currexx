@@ -48,12 +48,17 @@ object Optimiser extends IOApp.Simple {
 
   /** The catalogue as it currently stands, each strategy searched twice — once in file order, once shuffled.
     *
-    * Both are kept because shuffling has earned its place rather than because it is symmetrical: the two best champions this catalogue
-    * holds, s2_optimized and s1_v2_optimized, both came out of shuffled rounds, while their unshuffled twins produced champions that lose
-    * money on the later year.
+    * Both are kept because shuffling still finds champions the file order misses, but no longer because it finds the best ones: of the four
+    * leading vals by holdout net, s2_optimized and s1_v2_optimized came out of shuffled rounds and s2_optimized_v3 and s5_optimized_v2 out
+    * of unshuffled ones. The 2026-08-25/26 batch made the case weaker still: its one surviving champion, s5_optimized_v2, came out of an
+    * unshuffled round whose shuffled twin found nothing at all.
     *
-    * Ordered by out-of-sample net, best first. A full pass is long enough that it is routinely interrupted, and this way the strategies
-    * most worth improving are the ones already done when it is.
+    * Ordered by holdout net, best first. A full pass is long enough that it is routinely interrupted, and this way the strategies most
+    * worth improving are the ones already done when it is.
+    *
+    * Two vals in `BatchBacktester` are not searched here: s2_optimized_v3 and s4_optimized_v4. Each is a GA descendant of a base that is
+    * searched, so a round on one would largely re-derive its own sibling. Add them if that stops being true — s2_optimized_v3 currently
+    * leads the catalogue on holdout net, so it is the more defensible of the two to promote into a round of its own.
     */
   val rounds: List[OptimisationRound] = List(
     OptimisationRound(
@@ -65,6 +70,18 @@ object Optimiser extends IOApp.Simple {
     OptimisationRound(
       name = "s2_optimized_shuffle",
       strategy = TestStrategy.s2_optimized,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s5_optimized_v2",
+      strategy = TestStrategy.s5_optimized_v2,
+      gaParameters = gaParameters,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s5_optimized_v2_shuffle",
+      strategy = TestStrategy.s5_optimized_v2,
       gaParameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring
     ),
@@ -93,18 +110,6 @@ object Optimiser extends IOApp.Simple {
       scoringFunction = consistentScoring
     ),
     OptimisationRound(
-      name = "s5_optimized",
-      strategy = TestStrategy.s5_optimized,
-      gaParameters = gaParameters,
-      scoringFunction = consistentScoring
-    ),
-    OptimisationRound(
-      name = "s5_optimized_shuffle",
-      strategy = TestStrategy.s5_optimized,
-      gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring
-    ),
-    OptimisationRound(
       name = "s4_optimized_v2",
       strategy = TestStrategy.s4_optimized_v2,
       gaParameters = gaParameters,
@@ -117,18 +122,6 @@ object Optimiser extends IOApp.Simple {
       scoringFunction = consistentScoring
     ),
     OptimisationRound(
-      name = "s4_regime_optimized_v2",
-      strategy = TestStrategy.s4_regime_optimized_v2,
-      gaParameters = gaParameters,
-      scoringFunction = consistentScoring
-    ),
-    OptimisationRound(
-      name = "s4_regime_optimized_v2_shuffle",
-      strategy = TestStrategy.s4_regime_optimized_v2,
-      gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring
-    ),
-    OptimisationRound(
       name = "s12",
       strategy = TestStrategy.s12,
       gaParameters = gaParameters,
@@ -137,6 +130,18 @@ object Optimiser extends IOApp.Simple {
     OptimisationRound(
       name = "s12_shuffle",
       strategy = TestStrategy.s12,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s4_regime_optimized_v2",
+      strategy = TestStrategy.s4_regime_optimized_v2,
+      gaParameters = gaParameters,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s4_regime_optimized_v2_shuffle",
+      strategy = TestStrategy.s4_regime_optimized_v2,
       gaParameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring
     ),
