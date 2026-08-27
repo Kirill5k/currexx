@@ -9,5 +9,5 @@ object JsonPrinter extends IOApp.Simple {
     obj.asJson.printWith(Printer.spaces2)
 
   override def run: IO[Unit] =
-    IO.println(pprint(TestStrategy.s12))
+    IO.println(pprint(TestStrategy.s5_optimized_v2))
 }

@@ -963,7 +963,7 @@ object TestStrategy {
   // same lesson s5_optimized_v2 taught in the previous batch, from the same base.
   // searched 2023-07..2025-07: net=4221.68925, closed=528, forced=4, win=67.05%, exp=7.995624, PF=1.721, DD=0.35%, Sharpe=3.063
   // holdout 2025-12..2026-06:  net=1607.43953, closed=149, forced=0, win=70.47%, exp=10.788185, PF=2.079, DD=0.49%, Sharpe=4.131
-  val s5_optimized_v3 = TestStrategy(
+  val s5_optimized_v2 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
         source = ValueSource.HLC3,
