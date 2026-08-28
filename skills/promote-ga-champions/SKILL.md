@@ -1,13 +1,17 @@
 ---
 name: promote-ga-champions
-description: Promote the top result of every GA optimisation run in modules/backtest/optimisation-results into TestStrategy.scala and BatchBacktester.scala, then measure it. Use when asked to "add the optimisation results", "promote the champions", "pull in the latest GA runs", or after an Optimiser run finishes.
+description: Promote the selected champion of every GA optimisation run in modules/backtest/optimisation-results into TestStrategy.scala and BatchBacktester.scala, measure it on the searched and holdout corpora, then keep or discard it on the holdout result. Use when asked to "add the optimisation results", "promote the champions", "pull in the latest GA runs", or after an Optimiser run finishes.
 ---
 
 # Promote GA Champions
 
 Turns each markdown report in `modules/backtest/optimisation-results/` into a compiling
-`TestStrategy` val plus a `BatchBacktester` entry, so the winning parameter sets can be
-compared against the existing strategies.
+`TestStrategy` val plus a `BatchBacktester` entry, measures it, and then decides whether it
+earns a place in the catalogue.
+
+Promotion is not the end of the job. A champion is a candidate until `BatchBacktester` has
+scored it on the holdout corpus; the last steps keep the winners, delete the rest, and leave
+the catalogue's own documentation true.
 
 Paths
 
@@ -17,6 +21,7 @@ Paths
 | Strategy catalogue | `modules/backtest/src/main/scala/currexx/backtest/TestStrategy.scala` |
 | Batch runner | `modules/backtest/src/main/scala/currexx/backtest/BatchBacktester.scala` |
 | Round definitions | `modules/backtest/src/main/scala/currexx/backtest/Optimiser.scala` |
+| Corpora / folds | `modules/backtest/src/main/scala/currexx/backtest/MarketDataProvider.scala` |
 | Type definitions | `modules/domain/src/main/scala/currexx/domain/signal/Indicator.scala` |
 
 ## Step 1 — Collect the reports
@@ -25,70 +30,97 @@ Paths
 ls modules/backtest/optimisation-results/*.md
 ```
 
-Read the whole of `TestStrategy.scala` and `BatchBacktester.scala` before editing anything —
-you need the existing val names, their indicator params, and the base rule blocks.
+Reports are never deleted, so work out which are new — by timestamp in the filename, by `git
+status`, or by which report filenames the existing `TestStrategy` comments already cite.
 
-## Step 2 — Extract the top result from each report
+Read the whole of `TestStrategy.scala` (including its object-level scaladoc, which is the
+catalogue's own account of itself), `BatchBacktester.scala` and `Optimiser.scala`'s `rounds`
+before editing anything.
 
-Every report has this shape:
+## Step 2 — Read the champion selection block
+
+A report has this shape:
 
 ```
-# Genetic Algorithm Run: <label>
+# Genetic Algorithm Run: <round name>
 **Started at:** <iso timestamp>
 **Target:** <indicator toString of the strategy that was optimised>
-**Parameters:** GA(250,350,0.7,0.08,0.025,<shuffle>)
+**Parameters:** GA(<pop>,<maxGen>,<crossover>,<mutation>,<elitism>,<shuffle>)
 ## Progress
-### Generation N out of M   (top 3 members each)
-**Top 25 members:**            (final shortlist, best first)
-**Stats:** / **Duration:**
-## Champion: <label>          (fitness, constraint verdict, indicator)
+### Generation N out of M          **Top Members:** — top 3, ranked on TRAINING only
+## Final Results                   narrative + validation-ranked shortlist table + Stats + Duration
+## Champion selection: <round name>   corpus description, verdict, Indicator
 ```
-
-Pull the header and champion block:
 
 ```bash
 f=modules/backtest/optimisation-results/<file>.md
 grep -m1 '^\*\*Target:\*\*' "$f"
 grep -m1 '^\*\*Parameters:\*\*' "$f"
-awk '/^## Champion/{p=1} p' "$f"
+awk '/^## Final Results/{p=1} p' "$f"
 ```
 
-Take the top result in this order of preference:
+### Two scores, not one
 
-1. The `## Champion:` block — gives `Fitness: X.XXXXXX`, a constraint verdict, and `Indicator: …`.
-2. If there is no Champion block (i.e. interrupted run), fall back to `#1` under the final `**Top 25 members:**` or `Generation X out of Y`, whose fitness is the
-   number before the dash.
+Every candidate carries a **training** score from the search folds and a **validation** score
+from a fold the search never touched. The `## Final Results` shortlist is ranked on
+*validation*, and `## Champion selection` reports the top of that ranking — so nothing here
+chooses anything, and the shortlist's `#1` and the champion are the same individual.
 
-**Constraint verdict.** `Satisfies every constraint.` is the clean case. If it instead says
-`BREACHES n constraint(s) despite winning:` the fitness only *discounted* the breach — still
-promote the champion (it is the run's top result) but reproduce each breach line in the val's
+The shortlist table's columns are `rank train# training validation retained individual`;
+`train#` is where that individual placed on training, so a champion with `train# 13` means the
+training-ranked winner was not the one that survived validation.
+
+### The verdict decides whether there is anything to promote
+
+`## Champion selection` ends in one of two ways.
+
+**`SELECTED (best of N on validation): training X -> validation Y, retaining Z%`** — a
+candidate. Followed by either `Satisfies every constraint on validation data.` or `BREACHES n
+constraint(s) on validation data:` with one line per breach. A breach discounted the fitness
+rather than disqualifying it, so still promote — but reproduce every breach line in the val's
 comment so the next reader sees it without reopening the report.
 
-## Step 3 — Find the base strategy and pick the name
+**`NOTHING SELECTED: no finalist scored above zero on data it was never searched against.`** —
+**promote nothing from this round.** The indicator on the `Best by validation, recorded so the
+round leaves a trace and not as a candidate:` line exists to leave a trace, not to be used. Say
+in the final report that the round selected nothing.
+
+### Two readings that need flagging, not skipping
+
+- **`training 0.000000`** (and therefore `retaining n/a`): the search folds scored the champion
+  at zero and the single validation fold ranked it alone. Promote it, and say so in the comment
+  — a validation figure from such a round filters out the hopeless, it does not rank the rest.
+- **No `## Champion selection` block at all** (interrupted run): fall back to `#1` of the last
+  `**Top Members:**` block, which is *training*-ranked and never validated. Say so in the
+  comment — write `Best Top-25 member from …` instead of `Champion from …` — and expect it to
+  measure badly.
+
+## Step 3 — Find the base strategy and pick a name
 
 The champion is the same *rules* as the strategy that was optimised, with different *indicator*
-params. Identify that base strategy by matching the report's `**Target:**` string against the
-`indicator` of each existing `TestStrategy` val; `Optimiser.scala`'s `rounds` list is the
-cross-check (`name` → `strategy`). A report label ending in `_shuffle` is the shuffled GA run of
-the same base val — the `_shuffle` suffix is a round label, never a val name.
+params. Identify that base by matching the report's `**Target:**` against the `indicator` of
+each `TestStrategy` val; `Optimiser.scala`'s `rounds` list is the cross-check (`name` →
+`strategy`). A round name ending in `_shuffle` is the shuffled GA run of the same base val — a
+round label, never a val name.
 
-Naming rule, derived from the existing catalogue (`s1_v2` → `s1_v2_optimized` → `s1_v2_optimized_v2`):
+**Suffixes carry no meaning.** They neither rank a family nor run contiguously within one
+(`s5_optimized_v2` has no `s5_optimized` above it; `s2_optimized_v3` out-scores `s2_optimized`),
+because Step 9 renames winners into their base's name and deletes what they beat. A suffix
+records only that a val once needed distinguishing from something. So:
 
-- base has no `_optimized` → `<base>_optimized`
-- base ends `_optimized` → `<base>_v2`
-- base ends `_optimized_vN` → `<base minus vN>_v{N+1}`
+- pick any name not already in `TestStrategy.scala`, following the `<base>_optimized` /
+  `<base>_vN` shape of the file
+- when several champions share one base (typically a run and its `_shuffle` twin), order them by
+  **descending validation** score and allocate consecutive versions
+- do not renumber or reorder anything existing to make the new name fit
 
-Never reuse a name that already exists in `TestStrategy.scala`. When several champions share one
-base (typically a run and its `_shuffle` twin), sort them by **descending fitness** and allocate
-consecutive versions, so the better champion gets the lower number.
-
-**Skip duplicates.** If the champion's indicator is param-for-param identical to an existing val's
-indicator, the run found nothing new — do not add a val, and note the skip in the final report.
+**Skip duplicates.** If the champion's indicator is param-for-param identical to an existing
+val's, the run found nothing new — no val, and note the skip in the final report.
 
 ## Step 4 — Translate the indicator string into Scala
 
-The report prints case-class `toString`, i.e. positional args with no names. Convert to the named
-form used throughout `TestStrategy.scala`. Parameter names and order come from
+The report prints case-class `toString`, i.e. positional args with no names. Convert to the
+named form used throughout `TestStrategy.scala`. Parameter names and order come from
 `modules/domain/src/main/scala/currexx/domain/signal/Indicator.scala` — re-read it if a case is
 not in the tables below.
 
@@ -132,37 +164,48 @@ Comment header, following the format already in the file:
 
 ```scala
   // GA-optimized indicator params for <base> (rules unchanged). Champion from
-  // <report-file-name> (fitness X.XXXXXX, shuffled GA).      // ", shuffled GA" only when GA(...,true)
-  // <metrics line from Step 8>
+  // <report-file-name> (training X.XXXXXX -> validation Y.YYYYYY, retaining Z.Z%, shuffled GA).
+  // Satisfies every constraint on validation data.
+  // searched 2023-07..2025-07: <metrics from Step 8>
+  // holdout 2025-12..2026-06:  <metrics from Step 8>
   val <new_name> = TestStrategy(
 ```
 
-Use `Best Top-25 member from <file> (fitness …)` instead of `Champion from …` when the fitness
-came from the Step 2 fallback. For a breaching champion, append the breach lines:
+- `, shuffled GA` only when `**Parameters:**` ends in `true`.
+- `retaining Z.Z%` is copied from the verdict; omit it when the report says `n/a`, and add a
+  sentence saying the training score was zero.
+- Replace the `Satisfies` line with the breach block when the verdict breaches:
 
 ```scala
-  // BREACHES 2 constraint(s) despite winning:
-  //   - <breach text copied from the report>
+  // BREACHES 2 constraint(s) on validation data:
+  //   - <breach text copied verbatim from the report>
 ```
 
-Do not invent a `median win-to-loss ratio: …` or any other line. Older vals might carry different format, but no current
-tool emits those numbers — the metrics line comes from `BatchBacktester` (Step 8).
+- When the base named in the first line was itself deleted by a later prune, the file's phrasing
+  is `for <base>, which is no longer in this catalogue (rules unchanged)`.
+- Free prose between the verdict and the metrics lines is where the interesting reading goes —
+  how it compares to its base, whether its shuffled twin found anything, whether holdout beat
+  in-sample. Write it after Step 8, when there are numbers to write about.
+- Do not invent metrics. `net`/`closed`/`win`/`PF` figures come from `BatchBacktester` and
+  nowhere else; older vals carry pre-cost-model numbers, explicitly marked as not comparable.
 
 ## Step 6 — Register in BatchBacktester.scala
 
-Add each new strategy to the `strategies` list as a new group at the end, below the existing entries,
-so the batch report ends with new champions. Keep the blank-line grouping of the existing
-entries untouched:
+Add each new strategy to the `strategies` list as a new group at the end, below the existing
+entries, keeping the blank-line grouping of the existing entries untouched:
 
 ```scala
   val strategies: List[(String, TestStrategy)] = List(
-    "s1_v2_optimized_v2" -> TestStrategy.s1_v2_optimized_v2,
-    
-    "<new_name>" -> TestStrategy.<new_name>
+    "s1_v2_optimized" -> TestStrategy.s1_v2_optimized,
     …
+
+    "<new_name>" -> TestStrategy.<new_name>
+  )
 ```
 
-The string key must equal the val name — it is the label in the results table.
+The string key must equal the val name — it is the label in the results table. Not every val in
+`TestStrategy.scala` is here: vals kept only for lineage are marked `Not in BatchBacktester.` in
+their comment and stay out. New champions always go in; that is what Step 8 measures.
 
 ## Step 7 — Format
 
@@ -173,7 +216,7 @@ sbt -batch "backtest/scalafmt"
 This realigns the `->` arrows in `BatchBacktester.scala` and the named args in
 `TestStrategy.scala` to the repo's `defaultWithAlign` style, `maxColumn = 140`.
 
-## Step 8 — Measure, then backfill the metrics comment
+## Step 8 — Measure, then backfill the metrics comments
 
 Running the batch is also the compile check — `backtest/Test/compile` in this repo can report
 success while producing nothing, so do not rely on it.
@@ -182,31 +225,74 @@ success while producing nothing, so do not rely on it.
 sbt -batch "backtest/runMain currexx.backtest.BatchBacktester"
 ```
 
-Expect several minutes; run it in the background and let the completion notification come back.
-Fix any compile error and rerun before reading results.
+Expect a long run (three corpora × every strategy); run it in the background and let the
+completion notification come back. Fix any compile error and rerun before reading results.
 
-Each new strategy gets one output line:
+The output is three sections, each with one line per strategy:
 
 ```
-<name>  net=   0.99721  closed=  196  forced= 1  win= 44.90%  exp= 0.005088  PF=  2.104  DD=  6.12%  Sharpe=  1.883  gross=   1.10412  costs=  0.10691
+--- majors 1h 2024-07..2025-07 (12 months, original sample) ---
+--- searched 2023-07..2025-07 (24 months, in sample) ---
+--- holdout 2025-12..2026-06 (7 months, never selected) ---
+<name>  net=6285.64646  closed= 1259  forced=10  win= 45.75%  exp= 4.992571  PF=  1.259  DD=  1.79%  Sharpe=  1.597  gross=…  costs=…
 ```
 
-Write it back into that val's comment header (Step 5) as the metrics line, dropping the name column:
+Record **two** of the three per val — `searched` and `holdout` — dropping the name, `gross` and
+`costs` columns:
 
 ```scala
-  // net=0.99721, closed=196, forced=1, win=44.90%, exp=0.005088, PF=2.104, DD=6.12%, Sharpe=1.883, gross=1.10412, costs=0.10691
+  // searched 2023-07..2025-07: net=6285.64646, closed=1259, forced=10, win=45.75%, exp=4.992571, PF=1.259, DD=1.79%, Sharpe=1.597
+  // holdout 2025-12..2026-06:  net=1535.84151, closed=382, forced=6, win=45.55%, exp=4.020528, PF=1.242, DD=0.85%, Sharpe=1.548
 ```
+
+The first section is a subset of `searched` and is deliberately not recorded per val. Note the
+double space after `holdout …:` that aligns the two lines.
+
+**The holdout line is the one that means anything.** `searched` is the two years the GA folds
+cover, so for anything `_optimized` it reports fit to the data that chose it. Holdout net
+figures cover seven months against the searched column's twenty-four, so they rank strategies
+against each other and are not a forecast.
 
 Then re-run `sbt -batch "backtest/scalafmt"` if any comment pushed a line past 140 columns.
 
-## Step 9 — Report
+## Step 9 — Keep, promote, or delete
+
+Now that each champion has a holdout line, decide its fate against the base it came from. Do not
+leave a measured loser in the catalogue.
+
+- **Champion beats its base on the holdout** — rename it into the base's name, delete the base,
+  and add a line to its comment: `Promoted into its base's name on <date>, having beaten it
+  <how>.` Then fix every reference: `Optimiser.scala`'s `rounds` and its scaladoc,
+  `BatchBacktester.scala`'s `strategies`, and `JsonPrinter.scala` if it prints the deleted val.
+- **Champion loses to its base** — delete the new val and its `BatchBacktester` entry, unless it
+  is worth keeping for lineage or structural coverage (the only volume-reading strategy, the
+  base of a family), in which case keep it out of `BatchBacktester` and mark it `Not in
+  BatchBacktester.` with the reason.
+- **Whole family loses money on the holdout** — say so plainly; do not keep adding descendants
+  to it because their in-sample numbers look good.
+
+Then update the object-level scaladoc at the top of `TestStrategy.scala`. It is a live account
+of what the catalogue currently contains and what the last batch of rounds taught — the counts,
+the named exceptions, the "re-measured on <date>" line. Leaving it stale is the same defect as
+leaving a stale metrics line.
+
+Finally, re-run `sbt -batch "backtest/scalafmt"`, and re-run `BatchBacktester` if a rename or
+deletion changed what it measures.
+
+## Step 10 — Report
 
 Tell the user, per report file:
 
-- new val name, its base strategy, fitness, and whether it came from a shuffled run
-- the measured `net` / `closed` / `win` / `PF` / `DD` / `Sharpe`, and how that compares to the base
-  strategy's line in the same batch run
-- anything skipped — duplicate params, interrupted report, or a champion that breaches constraints
+- new val name, its base, `training -> validation` with the retention percentage, whether the
+  run was shuffled, and the constraint verdict
+- the measured holdout `net` / `closed` / `win` / `PF` / `DD` / `Sharpe`, and how that compares
+  to the base's holdout line in the same batch run — plus the in-sample line where the two
+  disagree
+- what Step 9 did: kept, promoted into a base's name, or deleted
+- anything skipped — `NOTHING SELECTED`, duplicate params, an interrupted report
 
-State plainly if a champion measured *worse* than the base it was optimised from; a high GA fitness
-with weak batch metrics is the signal worth surfacing, not something to smooth over.
+State plainly when a champion measured *worse* than the base it was optimised from, and when a
+high validation fitness produced weak holdout metrics. That gap is the signal worth surfacing,
+not something to smooth over: the GA's own ranking has repeatedly disagreed with the holdout,
+and the catalogue's best performers have come out of rounds with mediocre fitness and breached
+constraints.
