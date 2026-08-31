@@ -30,6 +30,15 @@ final case class TestStrategy(
   * s5_optimized_v2 — and three of those four lead the catalogue on holdout net. That is the pattern worth trusting: a strategy holding up
   * better on data nobody selected it on than on the data that chose it was not fitted to the folds.
   *
+  * The searched column hides a split worth knowing about, found on 2026-08-31 by scoring its two exports separately. Four vals here make
+  * money in 2023-07..2024-06 - s6 (+3844), s5_optimized_v2 (+1406), s2_optimized_v2 (+1013) and s12_optimized (+587), with s12 (+407) -
+  * while every JMA-crossover val loses there: s2_optimized returns -1819 against +7645 in 2024-07..2025-07, s2_optimized_v3 -1706 against
+  * +6629, s1_v2_optimized -902 against +7188, s4_optimized_v2 -1314 against +2596. Their 24-month net is therefore one profitable year
+  * paying for one losing one, which a single pooled figure cannot show. That year is the reason s6 exists and the constraint it was chosen
+  * under. It also cuts the other way: the vals that survive it are the counter-trend ones, and they are the ones that earn least on the
+  * holdout, so neither column alone ranks the file. Note that s2_optimized predates the six-fold corpus - when it was selected the folds
+  * spanned one year, so nothing in its search ever scored it on 2023-24.
+  *
   * Both lines were re-measured on 2026-08-25 when the folds went from three to six and reporting moved to the holdout, and re-verified
   * unchanged on 2026-08-27. They are not comparable to figures quoted in commit history or in `ga-optimisation-*.md` reports before
   * 2026-08-25: the earlier "searched" column was one year rather than two, and the earlier out-of-sample column was the whole newer export,
@@ -561,6 +570,137 @@ object TestStrategy {
               Rule.Condition.positionIsSell,
               Rule.Condition.TrendChangedTo(Direction.Upward)
             ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.momentumEnteredOverbought
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.momentumEnteredOversold
+            )
+          )
+        )
+      )
+    )
+  )
+
+  // S6: Bollinger re-entry and squeeze breakout, banked at the opposite momentum extreme.
+  //
+  // Two ways in, sharing one exit. The breakout leg is s5's: with the slow JMA trend up and ATR below its own average, a close
+  // through the upper band is a squeeze resolving in the trend's direction. The reversion leg is the earner: price that has been
+  // outside the lower band closing back inside it, while RSX is turning up, is an overextension being given up. Both are exited the
+  // same way, when RSX crosses into the zone opposite the position - the only exit here, and the one the profit comes from.
+  //
+  // Three departures from s5_optimized_v2, each measured on its own. Figures are searched-corpus net with the two years scored
+  // separately and summed, at trend 80 / ATR 20 / SMA 50 / mult 2.6 / RSX 11 66-30 and the trend exit still in place, which scores
+  // 6287, unless another basis is named:
+  //   - the reversion leg asks momentum to be turning (a state) rather than to have just left an extreme zone (an event). s5 needs
+  //     the band crossing and the zone change on the same bar, and that coincidence, not the idea, is what holds it to 342 trades
+  //     over the 24 months. Loosening it is worth +1613 (4347 -> 5960, measured on s5's own ATR 28 / SMA 63). On s5's parameters the
+  //     reversion leg alone earns 2779 of its 4222 and the breakout leg alone 1050, so the reversion leg is the bulk of the strategy.
+  //   - no exit on the trend reversing against the position. It was cutting winners: removing it is worth +824 (6287 -> 7111) on 109
+  //     fewer trades, and +664 at the trend 90 finally chosen (6698 -> 7362). Removing the momentum exit instead costs 4255
+  //     (6287 -> 2032), and dropping the squeeze from the breakout leg costs 5481 (6287 -> 806). Those two carry the strategy.
+  //   - a slower trend (JMA 90 rather than 50) and a slower squeeze (ATR 20 against SMA 50 rather than 28/63). Both sit on smooth
+  //     ridges rather than spikes: trend lengths 70, 80, 85, 95, 100 and 110 all return between 6289 and 7269.
+  //
+  // Chosen by coarse grid on the two searched years scored SEPARATELY, requiring both to be profitable - see the docstring's note on
+  // the 2023-24 year, which most of this file loses money in. Four other vals clear that bar (s5_optimized_v2, s2_optimized_v2,
+  // s12_optimized and s12); s6 earns more in sample than any of them, and more than anything else here. It does NOT lead on the holdout:
+  // read the caveat below before putting it on an account.
+  //
+  // Not GA-optimized, hence no _optimized suffix and no report to link to. A 27-point one-at-a-time perturbation sweep around the
+  // chosen parameters (trend length, band length, deviation length, band multiplier, RSX length, and the squeeze pair) left every
+  // variant profitable in both searched years, in a band of 3863 to 7269 in-sample net. The band multiplier is the one sensitive
+  // parameter: 2.6 earns 7362, 2.5 earns 4635 and 2.4 earns 3863, mostly by collapsing the second year. Treat 2.6 as fitted and the
+  // rest as structural.
+  //
+  // CAVEAT, and the reason this val is not a straight upgrade on s2_optimized_v3: it earns far less out of sample than in. Per month
+  // it makes 307 in sample against 74 across the validation fold and the holdout, while s2_optimized moves the other way, 243 in
+  // sample against 345 out. Its profit factor stays above 1 in all four periods (1.69, 1.64, 1.11, 1.16), so it does not break out of
+  // sample, it just earns thinly there - and the searched years are exactly the data it was chosen on. What it demonstrates is that
+  // the 2023-24 year is survivable, not that this is the strongest forward bet in the file.
+  // searched 2023-07..2025-07: net=7362.30479, closed=674, forced=9, win=70.03%, exp=10.923301, PF=1.667, DD=0.59%, Sharpe=2.565
+  //   of which 2023-07..2024-06: net=3844, closed=346, PF=1.69   and 2024-07..2025-07: net=3518, closed=328, PF=1.64
+  // holdout 2025-12..2026-06:  net=559.56308, closed=176, forced=2, win=65.91%, exp=3.179336, PF=1.163, DD=1.26%, Sharpe=0.869
+  val s6 = TestStrategy(
+    indicator = Indicator.compositeAnyOf(
+      // Regime: the slow trend the breakout leg has to agree with.
+      Indicator.TrendChangeDetection(
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.JMA(length = 90, phase = -6, power = 1)
+      ),
+      // The channel both entry legs read, as a breakout through it or a re-entry back into it.
+      Indicator.BollingerBands(
+        source = ValueSource.Close,
+        middleBand = ValueTransformation.SMA(length = 35),
+        stdDevLength = 41,
+        stdDevMultiplier = 2.6
+      ),
+      // Squeeze: gates the breakout leg only. Removing it from that leg costs 6500 in sample.
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 20,
+        smoothingType = ValueTransformation.SMA(length = 50)
+      ),
+      // Drives the momentum zone, and so the exit.
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 11),
+        upperBoundary = 66.0,
+        lowerBoundary = 30.0
+      ),
+      // Last, so this owns lastMomentumValue rather than the ThresholdCrossing above it, which only writes on a crossing.
+      // MomentumIs reads it to tell a turn from a drift. The length barely matters: RSX 5, 8 and 12 all agree on direction
+      // bar to bar and score identically.
+      Indicator.ValueTracking(
+        role = ValueRole.Momentum,
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 8)
+      )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.anyOf(
+              // Squeeze resolving upward with the trend.
+              Rule.Condition.allOf(
+                Rule.Condition.trendIsUpward,
+                Rule.Condition.volatilityIsLow,
+                Rule.Condition.UpperBandCrossed(Direction.Upward)
+              ),
+              // Price back inside the channel from below, momentum turning up.
+              Rule.Condition.allOf(
+                Rule.Condition.LowerBandCrossed(Direction.Upward),
+                Rule.Condition.MomentumIs(Direction.Upward)
+              )
+            )
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.anyOf(
+              Rule.Condition.allOf(
+                Rule.Condition.trendIsDownward,
+                Rule.Condition.volatilityIsLow,
+                Rule.Condition.LowerBandCrossed(Direction.Downward)
+              ),
+              Rule.Condition.allOf(
+                Rule.Condition.UpperBandCrossed(Direction.Downward),
+                Rule.Condition.MomentumIs(Direction.Downward)
+              )
+            )
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
             Rule.Condition.allOf(
               Rule.Condition.positionIsBuy,
               Rule.Condition.momentumEnteredOverbought

@@ -35,7 +35,7 @@ object Optimiser extends IOApp.Simple {
 
   val gaParameters = Parameters.GA(
     populationSize = 300,
-    maxGen = 80,
+    maxGen = 100,
     crossoverProbability = 0.7,
     mutationProbability = 0.1,
     elitismRatio = 0.02,
@@ -56,11 +56,45 @@ object Optimiser extends IOApp.Simple {
     * Ordered by holdout net, best first. A full pass is long enough that it is routinely interrupted, and this way the strategies most
     * worth improving are the ones already done when it is.
     *
+    * s6 is first despite the worst holdout net but one, because that ordering is a proxy for headroom and on s6 the proxy is wrong: every
+    * other val here is already a GA champion, and s6 is the only one whose parameters were set by a hand grid over the two searched years.
+    * It leads the catalogue on in-sample net and has never been searched, so it is the entry with the most left to find. Its rules also
+    * differ from the s5_optimized_v2 they descend from — a looser reversion leg and no trend exit — so a round on it is not re-deriving
+    * s5_optimized_v2's sibling, which is the reason the two vals below are left out.
+    *
+    * READ BEFORE SPENDING A RUN ON s6: the search cannot reach its trend length. s6 uses JMA 90 and `IndicatorMutator` clamps JMA length to
+    * [5, 50], while `IndicatorInitialiser` draws it from [2, 42]. So the unshuffled round starts every member at JMA 90 and collapses it to
+    * 50 the first time that gene mutates, with no way back, and the shuffled round never sees 90 at all. Nothing above 50 is explorable
+    * either way. That parameter is worth roughly 1000 of s6's in-sample net against a length of 50, so the champion of an s6 round is
+    * likely to be a worse strategy than s6 with a better fitness — measured against a corpus, not against s6. Two smaller cases of the same
+    * thing: the squeeze smoothing (SMA 50) and the trend JMA power (1) are outside what the initialiser draws, though mutation can reach
+    * both.
+    *
+    * Widening the JMA bound would fix it, and would also change the search space of every other round in this list, since s1_v2_optimized
+    * and the s2, s4 and s5 families all search on JMA. That is a decision about the whole catalogue rather than about s6, so it is left
+    * unmade here.
+    *
+    * Also expect a trade-count breach: s6 closed 116 trades on the validation fold against a floor of 120. That constraint ramps rather
+    * than gates, so it discounts the score instead of zeroing it, but a champion trading even slightly less often than s6 will breach it
+    * too.
+    *
     * Two vals in `BatchBacktester` are not searched here: s2_optimized_v3 and s4_optimized_v2. Each is a GA descendant of a base that is
     * searched, so a round on one would largely re-derive its own sibling. Add them if that stops being true — s2_optimized_v3 currently
     * leads the catalogue on holdout net, so it is the more defensible of the two to promote into a round of its own.
     */
   val rounds: List[OptimisationRound] = List(
+    OptimisationRound(
+      name = "s6",
+      strategy = TestStrategy.s6,
+      gaParameters = gaParameters,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s6_shuffle",
+      strategy = TestStrategy.s6,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring
+    ),
     OptimisationRound(
       name = "s2_optimized",
       strategy = TestStrategy.s2_optimized,
