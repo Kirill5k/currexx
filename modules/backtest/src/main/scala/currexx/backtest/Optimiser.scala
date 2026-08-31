@@ -56,7 +56,7 @@ object Optimiser extends IOApp.Simple {
     * Ordered by holdout net, best first. A full pass is long enough that it is routinely interrupted, and this way the strategies most
     * worth improving are the ones already done when it is.
     *
-    * Two vals in `BatchBacktester` are not searched here: s2_optimized_v3 and s4_optimized_v4. Each is a GA descendant of a base that is
+    * Two vals in `BatchBacktester` are not searched here: s2_optimized_v3 and s4_optimized_v2. Each is a GA descendant of a base that is
     * searched, so a round on one would largely re-derive its own sibling. Add them if that stops being true — s2_optimized_v3 currently
     * leads the catalogue on holdout net, so it is the more defensible of the two to promote into a round of its own.
     */
@@ -110,14 +110,14 @@ object Optimiser extends IOApp.Simple {
       scoringFunction = consistentScoring
     ),
     OptimisationRound(
-      name = "s4_optimized_v2",
-      strategy = TestStrategy.s4_optimized_v2,
+      name = "s4_optimized_v1",
+      strategy = TestStrategy.s4_optimized_v1,
       gaParameters = gaParameters,
       scoringFunction = consistentScoring
     ),
     OptimisationRound(
-      name = "s4_optimized_v2_shuffle",
-      strategy = TestStrategy.s4_optimized_v2,
+      name = "s4_optimized_v1_shuffle",
+      strategy = TestStrategy.s4_optimized_v1,
       gaParameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring
     ),
@@ -130,18 +130,6 @@ object Optimiser extends IOApp.Simple {
     OptimisationRound(
       name = "s12_shuffle",
       strategy = TestStrategy.s12,
-      gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring
-    ),
-    OptimisationRound(
-      name = "s4_regime_optimized_v2",
-      strategy = TestStrategy.s4_regime_optimized_v2,
-      gaParameters = gaParameters,
-      scoringFunction = consistentScoring
-    ),
-    OptimisationRound(
-      name = "s4_regime_optimized_v2_shuffle",
-      strategy = TestStrategy.s4_regime_optimized_v2,
       gaParameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring
     ),
