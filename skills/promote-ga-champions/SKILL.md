@@ -45,7 +45,7 @@ A report has this shape:
 # Genetic Algorithm Run: <round name>
 **Started at:** <iso timestamp>
 **Target:** <indicator toString of the strategy that was optimised>
-**Parameters:** GA(<pop>,<maxGen>,<crossover>,<mutation>,<elitism>,<shuffle>)
+**Parameters:** GA(<pop>,<maxGen>,<crossover>,<mutation>,<elitism>,<shuffle>,<initialOversampling>)
 ## Progress
 ### Generation N out of M          **Top Members:** — top 3, ranked on TRAINING only
 ## Final Results                   narrative + validation-ranked shortlist table + Stats + Duration
@@ -171,7 +171,8 @@ Comment header, following the format already in the file:
   val <new_name> = TestStrategy(
 ```
 
-- `, shuffled GA` only when `**Parameters:**` ends in `true`.
+- `, shuffled GA` only when the sixth field of `**Parameters:**` is `true`. Reports written before 2026-09-01 have no seventh field, so
+  that line ends in the boolean instead.
 - `retaining Z.Z%` is copied from the verdict; omit it when the report says `n/a`, and add a
   sentence saying the training score was zero.
 - Replace the `Satisfies` line with the breach block when the verdict breaches:

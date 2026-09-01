@@ -2,36 +2,39 @@ package currexx.backtest.optimizer
 
 import cats.effect.Sync
 import currexx.algorithms.operators.Mutator
+import currexx.backtest.optimizer.GeneBounds.{DoubleRange, IntRange}
 import currexx.domain.signal.{Indicator, ValueTransformation as VT}
 
 import scala.util.Random
 
 object IndicatorMutator {
-  def make[F[_]](using F: Sync[F]): F[Mutator[F, Indicator]] = F.pure {
+
+  def make[F[_]](using F: Sync[F]): F[Mutator[F, Indicator]] = scaled(1.0)
+
+  /** The same walk with a wider step. A scale of 1.0 is the search's own mutation, a standard deviation of a tenth of each gene's range;
+    * larger scales are how `IndicatorInitialiser` builds a population that sits at a chosen distance from its seed rather than on top of
+    * it. Nothing in the search itself should pass anything but 1.0.
+    */
+  def scaled[F[_]](sigmaScale: Double)(using F: Sync[F]): F[Mutator[F, Indicator]] = F.pure {
     new Mutator[F, Indicator] {
 
       override def mutate(ind: Indicator, mutationProbability: Double)(using r: Random): F[Indicator] = {
 
         /** Mutates an integer parameter using a Gaussian distribution. */
-        def mutInt(value: Int, minValue: Int, maxValue: Int): Int =
+        def mutInt(value: Int, range: IntRange): Int =
           if (r.nextDouble() < mutationProbability) {
-            val stdDev   = (maxValue - minValue) * 0.1 // 10% of range as standard deviation
+            val stdDev   = range.span * 0.1 * sigmaScale // 10% of range as standard deviation
             val mutation = (r.nextGaussian() * stdDev).round.toInt
-            val result   = value + mutation
-            math.max(minValue, math.min(result, maxValue))
+            range.clamp(value + mutation)
           } else {
             value
           }
 
         /** Mutates a double parameter using a Gaussian distribution, with rounding to a step size. */
-        def mutDouble(value: Double, minValue: Double, maxValue: Double, stepSize: Double): Double =
+        def mutDouble(value: Double, range: DoubleRange): Double =
           if (r.nextDouble() < mutationProbability) {
-            val stdDev        = (maxValue - minValue) * 0.1 // 10% of range
-            val mutation      = r.nextGaussian() * stdDev
-            val mutated       = value + mutation
-            val roundedToStep = math.round(mutated / stepSize) * stepSize
-            val finalValue    = math.max(minValue, math.min(roundedToStep, maxValue))
-            math.round(finalValue * 10000.0) / 10000.0
+            val stdDev = range.span * 0.1 * sigmaScale // 10% of range
+            range.snap(value + r.nextGaussian() * stdDev)
           } else {
             value
           }
@@ -40,43 +43,53 @@ object IndicatorMutator {
           case VT.Sequenced(sequence) =>
             VT.Sequenced(sequence.map(mutVt))
           case VT.StandardDeviation(length) =>
-            VT.StandardDeviation(mutInt(length, 5, 100))
+            VT.StandardDeviation(mutInt(length, GeneBounds.standardDeviation))
           case VT.Kalman(gain, measurementNoise) =>
-            VT.Kalman(mutDouble(gain, 0.01, 0.5, 0.01), mutDouble(measurementNoise, 0.01, 1.0, 0.01))
+            VT.Kalman(mutDouble(gain, GeneBounds.kalmanGain), mutDouble(measurementNoise, GeneBounds.kalmanNoise))
           case VT.KalmanVelocity(gain, measurementNoise) =>
-            VT.KalmanVelocity(mutDouble(gain, 0.01, 0.5, 0.01), mutDouble(measurementNoise, 0.01, 1.0, 0.01))
+            VT.KalmanVelocity(mutDouble(gain, GeneBounds.kalmanGain), mutDouble(measurementNoise, GeneBounds.kalmanNoise))
           case VT.STOCH(length) =>
-            VT.STOCH(mutInt(length, 5, 50))
+            VT.STOCH(mutInt(length, GeneBounds.oscillatorLength))
           case VT.ATR(length) =>
-            VT.ATR(mutInt(length, 5, 50))
+            VT.ATR(mutInt(length, GeneBounds.oscillatorLength))
           case VT.RSX(length) =>
-            VT.RSX(mutInt(length, 5, 50))
+            VT.RSX(mutInt(length, GeneBounds.oscillatorLength))
           case VT.JRSX(length) =>
-            VT.JRSX(mutInt(length, 5, 50))
+            VT.JRSX(mutInt(length, GeneBounds.oscillatorLength))
           case VT.WMA(length) =>
-            VT.WMA(mutInt(length, 5, 100))
+            VT.WMA(mutInt(length, GeneBounds.maLength))
           case VT.SMA(length) =>
-            VT.SMA(mutInt(length, 5, 100))
+            VT.SMA(mutInt(length, GeneBounds.maLength))
           case VT.EMA(length) =>
-            VT.EMA(mutInt(length, 5, 100))
+            VT.EMA(mutInt(length, GeneBounds.maLength))
           case VT.HMA(length) =>
-            VT.HMA(mutInt(length, 5, 100))
+            VT.HMA(mutInt(length, GeneBounds.maLength))
           case VT.JMA(length, phase, power) =>
-            VT.JMA(mutInt(length, 5, 50), mutInt(phase, -100, 100), mutInt(power, 1, 10)) // JMA phase can be negative
+            // JMA phase can be negative
+            VT.JMA(mutInt(length, GeneBounds.jmaLength), mutInt(phase, GeneBounds.jmaPhase), mutInt(power, GeneBounds.jmaPower))
           case VT.NMA(length, signalLength, lambda, maCalc) =>
-            VT.NMA(mutInt(length, 5, 50), mutInt(signalLength, 5, 50), mutDouble(lambda, 0.5, 4.0, 0.25), maCalc)
+            VT.NMA(
+              mutInt(length, GeneBounds.nmaLength),
+              mutInt(signalLength, GeneBounds.nmaSignalLength),
+              mutDouble(lambda, GeneBounds.nmaLambda),
+              maCalc
+            )
           case VT.ADX(length) =>
-            VT.ADX(mutInt(length, 7, 50))
+            VT.ADX(mutInt(length, GeneBounds.adxLength))
           case VT.WilliamsR(length) =>
-            VT.WilliamsR(mutInt(length, 5, 50))
+            VT.WilliamsR(mutInt(length, GeneBounds.oscillatorLength))
           case VT.CCI(length) =>
-            VT.CCI(mutInt(length, 10, 50))
+            VT.CCI(mutInt(length, GeneBounds.cciLength))
           case VT.IchimokuKijunSen(length) =>
-            VT.IchimokuKijunSen(mutInt(length, 9, 52))
+            VT.IchimokuKijunSen(mutInt(length, GeneBounds.ichimokuLength))
           case VT.ParabolicSAR(afStart, afMax, afStep) =>
-            VT.ParabolicSAR(mutDouble(afStart, 0.01, 0.05, 0.005), mutDouble(afMax, 0.1, 0.4, 0.01), mutDouble(afStep, 0.01, 0.05, 0.005))
+            VT.ParabolicSAR(
+              mutDouble(afStart, GeneBounds.sarAfStart),
+              mutDouble(afMax, GeneBounds.sarAfMax),
+              mutDouble(afStep, GeneBounds.sarAfStep)
+            )
           case VT.CMF(length) =>
-            VT.CMF(mutInt(length, 10, 40))
+            VT.CMF(mutInt(length, GeneBounds.cmfLength))
 
         def mutInd(indicator: Indicator): Indicator = indicator match
           case Indicator.Composite(is, comb) =>
@@ -86,17 +99,22 @@ object IndicatorMutator {
           case Indicator.ThresholdCrossing(vs, vt, ub, lb) =>
             val mutatedVt = mutVt(vt)
             val band      = ThresholdBounds.of(mutatedVt)
-            val mutatedUb = band.clampUpper(mutDouble(ub, band.upperMin, band.upperMax, band.step))
-            val mutatedLb = band.clampLower(mutDouble(lb, band.lowerMin, band.lowerMax, band.step))
+            val mutatedUb = band.clampUpper(mutDouble(ub, DoubleRange(band.upperMin, band.upperMax, band.step)))
+            val mutatedLb = band.clampLower(mutDouble(lb, DoubleRange(band.lowerMin, band.lowerMax, band.step)))
             Indicator.ThresholdCrossing(vs, mutatedVt, mutatedUb, mutatedLb)
           case Indicator.LinesCrossing(vs, vt1, vt2) =>
             Indicator.LinesCrossing(vs, mutVt(vt1), mutVt(vt2))
           case Indicator.KeltnerChannel(vs, md, atrL, atrM) =>
-            Indicator.KeltnerChannel(vs, mutVt(md), mutInt(atrL, 5, 50), mutDouble(atrM, 0.5, 5.0, 0.1))
+            Indicator.KeltnerChannel(vs, mutVt(md), mutInt(atrL, GeneBounds.atrLength), mutDouble(atrM, GeneBounds.keltnerMultiplier))
           case Indicator.BollingerBands(vs, md, stdDevL, stdDevM) =>
-            Indicator.BollingerBands(vs, mutVt(md), mutInt(stdDevL, 5, 50), mutDouble(stdDevM, 1.0, 4.0, 0.1))
+            Indicator.BollingerBands(
+              vs,
+              mutVt(md),
+              mutInt(stdDevL, GeneBounds.stdDevLength),
+              mutDouble(stdDevM, GeneBounds.bollingerMultiplier)
+            )
           case Indicator.VolatilityRegimeDetection(atrL, smoothing) =>
-            Indicator.VolatilityRegimeDetection(mutInt(atrL, 5, 50), mutVt(smoothing))
+            Indicator.VolatilityRegimeDetection(mutInt(atrL, GeneBounds.atrLength), mutVt(smoothing))
           case Indicator.ValueTracking(vr, vs, vt) =>
             Indicator.ValueTracking(vr, vs, mutVt(vt))
           case Indicator.PriceLineCrossing(vs, role, vt) =>

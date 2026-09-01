@@ -26,7 +26,7 @@ class GeneticAlgorithmSpec extends IOWordSpec {
   private def meanOnes(population: ValidatedPopulation[Array[Int]]): Double =
     population.map(p => onesIn(p._1).toDouble).sum / population.size
 
-  private def optimise(maxGen: Int)(using rand: Random): IO[ValidatedPopulation[Array[Int]]] =
+  private def optimise(maxGen: Int, oversampling: Int = 1)(using rand: Random): IO[ValidatedPopulation[Array[Int]]] =
     for
       initialiser <- Initialiser.simple[IO, Array[Int]](seed => IO(seed.map(_ => rand.nextInt(2))))
       crossover   <- Crossover.threeWaySplit[IO, Int]
@@ -42,7 +42,8 @@ class GeneticAlgorithmSpec extends IOWordSpec {
         crossoverProbability = 0.7,
         mutationProbability = 0.02,
         elitismRatio = 0.0,
-        shuffle = true
+        shuffle = true,
+        initialOversampling = oversampling
       )
       result <- Algorithm.GA
         .optimise[Array[Int]](Array.fill(genomeLength)(0), params)
@@ -62,6 +63,20 @@ class GeneticAlgorithmSpec extends IOWordSpec {
       result.asserting { case (bestEarly, bestLate) =>
         bestLate must be > bestEarly
         bestLate must be > (genomeLength * 0.9).toInt
+      }
+    }
+
+    "keep the best of a larger initial draw when oversampling, without growing the population" in {
+      // maxGen = 0 stops after the initial draw, so what is left is exactly what oversampling selected.
+      val result = for
+        plain <- optimise(0, 1)(using Random(3))
+        over  <- optimise(0, 8)(using Random(3))
+      yield (plain, over)
+
+      result.asserting { case (plain, over) =>
+        plain must have size populationSize
+        over must have size populationSize
+        onesIn(over.head._1) must be > onesIn(plain.head._1)
       }
     }
 

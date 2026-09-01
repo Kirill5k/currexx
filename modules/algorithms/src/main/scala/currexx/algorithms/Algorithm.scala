@@ -14,7 +14,8 @@ object Parameters {
       crossoverProbability: Double,
       mutationProbability: Double,
       elitismRatio: Double,
-      shuffle: Boolean
+      shuffle: Boolean,
+      initialOversampling: Int = 1
   ) extends Parameters[Alg.GA]
 }
 
@@ -25,11 +26,14 @@ object Algorithm {
   case object GA extends Algorithm[Alg.GA, Parameters.GA] {
     override def optimise[I](target: I, params: Parameters.GA): Free[Op[*, I], ValidatedPopulation[I]] =
       for
-        _           <- Op.DisplayInitial(target, params).freeM
-        pop         <- Op.InitPopulation(target, params.populationSize, params.shuffle).freeM
+        _ <- Op.DisplayInitial(target, params).freeM
+        // Over-drawing only means anything where the members differ from each other, so an unshuffled run asks for exactly what it will
+        // keep. Truncation happens after the sort, which is what makes this a selection rather than a bigger population.
+        initialSize = if (params.shuffle) params.populationSize * params.initialOversampling else params.populationSize
+        pop         <- Op.InitPopulation(target, initialSize, params.shuffle).freeM
         initialEval <- Op.EvaluatePopulation(pop).freeM
         initialSort <- Op.SortByFitness(initialEval).freeM
-        finalPop    <- iterate(initialSort, params.maxGen) { (currentPop, i) =>
+        finalPop    <- iterate(initialSort.take(params.populationSize), params.maxGen) { (currentPop, i) =>
           for
             elites    <- Op.SelectElites(currentPop, params.populationSize, params.elitismRatio).freeM
             pairs     <- Op.SelectPairs(currentPop, params.populationSize).freeM
