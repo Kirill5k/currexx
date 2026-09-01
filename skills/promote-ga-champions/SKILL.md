@@ -1,11 +1,11 @@
 ---
 name: promote-ga-champions
-description: Promote the selected champion of every GA optimisation run in modules/backtest/optimisation-results into TestStrategy.scala and BatchBacktester.scala, measure it on the searched and holdout corpora, then keep or discard it on the holdout result. Use when asked to "add the optimisation results", "promote the champions", "pull in the latest GA runs", or after an Optimiser run finishes.
+description: Promote the selected champion of every GA optimisation run in optimisation-results into TestStrategy.scala and BatchBacktester.scala, measure it on the searched and holdout corpora, then keep or discard it on the holdout result. Use when asked to "add the optimisation results", "promote the champions", "pull in the latest GA runs", or after an Optimiser run finishes.
 ---
 
 # Promote GA Champions
 
-Turns each markdown report in `modules/backtest/optimisation-results/` into a compiling
+Turns each markdown report in `optimisation-results/` into a compiling
 `TestStrategy` val plus a `BatchBacktester` entry, measures it, and then decides whether it
 earns a place in the catalogue.
 
@@ -17,7 +17,7 @@ Paths
 
 | Role | Path |
 |---|---|
-| Reports | `modules/backtest/optimisation-results/*.md` |
+| Reports | `optimisation-results/*.md` |
 | Strategy catalogue | `modules/backtest/src/main/scala/currexx/backtest/TestStrategy.scala` |
 | Batch runner | `modules/backtest/src/main/scala/currexx/backtest/BatchBacktester.scala` |
 | Round definitions | `modules/backtest/src/main/scala/currexx/backtest/Optimiser.scala` |
@@ -27,7 +27,7 @@ Paths
 ## Step 1 — Collect the reports
 
 ```bash
-ls modules/backtest/optimisation-results/*.md
+ls optimisation-results/*.md
 ```
 
 Reports are never deleted, so work out which are new — by timestamp in the filename, by `git
@@ -53,7 +53,7 @@ A report has this shape:
 ```
 
 ```bash
-f=modules/backtest/optimisation-results/<file>.md
+f=optimisation-results/<file>.md
 grep -m1 '^\*\*Target:\*\*' "$f"
 grep -m1 '^\*\*Parameters:\*\*' "$f"
 awk '/^## Final Results/{p=1} p' "$f"
