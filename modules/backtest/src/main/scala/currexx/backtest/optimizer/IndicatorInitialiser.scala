@@ -43,10 +43,12 @@ object IndicatorInitialiser:
   ): F[Population[Indicator]] = {
     // A seed that cannot be crossed with the target is a seed that fails the run the first time selection pairs it, so incompatible ones
     // are dropped rather than trusted to the caller.
-    val seeds      = (seed +: extraSeeds.filter(sameShape(seed, _))).toVector
-    val clones     = math.max(seeds.size, (size * CloneShare).toInt)
-    val jittered   = (size * JitterShare).toInt
-    val immigrants = math.max(0, size - clones - jittered)
+    val seeds = (seed +: extraSeeds.filter(sameShape(seed, _))).toVector
+    // Every seed earns a place of its own, which is what makes the share a floor rather than the count. Both shares are then held under
+    // what is left, because a caller that hands over more seeds than the population has room for is still asking for a population of `size`.
+    val clones     = math.min(size, math.max(seeds.size, (size * CloneShare).toInt))
+    val jittered   = math.min(size - clones, (size * JitterShare).toInt)
+    val immigrants = size - clones - jittered
     val clonePop   = Vector.tabulate(clones)(i => seeds(i % seeds.size))
     for jitterPop <- Vector.range(0, jittered).traverse(i => jitters(i % jitters.size).mutate(seeds(i % seeds.size), 1.0))
     yield clonePop ++ jitterPop ++ Vector.fill(immigrants)(randomiseInd(seed))

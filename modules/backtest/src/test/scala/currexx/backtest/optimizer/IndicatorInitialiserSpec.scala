@@ -128,6 +128,25 @@ class IndicatorInitialiserSpec extends IOWordSpec {
         }
       }
 
+      "return exactly the requested size when there are more seeds than the clone share allows" in {
+        given Random = Random(5)
+        val siblings = List.range(10, 40).map(l =>
+          Indicator.compositeAnyOf(
+            Indicator.TrendChangeDetection(ValueSource.HLC3, VT.JMA(length = l, phase = -6, power = 1)),
+            Indicator.BollingerBands(ValueSource.Close, VT.SMA(35), stdDevLength = 41, stdDevMultiplier = 2.6),
+            Indicator.VolatilityRegimeDetection(atrLength = 20, smoothingType = VT.SMA(50)),
+            Indicator.ThresholdCrossing(ValueSource.Close, VT.RSX(11), upperBoundary = 66.0, lowerBoundary = 30.0),
+            Indicator.ValueTracking(ValueRole.Momentum, ValueSource.Close, VT.RSX(8))
+          )
+        )
+        val result = for
+          init <- IndicatorInitialiser.seeded[IO](siblings)
+          pop  <- init.initialisePopulation(seed, 20, true)
+        yield pop
+
+        result.asserting(_ must have size 20)
+      }
+
       "drop extra seeds that could not be crossed with the target" in {
         given Random = Random(99)
         val result = for
