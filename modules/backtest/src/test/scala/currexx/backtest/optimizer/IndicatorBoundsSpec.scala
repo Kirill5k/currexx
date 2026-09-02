@@ -130,8 +130,8 @@ class IndicatorBoundsSpec extends IOWordSpec {
     "preserve validity through a long run of mutation" in {
       given Random = Random(77)
       val result   = for
-        mutator   <- IndicatorMutator.make[IO]
-        lineages  <- catalogue.map(_._2).traverse { seed =>
+        mutator  <- IndicatorMutator.make[IO]
+        lineages <- catalogue.map(_._2).traverse { seed =>
           (1 to 60).toList.foldLeft(IO.pure(List(seed)))((acc, _) =>
             acc.flatMap(walked => mutator.mutate(walked.head, 1.0).map(_ :: walked))
           )
@@ -209,7 +209,7 @@ class IndicatorBoundsSpec extends IOWordSpec {
     }
 
     "pair the faster line of each parent when the two parents are the other way round" in {
-      given Random = Random(4)
+      given Random  = Random(4)
       val fastFirst = Indicator.LinesCrossing(ValueSource.HLC3, VT.JMA(20, 0, 1), VT.JMA(60, 0, 1))
       val slowFirst = Indicator.LinesCrossing(ValueSource.HLC3, VT.JMA(64, 0, 1), VT.JMA(22, 0, 1))
       val result    = for

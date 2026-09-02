@@ -92,12 +92,59 @@ class IndicatorObjectiveSpec extends IOWordSpec {
 
   "IndicatorObjective.FoldAggregation" should {
 
-    "refuse a candidate that earned nothing in one of its folds" in {
-      // The single-fitted-regime shape the aggregate exists to refuse: everything made in one stretch of market and
-      // nothing in the others. A fold worth nothing makes the whole worth nothing, whatever the rest managed.
-      IndicatorObjective.FoldAggregation.combine(List(1.8, 0.0, 0.0)) mustBe 0.0
-      IndicatorObjective.FoldAggregation.combine(List(1.8, 0.0)) mustBe 0.0
-      IndicatorObjective.FoldAggregation.combine(List(0.0, 1.8)) mustBe 0.0
+    "refuse a candidate that earned nothing anywhere" in {
+      // The only absolute left. Earning in no fold at all is not a shape to be ranked below others, it is nothing.
+      IndicatorObjective.FoldAggregation.combine(List(0.0, 0.0, 0.0)) mustBe 0.0
+      IndicatorObjective.FoldAggregation.combine(List(0.0)) mustBe 0.0
+      IndicatorObjective.FoldAggregation.combine(Nil) mustBe 0.0
+    }
+
+    "charge a failed fold heavily without pretending the rest did not happen" in {
+      // Until 2026-09-02 every one of these was exactly 0.0, so a candidate that earned in five folds of six ranked
+      // level with one that earned in none - and the s1_v2 and s2 lineages, which lose money in search folds 1 to 3 by
+      // record, were pinned there by construction. They have to be ordered, and ordered well below a clean sweep.
+      val clean     = IndicatorObjective.FoldAggregation.combine(List.fill(6)(1.0))
+      val oneShort  = IndicatorObjective.FoldAggregation.combine(0.0 :: List.fill(5)(1.0))
+      val twoShort  = IndicatorObjective.FoldAggregation.combine(List.fill(2)(0.0) ++ List.fill(4)(1.0))
+      val fiveShort = IndicatorObjective.FoldAggregation.combine(List.fill(5)(0.0) ++ List(1.0))
+
+      clean mustBe 1.0000 +- 0.0001
+      oneShort mustBe 0.4580 +- 0.0001
+      twoShort mustBe 0.2069 +- 0.0001
+      fiveShort mustBe 0.0116 +- 0.0001
+
+      val descending = List(clean, oneShort, twoShort, fiveShort)
+      descending.zip(descending.tail).forall((better, worse) => better > worse) mustBe true
+    }
+
+    "rank a barely-alive fold above a dead one" in {
+      // The regression that sank the first attempt at softening the cliff. Taking the mean over only the folds that
+      // earned something and discounting by how many did not scored [1.8, 0.0] at 0.225 and [1.8, 0.001] at 0.042, so
+      // the aggregate fell by a factor of five when a fold improved. Every fold has to be worth more alive than dead.
+      val dead  = IndicatorObjective.FoldAggregation.combine(List(1.8, 0.0))
+      val alive = IndicatorObjective.FoldAggregation.combine(List(1.8, 0.001))
+      val awake = IndicatorObjective.FoldAggregation.combine(List(1.8, 0.1))
+
+      alive must be > dead
+      awake must be > alive
+    }
+
+    "keep a clean sweep ahead of a candidate that earned twice as much but missed a fold" in {
+      // The other failure of the filtered version, which scored the five-fold candidate 1.157 against the clean
+      // sweep's 1.000 - exactly the single-fitted-regime shape the aggregate exists to refuse.
+      val missedOne = IndicatorObjective.FoldAggregation.combine(0.0 :: List.fill(5)(2.0))
+      val clean     = IndicatorObjective.FoldAggregation.combine(List.fill(6)(1.0))
+
+      missedOne must be < clean
+    }
+
+    "still read the spread among the folds a candidate did earn in" in {
+      // The property the product was chosen for, kept under the ramp: having failed the same number of folds, one huge
+      // fold must not pay for a weak one.
+      val lumpy  = IndicatorObjective.FoldAggregation.combine(List(0.0, 1.8, 0.2))
+      val steady = IndicatorObjective.FoldAggregation.combine(List(0.0, 1.0, 1.0))
+
+      lumpy must be < steady
     }
 
     "prefer the balanced of two candidates that earned the same on average, at two folds as at three" in {
@@ -110,7 +157,10 @@ class IndicatorObjectiveSpec extends IOWordSpec {
       val lumpyTriple  = IndicatorObjective.FoldAggregation.combine(List(1.0, 0.4, 0.1))
       val steadyTriple = IndicatorObjective.FoldAggregation.combine(List(0.5, 0.5, 0.5))
 
-      lumpyPair mustBe 0.4 +- 0.0001
+      // 0.4024 rather than the unshifted 0.4: `deadFoldFloor` lifts every score a little, and most where the folds are
+      // small and uneven. The ordering below is the assertion that matters; the level is recorded to catch a change in
+      // the shift itself.
+      lumpyPair mustBe 0.4024 +- 0.0001
       balancedPair mustBe 0.5 +- 0.0001
       lumpyPair must be < balancedPair
       lumpyTriple must be < steadyTriple

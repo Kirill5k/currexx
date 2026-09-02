@@ -3,7 +3,7 @@ package currexx.backtest
 import cats.effect.{IO, IOApp}
 import cats.syntax.foldable.*
 import currexx.algorithms.{Parameters, ValidatedPopulation}
-import currexx.algorithms.operators.{Elitism, Selector}
+import currexx.algorithms.operators.{Elitism, Selector, Validator}
 import currexx.algorithms.progress.Tracker
 import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.optimizer.{
@@ -257,11 +257,12 @@ object Optimiser extends IOApp.Simple {
 
   /** Records how a round's finalists fared on both halves of the data, and says whether the one at the top of them can be trusted.
     *
-    * The population arrives already validated and already ranked on it, because `Op.ValidatePopulation` is the last step of the search
-    * itself — so the champion is `population.head` and nothing here chooses anything. What is left is the reading: the whole shortlist
-    * rather than only the winner, because the distribution is the diagnosis. Finalists that hold most of their training score mean the
-    * search found something and the remaining question is which; finalists that collapse to zero mean it found nothing, however good the
-    * training figures look, and no amount of picking between them will change that.
+    * The population arrives already validated and already ranked, because `Op.ValidatePopulation` is the last step of the search itself —
+    * so the champion is `population.head` and nothing here chooses anything. That ranking leads on the held-out score and falls back to the
+    * training rank only among candidates the held-out score could not separate, by the band `Validator.defaultTieBand` sets. What is left
+    * is the reading: the whole shortlist rather than only the winner, because the distribution is the diagnosis. Finalists that hold most
+    * of their training score mean the search found something and the remaining question is which; finalists that collapse to zero mean it
+    * found nothing, however good the training figures look, and no amount of picking between them will change that.
     *
     * The verdict goes to the tracker rather than to stdout, so that it is recorded wherever the round's results are and lasts as long as
     * they do. It is the shortlist in that same file that a strategy is eventually picked from, and this is what says which entry of it can
@@ -310,8 +311,8 @@ object Optimiser extends IOApp.Simple {
         )
       else {
         val summary =
-          f"SELECTED (best of ${population.size} on validation): training ${championTraining.value}%.6f -> " +
-            f"validation ${championValidation.value}%.6f, retaining $retained%s"
+          f"SELECTED (from ${population.size} after validation, ties inside ${Validator.defaultTieBand.describe}%s broken on training): " +
+            f"training ${championTraining.value}%.6f -> validation ${championValidation.value}%.6f, retaining $retained%s"
         val breachLines =
           if (championBreaches.isEmpty) List("Satisfies every constraint on validation data.")
           else s"BREACHES ${championBreaches.size} constraint(s) on validation data:" :: championBreaches.map(breach => s"  - $breach")

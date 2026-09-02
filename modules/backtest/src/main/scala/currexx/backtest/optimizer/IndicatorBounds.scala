@@ -8,9 +8,9 @@ import scala.util.Random
 /** The constraints that hold *between* two genes of one indicator, and what the operators do about them.
   *
   * `GeneBounds` says what a single gene may be and `ThresholdBounds` says what a boundary may be given the transformation feeding it. Both
-  * describe one gene at a time, which is all a per-gene operator can honour. These are relationships, and the region they carve out is not a
-  * box, so an operator that moves each gene inside its own range can still leave it.
- *
+  * describe one gene at a time, which is all a per-gene operator can honour. These are relationships, and the region they carve out is not
+  * a box, so an operator that moves each gene inside its own range can still leave it.
+  *
   * What is guaranteed, and what is not:
   *   - `isValid` is the definition: every gene inside its own range, and every related pair inside its ratio band.
   *   - crossover and mutation preserve it, so a valid parent cannot produce an invalid child. Mutation additionally holds the anchor inside
@@ -25,8 +25,8 @@ object IndicatorBounds:
   /** A relationship between an anchor gene and a dependent one, as the ratio of the second to the first, and every operation on it.
     *
     * The two bands are not the same question. `draw` is where a fresh random indicator should start and is a preference. `valid` is what an
-    * operator may not produce, and is set by measurement: wide enough to hold every strategy in `TestStrategy`, narrow enough to exclude the
-    * failures above.
+    * operator may not produce, and is set by measurement: wide enough to hold every strategy in `TestStrategy`, narrow enough to exclude
+    * the failures above.
     */
   final case class Relation(draw: DoubleRange, valid: DoubleRange):
 
@@ -42,8 +42,8 @@ object IndicatorBounds:
     /** The anchors that leave room for some legal dependent, which is where mutation is allowed to put one.
       *
       * Only `linesSeparation` is narrowed by this today - a fast line above 83 has no slow partner under a ceiling of 100, so the top sixth
-      * of `jmaLength` holds no usable crossover pair. For the other three the whole anchor range is feasible and this is the identity. Never
-      * empty: where the ranges cannot be reconciled it collapses to a point at the bottom of the anchor's range.
+      * of `jmaLength` holds no usable crossover pair. For the other three the whole anchor range is feasible and this is the identity.
+      * Never empty: where the ranges cannot be reconciled it collapses to a point at the bottom of the anchor's range.
       */
     def feasibleAnchor(anchorRange: IntRange, dependentRange: IntRange): IntRange =
       val lo = math.max(anchorRange.min, math.ceil(dependentRange.min / valid.max).toInt)
@@ -54,16 +54,17 @@ object IndicatorBounds:
     def dependentFor(anchor: Int, ratio: Double, dependentRange: IntRange): Int =
       project(anchor, math.round(anchor * ratio).toInt, dependentRange)
 
-    /** The legal dependent nearest the one given, without moving the anchor. See the note on `repair` above for when this cannot succeed. */
+    /** The legal dependent nearest the one given, without moving the anchor. See the note on `repair` above for when this cannot succeed.
+      */
     def project(anchor: Int, dependent: Int, dependentRange: IntRange): Int =
       val wanted = math.ceil(valid.min * anchor).toInt
       val lo     = math.max(dependentRange.min, wanted)
       val hi     = math.min(dependentRange.max, math.floor(valid.max * anchor).toInt)
-      if (lo > hi) then if (wanted > dependentRange.max) dependentRange.max else dependentRange.min
+      if lo > hi then if (wanted > dependentRange.max) dependentRange.max else dependentRange.min
       else math.max(lo, math.min(hi, dependent))
 
-  /** Smoothing over ATR. "Low volatility" means ATR below its own longer average, so a smoothing shorter than the ATR it smooths inverts the
-    * regime the rules read.
+  /** Smoothing over ATR. "Low volatility" means ATR below its own longer average, so a smoothing shorter than the ATR it smooths inverts
+    * the regime the rules read.
     */
   val volatilityRegime: Relation = Relation(DoubleRange(1.2, 4.0, 0.05), DoubleRange(0.70, 5.0, 0.05))
 
@@ -71,21 +72,21 @@ object IndicatorBounds:
     */
   val linesSeparation: Relation = Relation(DoubleRange(1.3, 4.0, 0.05), DoubleRange(1.20, 5.0, 0.05))
 
-  /** ATR over the middle band it widens. An ATR measured over a longer window than its band is measuring a different market. Catalogue range
-    * 0.476 to 0.731.
+  /** ATR over the middle band it widens. An ATR measured over a longer window than its band is measuring a different market. Catalogue
+    * range 0.476 to 0.731.
     */
   val keltnerAtr: Relation = Relation(DoubleRange(0.4, 1.0, 0.05), DoubleRange(0.30, 1.50, 0.05))
 
-  /** Deviation window over the middle band it describes. Catalogue holds 1.171 in both vals that use one; the floor allows for a long band's
-    * deviation being clamped to `stdDevLength.max`, which bottoms out at exactly 0.5.
+  /** Deviation window over the middle band it describes. Catalogue holds 1.171 in both vals that use one; the floor allows for a long
+    * band's deviation being clamped to `stdDevLength.max`, which bottoms out at exactly 0.5.
     */
   val bollingerStdDev: Relation = Relation(DoubleRange(0.7, 1.5, 0.05), DoubleRange(0.45, 2.50, 0.05))
 
   /** The related pair inside an indicator, where it has one: the relation, the anchor, the dependent, and the range the dependent lives in.
     *
     * One description, read by `repair`, by `isValid` and by the mutator, so the three cannot drift apart on which gene anchors which. For a
-    * crossover pair the anchor is the faster line whichever side it sits on: an inverted pair is the same crossover read the other way round
-    * and the catalogue holds both, so the separation is the constraint and the orientation is not.
+    * crossover pair the anchor is the faster line whichever side it sits on: an inverted pair is the same crossover read the other way
+    * round and the catalogue holds both, so the separation is the constraint and the orientation is not.
     */
   def relationOf(indicator: Indicator): Option[(Relation, Int, Int, IntRange)] = indicator match
     case Indicator.VolatilityRegimeDetection(atrLength, smoothing) =>
@@ -109,11 +110,11 @@ object IndicatorBounds:
     case other                      => genesInRange(other) && relationOf(other).forall((r, a, d, _) => r.holds(a, d))
 
   private def genesInRange(indicator: Indicator): Boolean = indicator match
-    case Indicator.Composite(is, _)            => is.forall(genesInRange)
-    case Indicator.TrendChangeDetection(_, vt) => normalise(vt) == vt
-    case Indicator.ValueTracking(_, _, vt)     => normalise(vt) == vt
-    case Indicator.PriceLineCrossing(_, _, vt) => normalise(vt) == vt
-    case Indicator.LinesCrossing(_, vt1, vt2)  => normalise(vt1) == vt1 && normalise(vt2) == vt2
+    case Indicator.Composite(is, _)                 => is.forall(genesInRange)
+    case Indicator.TrendChangeDetection(_, vt)      => normalise(vt) == vt
+    case Indicator.ValueTracking(_, _, vt)          => normalise(vt) == vt
+    case Indicator.PriceLineCrossing(_, _, vt)      => normalise(vt) == vt
+    case Indicator.LinesCrossing(_, vt1, vt2)       => normalise(vt1) == vt1 && normalise(vt2) == vt2
     case Indicator.ThresholdCrossing(_, vt, ub, lb) =>
       val band = ThresholdBounds.of(vt)
       normalise(vt) == vt && band.clampUpper(ub) == ub && band.clampLower(lb) == lb
@@ -166,13 +167,13 @@ object IndicatorBounds:
         .fold(GeneBounds.stdDevLength.clamp(stdDevLength))(bollingerStdDev.project(_, stdDevLength, GeneBounds.stdDevLength))
       Indicator.BollingerBands(vs, middle, stdDev, GeneBounds.bollingerMultiplier.clamp(stdDevMultiplier))
 
-  /** Every gene of a transformation, back inside the range the search is allowed to hold it in. Clamps rather than snapping to the step: the
-    * step is where an operator may place a new value, not a property a legal value has to have - see `DoubleRange.clamp`.
+  /** Every gene of a transformation, back inside the range the search is allowed to hold it in. Clamps rather than snapping to the step:
+    * the step is where an operator may place a new value, not a property a legal value has to have - see `DoubleRange.clamp`.
     */
   def normalise(transformation: VT): VT = transformation match
-    case VT.Sequenced(sequence)  => VT.Sequenced(sequence.map(normalise))
-    case VT.Kalman(g, n)         => VT.Kalman(GeneBounds.kalmanGain.clamp(g), GeneBounds.kalmanNoise.clamp(n))
-    case VT.KalmanVelocity(g, n) => VT.KalmanVelocity(GeneBounds.kalmanGain.clamp(g), GeneBounds.kalmanNoise.clamp(n))
+    case VT.Sequenced(sequence)       => VT.Sequenced(sequence.map(normalise))
+    case VT.Kalman(g, n)              => VT.Kalman(GeneBounds.kalmanGain.clamp(g), GeneBounds.kalmanNoise.clamp(n))
+    case VT.KalmanVelocity(g, n)      => VT.KalmanVelocity(GeneBounds.kalmanGain.clamp(g), GeneBounds.kalmanNoise.clamp(n))
     case VT.JMA(length, phase, power) =>
       VT.JMA(GeneBounds.jmaLength.clamp(length), GeneBounds.jmaPhase.clamp(phase), GeneBounds.jmaPower.clamp(power))
     case VT.NMA(length, signalLength, lambda, maCalc) =>

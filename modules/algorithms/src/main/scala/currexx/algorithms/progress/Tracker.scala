@@ -63,7 +63,9 @@ trait Tracker[F[_], I]:
     * The count of candidates that scored zero is the diagnosis rather than a detail: finalists holding most of their training score mean
     * the search found something and the remaining question is which, and finalists collapsing to zero mean it found nothing however good
     * the training figures look. The displacement line says whether validating changed the answer at all, which is the cheapest evidence
-    * that the holdout is doing any work.
+    * that the holdout is doing any work — it reports a placing in the final ranking, which is the held-out score except where two
+    * candidates were too close on it to separate, so a training-ranked #1 at the top either led out of sample or was inside the tie band of
+    * whatever did.
     */
   protected def validationSummaryMsg(population: ValidatedPopulation[I]): String =
     if (population.isEmpty) "No candidates were validated."
@@ -72,7 +74,7 @@ trait Tracker[F[_], I]:
       val placed  = population.indexWhere(_._1 == trainingOrder(population).head) + 1
       val summary = s"${population.size} finalist(s) validated, $zeroes of which scored zero on evidence the search never saw."
       if (placed == 1) summary
-      else s"$summary\nThe training-ranked #1 placed $placed of ${population.size} on validation."
+      else s"$summary\nThe training-ranked #1 placed $placed of ${population.size} in the final ranking."
 
   protected def statsMsg(population: EvaluatedPopulation[I]): String =
     val fitnesses = population.map(_._2.value)
@@ -81,18 +83,19 @@ trait Tracker[F[_], I]:
     val worst     = population.last._2.value
     s"Stats: Best=$best, Avg=$avg, Worst=$worst"
 
-  /** Reported on validation fitness, since that is what the population is ordered by and what the run is to be judged on. Guarded against
-    * an empty population, which `displayFinal` can be handed by a run that produced nothing and where a reporter throwing would lose the
-    * record of that.
+  /** Reported on validation fitness, which is what the run is to be judged on. Guarded against an empty population, which `displayFinal`
+    * can be handed by a run that produced nothing and where a reporter throwing would lose the record of that.
+    *
+    * Taken as the maximum and minimum rather than off the ends of the list. The population is no longer ordered strictly by this figure —
+    * the head is the champion, chosen on validation but with the training rank breaking ties the validation score could not — so reading
+    * `head` as the best would report a Best below the Worst the moment a tie was broken that way.
     */
   protected def validatedStatsMsg(population: ValidatedPopulation[I]): String =
     if (population.isEmpty) "Stats: no validated candidates"
     else
       val fitnesses = population.map(_._3.value)
       val avg       = fitnesses.sum / fitnesses.size
-      val best      = population.head._3.value
-      val worst     = population.last._3.value
-      s"Stats: Best=$best, Avg=$avg, Worst=$worst"
+      s"Stats: Best=${fitnesses.max}, Avg=$avg, Worst=${fitnesses.min}"
 
   protected def durationMsg(start: Instant, end: Instant): String =
     val totalMs = end.toEpochMilli - start.toEpochMilli
