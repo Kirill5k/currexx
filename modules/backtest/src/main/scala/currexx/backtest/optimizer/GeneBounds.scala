@@ -38,8 +38,7 @@ object GeneBounds:
       math.round(bounded * 10000.0) / 10000.0
 
     /** Into the range, and nowhere else. The step is where an operator is allowed to place a *new* value, not a property a value has to
-      * have to be legal - s12 has run CMF thresholds of +/-0.17 since before there was a grid, and snapping them to 0.18 would be a repair
-      * inventing a change nothing asked for. `IndicatorBounds.repair` therefore clamps and leaves the grid alone.
+      * have to be legal.
       */
     def clamp(value: Double): Double = math.max(min, math.min(max, value))
 

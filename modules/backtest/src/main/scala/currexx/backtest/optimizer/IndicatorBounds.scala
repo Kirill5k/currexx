@@ -9,10 +9,8 @@ import scala.util.Random
   *
   * `GeneBounds` says what a single gene may be and `ThresholdBounds` says what a boundary may be given the transformation feeding it. Both
   * describe one gene at a time, which is all a per-gene operator can honour. These are relationships, and the region they carve out is not a
-  * box, so an operator that moves each gene inside its own range can still leave it - which is how the champion of
-  * ga-optimisation-2026-09-02-0722 came to be `LinesCrossing(JMA(35,..), JMA(38,..))` with `VolatilityRegimeDetection(22, SMA(6))`: two
-  * lines a whisker apart and a squeeze smoothed over a quarter of the window it smooths, neither of which could have been drawn.
-  *
+  * box, so an operator that moves each gene inside its own range can still leave it.
+ *
   * What is guaranteed, and what is not:
   *   - `isValid` is the definition: every gene inside its own range, and every related pair inside its ratio band.
   *   - crossover and mutation preserve it, so a valid parent cannot produce an invalid child. Mutation additionally holds the anchor inside
@@ -28,9 +26,7 @@ object IndicatorBounds:
     *
     * The two bands are not the same question. `draw` is where a fresh random indicator should start and is a preference. `valid` is what an
     * operator may not produce, and is set by measurement: wide enough to hold every strategy in `TestStrategy`, narrow enough to exclude the
-    * failures above. They differ by more than a safety margin - s2_optimized and s2_optimized_v3, the best two vals by holdout net, both run
-    * `VolatilityRegimeDetection(37, SMA(35))` at 0.946, so a repair enforcing the draw band would rewrite the two strategies the search
-    * exists to find. Drawing a ratio below 1.2 is a bad bet; forbidding one is a false claim about what works.
+    * failures above.
     */
   final case class Relation(draw: DoubleRange, valid: DoubleRange):
 
@@ -67,12 +63,11 @@ object IndicatorBounds:
       else math.max(lo, math.min(hi, dependent))
 
   /** Smoothing over ATR. "Low volatility" means ATR below its own longer average, so a smoothing shorter than the ATR it smooths inverts the
-    * regime the rules read. Catalogue range 0.778 (s2_optimized_v2) to 2.500 (s6); the failure above sat at 0.27.
+    * regime the rules read.
     */
   val volatilityRegime: Relation = Relation(DoubleRange(1.2, 4.0, 0.05), DoubleRange(0.70, 5.0, 0.05))
 
-  /** Slow line over fast line. Two lines of near-equal length cross on noise and trade constantly for nothing. Catalogue range 1.550
-    * (s2_optimized_v3) to 2.211 (s1_v2_optimized); the failure above sat at 1.086.
+  /** Slow line over fast line. Two lines of near-equal length cross on noise and trade constantly for nothing.
     */
   val linesSeparation: Relation = Relation(DoubleRange(1.3, 4.0, 0.05), DoubleRange(1.20, 5.0, 0.05))
 
