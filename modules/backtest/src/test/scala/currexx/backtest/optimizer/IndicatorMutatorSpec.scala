@@ -67,7 +67,10 @@ class IndicatorMutatorSpec extends IOWordSpec {
         yield res
 
         result.asserting { ind =>
-          ind mustBe Indicator.BollingerBands(ValueSource.Close, ValueTransformation.SMA(34), 27, 2.5)
+          // The pair starts at 20/20, a ratio of 1.0. The band steps to 34 and the deviation window follows it rather than staying near its
+          // own old value: the ratio mutates 1.0 -> 1.29 and 34 x 1.29 is 44. Reading the ratio after the anchor had already moved, as the
+          // first cut of this did, would have measured 20/34 and returned 31 - the independent walk wearing a ratio's clothes.
+          ind mustBe Indicator.BollingerBands(ValueSource.Close, ValueTransformation.SMA(34), 44, 2.0)
         }
       }
     }

@@ -51,30 +51,15 @@ object IndicatorInitialiser:
     val immigrants = size - clones - jittered
     val clonePop   = Vector.tabulate(clones)(i => seeds(i % seeds.size))
     for jitterPop <- Vector.range(0, jittered).traverse(i => jitters(i % jitters.size).mutate(seeds(i % seeds.size), 1.0))
-    yield clonePop ++ jitterPop ++ Vector.fill(immigrants)(randomiseInd(seed))
+    // The draws are relationally correct by construction; repairing them anyway means the invariant is enforced in one place and a future
+    // change to a draw cannot quietly reintroduce a candidate the operators would have been forbidden to produce.
+    yield clonePop ++ jitterPop ++ Vector.fill(immigrants)(IndicatorBounds.repair(randomiseInd(seed)))
   }
 
-  /** Whether two indicators can be crossed, which is the same question as whether they have the same shape: `IndicatorCrossover` fails a
-    * whole run on a structural mismatch, so a hall-of-fame seed has to be checked before it enters the population rather than after.
+  /** Whether two indicators can be crossed. The question belongs to `IndicatorCrossover`, whose precondition it is, and is asked here
+    * because a structural mismatch fails a whole run - so a hall-of-fame seed has to be checked before it enters the population.
     */
-  def sameShape(a: Indicator, b: Indicator): Boolean = (a, b) match
-    case (Indicator.Composite(is1, _), Indicator.Composite(is2, _)) =>
-      is1.length == is2.length && is1.toList.zip(is2.toList).forall(sameShape)
-    case (Indicator.TrendChangeDetection(_, t1), Indicator.TrendChangeDetection(_, t2))       => sameVtShape(t1, t2)
-    case (Indicator.ThresholdCrossing(_, t1, _, _), Indicator.ThresholdCrossing(_, t2, _, _)) => sameVtShape(t1, t2)
-    case (Indicator.LinesCrossing(_, a1, b1), Indicator.LinesCrossing(_, a2, b2))             => sameVtShape(a1, a2) && sameVtShape(b1, b2)
-    case (Indicator.KeltnerChannel(_, m1, _, _), Indicator.KeltnerChannel(_, m2, _, _))       => sameVtShape(m1, m2)
-    case (Indicator.BollingerBands(_, m1, _, _), Indicator.BollingerBands(_, m2, _, _))       => sameVtShape(m1, m2)
-    case (Indicator.VolatilityRegimeDetection(_, s1), Indicator.VolatilityRegimeDetection(_, s2)) => sameVtShape(s1, s2)
-    // Crossover additionally requires these two to agree, because a tracked value read under the wrong role is not the same gene.
-    case (Indicator.ValueTracking(r1, s1, t1), Indicator.ValueTracking(r2, s2, t2))       => r1 == r2 && s1 == s2 && sameVtShape(t1, t2)
-    case (Indicator.PriceLineCrossing(_, r1, t1), Indicator.PriceLineCrossing(_, r2, t2)) => r1 == r2 && sameVtShape(t1, t2)
-    case _                                                                                => false
-
-  private def sameVtShape(a: VT, b: VT): Boolean = (a, b) match
-    case (VT.Sequenced(s1), VT.Sequenced(s2))        => s1.length == s2.length && s1.zip(s2).forall(sameVtShape)
-    case (VT.Sequenced(_), _) | (_, VT.Sequenced(_)) => false
-    case _                                           => a.getClass == b.getClass
+  def sameShape(a: Indicator, b: Indicator): Boolean = IndicatorCrossover.sameShape(a, b)
 
   private def logUniform(range: IntRange)(using rand: Random): Int =
     val low  = math.log(range.min.toDouble)
@@ -127,7 +112,7 @@ object IndicatorInitialiser:
       // earns nothing. What matters is the ratio between them and not which side of it is longer - an inverted pair is the same crossover
       // read the other way round, and the catalogue holds both - so the separation is drawn and the orientation is not.
       val (first, second) = (randomiseVt(vt1), randomiseVt(vt2))
-      val ratio           = 1.3 + rand.nextDouble() * 2.7
+      val ratio           = IndicatorBounds.linesSeparation.drawRatio
       val fastRange       = GeneBounds.lengthRange(first).leavingRoomFor(ratio, GeneBounds.lengthRange(second))
       val fast            = logUniform(fastRange)
       val slow            = math.round(fast * ratio).toInt
@@ -137,20 +122,20 @@ object IndicatorInitialiser:
       // The channel is the middle band plus a multiple of ATR, and an ATR measured over a longer window than the band it widens is
       // measuring a different market than the one being banded.
       val middle = randomiseVt(md)
-      val atr    = GeneBounds.atrLength.clamp(math.round(lengthOr(middle, 20) * (0.4 + rand.nextDouble() * 0.6)).toInt)
+      val atr    = GeneBounds.atrLength.clamp(math.round(lengthOr(middle, 20) * IndicatorBounds.keltnerAtr.drawRatio).toInt)
       Indicator.KeltnerChannel(vs, middle, atr, uniform(GeneBounds.keltnerMultiplier))
     case Indicator.BollingerBands(vs, md, _, _) =>
       // The deviation is meant to describe the spread of the same stretch of price the middle band averages, so its window is drawn near
       // the band's rather than independently of it.
       val middle = randomiseVt(md)
-      val stdDev = GeneBounds.stdDevLength.clamp(math.round(lengthOr(middle, 20) * (0.7 + rand.nextDouble() * 0.8)).toInt)
+      val stdDev = GeneBounds.stdDevLength.clamp(math.round(lengthOr(middle, 20) * IndicatorBounds.bollingerStdDev.drawRatio).toInt)
       Indicator.BollingerBands(vs, middle, stdDev, uniform(GeneBounds.bollingerMultiplier))
     case Indicator.VolatilityRegimeDetection(_, vt) =>
       // "Low volatility" means ATR below its own longer average. Drawn independently, half of these come back with the smoothing shorter
       // than the ATR it smooths, which inverts the regime the rules then read - the s5 shuffled round of 2026-08-31 drew (29, SMA(6)) and
       // closed 49 trades. The catalogue's own squeezes sit between 1.2 and 4 times: s6 at 20/50, s5_optimized_v2 at 28/63.
       val smoothing = randomiseVt(vt)
-      val ratio     = 1.2 + rand.nextDouble() * 2.8
+      val ratio     = IndicatorBounds.volatilityRegime.drawRatio
       val atrRange  = GeneBounds.atrLength.leavingRoomFor(ratio, GeneBounds.lengthRange(smoothing))
       val atr       = logUniform(atrRange)
       Indicator.VolatilityRegimeDetection(atr, GeneBounds.withLength(smoothing, math.round(atr * ratio).toInt))

@@ -24,42 +24,17 @@ class IndicatorInitialiserSpec extends IOWordSpec {
   )
 
   /** Every gene the initialiser draws has to sit inside the range the mutator is allowed to hold it in, or the first mutation to touch it
-    * silently moves it somewhere else.
+    * silently moves it somewhere else - and every related pair has to hold its ratio, or the operators inherit a candidate they would have
+    * been forbidden to produce. `IndicatorBounds.isValid` is the single definition of both.
     */
-  def genesWithinBounds(indicator: Indicator): Boolean = {
-    def vtOk(vt: VT): Boolean = vt match
-      case VT.Sequenced(sequence)     => sequence.forall(vtOk)
-      case VT.JMA(length, phase, power) =>
-        GeneBounds.jmaLength.clamp(length) == length && GeneBounds.jmaPhase.clamp(phase) == phase &&
-        GeneBounds.jmaPower.clamp(power) == power
-      case VT.Kalman(g, n)         => GeneBounds.kalmanGain.snap(g) == g && GeneBounds.kalmanNoise.snap(n) == n
-      case VT.KalmanVelocity(g, n) => GeneBounds.kalmanGain.snap(g) == g && GeneBounds.kalmanNoise.snap(n) == n
-      case VT.NMA(l, sl, lambda, _) =>
-        GeneBounds.nmaLength.clamp(l) == l && GeneBounds.nmaSignalLength.clamp(sl) == sl && GeneBounds.nmaLambda.snap(lambda) == lambda
-      case other => GeneBounds.lengthOf(other).forall(l => GeneBounds.lengthRange(other).clamp(l) == l)
-
-    def indOk(ind: Indicator): Boolean = ind match
-      case Indicator.Composite(is, _)                       => is.forall(indOk)
-      case Indicator.TrendChangeDetection(_, vt)            => vtOk(vt)
-      case Indicator.ThresholdCrossing(_, vt, _, _)         => vtOk(vt)
-      case Indicator.LinesCrossing(_, vt1, vt2)             => vtOk(vt1) && vtOk(vt2)
-      case Indicator.ValueTracking(_, _, vt)                => vtOk(vt)
-      case Indicator.PriceLineCrossing(_, _, vt)            => vtOk(vt)
-      case Indicator.VolatilityRegimeDetection(atrL, vt)    => GeneBounds.atrLength.clamp(atrL) == atrL && vtOk(vt)
-      case Indicator.KeltnerChannel(_, md, atrL, atrM)      =>
-        vtOk(md) && GeneBounds.atrLength.clamp(atrL) == atrL && GeneBounds.keltnerMultiplier.snap(atrM) == atrM
-      case Indicator.BollingerBands(_, md, sdl, sdm) =>
-        vtOk(md) && GeneBounds.stdDevLength.clamp(sdl) == sdl && GeneBounds.bollingerMultiplier.snap(sdm) == sdm
-
-    indOk(indicator)
-  }
+  def genesWithinBounds(indicator: Indicator): Boolean = IndicatorBounds.isValid(indicator)
 
   "An IndicatorInitialiser" when {
 
     "shuffle is false" should {
       "return the seed unchanged, as many times as asked" in {
         given Random = Random(42)
-        val result = for
+        val result   = for
           init <- IndicatorInitialiser.make[IO]
           pop  <- init.initialisePopulation(seed, 20, false)
         yield pop
@@ -74,7 +49,7 @@ class IndicatorInitialiserSpec extends IOWordSpec {
     "shuffle is true" should {
       "keep the seed in the population and draw the rest around it" in {
         given Random = Random(42)
-        val result = for
+        val result   = for
           init <- IndicatorInitialiser.make[IO]
           pop  <- init.initialisePopulation(seed, 100, true)
         yield pop
@@ -88,7 +63,7 @@ class IndicatorInitialiserSpec extends IOWordSpec {
 
       "draw every gene inside the range the mutator can hold" in {
         given Random = Random(7)
-        val result = for
+        val result   = for
           init <- IndicatorInitialiser.make[IO]
           pop  <- init.initialisePopulation(seed, 300, true)
         yield pop
@@ -98,11 +73,11 @@ class IndicatorInitialiserSpec extends IOWordSpec {
 
       "produce only members that can be crossed with each other" in {
         given Random = Random(13)
-        val result = for
-          init     <- IndicatorInitialiser.make[IO]
+        val result   = for
+          init      <- IndicatorInitialiser.make[IO]
           crossover <- IndicatorCrossover.make[IO]
-          pop      <- init.initialisePopulation(seed, 60, true)
-          crossed  <- pop.toList.traverse(crossover.cross(_, seed, 1.0))
+          pop       <- init.initialisePopulation(seed, 60, true)
+          crossed   <- pop.toList.traverse(crossover.cross(_, seed, 1.0))
         yield crossed
 
         result.asserting(_ must have size 60)
@@ -110,7 +85,7 @@ class IndicatorInitialiserSpec extends IOWordSpec {
 
       "mix in extra seeds of the same shape" in {
         given Random = Random(99)
-        val sibling = Indicator.compositeAnyOf(
+        val sibling  = Indicator.compositeAnyOf(
           Indicator.TrendChangeDetection(ValueSource.HLC3, VT.JMA(length = 50, phase = -6, power = 1)),
           Indicator.BollingerBands(ValueSource.Close, VT.SMA(35), stdDevLength = 41, stdDevMultiplier = 2.6),
           Indicator.VolatilityRegimeDetection(atrLength = 28, smoothingType = VT.SMA(63)),
@@ -130,15 +105,17 @@ class IndicatorInitialiserSpec extends IOWordSpec {
 
       "return exactly the requested size when there are more seeds than the clone share allows" in {
         given Random = Random(5)
-        val siblings = List.range(10, 40).map(l =>
-          Indicator.compositeAnyOf(
-            Indicator.TrendChangeDetection(ValueSource.HLC3, VT.JMA(length = l, phase = -6, power = 1)),
-            Indicator.BollingerBands(ValueSource.Close, VT.SMA(35), stdDevLength = 41, stdDevMultiplier = 2.6),
-            Indicator.VolatilityRegimeDetection(atrLength = 20, smoothingType = VT.SMA(50)),
-            Indicator.ThresholdCrossing(ValueSource.Close, VT.RSX(11), upperBoundary = 66.0, lowerBoundary = 30.0),
-            Indicator.ValueTracking(ValueRole.Momentum, ValueSource.Close, VT.RSX(8))
+        val siblings = List
+          .range(10, 40)
+          .map(l =>
+            Indicator.compositeAnyOf(
+              Indicator.TrendChangeDetection(ValueSource.HLC3, VT.JMA(length = l, phase = -6, power = 1)),
+              Indicator.BollingerBands(ValueSource.Close, VT.SMA(35), stdDevLength = 41, stdDevMultiplier = 2.6),
+              Indicator.VolatilityRegimeDetection(atrLength = 20, smoothingType = VT.SMA(50)),
+              Indicator.ThresholdCrossing(ValueSource.Close, VT.RSX(11), upperBoundary = 66.0, lowerBoundary = 30.0),
+              Indicator.ValueTracking(ValueRole.Momentum, ValueSource.Close, VT.RSX(8))
+            )
           )
-        )
         val result = for
           init <- IndicatorInitialiser.seeded[IO](siblings)
           pop  <- init.initialisePopulation(seed, 20, true)
@@ -149,7 +126,7 @@ class IndicatorInitialiserSpec extends IOWordSpec {
 
       "drop extra seeds that could not be crossed with the target" in {
         given Random = Random(99)
-        val result = for
+        val result   = for
           init <- IndicatorInitialiser.seeded[IO](List(differentShape))
           pop  <- init.initialisePopulation(seed, 100, true)
         yield pop
