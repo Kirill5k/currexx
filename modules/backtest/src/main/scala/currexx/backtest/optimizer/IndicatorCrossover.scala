@@ -136,7 +136,7 @@ object IndicatorCrossover:
         F.fromEither(crossInd(par1, par2).map(IndicatorBounds.repair))
           .handleErrorWith {
             case e: IllegalStateException => F.raiseError(e)
-            case e                        => F.raiseError(new IllegalArgumentException(s"failed to cross $par1 and $par2 together: ${e.getMessage}"))
+            case e => F.raiseError(new IllegalArgumentException(s"failed to cross $par1 and $par2 together: ${e.getMessage}"))
           }
       }
 

@@ -80,10 +80,8 @@ constraint(s) on validation data:` with one line per breach. A breach discounted
 rather than disqualifying it, so still promote — but reproduce every breach line in the val's
 comment so the next reader sees it without reopening the report.
 
-**`NOTHING SELECTED: no finalist scored above zero on data it was never searched against.`** —
-**promote nothing from this round.** The indicator on the `Best by validation, recorded so the
-round leaves a trace and not as a candidate:` line exists to leave a trace, not to be used. Say
-in the final report that the round selected nothing.
+**`NOTHING SELECTED: no finalist scored above zero on data it was never searched against.`** — 
+promote top candidate for reference. Make sure it is reflected in val's comment.
 
 ### Two readings that need flagging, not skipping
 
@@ -256,31 +254,7 @@ against each other and are not a forecast.
 
 Then re-run `sbt -batch "backtest/scalafmt"` if any comment pushed a line past 140 columns.
 
-## Step 9 — Keep, promote, or delete
-
-Now that each champion has a holdout line, decide its fate against the base it came from. Do not
-leave a measured loser in the catalogue.
-
-- **Champion beats its base on the holdout** — rename it into the base's name, delete the base,
-  and add a line to its comment: `Promoted into its base's name on <date>, having beaten it
-  <how>.` Then fix every reference: `Optimiser.scala`'s `rounds` and its scaladoc,
-  `BatchBacktester.scala`'s `strategies`, and `JsonPrinter.scala` if it prints the deleted val.
-- **Champion loses to its base** — delete the new val and its `BatchBacktester` entry, unless it
-  is worth keeping for lineage or structural coverage (the only volume-reading strategy, the
-  base of a family), in which case keep it out of `BatchBacktester` and mark it `Not in
-  BatchBacktester.` with the reason.
-- **Whole family loses money on the holdout** — say so plainly; do not keep adding descendants
-  to it because their in-sample numbers look good.
-
-Then update the object-level scaladoc at the top of `TestStrategy.scala`. It is a live account
-of what the catalogue currently contains and what the last batch of rounds taught — the counts,
-the named exceptions, the "re-measured on <date>" line. Leaving it stale is the same defect as
-leaving a stale metrics line.
-
-Finally, re-run `sbt -batch "backtest/scalafmt"`, and re-run `BatchBacktester` if a rename or
-deletion changed what it measures.
-
-## Step 10 — Report
+## Step 9 — Report
 
 Tell the user, per report file:
 
