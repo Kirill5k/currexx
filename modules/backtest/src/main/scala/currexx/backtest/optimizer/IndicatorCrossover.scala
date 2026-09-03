@@ -50,73 +50,69 @@ object IndicatorCrossover:
     new Crossover[F, Indicator] {
       override def cross(par1: Indicator, par2: Indicator)(using r: Random): F[Indicator] = {
 
-        def crossVt(blend: Blend)(so1: VT, so2: VT): Either[Throwable, VT] = (so1, so2) match
-          case (VT.StandardDeviation(l1), VT.StandardDeviation(l2)) => Right(VT.StandardDeviation(blend.int(l1, l2)))
-          case (VT.RSX(l1), VT.RSX(l2))                             => Right(VT.RSX(blend.int(l1, l2)))
-          case (VT.JRSX(l1), VT.JRSX(l2))                           => Right(VT.JRSX(blend.int(l1, l2)))
-          case (VT.STOCH(l1), VT.STOCH(l2))                         => Right(VT.STOCH(blend.int(l1, l2)))
-          case (VT.HMA(l1), VT.HMA(l2))                             => Right(VT.HMA(blend.int(l1, l2)))
-          case (VT.SMA(l1), VT.SMA(l2))                             => Right(VT.SMA(blend.int(l1, l2)))
-          case (VT.WMA(l1), VT.WMA(l2))                             => Right(VT.WMA(blend.int(l1, l2)))
-          case (VT.EMA(l1), VT.EMA(l2))                             => Right(VT.EMA(blend.int(l1, l2)))
-          case (VT.WilliamsR(l1), VT.WilliamsR(l2))                 => Right(VT.WilliamsR(blend.int(l1, l2)))
-          case (VT.ATR(l1), VT.ATR(l2))                             => Right(VT.ATR(blend.int(l1, l2)))
-          case (VT.ADX(l1), VT.ADX(l2))                             => Right(VT.ADX(blend.int(l1, l2)))
-          case (VT.CCI(l1), VT.CCI(l2))                             => Right(VT.CCI(blend.int(l1, l2)))
-          case (VT.CMF(l1), VT.CMF(l2))                             => Right(VT.CMF(blend.int(l1, l2)))
-          case (VT.IchimokuKijunSen(l1), VT.IchimokuKijunSen(l2))   => Right(VT.IchimokuKijunSen(blend.int(l1, l2)))
-          case (VT.Kalman(g1, mn1), VT.Kalman(g2, mn2))             =>
-            Right(VT.Kalman(blend.double(g1, g2, GeneBounds.kalmanGain.step), blend.double(mn1, mn2, GeneBounds.kalmanNoise.step)))
-          case (VT.KalmanVelocity(g1, mn1), VT.KalmanVelocity(g2, mn2)) =>
-            Right(VT.KalmanVelocity(blend.double(g1, g2, GeneBounds.kalmanGain.step), blend.double(mn1, mn2, GeneBounds.kalmanNoise.step)))
-          case (VT.JMA(l1, ph1, pow1), VT.JMA(l2, ph2, pow2)) =>
-            Right(VT.JMA(blend.int(l1, l2), blend.int(ph1, ph2), blend.int(pow1, pow2)))
-          case (VT.NMA(l1, sl1, d1, ma1), VT.NMA(l2, sl2, d2, _)) =>
-            Right(VT.NMA(blend.int(l1, l2), blend.int(sl1, sl2), blend.double(d1, d2, GeneBounds.nmaLambda.step), ma1))
-          case (VT.ParabolicSAR(start1, max1, step1), VT.ParabolicSAR(start2, max2, step2)) =>
-            Right(
-              VT.ParabolicSAR(
-                blend.double(start1, start2, GeneBounds.sarAfStart.step),
-                blend.double(max1, max2, GeneBounds.sarAfMax.step),
-                blend.double(step1, step2, GeneBounds.sarAfStep.step)
+        def crossVt(blend: Blend)(so1: VT, so2: VT): Either[Throwable, VT] =
+          (so1, so2) match
+            case (vt1, vt2) if !sameVtShape(vt1, vt2) =>
+              Left(new IllegalArgumentException(s"both value transformations must be of the same shape: $vt1 vs $vt2"))
+            case (VT.StandardDeviation(l1), VT.StandardDeviation(l2)) => Right(VT.StandardDeviation(blend.int(l1, l2)))
+            case (VT.RSX(l1), VT.RSX(l2))                             => Right(VT.RSX(blend.int(l1, l2)))
+            case (VT.JRSX(l1), VT.JRSX(l2))                           => Right(VT.JRSX(blend.int(l1, l2)))
+            case (VT.STOCH(l1), VT.STOCH(l2))                         => Right(VT.STOCH(blend.int(l1, l2)))
+            case (VT.HMA(l1), VT.HMA(l2))                             => Right(VT.HMA(blend.int(l1, l2)))
+            case (VT.SMA(l1), VT.SMA(l2))                             => Right(VT.SMA(blend.int(l1, l2)))
+            case (VT.WMA(l1), VT.WMA(l2))                             => Right(VT.WMA(blend.int(l1, l2)))
+            case (VT.EMA(l1), VT.EMA(l2))                             => Right(VT.EMA(blend.int(l1, l2)))
+            case (VT.WilliamsR(l1), VT.WilliamsR(l2))                 => Right(VT.WilliamsR(blend.int(l1, l2)))
+            case (VT.ATR(l1), VT.ATR(l2))                             => Right(VT.ATR(blend.int(l1, l2)))
+            case (VT.ADX(l1), VT.ADX(l2))                             => Right(VT.ADX(blend.int(l1, l2)))
+            case (VT.CCI(l1), VT.CCI(l2))                             => Right(VT.CCI(blend.int(l1, l2)))
+            case (VT.CMF(l1), VT.CMF(l2))                             => Right(VT.CMF(blend.int(l1, l2)))
+            case (VT.IchimokuKijunSen(l1), VT.IchimokuKijunSen(l2))   => Right(VT.IchimokuKijunSen(blend.int(l1, l2)))
+            case (VT.Kalman(g1, mn1), VT.Kalman(g2, mn2))             =>
+              Right(VT.Kalman(blend.double(g1, g2, GeneBounds.kalmanGain.step), blend.double(mn1, mn2, GeneBounds.kalmanNoise.step)))
+            case (VT.KalmanVelocity(g1, mn1), VT.KalmanVelocity(g2, mn2)) =>
+              Right(
+                VT.KalmanVelocity(
+                  blend.double(g1, g2, GeneBounds.kalmanGain.step),
+                  blend.double(mn1, mn2, GeneBounds.kalmanNoise.step)
+                )
               )
-            )
-          case (VT.Sequenced(s1), VT.Sequenced(s2)) =>
-            // Ensure sequences have same length before crossing
-            if (s1.length != s2.length) {
-              Left(new IllegalArgumentException(s"Sequenced transformations must have same length: ${s1.length} vs ${s2.length}"))
-            } else {
+            case (VT.JMA(l1, ph1, pow1), VT.JMA(l2, ph2, pow2)) =>
+              Right(VT.JMA(blend.int(l1, l2), blend.int(ph1, ph2), blend.int(pow1, pow2)))
+            case (VT.NMA(l1, sl1, d1, ma1), VT.NMA(l2, sl2, d2, _)) =>
+              Right(VT.NMA(blend.int(l1, l2), blend.int(sl1, sl2), blend.double(d1, d2, GeneBounds.nmaLambda.step), ma1))
+            case (VT.ParabolicSAR(start1, max1, step1), VT.ParabolicSAR(start2, max2, step2)) =>
+              Right(
+                VT.ParabolicSAR(
+                  blend.double(start1, start2, GeneBounds.sarAfStart.step),
+                  blend.double(max1, max2, GeneBounds.sarAfMax.step),
+                  blend.double(step1, step2, GeneBounds.sarAfStep.step)
+                )
+              )
+            case (VT.Sequenced(s1), VT.Sequenced(s2)) =>
               s1.zip(s2).traverse((v1, v2) => crossVt(blend)(v1, v2)).map(VT.Sequenced(_))
-            }
-          case (v1, v2) =>
-            Left(new IllegalArgumentException(s"both parents must be of the same type: $v1 vs $v2"))
+            case (vt1, vt2) =>
+              Left(new IllegalStateException(s"unhandled value transformation types: $vt1 vs $vt2"))
 
-        def crossInd(ind1: Indicator, ind2: Indicator): Either[Throwable, Indicator] = {
+        def crossInd(ind1: Indicator, ind2: Indicator): Either[Throwable, Indicator] =
           val blend = Blend.draw
           val cross = crossVt(blend)
           (ind1, ind2) match
+            case (i1, i2) if !sameShape(i1, i2) =>
+              Left(new IllegalArgumentException(s"both parent indicators must be of the same shape: $i1 vs $i2"))
             case (Indicator.VolatilityRegimeDetection(atr1, vt1), Indicator.VolatilityRegimeDetection(atr2, vt2)) =>
               cross(vt1, vt2).map(vt => Indicator.VolatilityRegimeDetection(blend.int(atr1, atr2), vt))
-            case (Indicator.ValueTracking(vr1, vs1, vt1), Indicator.ValueTracking(vr2, vs2, vt2)) =>
-              if (vr1 == vr2 && vs1 == vs2) {
-                cross(vt1, vt2).map(vt => Indicator.ValueTracking(vr1, vs1, vt))
-              } else {
-                Left(new IllegalArgumentException("both ValueTracking indicators must have the same value range and value source"))
-              }
+            case (Indicator.ValueTracking(vr, vs, vt1), Indicator.ValueTracking(_, _, vt2)) =>
+              cross(vt1, vt2).map(vt => Indicator.ValueTracking(vr, vs, vt))
             case (Indicator.Composite(is1, comb), Indicator.Composite(is2, _)) =>
-              // Ensure composite indicators have same length before crossing
-              if (is1.length != is2.length) {
-                Left(new IllegalArgumentException(s"Composite indicators must have same length: ${is1.length} vs ${is2.length}"))
-              } else {
-                // Each member draws its own blend, because a composite is a bag of independent indicators rather than one relationship.
-                is1.zip(is2).traverse((i1, i2) => crossInd(i1, i2)).map(inds => Indicator.Composite(inds, comb))
-              }
+              // Each member draws its own blend, because a composite is a bag of independent indicators rather than one relationship.
+              is1.zip(is2).traverse((i1, i2) => crossInd(i1, i2)).map(inds => Indicator.Composite(inds, comb))
             case (Indicator.LinesCrossing(s, st1, ft1), Indicator.LinesCrossing(_, st2, ft2)) =>
-              linePairing(st1, ft1, st2, ft2) match
-                case Some((other1, other2)) =>
-                  (cross(st1, other1), cross(ft1, other2)).mapN((st, ft) => Indicator.LinesCrossing(s, st, ft))
-                case None =>
-                  Left(new IllegalArgumentException(s"both parents must be of the same type: ($st1, $ft1) vs ($st2, $ft2)"))
+              linePairing(st1, ft1, st2, ft2).fold(
+                Left(new IllegalStateException(s"linePairing missing for same-shape parents: ($st1, $ft1) vs ($st2, $ft2)"))
+              ) { case (other1, other2) =>
+                (cross(st1, other1), cross(ft1, other2)).mapN((st, ft) => Indicator.LinesCrossing(s, st, ft))
+              }
             case (Indicator.TrendChangeDetection(s, t1), Indicator.TrendChangeDetection(_, t2)) =>
               cross(t1, t2).map(t => Indicator.TrendChangeDetection(s, t))
             case (Indicator.ThresholdCrossing(s, t1, ub1, lb1), Indicator.ThresholdCrossing(_, t2, ub2, lb2)) =>
@@ -135,12 +131,12 @@ object IndicatorCrossover:
             case (Indicator.PriceLineCrossing(s, r, vt1), Indicator.PriceLineCrossing(_, _, vt2)) =>
               cross(vt1, vt2).map(Indicator.PriceLineCrossing(s, r, _))
             case (i1, i2) =>
-              Left(new IllegalArgumentException(s"both parents must be of the same type: $i1 vs $i2"))
-        }
+              Left(new IllegalStateException(s"unhandled indicator types: $i1 vs $i2"))
 
         F.fromEither(crossInd(par1, par2).map(IndicatorBounds.repair))
-          .handleErrorWith { e =>
-            F.raiseError(new IllegalArgumentException(s"failed to cross $par1 and $par2 together: ${e.getMessage}"))
+          .handleErrorWith {
+            case e: IllegalStateException => F.raiseError(e)
+            case e                        => F.raiseError(new IllegalArgumentException(s"failed to cross $par1 and $par2 together: ${e.getMessage}"))
           }
       }
 
@@ -160,7 +156,7 @@ object IndicatorCrossover:
     * crossover can actually perform are the same set by construction. Asking positionally, as it used to, rejected an SMA/EMA parent
     * against a reversed EMA/SMA one that this handles.
     */
-  def linePairing(first1: VT, second1: VT, first2: VT, second2: VT): Option[(VT, VT)] =
+  private def linePairing(first1: VT, second1: VT, first2: VT, second2: VT): Option[(VT, VT)] =
     val positional = sameVtShape(first1, first2) && sameVtShape(second1, second2)
     val swapped    = sameVtShape(first1, second2) && sameVtShape(second1, first2)
     val aligned    =
@@ -188,7 +184,7 @@ object IndicatorCrossover:
     case (Indicator.PriceLineCrossing(_, r1, t1), Indicator.PriceLineCrossing(_, r2, t2)) => r1 == r2 && sameVtShape(t1, t2)
     case _                                                                                => false
 
-  def sameVtShape(a: VT, b: VT): Boolean = (a, b) match
+  private def sameVtShape(a: VT, b: VT): Boolean = (a, b) match
     case (VT.Sequenced(s1), VT.Sequenced(s2))        => s1.length == s2.length && s1.zip(s2).forall(sameVtShape)
     case (VT.Sequenced(_), _) | (_, VT.Sequenced(_)) => false
     case _                                           => a.getClass == b.getClass

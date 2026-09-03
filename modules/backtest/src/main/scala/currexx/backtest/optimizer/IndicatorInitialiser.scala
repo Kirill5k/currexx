@@ -59,7 +59,7 @@ object IndicatorInitialiser:
   /** Whether two indicators can be crossed. The question belongs to `IndicatorCrossover`, whose precondition it is, and is asked here
     * because a structural mismatch fails a whole run - so a hall-of-fame seed has to be checked before it enters the population.
     */
-  def sameShape(a: Indicator, b: Indicator): Boolean = IndicatorCrossover.sameShape(a, b)
+  private def sameShape(a: Indicator, b: Indicator): Boolean = IndicatorCrossover.sameShape(a, b)
 
   private def logUniform(range: IntRange)(using rand: Random): Int =
     val low  = math.log(range.min.toDouble)
