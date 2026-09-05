@@ -43,7 +43,7 @@ object Optimiser extends IOApp.Simple {
 
   val gaParameters = Parameters.GA(
     populationSize = 300,
-    maxGen = 100,
+    maxGen = 150,
     crossoverProbability = 0.7,
     mutationProbability = 0.1,
     elitismRatio = 0.02,
@@ -99,9 +99,9 @@ object Optimiser extends IOApp.Simple {
     * rounds. A champion that breaches is still worth measuring — the two that measured best out of that batch breached two constraints
     * each.
     *
-    * Two vals in `BatchBacktester` are not searched here: s2_optimized_v3 and s4_optimized_v2. Each is a GA descendant of a base that is
-    * searched, so a round on one would largely re-derive its own sibling. Add them if that stops being true — s2_optimized_v3 currently
-    * leads the catalogue on holdout net, so it is the more defensible of the two to promote into a round of its own.
+    * Descendants that already beat their searched base on holdout — s2_optimized_v3, s2_optimized_v4, s4_optimized_v2, s5_optimized_v3,
+    * s4_optimized_v3 — now have rounds of their own rather than appearing only as `extraSeeds` on a parent. Searching from a stronger seed
+    * should converge faster and is less likely to rediscover a weaker sibling.
     */
   val rounds: List[OptimisationRound] = List(
     OptimisationRound(
@@ -119,32 +119,84 @@ object Optimiser extends IOApp.Simple {
       extraSeeds = List(TestStrategy.s5_optimized_v2.indicator)
     ),
     OptimisationRound(
+      name = "s2_optimized_v3",
+      strategy = TestStrategy.s2_optimized_v3,
+      gaParameters = gaParameters,
+      scoringFunction = consistentScoring,
+      extraSeeds = List(
+        TestStrategy.s2_optimized.indicator,
+        TestStrategy.s2_optimized_v2.indicator,
+        TestStrategy.s2_optimized_v4.indicator
+      )
+    ),
+    OptimisationRound(
+      name = "s2_optimized_v3_shuffle",
+      strategy = TestStrategy.s2_optimized_v3,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring,
+      extraSeeds = List(
+        TestStrategy.s2_optimized.indicator,
+        TestStrategy.s2_optimized_v2.indicator,
+        TestStrategy.s2_optimized_v4.indicator
+      )
+    ),
+    OptimisationRound(
+      name = "s2_optimized_v4",
+      strategy = TestStrategy.s2_optimized_v4,
+      gaParameters = gaParameters,
+      scoringFunction = consistentScoring,
+      extraSeeds = List(
+        TestStrategy.s2_optimized.indicator,
+        TestStrategy.s2_optimized_v2.indicator,
+        TestStrategy.s2_optimized_v3.indicator
+      )
+    ),
+    OptimisationRound(
+      name = "s2_optimized_v4_shuffle",
+      strategy = TestStrategy.s2_optimized_v4,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring,
+      extraSeeds = List(
+        TestStrategy.s2_optimized.indicator,
+        TestStrategy.s2_optimized_v2.indicator,
+        TestStrategy.s2_optimized_v3.indicator
+      )
+    ),
+    OptimisationRound(
       name = "s2_optimized",
       strategy = TestStrategy.s2_optimized,
       gaParameters = gaParameters,
       scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s2_optimized_v2.indicator, TestStrategy.s2_optimized_v3.indicator)
+      extraSeeds = List(
+        TestStrategy.s2_optimized_v2.indicator,
+        TestStrategy.s2_optimized_v3.indicator,
+        TestStrategy.s2_optimized_v4.indicator
+      )
     ),
     OptimisationRound(
       name = "s2_optimized_shuffle",
       strategy = TestStrategy.s2_optimized,
       gaParameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s2_optimized_v2.indicator, TestStrategy.s2_optimized_v3.indicator)
+      extraSeeds = List(
+        TestStrategy.s2_optimized_v2.indicator,
+        TestStrategy.s2_optimized_v3.indicator,
+        TestStrategy.s2_optimized_v4.indicator
+      )
     ),
     OptimisationRound(
       name = "s5_optimized_v2",
       strategy = TestStrategy.s5_optimized_v2,
       gaParameters = gaParameters,
       scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s6.indicator)
+      extraSeeds = List(TestStrategy.s6.indicator, TestStrategy.s5_optimized_v3.indicator)
     ),
     OptimisationRound(
       name = "s5_optimized_v2_shuffle",
       strategy = TestStrategy.s5_optimized_v2,
       gaParameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s6.indicator)
+      extraSeeds = List(TestStrategy.s6.indicator, TestStrategy.s5_optimized_v3.indicator)
     ),
     OptimisationRound(
       name = "s1_v2_optimized",
@@ -159,32 +211,82 @@ object Optimiser extends IOApp.Simple {
       scoringFunction = consistentScoring
     ),
     OptimisationRound(
+      name = "s5_optimized_v3",
+      strategy = TestStrategy.s5_optimized_v3,
+      gaParameters = gaParameters,
+      scoringFunction = consistentScoring,
+      extraSeeds = List(TestStrategy.s5_optimized_v2.indicator, TestStrategy.s6.indicator)
+    ),
+    OptimisationRound(
+      name = "s5_optimized_v3_shuffle",
+      strategy = TestStrategy.s5_optimized_v3,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring,
+      extraSeeds = List(TestStrategy.s5_optimized_v2.indicator, TestStrategy.s6.indicator)
+    ),
+    OptimisationRound(
+      name = "s4_optimized_v2",
+      strategy = TestStrategy.s4_optimized_v2,
+      gaParameters = gaParameters,
+      scoringFunction = consistentScoring,
+      extraSeeds = List(TestStrategy.s4_optimized_v1.indicator, TestStrategy.s4_optimized_v3.indicator)
+    ),
+    OptimisationRound(
+      name = "s4_optimized_v2_shuffle",
+      strategy = TestStrategy.s4_optimized_v2,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring,
+      extraSeeds = List(TestStrategy.s4_optimized_v1.indicator, TestStrategy.s4_optimized_v3.indicator)
+    ),
+    OptimisationRound(
       name = "s2_optimized_v2",
       strategy = TestStrategy.s2_optimized_v2,
       gaParameters = gaParameters,
       scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s2_optimized.indicator, TestStrategy.s2_optimized_v3.indicator)
+      extraSeeds = List(
+        TestStrategy.s2_optimized.indicator,
+        TestStrategy.s2_optimized_v3.indicator,
+        TestStrategy.s2_optimized_v4.indicator
+      )
     ),
     OptimisationRound(
       name = "s2_optimized_v2_shuffle",
       strategy = TestStrategy.s2_optimized_v2,
       gaParameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s2_optimized.indicator, TestStrategy.s2_optimized_v3.indicator)
+      extraSeeds = List(
+        TestStrategy.s2_optimized.indicator,
+        TestStrategy.s2_optimized_v3.indicator,
+        TestStrategy.s2_optimized_v4.indicator
+      )
+    ),
+    OptimisationRound(
+      name = "s4_optimized_v3",
+      strategy = TestStrategy.s4_optimized_v3,
+      gaParameters = gaParameters,
+      scoringFunction = consistentScoring,
+      extraSeeds = List(TestStrategy.s4_optimized_v1.indicator, TestStrategy.s4_optimized_v2.indicator)
+    ),
+    OptimisationRound(
+      name = "s4_optimized_v3_shuffle",
+      strategy = TestStrategy.s4_optimized_v3,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring,
+      extraSeeds = List(TestStrategy.s4_optimized_v1.indicator, TestStrategy.s4_optimized_v2.indicator)
     ),
     OptimisationRound(
       name = "s4_optimized_v1",
       strategy = TestStrategy.s4_optimized_v1,
       gaParameters = gaParameters,
       scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s4_optimized_v2.indicator)
+      extraSeeds = List(TestStrategy.s4_optimized_v2.indicator, TestStrategy.s4_optimized_v3.indicator)
     ),
     OptimisationRound(
       name = "s4_optimized_v1_shuffle",
       strategy = TestStrategy.s4_optimized_v1,
       gaParameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s4_optimized_v2.indicator)
+      extraSeeds = List(TestStrategy.s4_optimized_v2.indicator, TestStrategy.s4_optimized_v3.indicator)
     ),
     OptimisationRound(
       name = "s12",
