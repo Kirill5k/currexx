@@ -24,6 +24,32 @@ object BatchBacktester extends IOApp.Simple {
     "s4_optimized_v3" -> TestStrategy.s4_optimized_v3,
     "s12"             -> TestStrategy.s12,
     "s12_optimized"   -> TestStrategy.s12_optimized,
+
+    "s6_optimized"       -> TestStrategy.s6_optimized,
+    "s6_optimized_v2"    -> TestStrategy.s6_optimized_v2,
+    "s6_optimized_v3"    -> TestStrategy.s6_optimized_v3,
+    "s6_optimized_v4"    -> TestStrategy.s6_optimized_v4,
+    "s2_optimized_v5"    -> TestStrategy.s2_optimized_v5,
+    "s2_optimized_v6"    -> TestStrategy.s2_optimized_v6,
+    "s2_optimized_v7"    -> TestStrategy.s2_optimized_v7,
+    "s2_optimized_v8"    -> TestStrategy.s2_optimized_v8,
+    "s2_optimized_v9"    -> TestStrategy.s2_optimized_v9,
+    "s2_optimized_v10"   -> TestStrategy.s2_optimized_v10,
+    "s2_optimized_v11"   -> TestStrategy.s2_optimized_v11,
+    "s2_optimized_v12"   -> TestStrategy.s2_optimized_v12,
+    "s2_optimized_v13"   -> TestStrategy.s2_optimized_v13,
+    "s2_optimized_v14"   -> TestStrategy.s2_optimized_v14,
+    "s2_optimized_v15"   -> TestStrategy.s2_optimized_v15,
+    "s2_optimized_v16"   -> TestStrategy.s2_optimized_v16,
+    "s5_optimized_v4"    -> TestStrategy.s5_optimized_v4,
+    "s5_optimized_v5"    -> TestStrategy.s5_optimized_v5,
+    "s5_optimized_v6"    -> TestStrategy.s5_optimized_v6,
+    "s5_optimized_v7"    -> TestStrategy.s5_optimized_v7,
+    "s5_optimized_v8"    -> TestStrategy.s5_optimized_v8,
+    "s5_optimized_v9"    -> TestStrategy.s5_optimized_v9,
+    "s1_v2_optimized_v2" -> TestStrategy.s1_v2_optimized_v2,
+    "s1_v2_optimized_v3" -> TestStrategy.s1_v2_optimized_v3,
+    "s1_v2_optimized_v4" -> TestStrategy.s1_v2_optimized_v4
   )
 
   val riskSettings: RiskSettings = RiskSettings()
