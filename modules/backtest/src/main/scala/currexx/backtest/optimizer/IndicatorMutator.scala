@@ -20,24 +20,35 @@ object IndicatorMutator {
 
       override def mutate(ind: Indicator, mutationProbability: Double)(using r: Random): F[Indicator] = {
 
-        /** Mutates an integer parameter using a Gaussian distribution. */
-        def mutInt(value: Int, range: IntRange): Int =
-          if (r.nextDouble() < mutationProbability) {
-            val stdDev   = range.span * 0.1 * sigmaScale // 10% of range as standard deviation
-            val mutation = (r.nextGaussian() * stdDev).round.toInt
-            range.clamp(value + mutation)
-          } else {
-            value
-          }
+        /** One flip of the mutation coin. A `def` rather than a `val` because every gene gets its own; sharing one would move all of an
+          * indicator's genes together or none of them, which is a different operator.
+          */
+        def geneMutates: Boolean = r.nextDouble() < mutationProbability
 
-        /** Mutates a double parameter using a Gaussian distribution, with rounding to a step size. */
+        /** `Double.round` widens to `Long` and `Long.MaxValue.toInt` is -1, so an overflowing step would land at the bottom of a range
+          * rather than the top. Out of reach at this step size, and cheaper to rule out than to keep having to reason about.
+          */
+        def rounded(value: Double): Int =
+          math.max(Int.MinValue.toDouble, math.min(Int.MaxValue.toDouble, value)).round.toInt
+
+        /** A Gaussian step of a tenth of the gene's range, then back inside it.
+          *
+          * Taken in whichever space the gene is measured in — see `GeneBounds.Scale`. For a proportional gene the tenth is a tenth of the
+          * range's ratio rather than of its width, which is what keeps the step the same size at both ends of something like [5, 100] and
+          * what makes it match the distribution `IndicatorInitialiser` draws from.
+          */
+        def mutInt(value: Int, range: IntRange): Int =
+          if (!geneMutates) value
+          else if (range.isLogarithmic) {
+            val logSpan = math.log(range.max.toDouble) - math.log(range.min.toDouble)
+            val walked  = math.log(range.clamp(value).toDouble) + r.nextGaussian() * logSpan * 0.1 * sigmaScale
+            range.clamp(rounded(math.exp(walked)))
+          } else range.clamp(value + rounded(r.nextGaussian() * range.span * 0.1 * sigmaScale))
+
+        /** The same walk for a continuous gene, snapped to the step the gene is placed on. */
         def mutDouble(value: Double, range: DoubleRange): Double =
-          if (r.nextDouble() < mutationProbability) {
-            val stdDev = range.span * 0.1 * sigmaScale // 10% of range
-            range.snap(value + r.nextGaussian() * stdDev)
-          } else {
-            value
-          }
+          if (!geneMutates) value
+          else range.snap(value + r.nextGaussian() * range.span * 0.1 * sigmaScale)
 
         def mutVt(vt: VT): VT = vt match
           case VT.Sequenced(sequence) =>
@@ -65,7 +76,6 @@ object IndicatorMutator {
           case VT.HMA(length) =>
             VT.HMA(mutInt(length, GeneBounds.maLength))
           case VT.JMA(length, phase, power) =>
-            // JMA phase can be negative
             VT.JMA(mutInt(length, GeneBounds.jmaLength), mutInt(phase, GeneBounds.jmaPhase), mutInt(power, GeneBounds.jmaPower))
           case VT.NMA(length, signalLength, lambda, maCalc) =>
             VT.NMA(

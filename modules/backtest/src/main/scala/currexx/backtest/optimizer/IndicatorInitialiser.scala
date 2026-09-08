@@ -5,7 +5,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import currexx.algorithms.Population
-import currexx.algorithms.operators.{Initialiser, Mutator}
+import currexx.algorithms.operators.Initialiser
 import currexx.backtest.optimizer.GeneBounds.{DoubleRange, IntRange}
 import currexx.domain.signal.{Indicator, ValueTransformation as VT}
 
@@ -13,44 +13,63 @@ import scala.util.Random
 
 object IndicatorInitialiser:
 
-  private val CloneShare  = 0.15
-  private val JitterShare = 0.55
+  /** What a starting population is made of: copies of the seeds, jittered neighbours of them, and independent draws for the remainder.
+    *
+    * The radii are multiples of the mutator's own 10%-of-range step, so a jitter is a mutation held at a chosen distance rather than a
+    * separate kind of draw: one step out is a near neighbour, six is most of the way to an immigrant.
+    *
+    * @param cloneShare
+    *   a floor rather than the count. Every seed earns a place of its own however many are handed over.
+    * @param jitterShare
+    *   taken from what the clones leave, so a caller with more seeds than the population has room for still gets a population of the size
+    *   it asked for.
+    * @param jitterRadii
+    *   spread evenly over the jittered share, in whatever order they are given.
+    */
+  final private case class PopulationMix(cloneShare: Double, jitterShare: Double, jitterRadii: List[Double]):
+    require(cloneShare + jitterShare <= 1.0, s"clones and jitter cannot claim more than the whole population: $cloneShare + $jitterShare")
+    require(jitterRadii.nonEmpty, "a mix with a jitter share needs at least one radius to jitter by")
 
-  /** Multiples of the mutator's own 10%-of-range step: near neighbours, middle distance, and most of the way to an independent draw. */
-  private val JitterRadii = List(1.0, 3.0, 6.0)
+  /** Searching for a shape the round does not have yet, so most of the population sits away from the seed. */
+  private val Exploring = PopulationMix(cloneShare = 0.15, jitterShare = 0.55, jitterRadii = List(1.0, 3.0, 6.0))
+
+  /** Refining a shape the round already believes in, so the population stays within a step of it - but not entirely, because a population
+    * that is nothing but its seed can only move as fast as mutation alone, and crossover between near-identical parents does nothing.
+    */
+  private val Refining = PopulationMix(cloneShare = 0.70, jitterShare = 0.20, jitterRadii = List(1.0))
 
   def make[F[_]](using F: Sync[F], rand: Random): F[Initialiser[F, Indicator]] = seeded(Nil)
 
-  /** The same population, with champions of the same shape mixed in alongside the round's own indicator. See `OptimisationRound.extraSeeds`
-    * for what belongs here and why an unshuffled round ignores it.
+  /** The same population, with champions of the same shape mixed in alongside the round's own indicator. See
+    * `OptimisationRound.extraSeeds`.
+    *
+    * `shuffle` chooses between the two mixes rather than between a random population and a copied one, so neither setting returns the seed
+    * repeated - `Initialiser.simple` is the one that does that.
     */
   def seeded[F[_]](extraSeeds: List[Indicator])(using F: Sync[F], rand: Random): F[Initialiser[F, Indicator]] =
-    JitterRadii.traverse(IndicatorMutator.scaled[F]).flatMap { jitters =>
-      Initialiser.custom[F, Indicator] { (seed, size, shuffle) =>
-        if (!shuffle) F.pure(Vector.fill(size)(seed))
-        else buildMixed[F](seed, extraSeeds, size, jitters)
-      }
+    Initialiser.custom[F, Indicator] { (seed, size, shuffle) =>
+      buildPopulation(seed, extraSeeds, size, if (shuffle) Exploring else Refining)
     }
 
-  private def buildMixed[F[_]](
+  private def buildPopulation[F[_]](
       seed: Indicator,
       extraSeeds: List[Indicator],
       size: Int,
-      jitters: List[Mutator[F, Indicator]]
+      mix: PopulationMix
   )(using
       F: Sync[F],
       rand: Random
   ): F[Population[Indicator]] = {
     // A seed that cannot be crossed with the target is a seed that fails the run the first time selection pairs it, so incompatible ones
     // are dropped rather than trusted to the caller.
-    val seeds = (seed +: extraSeeds.filter(sameShape(seed, _))).toVector
-    // Every seed earns a place of its own, which is what makes the share a floor rather than the count. Both shares are then held under
-    // what is left, because a caller that hands over more seeds than the population has room for is still asking for a population of `size`.
-    val clones     = math.min(size, math.max(seeds.size, (size * CloneShare).toInt))
-    val jittered   = math.min(size - clones, (size * JitterShare).toInt)
+    val seeds      = (seed +: extraSeeds.filter(sameShape(seed, _))).toVector
+    val clones     = math.min(size, math.max(seeds.size, (size * mix.cloneShare).toInt))
+    val jittered   = math.min(size - clones, (size * mix.jitterShare).toInt)
     val immigrants = size - clones - jittered
     val clonePop   = Vector.tabulate(clones)(i => seeds(i % seeds.size))
-    for jitterPop <- Vector.range(0, jittered).traverse(i => jitters(i % jitters.size).mutate(seeds(i % seeds.size), 1.0))
+    for
+      jitters   <- mix.jitterRadii.traverse(IndicatorMutator.scaled[F])
+      jitterPop <- Vector.range(0, jittered).traverse(i => jitters(i % jitters.size).mutate(seeds(i % seeds.size), 1.0))
     // The draws are relationally correct by construction; repairing them anyway means the invariant is enforced in one place and a future
     // change to a draw cannot quietly reintroduce a candidate the operators would have been forbidden to produce.
     yield clonePop ++ jitterPop ++ Vector.fill(immigrants)(IndicatorBounds.repair(randomiseInd(seed)))
@@ -121,14 +140,22 @@ object IndicatorInitialiser:
     case Indicator.KeltnerChannel(vs, md, _, _) =>
       // The channel is the middle band plus a multiple of ATR, and an ATR measured over a longer window than the band it widens is
       // measuring a different market than the one being banded.
-      val middle = randomiseVt(md)
-      val atr    = GeneBounds.atrLength.clamp(math.round(lengthOr(middle, 20) * IndicatorBounds.keltnerAtr.drawRatio).toInt)
+      val ratio      = IndicatorBounds.keltnerAtr.drawRatio
+      val middleBase = randomiseVt(md)
+      val bandRange  = GeneBounds.lengthRange(middleBase).leavingRoomFor(ratio, GeneBounds.atrLength)
+      val bandLength = logUniform(bandRange)
+      val middle     = GeneBounds.withLength(middleBase, bandLength)
+      val atr        = GeneBounds.atrLength.clamp(math.round(bandLength * ratio).toInt)
       Indicator.KeltnerChannel(vs, middle, atr, uniform(GeneBounds.keltnerMultiplier))
     case Indicator.BollingerBands(vs, md, _, _) =>
       // The deviation is meant to describe the spread of the same stretch of price the middle band averages, so its window is drawn near
       // the band's rather than independently of it.
-      val middle = randomiseVt(md)
-      val stdDev = GeneBounds.stdDevLength.clamp(math.round(lengthOr(middle, 20) * IndicatorBounds.bollingerStdDev.drawRatio).toInt)
+      val ratio      = IndicatorBounds.bollingerStdDev.drawRatio
+      val middleBase = randomiseVt(md)
+      val bandRange  = GeneBounds.lengthRange(middleBase).leavingRoomFor(ratio, GeneBounds.stdDevLength)
+      val bandLength = logUniform(bandRange)
+      val middle     = GeneBounds.withLength(middleBase, bandLength)
+      val stdDev     = GeneBounds.stdDevLength.clamp(math.round(bandLength * ratio).toInt)
       Indicator.BollingerBands(vs, middle, stdDev, uniform(GeneBounds.bollingerMultiplier))
     case Indicator.VolatilityRegimeDetection(_, vt) =>
       // "Low volatility" means ATR below its own longer average. Drawn independently, half of these come back with the smoothing shorter
@@ -145,5 +172,3 @@ object IndicatorInitialiser:
       Indicator.ValueTracking(vr, vs, randomiseVt(vt))
     case Indicator.PriceLineCrossing(vs, role, vt) =>
       Indicator.PriceLineCrossing(vs, role, randomiseVt(vt))
-
-  private def lengthOr(vt: VT, fallback: Int): Int = GeneBounds.lengthOf(vt).getOrElse(fallback)

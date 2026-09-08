@@ -41,14 +41,15 @@ object IndicatorBounds:
 
     /** The anchors that leave room for some legal dependent, which is where mutation is allowed to put one.
       *
-      * Only `linesSeparation` is narrowed by this today - a fast line above 83 has no slow partner under a ceiling of 100, so the top sixth
-      * of `jmaLength` holds no usable crossover pair. For the other three the whole anchor range is feasible and this is the identity.
-      * Never empty: where the ranges cannot be reconciled it collapses to a point at the bottom of the anchor's range.
+      * The same formula applies to every relation; with current `GeneBounds` only `linesSeparation` hits a binding ceiling (fast line above
+      * 83 has no slow partner under a `jmaLength` ceiling of 100). The other three return the full anchor range because their dependent
+      * ranges are wide enough. Never empty: where the ranges cannot be reconciled it collapses to a point at the bottom of the anchor's
+      * range.
       */
     def feasibleAnchor(anchorRange: IntRange, dependentRange: IntRange): IntRange =
       val lo = math.max(anchorRange.min, math.ceil(dependentRange.min / valid.max).toInt)
       val hi = math.min(anchorRange.max, math.floor(dependentRange.max / valid.min).toInt)
-      IntRange(lo, math.max(lo, hi))
+      anchorRange.copy(min = lo, max = math.max(lo, hi))
 
     /** The dependent an anchor and a ratio imply, held inside the band and inside the dependent's own range. */
     def dependentFor(anchor: Int, ratio: Double, dependentRange: IntRange): Int =

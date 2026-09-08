@@ -16,17 +16,20 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
       val optResult = Algorithm.GA.optimise(ind, params)
       val result    = optResult.foldMap(stateInterpreter).run(List.empty).value._1
 
+      // The phases are part of what is being asserted, not decoration. An objective that reads a different slice of its evidence per
+      // generation is relying on these numbers running 0, 1, 2 with no gaps and on `Rescore` arriving exactly once, after the last of
+      // them and before validation - and inferring any of that by counting evaluations is the coupling the phase exists to remove.
       result.mkString mustBe
         """Starting GA
           |Initialise population of size 5 with shuffle=true
-          |Evaluate entire population
+          |Evaluate entire population for Search(0)
           |Sorting evaluated population by fitness
           |Select 1.25 elites from the current population
           |Distribute population in pairs
           |Applied to the entire population: Crossover 2 individuals with probability 0.5
           |Applied to the entire population: Crossover 2 individuals with probability 0.5
           |Applied to the entire population: Mutate individual with probability 0.2
-          |Evaluate entire population
+          |Evaluate entire population for Search(1)
           |Sorting evaluated population by fitness
           |Iteration 1 of 2
           |Select 1.25 elites from the current population
@@ -34,9 +37,11 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
           |Applied to the entire population: Crossover 2 individuals with probability 0.5
           |Applied to the entire population: Crossover 2 individuals with probability 0.5
           |Applied to the entire population: Mutate individual with probability 0.2
-          |Evaluate entire population
+          |Evaluate entire population for Search(2)
           |Sorting evaluated population by fitness
           |Iteration 2 of 2
+          |Evaluate entire population for Rescore
+          |Sorting evaluated population by fitness
           |Validate the finished population
           |Final population displayed
           |""".stripMargin
@@ -60,11 +65,8 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
       case Op.Mutate(ind, prob) =>
         State.modify[List[String]](_ :+ s"Mutate individual with probability $prob\n") >>
           State.pure(ind)
-      case Op.EvaluateOne(ind) =>
-        State.modify[List[String]](_ :+ "Evaluate single individual\n") >>
-          State.pure((ind, Fitness(1.0)))
-      case Op.EvaluatePopulation(population) =>
-        State.modify[List[String]](_ :+ "Evaluate entire population\n") >>
+      case Op.EvaluatePopulation(population, phase) =>
+        State.modify[List[String]](_ :+ s"Evaluate entire population for $phase\n") >>
           State.pure(population.map(i => (i, Fitness(1.0))))
       case Op.SelectElites(population, popSize, ratio) =>
         State.modify[List[String]](_ :+ s"Select ${popSize * ratio} elites from the current population\n") >>

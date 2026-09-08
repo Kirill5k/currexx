@@ -10,21 +10,22 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 object BatchBacktester extends IOApp.Simple {
   inline given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
+  /** The vals worth the runtime, ordered by holdout net.
+    *
+    * Not all of `TestStrategy`, which keeps every val a decision was ever based on so that a report filename still resolves to something. A
+    * val is dropped from here once a descendant dominates it on the holdout, or once its family has been answered - measuring it again only
+    * adds a line nothing reads. Each of those carries a `Not in BatchBacktester` line in its comment saying which val replaced it.
+    */
   val strategies: List[(String, TestStrategy)] = List(
-    "s1_v2_optimized" -> TestStrategy.s1_v2_optimized,
-    "s2_optimized"    -> TestStrategy.s2_optimized,
-    "s2_optimized_v2" -> TestStrategy.s2_optimized_v2,
-    "s2_optimized_v3" -> TestStrategy.s2_optimized_v3,
     "s2_optimized_v4" -> TestStrategy.s2_optimized_v4,
+    "s2_optimized_v3" -> TestStrategy.s2_optimized_v3,
+    "s2_optimized"    -> TestStrategy.s2_optimized,
     "s5_optimized_v2" -> TestStrategy.s5_optimized_v2,
     "s5_optimized_v3" -> TestStrategy.s5_optimized_v3,
-    "s6"              -> TestStrategy.s6,
-    "s6_optimized"    -> TestStrategy.s6_optimized,
-    "s4_optimized_v1" -> TestStrategy.s4_optimized_v1,
+    "s1_v2_optimized" -> TestStrategy.s1_v2_optimized,
     "s4_optimized_v2" -> TestStrategy.s4_optimized_v2,
-    "s4_optimized_v3" -> TestStrategy.s4_optimized_v3,
-    "s12"             -> TestStrategy.s12,
-    "s12_optimized"   -> TestStrategy.s12_optimized
+    "s6_optimized"    -> TestStrategy.s6_optimized,
+    "s6"              -> TestStrategy.s6
   )
 
   val riskSettings: RiskSettings = RiskSettings()
@@ -58,10 +59,16 @@ object BatchBacktester extends IOApp.Simple {
           f"costs=${portfolio.totalCosts}%9.5f"
       }
 
+  /** The searched years separately as well as pooled, because the pooled figure hides which of them paid for the other.
+    *
+    * A val that nets +6000 over the two might have earned +7600 in one and lost -1600 in the other, and a single number cannot show that -
+    * see the note in `TestStrategy` on what the 2023-24 year separates. The holdout is last and is the column to read.
+    */
   override val run: IO[Unit] = List(
-    "majors 1h 2024-07..2025-07 (12 months, original sample)" -> MarketDataProvider.majors1h,
-    "searched 2023-07..2025-07 (24 months, in sample)"        -> MarketDataProvider.majors1hSearched,
-    "holdout 2025-12..2026-06 (7 months, never selected)"     -> MarketDataProvider.majors1hHoldout
+    "searched 2023-07..2024-06 (12 months, in sample)"    -> MarketDataProvider.majors1h_202307_202406,
+    "searched 2024-07..2025-07 (12 months, in sample)"    -> MarketDataProvider.majors1h,
+    "searched 2023-07..2025-07 (24 months, in sample)"    -> MarketDataProvider.majors1hSearched,
+    "holdout 2025-12..2026-06 (7 months, never selected)" -> MarketDataProvider.majors1hHoldout
   ).foldLeft(IO.pure(List.empty[String])) { case (acc, (label, datasets)) =>
     acc.flatMap { sections =>
       strategies

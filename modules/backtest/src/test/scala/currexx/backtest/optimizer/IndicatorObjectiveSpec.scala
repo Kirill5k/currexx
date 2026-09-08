@@ -1,6 +1,7 @@
 package currexx.backtest.optimizer
 
 import cats.effect.IO
+import currexx.algorithms.EvaluationPhase
 import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.{MarketDataProvider, TestStrategy}
 import kirill5k.common.cats.test.IOWordSpec
@@ -27,17 +28,23 @@ class IndicatorObjectiveSpec extends IOWordSpec {
           shortlistSize = 25,
           scoringFunction = scoring
         )
-        scored <- objective.evaluator.evaluateIndividual(strategy.indicator)
-        stats  <- objective.backtest(strategy.indicator)
-      yield (scored._2.value, IndicatorObjective.FoldAggregation.combine(stats.map(scoring.score)))
+        rescored <- objective.evaluator.evaluateIndividual(strategy.indicator, EvaluationPhase.Rescore)
+        searched <- objective.evaluator.evaluateIndividual(strategy.indicator, EvaluationPhase.Search(2))
+        stats    <- objective.backtest(strategy.indicator)
+      yield (rescored._2.value, searched._2.value, stats.map(scoring.score))
 
       // The champion report re-runs the winner through this backtest to say whether it satisfies its constraints. If
       // the replay were configured even slightly differently from the search it would be describing a different run,
       // and the report would be confidently wrong about the candidate that is actually about to be used. Aggregating
       // the replay the same way is part of that: the fitness is the folds combined, so a replay that reported one
       // fold, or combined them differently, would not be the number selection sorted on.
-      result.asserting { case (searched, replayed) =>
-        replayed mustBe searched
+      //
+      // Which folds are combined is the phase's business, and the phase has to reach the aggregation for the rotation
+      // to mean anything at all: the two figures below come from the same cached backtests and differ only in that one
+      // of them is not counting fold 2.
+      result.asserting { case (rescored, searched, foldScores) =>
+        rescored mustBe IndicatorObjective.FoldAggregation.combine(foldScores)
+        searched mustBe IndicatorObjective.FoldAggregation.combineExcluding(foldScores, Some(2))
       }
     }
 
@@ -189,6 +196,55 @@ class IndicatorObjectiveSpec extends IOWordSpec {
 
     "score an empty result as worthless rather than dividing by nothing" in {
       IndicatorObjective.FoldAggregation.combine(Nil) mustBe 0.0
+    }
+
+    "withhold nothing when asked to withhold nothing" in {
+      val scores = List(1.0, 0.5, 0.8, 0.2, 1.2, 0.9)
+      IndicatorObjective.FoldAggregation.combineExcluding(scores, None) mustBe
+        IndicatorObjective.FoldAggregation.combine(scores)
+    }
+
+    "leave the withheld fold out of the mean rather than scoring it as zero" in {
+      // Not the same as scoring it dead. A withheld fold does not reach `deadFoldFloor` either, or a rotation would cost every candidate
+      // most of its score once per orbit and selection would be reading the rotation rather than the candidates.
+      val scores = List(1.0, 0.0, 1.0, 1.0, 1.0, 1.0)
+      IndicatorObjective.FoldAggregation.combineExcluding(scores, Some(1)) mustBe
+        IndicatorObjective.FoldAggregation.combine(List(1.0, 1.0, 1.0, 1.0, 1.0))
+    }
+
+    "let a candidate off the fold it failed only on the generation that fold is withheld" in {
+      val scores  = List(1.0, 0.0, 1.0, 1.0, 1.0, 1.0)
+      val hidden  = IndicatorObjective.FoldAggregation.combineExcluding(scores, Some(1))
+      val counted = IndicatorObjective.FoldAggregation.combineExcluding(scores, Some(0))
+
+      hidden must be > counted
+    }
+  }
+
+  "A FoldRotatingEvaluator" should {
+
+    def over(foldCount: Int) = FoldRotatingEvaluator[IO](_ => IO.pure(Nil), scoring, foldCount)
+
+    "count every fold when the finished population is re-scored" in {
+      // The figure a run reports, and the only one comparable with another run's. Withholding anything here would make the training column
+      // of two reports mean different things depending on which generation each of them happened to stop at.
+      over(6).withheldFold(EvaluationPhase.Rescore) mustBe None
+    }
+
+    "withhold a different fold each generation, wrapping round the corpus" in {
+      // A hundred generations against a fixed six folds is long enough to fit them thoroughly. Rotating means no candidate is ever ranked
+      // on the whole corpus during the search, so a shape that only works because of one regime loses the generations that hold it back.
+      val withheld = (0 to 13).toList.map(g => over(6).withheldFold(EvaluationPhase.Search(g)))
+
+      withheld.take(6) mustBe (0 to 5).toList.map(Some(_))
+      withheld(6) mustBe Some(0)
+      withheld(13) mustBe Some(1)
+    }
+
+    "read a corpus with nothing to spare in full" in {
+      // Withholding the only fold there is scores every candidate on nothing and ranks them all equal, which is worse than not rotating.
+      over(1).withheldFold(EvaluationPhase.Search(0)) mustBe None
+      over(0).withheldFold(EvaluationPhase.Search(3)) mustBe None
     }
   }
 }

@@ -16,15 +16,39 @@ import currexx.domain.signal.ValueTransformation as VT
   */
 object GeneBounds:
 
-  final case class IntRange(min: Int, max: Int):
+  /** Whether the operators walk a gene in equal steps or in equal proportions.
+    *
+    * A lookback is a proportional quantity. Five bars to ten is the same change to a moving average as fifty to a hundred, so a step of a
+    * fixed number of bars means two different things at either end of [5, 100]: it is a rewrite of a fast line and a nudge to a slow one.
+    * Drawn and mutated in log-space, a step means the same thing everywhere, and the bottom of the range - where most of the catalogue
+    * lives - is reachable at the resolution it is actually distinguished at.
+    *
+    * A gene that is genuinely additive stays `Linear`, as does anything that crosses zero and so has no logarithm to take. The choice is
+    * recorded here per gene rather than inferred from the sign of a floor, because inferring it means a range declared with a floor of zero
+    * silently changes how it is searched.
+    */
+  enum Scale:
+    case Linear, Logarithmic
+
+  final case class IntRange(min: Int, max: Int, scale: Scale):
     val span: Int              = max - min
     def clamp(value: Int): Int = math.max(min, math.min(max, value))
+    def isLogarithmic: Boolean = scale == Scale.Logarithmic
 
     /** The sub-range whose values leave room for a companion `ratio` times longer, so a related pair can be drawn without either end
-      * landing on a clamp. Never narrower than a point at `min`.
+      * landing on a clamp. Never narrower than a point at `min`, and always on the same scale as the range it narrows.
       */
     def leavingRoomFor(ratio: Double, companion: IntRange): IntRange =
-      IntRange(min, math.max(min, math.min(max, (companion.max / ratio).toInt)))
+      copy(max = math.max(min, math.min(max, (companion.max / ratio).toInt)))
+
+  object IntRange:
+    /** A gene walked in proportions. The floor has to be positive: there is no proportional step away from zero, and no logarithm of it. */
+    def log(min: Int, max: Int): IntRange =
+      require(min > 0, s"a logarithmic gene needs a positive floor, got [$min, $max]")
+      IntRange(min, max, Scale.Logarithmic)
+
+    /** A gene walked in equal steps, for the quantities where a step is a step wherever it starts. */
+    def linear(min: Int, max: Int): IntRange = IntRange(min, max, Scale.Linear)
 
   final case class DoubleRange(min: Double, max: Double, step: Double):
     val span: Double = max - min
@@ -43,28 +67,30 @@ object GeneBounds:
     def clamp(value: Double): Double = math.max(min, math.min(max, value))
 
   // Moving averages and other smoothers, which are allowed to run slow enough to act as a regime line.
-  val maLength: IntRange          = IntRange(5, 100)
-  val standardDeviation: IntRange = IntRange(5, 100)
+  val maLength: IntRange          = IntRange.log(5, 100)
+  val standardDeviation: IntRange = IntRange.log(5, 100)
   // Oscillators, whose length is a lookback rather than a trend and stops being meaningful long before 100.
-  val oscillatorLength: IntRange       = IntRange(5, 50)
-  val jmaLength: IntRange              = IntRange(5, 100)
-  val jmaPhase: IntRange               = IntRange(-100, 100)
-  val jmaPower: IntRange               = IntRange(1, 10)
-  val nmaLength: IntRange              = IntRange(5, 50)
-  val nmaSignalLength: IntRange        = IntRange(5, 50)
+  val oscillatorLength: IntRange = IntRange.log(5, 50)
+  val jmaLength: IntRange        = IntRange.log(5, 100)
+  // Phase is a shift rather than a lookback: it crosses zero, and moving it by ten means much the same wherever it started.
+  val jmaPhase: IntRange = IntRange.linear(-100, 100)
+  // Power moves the curve more than length does and the catalogue sits at the bottom of the range, so it is proportional too.
+  val jmaPower: IntRange               = IntRange.log(1, 10)
+  val nmaLength: IntRange              = IntRange.log(5, 50)
+  val nmaSignalLength: IntRange        = IntRange.log(5, 50)
   val nmaLambda: DoubleRange           = DoubleRange(0.5, 4.0, 0.25)
-  val adxLength: IntRange              = IntRange(7, 50)
-  val cciLength: IntRange              = IntRange(10, 50)
-  val ichimokuLength: IntRange         = IntRange(9, 52)
-  val cmfLength: IntRange              = IntRange(10, 40)
+  val adxLength: IntRange              = IntRange.log(7, 50)
+  val cciLength: IntRange              = IntRange.log(10, 50)
+  val ichimokuLength: IntRange         = IntRange.log(9, 52)
+  val cmfLength: IntRange              = IntRange.log(10, 40)
   val kalmanGain: DoubleRange          = DoubleRange(0.01, 0.5, 0.01)
   val kalmanNoise: DoubleRange         = DoubleRange(0.01, 1.0, 0.01)
   val sarAfStart: DoubleRange          = DoubleRange(0.01, 0.05, 0.005)
   val sarAfMax: DoubleRange            = DoubleRange(0.1, 0.4, 0.01)
   val sarAfStep: DoubleRange           = DoubleRange(0.01, 0.05, 0.005)
-  val atrLength: IntRange              = IntRange(5, 50)
+  val atrLength: IntRange              = IntRange.log(5, 50)
   val keltnerMultiplier: DoubleRange   = DoubleRange(0.5, 5.0, 0.1)
-  val stdDevLength: IntRange           = IntRange(5, 50)
+  val stdDevLength: IntRange           = IntRange.log(5, 50)
   val bollingerMultiplier: DoubleRange = DoubleRange(1.0, 4.0, 0.1)
 
   /** The range of a transformation's one length gene, for the callers that need to relate two of them without knowing which types they got.

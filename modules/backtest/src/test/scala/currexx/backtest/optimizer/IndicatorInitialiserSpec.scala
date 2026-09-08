@@ -29,19 +29,66 @@ class IndicatorInitialiserSpec extends IOWordSpec {
     */
   def genesWithinBounds(indicator: Indicator): Boolean = IndicatorBounds.isValid(indicator)
 
+  /** Whether a member is drawn from the seed's own neighbourhood, read off the trend line because it is the gene the seed pins furthest
+    * from the middle of its range: JMA(90) against a searchable [5, 100], where an independent draw is log-uniform and lands low.
+    */
+  def nearSeed(indicator: Indicator): Boolean = indicator match
+    case Indicator.Composite(is, _)            => is.toList.exists(nearSeed)
+    case Indicator.TrendChangeDetection(_, vt) => GeneBounds.lengthOf(vt).exists(_ >= 45)
+    case _                                     => false
+
   "An IndicatorInitialiser" when {
 
     "shuffle is false" should {
-      "return the seed unchanged, as many times as asked" in {
+      "keep seventy copies of the seed and draw the remaining thirty" in {
+        // A refining round is mostly its own seed, but not entirely: a population that is nothing but copies can only move at the speed of
+        // mutation, because crossover between identical parents produces the parent. The thirty are what give it anything to cross with.
         given Random = Random(42)
         val result   = for
           init <- IndicatorInitialiser.make[IO]
-          pop  <- init.initialisePopulation(seed, 20, false)
+          pop  <- init.initialisePopulation(seed, 100, false)
         yield pop
 
         result.asserting { pop =>
-          pop must have size 20
-          pop.toSet mustBe Set(seed)
+          pop must have size 100
+          pop.count(_ == seed) mustBe 70
+          pop.distinct.size must be > 20
+          pop.filterNot(genesWithinBounds) mustBe Vector.empty
+        }
+      }
+
+      "stay nearer the seed than a shuffled draw does" in {
+        // What the two mixes are for, and the only difference between them that matters. Refining spends 90% of the population within one
+        // mutation step of the seed; exploring spends 85% of it further out than that, at three and six steps or drawn outright.
+        given Random = Random(42)
+        val result   = for
+          init      <- IndicatorInitialiser.make[IO]
+          refining  <- init.initialisePopulation(seed, 200, false)
+          exploring <- init.initialisePopulation(seed, 200, true)
+        yield (refining.count(nearSeed), exploring.count(nearSeed))
+
+        result.asserting { case (refining, exploring) =>
+          refining must be > exploring
+        }
+      }
+
+      "mix in extra seeds of the same shape" in {
+        given Random = Random(99)
+        val sibling  = Indicator.compositeAnyOf(
+          Indicator.TrendChangeDetection(ValueSource.HLC3, VT.JMA(length = 50, phase = -6, power = 1)),
+          Indicator.BollingerBands(ValueSource.Close, VT.SMA(35), stdDevLength = 41, stdDevMultiplier = 2.6),
+          Indicator.VolatilityRegimeDetection(atrLength = 28, smoothingType = VT.SMA(63)),
+          Indicator.ThresholdCrossing(ValueSource.Close, VT.RSX(11), upperBoundary = 66.0, lowerBoundary = 30.0),
+          Indicator.ValueTracking(ValueRole.Momentum, ValueSource.Close, VT.RSX(8))
+        )
+        val result = for
+          init <- IndicatorInitialiser.seeded[IO](List(sibling))
+          pop  <- init.initialisePopulation(seed, 100, false)
+        yield pop
+
+        result.asserting { pop =>
+          pop must contain(seed)
+          pop must contain(sibling)
         }
       }
     }

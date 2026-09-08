@@ -169,6 +169,22 @@ class IndicatorBoundsSpec extends IOWordSpec {
 
       result.asserting(pop => pop.filterNot(IndicatorBounds.isValid) mustBe Vector.empty)
     }
+
+    "draw Keltner and Bollinger immigrants that satisfy relational bounds" in {
+      given Random  = Random(12)
+      val keltner   = Indicator.KeltnerChannel(ValueSource.Close, VT.EMA(20), atrLength = 10, atrMultiplier = 2.0)
+      val bollinger = Indicator.BollingerBands(ValueSource.Close, VT.SMA(20), stdDevLength = 20, stdDevMultiplier = 2.0)
+      val result    = for
+        init <- IndicatorInitialiser.make[IO]
+        kPop <- init.initialisePopulation(keltner, 300, true)
+        bPop <- init.initialisePopulation(bollinger, 300, true)
+      yield (kPop, bPop)
+
+      result.asserting { case (kPop, bPop) =>
+        kPop.filterNot(IndicatorBounds.isValid) mustBe Vector.empty
+        bPop.filterNot(IndicatorBounds.isValid) mustBe Vector.empty
+      }
+    }
   }
 
   "An IndicatorMutator" should {
@@ -258,19 +274,24 @@ class IndicatorBoundsSpec extends IOWordSpec {
     "reach a legal ratio for every anchor the mutator is allowed to use" in {
       // The claim `repair` cannot make on its own: inside `feasibleAnchor` a legal dependent always exists, which is why mutation holds the
       // anchor there rather than in its own full range.
-      val relation = IndicatorBounds.linesSeparation
-      val range    = GeneBounds.jmaLength
-      val stranded = for
-        anchor <- relation.feasibleAnchor(range, range).min to relation.feasibleAnchor(range, range).max
-        if !relation.holds(anchor, relation.project(anchor, range.min, range))
-      yield anchor
+      def strandedFor(relation: IndicatorBounds.Relation, anchorRange: GeneBounds.IntRange, dependentRange: GeneBounds.IntRange) =
+        val feasible = relation.feasibleAnchor(anchorRange, dependentRange)
+        for
+          anchor <- feasible.min to feasible.max
+          if !relation.holds(anchor, relation.project(anchor, dependentRange.min, dependentRange))
+        yield anchor
 
-      stranded mustBe empty
+      strandedFor(IndicatorBounds.linesSeparation, GeneBounds.jmaLength, GeneBounds.jmaLength) mustBe empty
+      strandedFor(IndicatorBounds.keltnerAtr, GeneBounds.maLength, GeneBounds.atrLength) mustBe empty
+      strandedFor(IndicatorBounds.bollingerStdDev, GeneBounds.maLength, GeneBounds.stdDevLength) mustBe empty
+      strandedFor(IndicatorBounds.volatilityRegime, GeneBounds.atrLength, GeneBounds.maLength) mustBe empty
     }
 
     "narrow the anchor only where the dependent's range cannot follow" in {
       val lines = IndicatorBounds.linesSeparation.feasibleAnchor(GeneBounds.jmaLength, GeneBounds.jmaLength)
-      lines mustBe GeneBounds.IntRange(5, 83)
+      // Narrowed, and still the same gene: a feasible anchor is searched on the scale its range is searched on, or mutation would walk it
+      // in one space and the initialiser would draw it in another.
+      lines mustBe GeneBounds.jmaLength.copy(max = 83)
 
       val squeeze = IndicatorBounds.volatilityRegime.feasibleAnchor(GeneBounds.atrLength, GeneBounds.maLength)
       squeeze mustBe GeneBounds.atrLength

@@ -6,8 +6,8 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import currexx.algorithms.Fitness
 import currexx.algorithms.operators.{Evaluator, Validator}
+import currexx.algorithms.{Fitness, memoize}
 import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.services.TestServicesPool
 import currexx.backtest.{MarketDataProvider, OrderStats, TestSettings}
@@ -39,6 +39,10 @@ object IndicatorObjective {
     * because the shift cancels. Shifting rather than filtering is what keeps the result monotonic in every fold - see `deadFoldFloor`,
     * where the filtered version's two failures are recorded. The geometric mean over all of them keeps the property the product was chosen
     * for: one huge fold still cannot pay for a weak one.
+    *
+    * Not always over every fold. `FoldRotatingEvaluator` withholds one per generation so that selection cannot climb a single regime, and
+    * `combineExcluding` is where that happens - in the aggregation rather than in the backtest, so a rotation is free and the run's closing
+    * figure can still be taken over all of them.
     */
   object FoldAggregation {
 
@@ -67,6 +71,12 @@ object IndicatorObjective {
       else
         val shifted = foldScores.map(score => math.max(0.0, score) + deadFoldFloor)
         math.pow(shifted.product, 1.0 / shifted.size) - deadFoldFloor
+
+    /** Geometric mean over every fold except the one at `excludedIndex`, if any. `None` is the full fold set. */
+    def combineExcluding(foldScores: List[Double], excludedIndex: Option[Int]): Double =
+      excludedIndex match
+        case None           => combine(foldScores)
+        case Some(excluded) => combine(foldScores.zipWithIndex.filterNot(_._2 == excluded).map(_._1))
   }
 
   final case class Operators[F[_]](
@@ -95,9 +105,10 @@ object IndicatorObjective {
       perFold  = folds.map(fold => backtestOver[F](pool, fold, strategy, otherIndicators, signalDetector))
       backtest = (indicator: Indicator) => perFold.traverse(_(indicator))
       validate = backtestOver[F](pool, validation, strategy, otherIndicators, signalDetector)
-      evaluator <- Evaluator.cached[F, Indicator] { indicator =>
-        backtest(indicator).map(stats => indicator -> Fitness(FoldAggregation.combine(stats.map(scoringFunction.score))))
-      }
+      // The backtests are memoised rather than the fitness, because the fitness depends on which fold the generation is withholding and
+      // the backtests do not. Caching the number would tie an elite's score to the generation it was first evaluated in.
+      cachedBacktest <- memoize[F, Indicator, List[List[OrderStats]]](backtest)
+      evaluator = FoldRotatingEvaluator(cachedBacktest, scoringFunction, folds.size)
       validator <- Validator.shortlisted[F, Indicator](shortlistSize)(ind => validate(ind).map(res => Fitness(scoringFunction.score(res))))
     yield Operators(evaluator, validator, backtest, validate)
 

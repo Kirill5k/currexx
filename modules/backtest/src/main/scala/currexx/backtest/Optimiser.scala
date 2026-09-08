@@ -25,12 +25,12 @@ final case class OptimisationRound(
     scoringFunction: ScoringFunction,
     corpus: Corpus = MarketDataProvider.majors1hCorpus,
     shortlistSize: Int = 25,
-    /** Champions of the same indicator shape, mixed into a shuffled round's starting population alongside the strategy's own indicator.
+    /** Champions of the same indicator shape, mixed into the starting population alongside the strategy's own indicator.
       *
-      * The catalogue is a record of what has already scored well under these rules, and a shuffled round throws all of it away. Seeding
-      * with the siblings costs nothing and starts the search from several points that are known to work rather than one. Only shapes that
-      * can be crossed with the target are usable - `IndicatorInitialiser` drops the rest rather than letting a structural mismatch fail the
-      * run mid-flight - and unshuffled rounds ignore these entirely, since their population is the seed by definition.
+      * The catalogue is a record of what has already scored well under these rules, and starting from several points known to work costs
+      * nothing over starting from one. Both mixes use them: a shuffled round leans on them heavily, having thrown everything else away, and
+      * an unshuffled one keeps enough of them to have something worth crossing its seed with. Only shapes that can be crossed with the
+      * target are usable - `IndicatorInitialiser` drops the rest rather than letting a structural mismatch fail the run mid-flight.
       */
     extraSeeds: List[Indicator] = Nil
 )
@@ -50,179 +50,62 @@ object Optimiser extends IOApp.Simple {
     shuffle = false
   )
 
-  // Shuffled rounds draw three populations and keep the best one's worth of members. Unshuffled rounds read this as 1 whatever it says.
+  // Three populations drawn and the best one's worth of members kept. Worth it here and not on an unshuffled round, whose members mostly
+  // are the seed: over-drawing selects on variation, and there has to be some to select on.
   val gaParametersWithShuffle = gaParameters.copy(shuffle = true, initialOversampling = 3)
 
   val consistentScoring: ScoringFunction = ScoringFunction.Consistent()
 
-  /** The catalogue as it currently stands, each strategy searched twice — once in file order, once shuffled.
+  /** The holdout leaders the catalogue still spends GA budget on, each searched twice — file order, then shuffled.
     *
-    * Both are kept because shuffling still finds champions the file order misses, but no longer because it finds the best ones, and the
-    * case has weakened with every batch. Of the four leading vals by holdout net, s2_optimized and s1_v2_optimized came out of shuffled
-    * rounds and s2_optimized_v3 and s5_optimized_v2 out of unshuffled ones. The 2026-08-25/26 batch's one surviving champion came from an
-    * unshuffled round whose shuffled twin found nothing at all, and of the six shuffled rounds of 2026-08-31 not one produced a val worth
-    * keeping, while four of them breached the closed-trade floor - shuffled populations converge on strategies that trade too rarely to
-    * score. On the evidence so far a shuffled round is worth about half of what an unshuffled one is; they are still run because six rounds
-    * is a cheap way to keep testing that.
+    * A round earns its place by being the best of its family on the holdout and by having somewhere left to go. That rules out a val a
+    * descendant already beats, because searching from the weaker seed mostly rediscovers the stronger one; a family whose problem is its
+    * rules rather than its parameters, which no amount of indicator search will fix; and a val whose parameters came from a hand grid that
+    * the GA has already failed to improve on. Everything dropped for one of those reasons stays in `TestStrategy` and can come back as an
+    * `extraSeeds` entry, which costs nothing.
     *
-    * Ordered by holdout net, best first. A full pass is long enough that it is routinely interrupted, and this way the strategies most
-    * worth improving are the ones already done when it is.
+    * Both twins run because the shuffled one keeps earning it: it surfaces training-fitness leaders that validation ranking misses, and
+    * both September promotions (`s2_optimized_v4`, `s5_optimized_v3`) arrived that way with a validation figure of 0.000000.
     *
-    * s6 is first despite one of the worst holdout nets in the list, because that ordering is a proxy for headroom. It is first as the only
-    * val whose parameters came from a hand grid rather than a search, and the round of 2026-08-31 did not change that: its champion ran the
-    * trend line to JMA 100, the ceiling introduced the same day, so the search stopped at the bound rather than at an optimum. Another s6
-    * round is worth spending once that bound is widened again, and is the first round to spend when it is. Its rules still differ from the
-    * s5_optimized_v2 they descend from — a looser reversion leg and no trend exit — so a round on it is not re-deriving s5_optimized_v2's
-    * sibling, which is the reason the two vals below are left out.
-    *
-    * JMA length bounds were widened from [5, 50] to [5, 100] on 2026-08-31, when s6 was added, because s6 uses JMA 90 as its trend line and
-    * the old ceiling meant any lineage that mutated that gene collapsed to 50 with no way back - seedable but not searchable. This changes
-    * the space every round here searches, not only s6's, since s1_v2_optimized and the s2, s4 and s5 families all search on JMA: a re-run
-    * of any of them can now return a slower line than its recorded champion, and the JMA lengths in `ga-optimisation-*.md` reports dated
-    * before that change came from a search that could not exceed 50. The first batch run under the wider bound, on 2026-08-31, used it: the
-    * s6 champion runs JMA 100 and the top of its shortlist sits between 84 and 100, so the new ceiling binds as the old one did. Elsewhere
-    * it barely mattered - the s5_optimized_v2 champion came back with JMA 46, well inside the old range. The mutation step scales with the
-    * range, so it is now 9.5 per event rather than 4.5 and walks further.
-    *
-    * `IndicatorInitialiser` was rebuilt on the same day and the shuffled rounds below are not comparable to the ones that produced the
-    * champions recorded in this catalogue. Every bound it draws inside now comes from `GeneBounds`, which the mutator reads too, so a draw
-    * can no longer start outside the space mutation is allowed to hold - the old initialiser drew every moving average from [2, 42] against
-    * a searchable [5, 100], and NMA's lambda across a range five times wider than the one it could keep. Lengths are drawn log-uniformly
-    * rather than uniformly, related lengths as a ratio rather than independently, and the population is now a mixture: 15% copies of the
-    * seed, 55% jittered around it at three radii, 30% independent draws. A shuffled round is therefore no longer a purely random start, and
-    * the failure it was losing to - candidates whose lines cross on noise, or whose squeeze is smoothed over a shorter window than the ATR
-    * it smooths, neither of which trades its way to a score - is the thing those changes are aimed at.
-    *
-    * Expect breaches rather than clean verdicts. All twelve champions of 2026-08-31 breached at least one constraint and none was rejected
-    * for it: the constraints ramp rather than gate, discounting a score instead of zeroing it. The two that breached in every round were
-    * concentration (one pair earning a whole month) and the closed-trade floor of 120 on the validation fold, the latter only in shuffled
-    * rounds. A champion that breaches is still worth measuring — the two that measured best out of that batch breached two constraints
-    * each.
-    *
-    * Descendants that already beat their searched base on holdout — s2_optimized_v3, s2_optimized_v4, s4_optimized_v2, s5_optimized_v3,
-    * s4_optimized_v3 — now have rounds of their own rather than appearing only as `extraSeeds` on a parent. Searching from a stronger seed
-    * should converge faster and is less likely to rediscover a weaker sibling.
+    * Ordered by holdout net, best first, because a full pass is long enough to be interrupted routinely and this way the rounds most worth
+    * having are the ones already done when it is.
     */
   val rounds: List[OptimisationRound] = List(
-    OptimisationRound(
-      name = "s6",
-      strategy = TestStrategy.s6,
-      gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s5_optimized_v2.indicator)
-    ),
-    OptimisationRound(
-      name = "s6_shuffle",
-      strategy = TestStrategy.s6,
-      gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s5_optimized_v2.indicator)
-    ),
-    OptimisationRound(
-      name = "s2_optimized_v3",
-      strategy = TestStrategy.s2_optimized_v3,
-      gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(
-        TestStrategy.s2_optimized.indicator,
-        TestStrategy.s2_optimized_v2.indicator,
-        TestStrategy.s2_optimized_v4.indicator
-      )
-    ),
-    OptimisationRound(
-      name = "s2_optimized_v3_shuffle",
-      strategy = TestStrategy.s2_optimized_v3,
-      gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(
-        TestStrategy.s2_optimized.indicator,
-        TestStrategy.s2_optimized_v2.indicator,
-        TestStrategy.s2_optimized_v4.indicator
-      )
-    ),
     OptimisationRound(
       name = "s2_optimized_v4",
       strategy = TestStrategy.s2_optimized_v4,
       gaParameters = gaParameters,
       scoringFunction = consistentScoring,
-      extraSeeds = List(
-        TestStrategy.s2_optimized.indicator,
-        TestStrategy.s2_optimized_v2.indicator,
-        TestStrategy.s2_optimized_v3.indicator
-      )
+      extraSeeds = List(TestStrategy.s2_optimized_v3.indicator, TestStrategy.s2_optimized.indicator)
     ),
     OptimisationRound(
       name = "s2_optimized_v4_shuffle",
       strategy = TestStrategy.s2_optimized_v4,
       gaParameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring,
-      extraSeeds = List(
-        TestStrategy.s2_optimized.indicator,
-        TestStrategy.s2_optimized_v2.indicator,
-        TestStrategy.s2_optimized_v3.indicator
-      )
-    ),
-    OptimisationRound(
-      name = "s2_optimized",
-      strategy = TestStrategy.s2_optimized,
-      gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(
-        TestStrategy.s2_optimized_v2.indicator,
-        TestStrategy.s2_optimized_v3.indicator,
-        TestStrategy.s2_optimized_v4.indicator
-      )
-    ),
-    OptimisationRound(
-      name = "s2_optimized_shuffle",
-      strategy = TestStrategy.s2_optimized,
-      gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(
-        TestStrategy.s2_optimized_v2.indicator,
-        TestStrategy.s2_optimized_v3.indicator,
-        TestStrategy.s2_optimized_v4.indicator
-      )
+      extraSeeds = List(TestStrategy.s2_optimized_v3.indicator, TestStrategy.s2_optimized.indicator)
     ),
     OptimisationRound(
       name = "s5_optimized_v2",
       strategy = TestStrategy.s5_optimized_v2,
       gaParameters = gaParameters,
       scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s6.indicator, TestStrategy.s5_optimized_v3.indicator)
+      extraSeeds = List(
+        TestStrategy.s5_optimized_v3.indicator,
+        TestStrategy.s6.indicator,
+        TestStrategy.s6_optimized.indicator
+      )
     ),
     OptimisationRound(
       name = "s5_optimized_v2_shuffle",
       strategy = TestStrategy.s5_optimized_v2,
       gaParameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s6.indicator, TestStrategy.s5_optimized_v3.indicator)
-    ),
-    OptimisationRound(
-      name = "s1_v2_optimized",
-      strategy = TestStrategy.s1_v2_optimized,
-      gaParameters = gaParameters,
-      scoringFunction = consistentScoring
-    ),
-    OptimisationRound(
-      name = "s1_v2_optimized_shuffle",
-      strategy = TestStrategy.s1_v2_optimized,
-      gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring
-    ),
-    OptimisationRound(
-      name = "s5_optimized_v3",
-      strategy = TestStrategy.s5_optimized_v3,
-      gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s5_optimized_v2.indicator, TestStrategy.s6.indicator)
-    ),
-    OptimisationRound(
-      name = "s5_optimized_v3_shuffle",
-      strategy = TestStrategy.s5_optimized_v3,
-      gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s5_optimized_v2.indicator, TestStrategy.s6.indicator)
+      extraSeeds = List(
+        TestStrategy.s5_optimized_v3.indicator,
+        TestStrategy.s6.indicator,
+        TestStrategy.s6_optimized.indicator
+      )
     ),
     OptimisationRound(
       name = "s4_optimized_v2",
@@ -237,84 +120,6 @@ object Optimiser extends IOApp.Simple {
       gaParameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring,
       extraSeeds = List(TestStrategy.s4_optimized_v1.indicator, TestStrategy.s4_optimized_v3.indicator)
-    ),
-    OptimisationRound(
-      name = "s2_optimized_v2",
-      strategy = TestStrategy.s2_optimized_v2,
-      gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(
-        TestStrategy.s2_optimized.indicator,
-        TestStrategy.s2_optimized_v3.indicator,
-        TestStrategy.s2_optimized_v4.indicator
-      )
-    ),
-    OptimisationRound(
-      name = "s2_optimized_v2_shuffle",
-      strategy = TestStrategy.s2_optimized_v2,
-      gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(
-        TestStrategy.s2_optimized.indicator,
-        TestStrategy.s2_optimized_v3.indicator,
-        TestStrategy.s2_optimized_v4.indicator
-      )
-    ),
-    OptimisationRound(
-      name = "s4_optimized_v3",
-      strategy = TestStrategy.s4_optimized_v3,
-      gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s4_optimized_v1.indicator, TestStrategy.s4_optimized_v2.indicator)
-    ),
-    OptimisationRound(
-      name = "s4_optimized_v3_shuffle",
-      strategy = TestStrategy.s4_optimized_v3,
-      gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s4_optimized_v1.indicator, TestStrategy.s4_optimized_v2.indicator)
-    ),
-    OptimisationRound(
-      name = "s4_optimized_v1",
-      strategy = TestStrategy.s4_optimized_v1,
-      gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s4_optimized_v2.indicator, TestStrategy.s4_optimized_v3.indicator)
-    ),
-    OptimisationRound(
-      name = "s4_optimized_v1_shuffle",
-      strategy = TestStrategy.s4_optimized_v1,
-      gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s4_optimized_v2.indicator, TestStrategy.s4_optimized_v3.indicator)
-    ),
-    OptimisationRound(
-      name = "s12",
-      strategy = TestStrategy.s12,
-      gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s12_optimized.indicator)
-    ),
-    OptimisationRound(
-      name = "s12_shuffle",
-      strategy = TestStrategy.s12,
-      gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s12_optimized.indicator)
-    ),
-    OptimisationRound(
-      name = "s12_optimized",
-      strategy = TestStrategy.s12_optimized,
-      gaParameters = gaParameters,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s12.indicator)
-    ),
-    OptimisationRound(
-      name = "s12_optimized_shuffle",
-      strategy = TestStrategy.s12_optimized,
-      gaParameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s12.indicator)
     )
   )
 

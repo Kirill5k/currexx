@@ -54,8 +54,7 @@ enum Op[A, I]:
   case InitPopulation[I](seed: I, size: Int, shuffle: Boolean)                             extends Op[Population[I], I]
   case Cross[I](ind1: I, ind2: I, prob: Double)                                            extends Op[I, I]
   case Mutate[I](ind: I, prob: Double)                                                     extends Op[I, I]
-  case EvaluateOne[I](ind: I)                                                              extends Op[(I, Fitness), I]
-  case EvaluatePopulation[I](population: Population[I])                                    extends Op[EvaluatedPopulation[I], I]
+  case EvaluatePopulation[I](population: Population[I], phase: EvaluationPhase)            extends Op[EvaluatedPopulation[I], I]
   case ValidatePopulation[I](population: EvaluatedPopulation[I])                           extends Op[ValidatedPopulation[I], I]
   case SelectElites[I](population: EvaluatedPopulation[I], popSize: Int, ratio: Double)    extends Op[Population[I], I]
   case SelectPairs[I](population: EvaluatedPopulation[I], limit: Int)                      extends Op[DistributedPopulation[I], I]
@@ -90,11 +89,9 @@ object Op:
           crossover.cross(ind1, ind2, prob)
         case Op.Mutate(ind, prob) =>
           mutator.mutate(ind, prob)
-        case Op.EvaluateOne(ind) =>
-          evaluator.evaluateIndividual(ind)
-        case Op.EvaluatePopulation(population) =>
+        case Op.EvaluatePopulation(population, phase) =>
           val parallelism = Math.max(1, Runtime.getRuntime.availableProcessors())
-          Stream.emits(population).mapAsync(parallelism)(evaluator.evaluateIndividual).compile.toVector
+          Stream.emits(population).mapAsync(parallelism)(evaluator.evaluateIndividual(_, phase)).compile.toVector
         case Op.ValidatePopulation(population) =>
           validator.validate(population)
         case Op.SelectElites(population, popSize, ratio) =>
