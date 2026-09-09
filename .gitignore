@@ -23,6 +23,7 @@ project/plugins/project/
 
 .idea/
 .run/
+.junie/
 
 
 # Gradle and Maven with auto-import
