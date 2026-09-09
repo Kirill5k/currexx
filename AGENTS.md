@@ -13,7 +13,7 @@ This file provides guidance to AI agents when working with code in this reposito
 - `sbt test` - Run all tests
 - `sbt "testOnly *ClassName*"` - Run specific test class
 - `sbt "project core" run` - Run the core application
-- `sbt "project backtest" "runMain currexx.backtest.Backtester"` - Run backtesting
+- `sbt "project backtest" "runMain currexx.backtest.BatchBacktester"` - Run backtesting
 - `sbt docker:publishLocal` - Build Docker image locally
 
 ### Module-Specific Commands
@@ -140,7 +140,7 @@ The `backtest` module provides a genetic algorithm for discovering optimal strat
 
 Run via Optimiser: `sbt "backtest/runMain currexx.backtest.Optimiser"`
 
-Testing a strategy against historical set of data via Backtester: `sbt "backtest/runMain currexx.backtest.Backtester"`
+Testing a strategy against historical set of data via Backtester: `sbt "backtest/runMain currexx.backtest.BatchBacktester"`
 
 ## Key Technologies
 
