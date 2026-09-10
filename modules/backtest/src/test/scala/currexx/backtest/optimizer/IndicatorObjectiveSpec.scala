@@ -40,7 +40,7 @@ class IndicatorObjectiveSpec extends IOWordSpec {
       // fold, or combined them differently, would not be the number selection sorted on.
       //
       // Which folds are combined is the phase's business, and the phase has to reach the aggregation for the rotation
-      // to mean anything at all: the two figures below come from the same cached backtests and differ only in that one
+      // to mean anything at all: the two figures below come from the same cached fold scores and differ only in that one
       // of them is not counting fold 2.
       result.asserting { case (rescored, searched, foldScores) =>
         rescored mustBe IndicatorObjective.FoldAggregation.combine(foldScores)
@@ -223,7 +223,7 @@ class IndicatorObjectiveSpec extends IOWordSpec {
 
   "A FoldRotatingEvaluator" should {
 
-    def over(foldCount: Int) = FoldRotatingEvaluator[IO](_ => IO.pure(Nil), scoring, foldCount)
+    def over(foldCount: Int) = FoldRotatingEvaluator[IO](_ => IO.pure(Nil), foldCount)
 
     "count every fold when the finished population is re-scored" in {
       // The figure a run reports, and the only one comparable with another run's. Withholding anything here would make the training column

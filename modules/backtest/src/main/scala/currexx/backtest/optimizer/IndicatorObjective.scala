@@ -7,7 +7,7 @@ import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import currexx.algorithms.operators.{Evaluator, Validator}
-import currexx.algorithms.{Fitness, memoize}
+import currexx.algorithms.Fitness
 import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.services.TestServicesPool
 import currexx.backtest.{MarketDataProvider, OrderStats, TestSettings}
@@ -105,10 +105,9 @@ object IndicatorObjective {
       perFold  = folds.map(fold => backtestOver[F](pool, fold, strategy, otherIndicators, signalDetector))
       backtest = (indicator: Indicator) => perFold.traverse(_(indicator))
       validate = backtestOver[F](pool, validation, strategy, otherIndicators, signalDetector)
-      // The backtests are memoised rather than the fitness, because the fitness depends on which fold the generation is withholding and
-      // the backtests do not. Caching the number would tie an elite's score to the generation it was first evaluated in.
-      cachedBacktest <- memoize[F, Indicator, List[List[OrderStats]]](backtest)
-      evaluator = FoldRotatingEvaluator(cachedBacktest, scoringFunction, folds.size)
+      // Per-fold scores do not depend on the phase, so they can be cached without retaining full backtest histories or tying an elite's
+      // aggregate fitness to the generation it was first evaluated in. Full results remain available through the uncached backtest.
+      evaluator <- FoldRotatingEvaluator.cached[F](perFold, scoringFunction)
       validator <- Validator.shortlisted[F, Indicator](shortlistSize)(ind => validate(ind).map(res => Fitness(scoringFunction.score(res))))
     yield Operators(evaluator, validator, backtest, validate)
 

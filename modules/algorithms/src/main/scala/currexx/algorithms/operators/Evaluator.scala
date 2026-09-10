@@ -19,7 +19,7 @@ object Evaluator:
     * an objective that does need the phase cannot be passed here at all.
     *
     * Which is the whole trick for a phase-dependent objective: memoise the part of it that does not depend on the phase, rather than the
-    * fitness. `IndicatorObjective` caches per-fold backtests, the expensive half, and recombines them per phase for nothing.
+    * fitness. `IndicatorObjective` caches per-fold scores after backtesting and recombines them per phase for nothing.
     */
   def cached[F[_]: Concurrent, I](objectiveFn: I => F[(I, Fitness)]): F[Evaluator[F, I]] =
     memoize[F, I, Fitness](individual => objectiveFn(individual).map(_._2)).map { fitnessOf =>
