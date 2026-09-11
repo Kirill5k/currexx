@@ -26,7 +26,7 @@ final class ApplicationState[F[_]](
     val signalSettingsRef: Ref[F, SignalSettings],
     val clockRef: Ref[F, Option[Instant]],
     val dataRef: Ref[F, Option[MarketTimeSeriesData]],
-    val finalMarkRef: Ref[F, Option[MarketMark]],
+    val marketMarksRef: Ref[F, List[MarketMark]],
     val dataWindowRef: Ref[F, Option[DataWindow]],
     val dispatcherQueue: Queue[F, Action],
     val userIdRef: Ref[F, UserId]
@@ -34,8 +34,11 @@ final class ApplicationState[F[_]](
 
   private val fetchTimeOffset: FiniteDuration = 100.seconds
 
+  // The simulator clock includes a fetch delay; accounting uses the open at which the order actually filled.
+  def accountingTime(time: Instant): Instant = time.minusNanos(fetchTimeOffset.toNanos)
+
   // Stages the current bar for execution: orders fill at the bar's open (close overwritten with open),
-  // records the mark-to-market of the real close for final accounting, and advances the clock to the
+  // records the real close for equity accounting, and advances the clock to the
   // fetch time. Signals still run against the fully closed previous candle, so fills never use a close
   // that is only known retrospectively.
   def prepareExecution(currentData: MarketTimeSeriesData): F[Unit] =
@@ -43,13 +46,14 @@ final class ApplicationState[F[_]](
     val executionBar  = currentBar.copy(close = currentBar.open)
     val executionData = currentData.copy(prices = NonEmptyList(executionBar, currentData.prices.tail))
     val executionTime = currentBar.time.plus(fetchTimeOffset)
-    val finalMark     = MarketMark(
+    val closeMark     = MarketMark(
       price = BigDecimal(currentBar.close),
-      observedAt = executionTime.plus(currentData.interval.toDuration)
+      // A bar's end is exclusive: a close at midnight belongs to the preceding day/month.
+      observedAt = currentBar.time.plus(currentData.interval.toDuration).minusNanos(1)
     )
-    val barWindow = DataWindow(currentBar.time, currentBar.time)
+    val barWindow = DataWindow(currentBar.time, closeMark.observedAt)
     for
-      _ <- finalMarkRef.set(Some(finalMark))
+      _ <- marketMarksRef.update(closeMark :: _)
       _ <- dataRef.set(Some(executionData))
       _ <- clockRef.set(Some(executionTime))
       _ <- dataWindowRef.update(_.fold(Some(barWindow))(window => Some(window.union(barWindow))))
@@ -63,7 +67,7 @@ final class ApplicationState[F[_]](
       _ <- signalSettingsRef.set(newSettings.signal)
       _ <- clockRef.set(None)
       _ <- dataRef.set(None)
-      _ <- finalMarkRef.set(None)
+      _ <- marketMarksRef.set(Nil)
       _ <- dataWindowRef.set(None)
       _ <- dispatcherQueue.tryTakeN(None).void
       _ <- userIdRef.set(newSettings.userId)
@@ -76,7 +80,7 @@ object ApplicationState {
       dispatcherQueue   <- Queue.bounded[F, Action](1024)
       clockRef          <- Ref.of[F, Option[Instant]](None)
       dataRef           <- Ref.of[F, Option[MarketTimeSeriesData]](None)
-      finalMarkRef      <- Ref.of[F, Option[MarketMark]](None)
+      marketMarksRef    <- Ref.of[F, List[MarketMark]](Nil)
       dataWindowRef     <- Ref.of[F, Option[DataWindow]](None)
       marketStateRef    <- Ref.of[F, MarketState](settings.marketState)
       tradeSettingsRef  <- Ref.of[F, TradeSettings](settings.trade)
@@ -90,7 +94,7 @@ object ApplicationState {
       signalSettingsRef = signalSettingsRef,
       clockRef = clockRef,
       dataRef = dataRef,
-      finalMarkRef = finalMarkRef,
+      marketMarksRef = marketMarksRef,
       dataWindowRef = dataWindowRef,
       dispatcherQueue = dispatcherQueue,
       userIdRef = userIdRef

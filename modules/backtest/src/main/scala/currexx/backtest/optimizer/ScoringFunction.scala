@@ -98,7 +98,7 @@ object ScoringFunction {
       val netReturn      = (portfolio.totalProfit / portfolio.initialBalance).toDouble
       val recoveryFactor = portfolio.recoveryFactor.fold(credited(config.targetRecoveryFactor.value))(_.toDouble)
       // Only a ratio that was measured and found to have no downside earns the credit. One that could not be measured at
-      // all — every trade closed inside a single calendar month — has demonstrated nothing.
+      // all — the equity history covered only one calendar month — has demonstrated nothing.
       val sortinoRatio = portfolio.sortinoRatio match
         case RiskRatio.Defined(value)   => value
         case RiskRatio.ZeroDeviation    => credited(config.targetSortinoRatio.value)
@@ -244,12 +244,7 @@ object ScoringFunction {
         }
     }
 
-    /** One dataset's profit per period over every period it covered, including the ones no trade closed in.
-      *
-      * `profitByMonth` holds a key only for a month some trade closed in, so a candidate that traded in three months of a twelve-month run
-      * and won all three would read as 100% profitable periods and perfectly unconcentrated. Filling from the data window is what makes it
-      * 25%, and what stops a candidate flattering itself by sitting out either end.
-      */
+    /** One dataset's net equity change per period, including unrealized gains and losses and every flat calendar month it covered. */
     final private case class Series(profits: List[BigDecimal]) {
       val count: Int         = profits.size
       private val gains      = profits.filter(_ > 0)
@@ -302,33 +297,18 @@ object ScoringFunction {
       val medianPeriodReturn: Double =
         if (pooledBalance == 0) 0.0 else (pooled.median / pooledBalance).toDouble
 
-      /** Sortino over the filled pooled series rather than `OrderStats.sortinoRatio`, which is built from `profitByMonth` and so measures
-        * dispersion across only the months a candidate chose to trade — leaving the one axis whose job is to punish downside blind to
-        * exactly the flat and skipped months every other constraint here counts. Computed the way `OrderStats` computes it, so the target
-        * keeps its calibration.
-        */
-      def sortino(periodsPerYear: Double): RiskRatio = {
-        val (_, reversed) = pooled.profits.foldLeft((pooledBalance, List.empty[Double])) { case ((balance, acc), profit) =>
-          val periodReturn = if (balance == 0) 0.0 else (profit / balance).toDouble
-          (balance + profit, periodReturn :: acc)
-        }
-        val returns = reversed.reverse
-        if (returns.size < 2) RiskRatio.InsufficientData
-        else {
-          val mean     = returns.sum / returns.size
-          val downside = math.sqrt(returns.map(r => math.pow(math.min(r, 0.0), 2)).sum / returns.size)
-          RiskRatio.from(mean, downside, math.sqrt(periodsPerYear))
-        }
-      }
+      /** The same return calculation used by reported risk ratios, annualized for the configured period length. */
+      def sortino(periodsPerYear: Double): RiskRatio =
+        OrderStats.riskRatios(pooled.profits, pooledBalance, periodsPerYear)._2
     }
 
     /** Scores candidates on how consistently they earn across the run rather than on what they earned over it.
       *
-      * A pooled total is a sum: a candidate that lost for eight months and made it all back in the ninth reports the same net profit,
-      * profit factor and drawdown as one that earned steadily, and `scaled` floors at zero, so a losing period can only dilute a positive
-      * total and never count against it. That is the shape a search converges on when it is free to, and the shape that does not survive a
-      * different year. So the unit of evidence is the period a dataset covered: 30% median period return, 20% pair-month profit factor, 20%
-      * recovery factor, 15% Sortino over the filled series, 15% expectancy over average loss.
+      * A pooled total is a sum: a candidate that lost for eight months and made it all back in the ninth can report the same net profit as
+      * one that earned steadily, and `scaled` floors at zero, so a losing period can only dilute a positive total and never count against
+      * it. That is the shape a search converges on when it is free to, and the shape that does not survive a different year. So the unit of
+      * evidence is the period a dataset covered: 30% median period return, 20% pair-month profit factor, 20% recovery factor, 15% Sortino
+      * over the calendar equity series, 15% expectancy over average loss.
       *
       * Constraints then attack compensation from each direction it comes from — too few profitable pair-months, too much of one pair's
       * winnings in its best period, winning periods that do not outweigh losing ones — and a median period that loses money is
@@ -408,11 +388,9 @@ object ScoringFunction {
       merged.map(_.sum)
     }
 
-    /** What the run made in each month it is answerable for, oldest first. A month no trade closed in contributes a zero rather than being
-      * absent, which is what stops the breakdown flattering a candidate that traded in a burst.
-      */
+    /** Net equity changes in calendar order. Accounting supplies all covered months, including the ones with no equity change. */
     private def monthlyProfits(stats: OrderStats): List[BigDecimal] =
-      coveredMonths(stats).map(month => stats.profitByMonth.getOrElse(month.toString, BigDecimal(0)))
+      stats.profitByMonth.toList.sortBy(_._1).map(_._2)
 
     private def constraints(portfolio: OrderStats, evidence: Evidence, profitableRatio: Double, config: Config): List[Constraint] = {
       val costRatio  = if (portfolio.preCostProfit <= 0) BigDecimal(1) else portfolio.totalCosts / portfolio.preCostProfit
@@ -430,8 +408,7 @@ object ScoringFunction {
           tradeFloorDescription(config.minTradesPerMonth, evidence.dataMonths, evidence.datasetCount),
           sampleConfidence(portfolio, config.minTradesPerMonth, evidence.dataMonths, evidence.datasetCount)
         ),
-        // The union, not the data window: this asks how much of the run there was to judge, and a month a position was
-        // liquidated into is a month that earned something.
+        // Equity coverage may extend past the data window when a final position is liquidated later.
         Constraint(
           "months covered",
           s"${evidence.monthsCovered} months",
@@ -507,29 +484,12 @@ object ScoringFunction {
     }
   }
 
-  /** Every calendar month a run is answerable for, oldest first: the union of the months the data covered and the months a trade closed in.
-    *
-    * Both directions matter. The window reaches past the trades when a run sat out either end, which it has to answer for. A trade reaches
-    * past the window when a position still open at the final bar is liquidated one interval later, landing in the next month for any
-    * dataset ending at 23:00 on the last of the month — and profit must not be able to exist outside the record while `totalProfit` counts
-    * it.
-    *
-    * With no window recorded this degenerates to the span of the trades, which is all a caller assembling `OrderStats` by hand can supply.
-    */
-  private def coveredMonths(stats: OrderStats): List[YearMonth] = {
-    val bounds = stats.completedTrades.map(_.closedAt) ::: stats.dataWindow.toList.flatMap(w => List(w.from, w.to))
-    bounds match
-      case Nil   => Nil
-      case times => monthsBetween(times.min, times.max)
-  }
-
   /** Calendar months of market data the run was given, which is what the trade floor scales by: a run cannot be asked to trade through
-    * months it was never offered. `coveredMonths` deliberately spans the month a final position was liquidated into, and billing the floor
-    * for that month demands a fourth month of trades from three months of data. Falls back to the span of the trades with no window
-    * recorded.
+    * months it was never offered. The equity series can span the month a final position was liquidated into, and billing the floor for that
+    * month demands a fourth month of trades from three months of data. Falls back to the equity series with no window recorded.
     */
   private def monthsOfData(stats: OrderStats): Int =
-    stats.dataWindow.fold(coveredMonths(stats).size)(w => monthsBetween(w.from, w.to).size)
+    stats.dataWindow.fold(stats.profitByMonth.size)(w => monthsBetween(w.from, w.to).size)
 
   /** The calendar months two instants touch, inclusive. Not `ChronoUnit.MONTHS.between`, which counts whole elapsed months and would read
     * 2024-08-01 to 2024-10-31T23:00 as two.

@@ -1,9 +1,12 @@
 package currexx.backtest.optimizer
 
-import currexx.backtest.{CompletedTrade, DataWindow, OrderStats, RiskSettings}
+import currexx.backtest.{CompletedTrade, DataWindow, MarketMark, OrderStats, OrderStatsCollector, RiskSettings, TransactionCosts}
 import currexx.backtest.types.given
-import currexx.domain.market.TradeOrder.Position
+import currexx.clients.broker.BrokerParameters
+import currexx.core.trade.TradeOrderPlacement
+import currexx.domain.market.TradeOrder.{Enter, Exit, Position}
 import currexx.domain.market.{Currency, CurrencyPair}
+import currexx.domain.user.UserId
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -93,6 +96,28 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
     */
   private def statsAtFloorRate(pair: CurrencyPair, monthlyProfit: BigDecimal, months: Int): OrderStats =
     statsFor(pair, List.fill(months * 10)(monthlyProfit / 10), spacing = 3.days)
+
+  /** Identical orders earning 300 at the end of March, with the supplied equity path while the position remains open. */
+  private def statsMarkedAt(prices: List[(String, String)]): OrderStats = {
+    val end          = Instant.parse("2025-03-31T23:00:00Z")
+    val userId       = UserId("user-1")
+    val brokerParams = BrokerParameters.Oanda("key", true, "account")
+    val orders       = List(
+      TradeOrderPlacement(userId, Enter(Position.Buy, pairs.head, BigDecimal(1), BigDecimal(1)), brokerParams, start),
+      TradeOrderPlacement(userId, Exit(pairs.head, BigDecimal("1.03")), brokerParams, end)
+    )
+    OrderStatsCollector
+      .collect(
+        orders = orders,
+        settings = RiskSettings(
+          unitsPerLot = BigDecimal(10000),
+          transactionCosts = TransactionCosts(spreadPips = BigDecimal(0), slippagePipsPerSide = BigDecimal(0))
+        ),
+        dataWindow = Some(DataWindow(start, end)),
+        marketMarks = prices.map { case (time, price) => MarketMark(BigDecimal(price), Instant.parse(time)) }
+      )
+      .fold(error => fail("Marked trade fixture was rejected", error), identity)
+  }
 
   private val permissiveConfig = ScoringFunction.Robust.Config(
     minTradesPerMonth = 1,
@@ -204,6 +229,25 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
 
       over must be > 0.0
       over must be < within
+    }
+
+    "penalise unrealized drawdown despite identical winning trades and monthly returns" in {
+      val monthEnds = List(
+        "2025-01-31T23:00:00Z" -> "1.01",
+        "2025-02-28T23:00:00Z" -> "1.02",
+        "2025-03-31T23:00:00Z" -> "1.03"
+      )
+      val steady  = statsMarkedAt(("2025-01-15T00:00:00Z" -> "1.00") :: monthEnds)
+      val exposed = statsMarkedAt(("2025-01-15T00:00:00Z" -> "0.80") :: monthEnds)
+      val scoring = ScoringFunction.Robust(permissiveConfig.copy(maxDrawdownPercent = 15.0))
+
+      exposed.completedTrades mustBe steady.completedTrades
+      exposed.profitByMonth mustBe steady.profitByMonth
+      exposed.maxDrawdownPercent mustBe BigDecimal(20)
+      steady.maxDrawdownPercent mustBe BigDecimal(0)
+      scoring.score(List(exposed)) must be < scoring.score(List(steady))
+      scoring.violations(List(exposed)).map(_.constraint) must contain("max drawdown")
+      scoring.violations(List(steady)).map(_.constraint) must not contain "max drawdown"
     }
 
     "penalise candidates whose profit is concentrated in too few datasets" in {
@@ -348,6 +392,33 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       scoring.score(steady) must be > scoring.score(lumpy)
     }
 
+    "rank calendar equity gains before a trade closes rather than attributing all profit to its closing month" in {
+      val steady = statsMarkedAt(
+        List(
+          "2025-01-31T23:00:00Z" -> "1.01",
+          "2025-02-28T23:00:00Z" -> "1.02",
+          "2025-03-31T23:00:00Z" -> "1.03"
+        )
+      )
+      val stalled = statsMarkedAt(
+        List(
+          "2025-01-31T23:00:00Z" -> "1.01",
+          "2025-02-28T23:00:00Z" -> "1.01",
+          "2025-03-31T23:00:00Z" -> "1.03"
+        )
+      )
+      val scoring = ScoringFunction.Consistent(permissive.copy(minProfitablePeriodRatio = 0.9))
+
+      stalled.completedTrades mustBe steady.completedTrades
+      stalled.totalProfit mustBe steady.totalProfit
+      stalled.maxDrawdown mustBe steady.maxDrawdown
+      steady.profitByMonth mustBe Map("2025-01" -> BigDecimal(100), "2025-02" -> BigDecimal(100), "2025-03" -> BigDecimal(100))
+      stalled.profitByMonth mustBe Map("2025-01" -> BigDecimal(100), "2025-02" -> BigDecimal(0), "2025-03" -> BigDecimal(200))
+      scoring.score(List(steady)) must be > scoring.score(List(stalled))
+      scoring.violations(List(steady)).map(_.constraint) must not contain "profitable pair-months"
+      scoring.violations(List(stalled)).map(_.constraint) must contain("profitable pair-months")
+    }
+
     "disqualify a candidate whose typical period loses money" in {
       // Seven losing months against five winners that more than pay for them: the total is positive but the median
       // period is not, so there is no edge here to have found.
@@ -428,10 +499,8 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       //
       // Everything else is held equal: the pooled figures are identical, the median is too because the four zeros land
       // below it, the concentration share and pair-month profit factor are unchanged, and the profitable-month ratio is
-      // configured out of the way. So the only axis left to separate these is the risk-adjusted one. OrderStats
-      // .sortinoRatio cannot separate them: profitByMonth has no key for a month nothing closed in, so it measures
-      // dispersion across the eight traded months either way, and disagrees with every constraint on this object about
-      // what the run was.
+      // configured out of the way. So the only axis left to separate these is the risk-adjusted one. Both scoring
+      // functions and the reported Sortino must account for the four flat months in the same way.
       //
       // Two trades a month rather than one, so that the four months the window adds cannot take the sample-size ramp
       // down with them: at one a month the ramp would fall in the same direction as the axis under test and the
@@ -441,7 +510,11 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       val eightBusy = List(statsFor(pairs.head, trades, spacing = 16.days))
       val fourIdle  = List(statsFor(pairs.head, trades, spacing = 16.days, dataWindow = fullYear))
 
+      eightBusy.head.profitByMonth must have size 8
+      fourIdle.head.profitByMonth must have size 12
+      fourIdle.head.sortinoRatio.toOption.get mustBe eightBusy.head.sortinoRatio.toOption.get * math.sqrt(8.0 / 12.0) +- 0.0001
       scoring.score(fourIdle) must be < scoring.score(eightBusy)
+      ScoringFunction.Robust(permissiveConfig).score(fourIdle) must be < ScoringFunction.Robust(permissiveConfig).score(eightBusy)
     }
 
     "count a position liquidated after the data ran out in the month it was liquidated" in {

@@ -84,7 +84,7 @@ object BatchBacktester extends IOApp.Simple {
           |forced - positions still open when the data ran out, liquidated at the final mark price
           |exp - expectancy - Average net profit per closed trade
           |PF - profit factor - Relationship between winning and losing closed trades (1.5 means $1.50 won for every $1 lost)
-          |DD - drawdown - Maximum percentage of the portfolio that was lost during the period
+          |DD - drawdown - Largest peak-to-trough decline in portfolio equity at candle closes and executions, including open P&L and costs
           |sharpe - Risk-adjusted performance calculated from monthly equity returns and annualized. Higher means returns were more consistent
           |""".stripMargin)
     )

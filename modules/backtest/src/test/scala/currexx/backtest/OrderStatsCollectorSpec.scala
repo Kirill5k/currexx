@@ -13,7 +13,6 @@ import org.scalatest.wordspec.AnyWordSpec
 import kirill5k.common.syntax.time.*
 
 import java.time.Instant
-import scala.concurrent.duration.*
 
 class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
 
@@ -40,13 +39,21 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
   def finalMark(price: Double, hour: Long): MarketMark =
     MarketMark(BigDecimal(price), start.plusSeconds(hour * 3600))
 
+  private def collectTrades(
+      orders: List[TradeOrderPlacement],
+      finalMark: Option[MarketMark] = None,
+      settings: RiskSettings,
+      dataWindow: Option[DataWindow] = None
+  ): OrderStats =
+    OrderStatsCollector.collectTradeOnly(orders, finalMark, settings, dataWindow).fold(error => fail(error.getMessage, error), identity)
+
   "OrderStatsCollector" should {
     "calculate closed-trade statistics for a buy" in {
       val orders = List(
         mkEnter(Position.Buy, 100, 0),
         mkExit(110, 1)
       )
-      val stats = OrderStatsCollector.collect(orders, settings = noCosts)
+      val stats = collectTrades(orders, settings = noCosts)
 
       stats.total mustBe 1
       stats.buys mustBe 1
@@ -68,7 +75,7 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
         mkEnter(Position.Sell, 100, 0),
         mkExit(90, 1)
       )
-      val stats = OrderStatsCollector.collect(orders, settings = noCosts)
+      val stats = collectTrades(orders, settings = noCosts)
 
       stats.total mustBe 1
       stats.buys mustBe 0
@@ -81,7 +88,7 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
         mkEnter(Position.Buy, 100, 0),
         mkEnter(Position.Sell, 90, 1)
       )
-      val stats = OrderStatsCollector.collect(orders, Some(finalMark(80, 2)), noCosts)
+      val stats = collectTrades(orders, Some(finalMark(80, 2)), noCosts)
 
       stats.total mustBe 2
       stats.buys mustBe 1
@@ -94,7 +101,7 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
     }
 
     "liquidate a position still open at the end of the data at the final mark" in {
-      val stats = OrderStatsCollector.collect(
+      val stats = collectTrades(
         List(mkEnter(Position.Buy, 100, 0)),
         Some(finalMark(110, 1)),
         noCosts
@@ -112,7 +119,7 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
     }
 
     "leave a position open when there is no final mark to liquidate it against" in {
-      val stats = OrderStatsCollector.collect(List(mkEnter(Position.Buy, 100, 0)), None, noCosts)
+      val stats = collectTrades(List(mkEnter(Position.Buy, 100, 0)), None, noCosts)
 
       stats.total mustBe 0
       stats.totalProfit mustBe BigDecimal(0)
@@ -129,7 +136,7 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
           commissionPerTrade = NonNegBigDecimal.unsafeFrom(BigDecimal(2))
         )
       )
-      val stats = OrderStatsCollector.collect(
+      val stats = collectTrades(
         List(
           mkEnter(Position.Buy, 1.1, 0, volume = BigDecimal(100000)),
           mkExit(1.101, 1)
@@ -153,7 +160,7 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
         mkEnter(Position.Buy, 100, 6),
         mkExit(100, 7) // breakeven
       )
-      val stats = OrderStatsCollector.collect(orders, settings = noCosts)
+      val stats = collectTrades(orders, settings = noCosts)
 
       stats.total mustBe 4
       stats.winCount mustBe 1
@@ -184,15 +191,25 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
         brokerParams,
         start.plusSeconds(3600)
       )
-      val stats = OrderStatsCollector.collect(List(enter, exit), settings = noCosts)
+      val stats = collectTrades(List(enter, exit), settings = noCosts)
 
       stats.preCostProfit mustBe BigDecimal(80)
+    }
+
+    "return a validation error when trade-only profit needs a missing account conversion rate" in {
+      val pair   = CurrencyPair.fromUnsafe("GBPJPY")
+      val orders = List(
+        TradeOrderPlacement(uid, Enter(Position.Buy, pair, BigDecimal(150), BigDecimal(1)), brokerParams, start),
+        TradeOrderPlacement(uid, Exit(pair, BigDecimal(151)), brokerParams, start.plusSeconds(3600))
+      )
+
+      OrderStatsCollector.collectTradeOnly(orders, settings = noCosts).isLeft mustBe true
     }
 
     "calculate annualized Sharpe and Sortino ratios from monthly equity returns" in {
       val february = 31L * 24
       val march    = (31L + 28L) * 24
-      val stats    = OrderStatsCollector.collect(
+      val stats    = collectTrades(
         List(
           mkEnter(Position.Buy, 100, 0),
           mkExit(200, 1), // January +100
@@ -210,7 +227,7 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
 
     "report a zero-deviation Sortino ratio when no month lost money" in {
       val february = 31L * 24
-      val stats    = OrderStatsCollector.collect(
+      val stats    = collectTrades(
         List(
           mkEnter(Position.Buy, 100, 0),
           mkExit(200, 1), // January +100
@@ -227,7 +244,7 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
     }
 
     "report insufficient data, not zero deviation, when every trade closed inside one month" in {
-      val stats = OrderStatsCollector.collect(
+      val stats = collectTrades(
         List(
           mkEnter(Position.Buy, 100, 0),
           mkExit(200, 1), // January +100
@@ -244,26 +261,28 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
       stats.sharpeRatio mustBe RiskRatio.InsufficientData
     }
 
-    "liquidate positions at the production fetch offset for H1 and M1 candles" in
-      List(Interval.H1 -> 3700L, Interval.M1 -> 160L).foreach { case (interval, expectedMarkOffset) =>
+    "liquidate positions at the candle close for H1 and M1 candles" in
+      List(Interval.H1 -> 3600L, Interval.M1 -> 60L).foreach { case (interval, expectedMarkOffset) =>
         val bar  = PriceRange(100, 110, 90, 105, 1, start)
         val data = MarketTimeSeriesData(cp, interval, NonEmptyList.one(bar), "test")
         val open = TradeOrderPlacement(
           uid,
           Enter(Position.Buy, cp, BigDecimal(100), BigDecimal(1)),
           brokerParams,
-          start.plusSeconds(100)
+          start
         )
 
         val finalMark = MarketMark(
           price = BigDecimal(data.prices.head.close),
-          observedAt = data.latestTime.plus(data.interval.toDuration + 100.seconds)
+          observedAt = data.latestTime.plus(data.interval.toDuration).minusNanos(1)
         )
 
-        val stats = OrderStatsCollector.collect(List(open), Some(finalMark), noCosts)
+        val stats = OrderStatsCollector
+          .collect(List(open), List(finalMark), noCosts)
+          .fold(error => fail(error.getMessage, error), identity)
 
         stats.completedTrades must have size 1
-        stats.completedTrades.head.closedAt mustBe start.plusSeconds(expectedMarkOffset)
+        stats.completedTrades.head.closedAt mustBe start.plusSeconds(expectedMarkOffset).minusNanos(1)
         stats.totalProfit mustBe BigDecimal(5)
       }
 
@@ -297,7 +316,7 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
     }
 
     "track invalid duplicate and unmatched orders" in {
-      val stats = OrderStatsCollector.collect(
+      val stats = collectTrades(
         List(
           mkExit(100, 0),
           mkEnter(Position.Buy, 100, 1),

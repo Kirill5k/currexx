@@ -1,13 +1,14 @@
 package currexx.backtest
 
+import cats.syntax.foldable.*
+import cats.syntax.traverse.*
 import currexx.backtest.syntax.*
 import currexx.backtest.types.given
 import currexx.core.trade.TradeOrderPlacement
 import currexx.domain.market.{Currency, CurrencyPair, TradeOrder as TO}
 import eu.timepit.refined.types.numeric.{NonNegBigDecimal, PosBigDecimal}
 
-import java.time.{Instant, ZoneOffset}
-import java.time.format.DateTimeFormatter
+import java.time.Instant
 import scala.math.sqrt
 
 final case class TransactionCosts(
@@ -94,8 +95,8 @@ final case class OrderStats(
     lossCount: Int = 0,
     breakevenCount: Int = 0,
     lossTotal: Double = 0.0,
-    // Every figure below is realized: positions still open when the data ran out are liquidated at the final mark
-    // and counted as completed trades, so trade counts, profit and the equity curve all describe the same trades.
+    // Trade totals include positions liquidated at the final mark. Risk and calendar profit also include the
+    // unrealized P&L observed while those positions were open.
     totalProfit: BigDecimal = BigDecimal(0),
     preCostProfit: BigDecimal = BigDecimal(0),
     // Total trading costs in account currency (spread + two-sided slippage + commission)
@@ -104,14 +105,14 @@ final case class OrderStats(
     grossLoss: BigDecimal = BigDecimal(0),
     biggestWin: BigDecimal = BigDecimal(0),
     biggestLoss: BigDecimal = BigDecimal(0),
+    // Change in account equity per calendar month, including flat months in the data window.
     profitByMonth: Map[String, BigDecimal] = Map.empty,
     completedTrades: List[CompletedTrade] = Nil,
     equityCurve: List[EquityPoint] = Nil,
     initialBalance: BigDecimal = BigDecimal(10000),
     maxDrawdown: BigDecimal = BigDecimal(0),
     // Largest peak-to-trough equity decline (((peak equity − lowest subsequent equity) / peak equity) × 100)
-    // Lower is better. Equity is only sampled at trade close times, so this does not capture intra-trade drawdown
-    // between candles, nor unrealized losses on positions that were open concurrently.
+    // Sampled at candle closes and executions; movements inside a candle are not reconstructed from OHLC extremes.
     maxDrawdownPercent: BigDecimal = BigDecimal(0),
     // Risk-adjusted performance calculated from monthly equity returns and annualized, assuming a zero risk-free
     // rate. Higher means returns were more consistent. See RiskRatio for the two ways this can be unmeasurable.
@@ -185,23 +186,30 @@ final case class OrderStats(
        |)""".stripMargin.replaceAll("\n", "")
 
 object OrderStats {
-  private[backtest] val monthFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("yyyy-MM").withZone(ZoneOffset.UTC)
 
+  /** Trade-close accounting for callers with no market-price history. Calendar gaps are filled, but open-position risk is unobserved. */
   def fromTrades(
       trades: List[CompletedTrade],
       settings: RiskSettings,
       invalidOrderCount: Int = 0,
       dataWindow: Option[DataWindow] = None
   ): OrderStats = {
-    val sortedTrades         = trades.sortBy(_.closedAt)
-    val (completed, curve)   = buildEquityCurve(sortedTrades, settings.initialBalance.value)
+    val stats = aggregateTrades(trades, settings.initialBalance.value, invalidOrderCount, dataWindow)
+    withEquityCurve(stats, tradeCloseEquityCurve(stats.completedTrades, stats.initialBalance))
+  }
+
+  /** Trade aggregates without an assumed equity path. The caller attaches the observed or explicitly trade-close curve once. */
+  private[backtest] def aggregateTrades(
+      trades: List[CompletedTrade],
+      initialBalance: BigDecimal,
+      invalidOrderCount: Int,
+      dataWindow: Option[DataWindow]
+  ): OrderStats = {
+    val completed            = withTradeReturns(trades, initialBalance)
     val netProfits           = completed.map(_.netProfit)
     val wins                 = netProfits.filter(_ > 0)
     val losses               = netProfits.filter(_ < 0)
-    val monthly              = completed.groupMapReduce(t => monthFormatter.format(t.closedAt))(_.netProfit)(_ + _)
     val (maxWins, maxLosses) = streaks(netProfits)
-    val (sharpe, sortino)    = monthlyRiskRatios(monthly, settings.initialBalance.value)
 
     OrderStats(
       total = completed.size,
@@ -218,14 +226,8 @@ object OrderStats {
       grossLoss = losses.map(_.abs).sum,
       biggestWin = wins.maxOption.getOrElse(BigDecimal(0)),
       biggestLoss = losses.minOption.getOrElse(BigDecimal(0)),
-      profitByMonth = monthly,
       completedTrades = completed,
-      equityCurve = curve,
-      initialBalance = settings.initialBalance.value,
-      maxDrawdown = curve.map(_.drawdown).maxOption.getOrElse(BigDecimal(0)),
-      maxDrawdownPercent = curve.map(_.drawdownPercent).maxOption.getOrElse(BigDecimal(0)),
-      sharpeRatio = sharpe,
-      sortinoRatio = sortino,
+      initialBalance = initialBalance,
       maxConsecutiveWins = maxWins,
       maxConsecutiveLosses = maxLosses,
       forcedClosureCount = completed.count(_.forcedClosure),
@@ -234,52 +236,61 @@ object OrderStats {
     )
   }
 
-  /** Pools per-dataset results into a single portfolio.
-    *
-    * The pooled account starts with the sum of the member balances, because each dataset was simulated on its own account. Charging the
-    * combined trades against a single dataset's balance would scale returns and drawdown percentages with the number of datasets, so any
-    * threshold expressed as a percentage would silently change meaning whenever a dataset is added or removed.
-    *
-    * That sum is the only balance this can honestly use, so there is no settings parameter to pass one in with: initial balance is all
-    * `fromTrades` reads out of `RiskSettings`, and any value supplied here would be discarded. The default only ever applies to an empty
-    * list, which has no member balances to add up.
+  /** Pools trade aggregates and observed equity curves. Each dataset was simulated on its own account, so the portfolio starts with their
+    * combined balances. Using one member's balance would make percentage thresholds change meaning with dataset count.
     */
-  def combine(stats: List[OrderStats]): OrderStats =
-    fromTrades(
+  def combine(stats: List[OrderStats]): OrderStats = {
+    val initialBalance = stats.map(_.initialBalance).sum match
+      case pooled if pooled > 0 => pooled
+      case _                    => RiskSettings().initialBalance.value
+    val pooled = aggregateTrades(
       trades = stats.flatMap(_.completedTrades),
-      settings = stats.map(_.initialBalance).sum match
-        case pooled if pooled > 0 => RiskSettings(initialBalance = PosBigDecimal.unsafeFrom(pooled))
-        case _                    => RiskSettings(),
+      initialBalance = initialBalance,
       invalidOrderCount = stats.map(_.invalidOrderCount).sum,
       // The pooled window has to span every member's, or a month one dataset was given and another was not would be
       // missing from the pooled record of a run that did cover it.
       dataWindow = stats.flatMap(_.dataWindow).reduceOption(_.union(_))
     )
+    withEquityCurve(pooled, EquityCurve.combine(stats, pooled.initialBalance))
+  }
 
-  private def buildEquityCurve(
+  private[backtest] def withEquityCurve(stats: OrderStats, curve: List[EquityPoint]): OrderStats = {
+    val monthly           = EquityCurve.monthlyProfits(curve, stats.initialBalance, stats.dataWindow)
+    val (sharpe, sortino) = riskRatios(monthly.toList.sortBy(_._1).map(_._2), stats.initialBalance)
+    stats.copy(
+      equityCurve = curve,
+      profitByMonth = monthly,
+      maxDrawdown = curve.map(_.drawdown).maxOption.getOrElse(BigDecimal(0)),
+      maxDrawdownPercent = curve.map(_.drawdownPercent).maxOption.getOrElse(BigDecimal(0)),
+      sharpeRatio = sharpe,
+      sortinoRatio = sortino
+    )
+  }
+
+  // Per-trade returns remain relative to the realized balance immediately before simultaneous closes.
+  private def withTradeReturns(
       trades: List[CompletedTrade],
       initialBalance: BigDecimal
-  ): (List[CompletedTrade], List[EquityPoint]) = {
-    val tradesByCloseTime         = trades.groupBy(_.closedAt).toList.sortBy(_._1)
-    val (_, _, completed, points) = tradesByCloseTime.foldLeft(
-      (initialBalance, initialBalance, List.empty[CompletedTrade], List.empty[EquityPoint])
-    ) { case ((equity, peak, accTrades, accPoints), (closedAt, simultaneousTrades)) =>
-      val enriched = simultaneousTrades.map { trade =>
-        val returnPct = if (equity == 0) BigDecimal(0) else (trade.netProfit / equity * 100).roundTo(8)
-        trade.copy(returnPct = returnPct)
-      }
-      val next     = equity + simultaneousTrades.map(_.netProfit).sum
-      val nextPeak = peak.max(next)
-      val drawdown = nextPeak - next
-      val ddPct    = if (nextPeak == 0) BigDecimal(0) else (drawdown / nextPeak * 100).roundTo(8)
-      (
-        next,
-        nextPeak,
-        enriched.reverse ::: accTrades,
-        EquityPoint(closedAt, next, drawdown, ddPct) :: accPoints
-      )
+  ): List[CompletedTrade] = {
+    val tradesByCloseTime = trades.groupBy(_.closedAt).toList.sortBy(_._1)
+    val (_, completed)    = tradesByCloseTime.foldLeft((initialBalance, List.empty[CompletedTrade])) {
+      case ((balance, accTrades), (_, simultaneousTrades)) =>
+        val enriched = simultaneousTrades.map { trade =>
+          val returnPct = if (balance == 0) BigDecimal(0) else (trade.netProfit / balance * 100).roundTo(8)
+          trade.copy(returnPct = returnPct)
+        }
+        (balance + simultaneousTrades.map(_.netProfit).sum, enriched.reverse ::: accTrades)
     }
-    (completed.reverse, points.reverse)
+    completed.reverse
+  }
+
+  private def tradeCloseEquityCurve(trades: List[CompletedTrade], initialBalance: BigDecimal): List[EquityPoint] = {
+    val profits     = trades.groupMapReduce(_.closedAt)(_.netProfit)(_ + _).toList.sortBy(_._1)
+    val (_, values) = profits.foldLeft((initialBalance, List.empty[(Instant, BigDecimal)])) { case ((equity, points), (time, profit)) =>
+      val next = equity + profit
+      (next, (time -> next) :: points)
+    }
+    EquityCurve.fromValues(values.reverse, initialBalance)
   }
 
   /** Annualized Sharpe and Sortino from the monthly profit series.
@@ -289,10 +300,12 @@ object OrderStats {
     * an optimiser towards strategies that do have losing months. They are returned as distinct cases rather than one catch-all so that a
     * caller can credit the good outcome without also crediting the absent one.
     */
-  private def monthlyRiskRatios(profitByMonth: Map[String, BigDecimal], initialBalance: BigDecimal): (RiskRatio, RiskRatio) = {
-    val monthlyProfits = profitByMonth.toList.sortBy(_._1).map(_._2)
-
-    val (_, returns) = monthlyProfits.foldLeft((initialBalance, List.empty[Double])) { case ((balance, acc), profit) =>
+  def riskRatios(
+      profits: List[BigDecimal],
+      initialBalance: BigDecimal,
+      periodsPerYear: Double = 12.0
+  ): (RiskRatio, RiskRatio) = {
+    val (_, returns) = profits.foldLeft((initialBalance, List.empty[Double])) { case ((balance, acc), profit) =>
       val monthlyReturn = if (balance == 0) 0.0 else (profit / balance).toDouble
       (balance + profit, monthlyReturn :: acc)
     }
@@ -304,7 +317,7 @@ object OrderStats {
       val deviation  = sqrt(variance)
       val downside   = orderedReturns.map(r => math.pow(math.min(r, 0.0), 2)).sum / orderedReturns.size
       val downsideSd = sqrt(downside)
-      val annualizer = sqrt(12.0)
+      val annualizer = sqrt(periodsPerYear)
       (RiskRatio.from(mean, deviation, annualizer), RiskRatio.from(mean, downsideSd, annualizer))
     }
   }
@@ -331,50 +344,163 @@ object OrderStatsCollector {
       invalidOrderCount: Int = 0
   )
 
+  /** Values equity at every supplied market mark and execution. Callers must supply the candle-close history for the evaluated window;
+    * missing observations cannot be inferred from trades. The latest mark liquidates any remaining position.
+    *
+    * An empty history is valid only for an empty, unstarted run. Identical duplicate marks are harmless; conflicting prices are rejected.
+    */
   def collect(
+      orders: List[TradeOrderPlacement],
+      marketMarks: List[MarketMark],
+      settings: RiskSettings = RiskSettings(),
+      dataWindow: Option[DataWindow] = None
+  ): Either[IllegalArgumentException, OrderStats] =
+    marketMarks match {
+      case Nil if orders.isEmpty && dataWindow.isEmpty =>
+        Right(OrderStats(initialBalance = settings.initialBalance.value))
+      case Nil =>
+        Left(
+          new IllegalArgumentException(
+            "Market marks are required for equity accounting; use collectTradeOnly when no price history is available"
+          )
+        )
+      case _ =>
+        for
+          marks <- validateMarks(marketMarks)
+          state <- collectOrders(orders, marks.lastOption, settings)
+          curve <- state.openPosition match {
+            case None    => markedEquityCurve(state.trades, marks, settings)
+            case Some(_) =>
+              Left(new IllegalArgumentException("Market marks must extend through the open position so its final equity can be measured"))
+          }
+        yield {
+          val stats = OrderStats.aggregateTrades(state.trades, settings.initialBalance.value, state.invalidOrderCount, dataWindow)
+          OrderStats.withEquityCurve(stats, curve)
+        }
+    }
+
+  /** Explicit trade-close accounting. A final mark may settle an open position, but does not supply its intervening equity path. */
+  def collectTradeOnly(
       orders: List[TradeOrderPlacement],
       finalMark: Option[MarketMark] = None,
       settings: RiskSettings = RiskSettings(),
       dataWindow: Option[DataWindow] = None
-  ): OrderStats = {
-    val state = orders.foldLeft(CollectionState()) { (state, currentOrder) =>
+  ): Either[IllegalArgumentException, OrderStats] =
+    collectOrders(orders, finalMark, settings).map { state =>
+      OrderStats.fromTrades(state.trades, settings, state.invalidOrderCount, dataWindow)
+    }
+
+  private def validateMarks(marks: List[MarketMark]): Either[IllegalArgumentException, List[MarketMark]] =
+    marks
+      .sortBy(_.observedAt)
+      .foldLeft[Either[IllegalArgumentException, List[MarketMark]]](Right(Nil)) { (result, mark) =>
+        result.flatMap { previous =>
+          previous.headOption match {
+            case Some(last) if last.observedAt == mark.observedAt && last.price == mark.price =>
+              Right(previous)
+            case Some(last) if last.observedAt == mark.observedAt =>
+              Left(new IllegalArgumentException(s"Conflicting market marks at ${mark.observedAt}: ${last.price} and ${mark.price}"))
+            case _ =>
+              Right(mark :: previous)
+          }
+        }
+      }
+      .map(_.reverse)
+
+  private def collectOrders(
+      orders: List[TradeOrderPlacement],
+      finalMark: Option[MarketMark],
+      settings: RiskSettings
+  ): Either[IllegalArgumentException, CollectionState] = {
+    val collected: Either[IllegalArgumentException, CollectionState] = orders.foldM(CollectionState()) { (state, currentOrder) =>
       val openPosition = state.openPosition.flatMap(placement => asEnter(placement).map(placement -> _))
       (openPosition, currentOrder.order) match {
         case (None, _: TO.Enter) =>
-          state.copy(openPosition = Some(currentOrder))
+          Right(state.copy(openPosition = Some(currentOrder)))
 
         case (None, _: TO.Exit) =>
-          state.copy(invalidOrderCount = state.invalidOrderCount + 1)
+          Right(state.copy(invalidOrderCount = state.invalidOrderCount + 1))
 
         case (Some((_, open)), enter: TO.Enter) if enter.position == open.position =>
-          state.copy(invalidOrderCount = state.invalidOrderCount + 1)
+          Right(state.copy(invalidOrderCount = state.invalidOrderCount + 1))
 
         case (Some((placement, open)), enter: TO.Enter) =>
-          val trade = closeTrade(open, placement.time, enter.price, currentOrder.time, settings)
-          state.copy(trades = trade :: state.trades, openPosition = Some(currentOrder))
+          closeTrade(open, placement.time, enter.price, currentOrder.time, settings)
+            .map(trade => state.copy(trades = trade :: state.trades, openPosition = Some(currentOrder)))
 
         case (Some((placement, open)), exit: TO.Exit) =>
-          val trade = closeTrade(open, placement.time, exit.price, currentOrder.time, settings)
-          state.copy(trades = trade :: state.trades, openPosition = None)
+          closeTrade(open, placement.time, exit.price, currentOrder.time, settings)
+            .map(trade => state.copy(trades = trade :: state.trades, openPosition = None))
       }
     }
 
     // A position still open when the data runs out is liquidated at the final mark instead of being reported as an
     // unrealized balance. Reporting it separately left totalProfit including it while trade counts, expectancy,
     // profit factor and the monthly return series all excluded it, so no two metrics described the same trades.
-    val forcedClosure = for
-      placement <- state.openPosition
-      open      <- asEnter(placement)
-      mark      <- finalMark
-      if !mark.observedAt.isBefore(placement.time)
-    yield closeTrade(open, placement.time, mark.price, mark.observedAt, settings, forcedClosure = true)
+    collected.flatMap { state =>
+      val closing = for
+        placement <- state.openPosition
+        open      <- asEnter(placement)
+        mark      <- finalMark
+        if !mark.observedAt.isBefore(placement.time)
+      yield (placement, open, mark)
 
-    OrderStats.fromTrades(
-      trades = state.trades.reverse ::: forcedClosure.toList,
-      settings = settings,
-      invalidOrderCount = state.invalidOrderCount,
-      dataWindow = dataWindow
-    )
+      closing
+        .traverse { case (placement, open, mark) =>
+          closeTrade(open, placement.time, mark.price, mark.observedAt, settings, forcedClosure = true)
+        }
+        .map { forcedClosure =>
+          state.copy(
+            trades = state.trades.reverse ::: forcedClosure.toList,
+            openPosition = state.openPosition.filter(_ => forcedClosure.isEmpty)
+          )
+        }
+    }
+  }
+
+  /** Equity is the amount left on liquidation at the current price. Reserve the full configured round-trip cost while a position is open,
+    * then replace its marked P&L with the realized net result on close; costs are never deducted a second time. This keeps the existing
+    * trade-cost model and terminal P&L while recognizing its cost throughout the position's life.
+    */
+  private def markedEquityCurve(
+      trades: List[CompletedTrade],
+      marks: List[MarketMark],
+      settings: RiskSettings
+  ): Either[IllegalArgumentException, List[EquityPoint]] = {
+    val openings = trades.groupBy(_.openedAt)
+    val closings = trades.groupBy(_.closedAt)
+    val prices   = marks.map(mark => mark.observedAt -> mark.price).toMap
+    val times    = (openings.keySet ++ closings.keySet ++ prices.keySet).toList.sorted
+    times
+      .foldM((settings.initialBalance.value, List.empty[CompletedTrade], List.empty[(Instant, BigDecimal)])) {
+        case ((balance, positions, values), time) =>
+          val opened   = openings.getOrElse(time, Nil)
+          val closed   = closings.getOrElse(time, Nil)
+          val active   = (positions ::: opened).filter(_.closedAt.isAfter(time))
+          val realised = balance + closed.map(_.netProfit).sum
+          // At executions the fill price is the available mark; at candle close the supplied close takes precedence.
+          val price      = prices.get(time).orElse(opened.headOption.map(_.entryPrice)).orElse(closed.headOption.map(_.exitPrice))
+          val unrealised = price
+            .traverse { currentPrice =>
+              active
+                .traverse { trade =>
+                  for
+                    units      = trade.volume * settings.unitsPerLot.value
+                    grossQuote = priceProfit(trade.position, trade.entryPrice, currentPrice) * units
+                    gross <- toAccountCurrency(trade.currencyPair, grossQuote, currentPrice, settings)
+                    costs <- transactionCosts(trade.currencyPair, units, currentPrice, settings)
+                  yield gross - costs
+                }
+                .map(_.sum)
+            }
+          unrealised
+            .map { profit =>
+              (realised, active, (time -> (realised + profit.getOrElse(BigDecimal(0)))) :: values)
+            }
+      }
+      .map { case (_, _, values) =>
+        EquityCurve.fromValues(values.reverse, settings.initialBalance.value)
+      }
   }
 
   private def closeTrade(
@@ -384,12 +510,13 @@ object OrderStatsCollector {
       closedAt: Instant,
       settings: RiskSettings,
       forcedClosure: Boolean = false
-  ): CompletedTrade = {
-    val units      = open.volume * settings.unitsPerLot.value
-    val grossQuote = priceProfit(open.position, open.price, exitPrice) * units
-    val gross      = toAccountCurrency(open.currencyPair, grossQuote, exitPrice, settings)
-    val costs      = transactionCosts(open.currencyPair, units, exitPrice, settings)
-    CompletedTrade(
+  ): Either[IllegalArgumentException, CompletedTrade] =
+    for
+      units      = open.volume * settings.unitsPerLot.value
+      grossQuote = priceProfit(open.position, open.price, exitPrice) * units
+      gross <- toAccountCurrency(open.currencyPair, grossQuote, exitPrice, settings)
+      costs <- transactionCosts(open.currencyPair, units, exitPrice, settings)
+    yield CompletedTrade(
       currencyPair = open.currencyPair,
       position = open.position,
       openedAt = openedAt,
@@ -402,7 +529,6 @@ object OrderStatsCollector {
       netProfit = gross - costs,
       forcedClosure = forcedClosure
     )
-  }
 
   private def asEnter(placement: TradeOrderPlacement): Option[TO.Enter] =
     placement.order match {
@@ -421,11 +547,12 @@ object OrderStatsCollector {
       units: BigDecimal,
       exitPrice: BigDecimal,
       settings: RiskSettings
-  ): BigDecimal = {
+  ): Either[IllegalArgumentException, BigDecimal] = {
     val pipSize           = if (currencyPair.quote.code == "JPY") BigDecimal("0.01") else BigDecimal("0.0001")
     val variableCostPips  = settings.transactionCosts.spreadPips.value + (settings.transactionCosts.slippagePipsPerSide.value * 2)
     val variableQuoteCost = variableCostPips * pipSize * units
-    toAccountCurrency(currencyPair, variableQuoteCost, exitPrice, settings).abs + settings.transactionCosts.commissionPerTrade.value
+    toAccountCurrency(currencyPair, variableQuoteCost, exitPrice, settings)
+      .map(_.abs + settings.transactionCosts.commissionPerTrade.value)
   }
 
   private def toAccountCurrency(
@@ -433,16 +560,23 @@ object OrderStatsCollector {
       quoteAmount: BigDecimal,
       price: BigDecimal,
       settings: RiskSettings
-  ): BigDecimal =
-    if (currencyPair.quote == settings.accountCurrency) quoteAmount
-    else if (currencyPair.base == settings.accountCurrency) quoteAmount / price
-    else
+  ): Either[IllegalArgumentException, BigDecimal] =
+    if (currencyPair.quote == settings.accountCurrency) Right(quoteAmount)
+    else if (currencyPair.base == settings.accountCurrency) {
+      Either.cond(
+        price > 0,
+        quoteAmount / price,
+        new IllegalArgumentException(
+          s"Cannot convert ${currencyPair.quote.code}/${settings.accountCurrency.code} at non-positive price $price"
+        )
+      )
+    } else
       settings.quoteToAccountRates
         .get(currencyPair.quote)
-        .map(rate => quoteAmount * rate.value)
-        .getOrElse {
-          throw new IllegalArgumentException(
+        .toRight(
+          new IllegalArgumentException(
             s"Missing ${currencyPair.quote.code}/${settings.accountCurrency.code} conversion rate for $currencyPair"
           )
-        }
+        )
+        .map(rate => quoteAmount * rate.value)
 }
