@@ -37,6 +37,7 @@ val docker = Seq(
 )
 
 val common = Seq(
+  Test / fork := true,
   Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement,
   tpolecatExcludeOptions ++= Set(ScalacOptions.fatalWarnings),
   scalacOptions += "-Werror"
