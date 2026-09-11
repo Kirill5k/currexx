@@ -1,7 +1,8 @@
 package currexx.backtest.optimizer
 
-import cats.Functor
+import cats.MonadThrow
 import cats.effect.Concurrent
+import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import currexx.algorithms.operators.Evaluator
@@ -19,14 +20,17 @@ import currexx.domain.signal.Indicator
   * fold, so a rotation costs a geometric mean over a shorter list and an elite that survives twenty generations is still backtested once.
   * `EvaluationPhase.Rescore` counts every fold, which is what makes the figure a run finally reports comparable with another run's.
   */
-final class FoldRotatingEvaluator[F[_]: Functor](
+final class FoldRotatingEvaluator[F[_]: MonadThrow](
     foldScores: Indicator => F[List[Double]],
-    foldCount: Int
+    foldCount: Int,
+    canonicalise: Indicator => Either[Throwable, Indicator] = indicator => Right(indicator)
 ) extends Evaluator[F, Indicator]:
 
   override def evaluateIndividual(indicator: Indicator, phase: EvaluationPhase): F[(Indicator, Fitness)] =
-    foldScores(indicator).map { scores =>
-      indicator -> Fitness(IndicatorObjective.FoldAggregation.combineExcluding(scores, withheldFold(phase)))
+    MonadThrow[F].fromEither(canonicalise(indicator)).flatMap { candidate =>
+      foldScores(candidate).map { scores =>
+        candidate -> Fitness(IndicatorObjective.FoldAggregation.combineExcluding(scores, withheldFold(phase)))
+      }
     }
 
   /** Which fold this phase does not get to count, if any. */
@@ -39,13 +43,14 @@ final class FoldRotatingEvaluator[F[_]: Functor](
 
 object FoldRotatingEvaluator:
 
-  /** Cache only each fold's score: retaining OrderStats would keep every candidate's trades and equity curves for the entire search.
-    * Score a fold before starting the next one so completed folds' histories can also be collected while a candidate is still running.
+  /** Cache only each fold's score: retaining OrderStats would keep every candidate's trades and equity curves for the entire search. Score
+    * a fold before starting the next one so completed folds' histories can also be collected while a candidate is still running.
     */
   def cached[F[_]: Concurrent](
       backtests: List[Indicator => F[List[OrderStats]]],
-      scoringFunction: ScoringFunction
+      scoringFunction: ScoringFunction,
+      canonicalise: Indicator => Either[Throwable, Indicator] = indicator => Right(indicator)
   ): F[FoldRotatingEvaluator[F]] =
     memoize[F, Indicator, List[Double]] { indicator =>
       backtests.traverse(backtest => backtest(indicator).map(scoringFunction.score))
-    }.map(scores => FoldRotatingEvaluator(scores, backtests.size))
+    }.map(scores => FoldRotatingEvaluator(scores, backtests.size, canonicalise))

@@ -3,8 +3,8 @@ package currexx.backtest.optimizer
 import cats.effect.{Deferred, IO, Ref}
 import cats.syntax.all.*
 import currexx.algorithms.EvaluationPhase
-import currexx.backtest.OrderStats
-import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation}
+import currexx.backtest.{OrderStats, TestStrategy}
+import currexx.domain.signal.{Indicator, ValueRole, ValueSource, ValueTransformation}
 import kirill5k.common.cats.test.IOWordSpec
 
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -32,8 +32,8 @@ class FoldRotatingEvaluatorSpec extends IOWordSpec {
 
     "preserve the rotating search and full rescore fitness from unequal fold scores" in {
       val backtests = scores.map(score => (_: Indicator) => IO.pure(stats(score)))
-      val phases   = List.tabulate(4)(EvaluationPhase.Search(_)) :+ EvaluationPhase.Rescore
-      val result = for
+      val phases    = List.tabulate(4)(EvaluationPhase.Search(_)) :+ EvaluationPhase.Rescore
+      val result    = for
         evaluator <- FoldRotatingEvaluator.cached[IO](backtests, scoring())
         evaluated <- phases.traverse(evaluator.evaluateIndividual(indicator, _))
       yield evaluated
@@ -56,13 +56,13 @@ class FoldRotatingEvaluatorSpec extends IOWordSpec {
 
     "backtest and score each fold once per distinct candidate across all phases" in {
       val scoreCalls = new AtomicInteger(0)
-      val result = for
+      val result     = for
         calls <- Ref.of[IO, List[(Indicator, Int)]](Nil)
         backtests = scores.zipWithIndex.map { case (score, fold) =>
           (candidate: Indicator) => calls.update(_ :+ (candidate -> fold)).as(stats(score))
         }
-        evaluator <- FoldRotatingEvaluator.cached[IO](backtests, scoring(_ => { scoreCalls.incrementAndGet(); () }))
-        _ <- List(indicator, other, indicator, other).traverse_ { candidate =>
+        evaluator <- FoldRotatingEvaluator.cached[IO](backtests, scoring { _ => scoreCalls.incrementAndGet(); () })
+        _         <- List(indicator, other, indicator, other).traverse_ { candidate =>
           List(EvaluationPhase.Search(0), EvaluationPhase.Search(2), EvaluationPhase.Rescore)
             .traverse_(evaluator.evaluateIndividual(candidate, _))
         }
@@ -99,16 +99,77 @@ class FoldRotatingEvaluatorSpec extends IOWordSpec {
       }
     }
 
-    "reduce each fold to its score before starting the next backtest" in {
-      val events = new ConcurrentLinkedQueue[String]()
-      val backtests = scores.zipWithIndex.map { case (score, fold) =>
-        (_: Indicator) => IO {
-          events.add(s"backtest $fold")
-          List(OrderStats(total = fold, totalProfit = BigDecimal(score)))
-        }
-      }
-      val foldScoring = scoring(foldStats => { events.add(s"score ${foldStats.head.total}"); () })
+    "share fold scores and return the canonical candidate when only a fixed tracker differs" in {
+      val strategy = TestStrategy.s5_optimized_v2
+      val alias    = strategy.indicator match
+        case Indicator.Composite(children, combinator) =>
+          Indicator.Composite(
+            children.map {
+              case Indicator.ValueTracking(ValueRole.Momentum, source, _) =>
+                Indicator.ValueTracking(ValueRole.Momentum, source, ValueTransformation.RSX(40))
+              case child => child
+            },
+            combinator
+          )
+        case _ => fail("Expected s5 to be a composite")
+
       val result = for
+        space <- IO.fromEither(IndicatorSearchSpace.forStrategy(strategy))
+        calls <- Ref.of[IO, List[Indicator]](Nil)
+        backtests = scores.map(score => (candidate: Indicator) => calls.update(_ :+ candidate).as(stats(score)))
+        evaluator <- FoldRotatingEvaluator.cached[IO](backtests, scoring(), space.canonicalise)
+        first     <- evaluator.evaluateIndividual(alias, EvaluationPhase.Search(0))
+        second    <- evaluator.evaluateIndividual(strategy.indicator, EvaluationPhase.Rescore)
+        recorded  <- calls.get
+      yield (first, second, recorded)
+
+      result.asserting { case (first, second, recorded) =>
+        alias must not be strategy.indicator
+        first._1 mustBe strategy.indicator
+        second._1 mustBe strategy.indicator
+        recorded mustBe List.fill(scores.size)(strategy.indicator)
+      }
+    }
+
+    "return a failed effect for an incompatible schema without backtesting or scoring it" in {
+      val scoreCalls = new AtomicInteger(0)
+      val result     = for
+        space <- IO.fromEither(IndicatorSearchSpace.forStrategy(TestStrategy.s10))
+        calls <- Ref.of[IO, List[Indicator]](Nil)
+        backtests = scores.map(score => (candidate: Indicator) => calls.update(_ :+ candidate).as(stats(score)))
+        evaluator <- FoldRotatingEvaluator.cached[IO](backtests, scoring { _ => scoreCalls.incrementAndGet(); () }, space.canonicalise)
+        // Build the effects before attempting them: a synchronous exception must fail this test, rather than count as the expected Left.
+        effects <- IO {
+          List(
+            evaluator.evaluateIndividual(indicator, EvaluationPhase.Search(0)),
+            evaluator.evaluateIndividual(indicator, EvaluationPhase.Rescore)
+          )
+        }
+        failures <- effects.traverse(_.attempt)
+        recorded <- calls.get
+      yield (failures, recorded)
+
+      result.asserting { case (failures, recorded) =>
+        failures.foreach {
+          case Left(error: IllegalArgumentException) => error.getMessage mustBe "Indicator does not match this round's search-space schema"
+          case other                                 => fail(s"Expected an effect containing a schema failure, got $other")
+        }
+        recorded mustBe Nil
+        scoreCalls.get() mustBe 0
+      }
+    }
+
+    "reduce each fold to its score before starting the next backtest" in {
+      val events    = new ConcurrentLinkedQueue[String]()
+      val backtests = scores.zipWithIndex.map { case (score, fold) =>
+        (_: Indicator) =>
+          IO {
+            events.add(s"backtest $fold")
+            List(OrderStats(total = fold, totalProfit = BigDecimal(score)))
+          }
+      }
+      val foldScoring = scoring { foldStats => events.add(s"score ${foldStats.head.total}"); () }
+      val result      = for
         evaluator <- FoldRotatingEvaluator.cached[IO](backtests, foldScoring)
         _         <- evaluator.evaluateIndividual(indicator, EvaluationPhase.Search(0))
         _         <- evaluator.evaluateIndividual(indicator, EvaluationPhase.Rescore)
@@ -121,12 +182,13 @@ class FoldRotatingEvaluatorSpec extends IOWordSpec {
 
     "retry a failed candidate and cache its successful fold scores" in {
       val failure = new RuntimeException("temporary backtest failure")
-      val result = for
+      val result  = for
         calls <- Ref.of[IO, Int](0)
-        backtest = (_: Indicator) => calls.getAndUpdate(_ + 1).flatMap {
-          case 0 => IO.raiseError[List[OrderStats]](failure)
-          case _ => IO.pure(stats(0.5))
-        }
+        backtest = (_: Indicator) =>
+          calls.getAndUpdate(_ + 1).flatMap {
+            case 0 => IO.raiseError[List[OrderStats]](failure)
+            case _ => IO.pure(stats(0.5))
+          }
         evaluator <- FoldRotatingEvaluator.cached[IO](List(backtest), scoring())
         failed    <- evaluator.evaluateIndividual(indicator, EvaluationPhase.Search(0)).attempt
         retried   <- evaluator.evaluateIndividual(indicator, EvaluationPhase.Search(1))

@@ -7,10 +7,9 @@ import currexx.algorithms.operators.{Elitism, Selector, Validator}
 import currexx.algorithms.progress.Tracker
 import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.optimizer.{
-  IndicatorCrossover,
-  IndicatorInitialiser,
-  IndicatorMutator,
   IndicatorObjective,
+  IndicatorSearchOperators,
+  IndicatorSearchSpace,
   OptimisationAlgorithm,
   ScoringFunction
 }
@@ -30,9 +29,13 @@ final case class OptimisationRound(
       * The catalogue is a record of what has already scored well under these rules, and starting from several points known to work costs
       * nothing over starting from one. Both mixes use them: a shuffled round leans on them heavily, having thrown everything else away, and
       * an unshuffled one keeps enough of them to have something worth crossing its seed with. Only shapes that can be crossed with the
-      * target are usable - `IndicatorInitialiser` drops the rest rather than letting a structural mismatch fail the run mid-flight.
+      * target are usable. The round's search space filters incompatible schemas and restores fixed values before mixing seeds.
       */
-    extraSeeds: List[Indicator] = Nil
+    extraSeeds: List[Indicator] = Nil,
+    /** Additional indicators or composite subtrees to keep at their target values. All identical occurrences are fixed; values absent from
+      * the strategy produce a validation error. Raw-close identity inputs and value trackers unused by these rules are fixed automatically.
+      */
+    fixedIndicators: Set[Indicator] = Set.empty
 )
 
 object Optimiser extends IOApp.Simple {
@@ -140,17 +143,17 @@ object Optimiser extends IOApp.Simple {
   override def run: IO[Unit] =
     rounds.traverse_ { round =>
       for
-        init  <- IndicatorInitialiser.seeded[IO](round.extraSeeds)
-        cross <- IndicatorCrossover.make[IO]
-        mut   <- IndicatorMutator.make[IO]
-        sel   <- Selector.tournament[IO, Indicator]
-        elit  <- Elitism.simple[IO, Indicator]
-        obj   <- IndicatorObjective.make[IO](
+        space  <- IO.fromEither(IndicatorSearchSpace.forStrategy(round.strategy, round.fixedIndicators))
+        search <- IndicatorSearchOperators.make[IO](space, round.extraSeeds)
+        sel    <- Selector.tournament[IO, Indicator]
+        elit   <- Elitism.simple[IO, Indicator]
+        obj    <- IndicatorObjective.make[IO](
           corpus = round.corpus,
           strategy = round.strategy.rules,
           poolSize = evaluatorPoolSize,
           shortlistSize = round.shortlistSize,
-          scoringFunction = round.scoringFunction
+          scoringFunction = round.scoringFunction,
+          searchSpace = Some(space)
         )
         markDownProg <- Tracker.markdown[IO, Indicator](
           label = round.name,
@@ -170,8 +173,16 @@ object Optimiser extends IOApp.Simple {
         )
         prog = Tracker.composite(markDownProg, loggingProg)
         finalPop <- OptimisationAlgorithm
-          .ga[IO, Indicator](init, cross, mut, obj.evaluator, obj.validator, sel, elit, prog)
+          .ga[IO, Indicator](search.initialiser, search.crossover, search.mutator, obj.evaluator, obj.validator, sel, elit, prog)
           .optimise(round.strategy.indicator, round.gaParameters)
+        _ <- prog.displayNote(
+          "Search space",
+          List(
+            "Indicator structure, sources and roles are fixed; only searchable numeric parameters can evolve.",
+            "Raw-close identity inputs and value trackers unused by the rules are pinned to the target, alongside explicit fixed subtrees."
+          ) ++ (if (space.fixedIndicators.isEmpty) List("No fixed indicators.")
+                else space.fixedIndicators.toList.map(indicator => s"Fixed: $indicator").sorted)
+        )
         _ <- reportChampion(round, obj.validate, prog, finalPop)
       yield ()
     }

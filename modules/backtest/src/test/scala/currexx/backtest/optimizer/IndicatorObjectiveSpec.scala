@@ -1,10 +1,17 @@
 package currexx.backtest.optimizer
 
 import cats.effect.IO
-import currexx.algorithms.EvaluationPhase
+import cats.syntax.all.*
+import currexx.algorithms.{EvaluationPhase, Fitness}
 import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.{MarketDataProvider, TestStrategy}
+import currexx.core.signal.{Signal, SignalDetector}
+import currexx.domain.market.MarketTimeSeriesData
+import currexx.domain.signal.{Indicator, ValueRole, ValueSource, ValueTransformation}
+import currexx.domain.user.UserId
 import kirill5k.common.cats.test.IOWordSpec
+
+import java.util.concurrent.atomic.AtomicInteger
 
 class IndicatorObjectiveSpec extends IOWordSpec {
 
@@ -93,6 +100,102 @@ class IndicatorObjectiveSpec extends IOWordSpec {
       result.asserting { case (trained, validated) =>
         validated must have size 1
         trained.map(_.to).max.isBefore(validated.head.from) mustBe true
+      }
+    }
+
+    "canonicalise before shortlisting and replay the same constrained strategy" in {
+      val target = TestStrategy.s5_optimized_v2
+      val alias  = target.indicator match
+        case Indicator.Composite(children, combinator) =>
+          Indicator.Composite(
+            children.map {
+              case Indicator.ValueTracking(ValueRole.Momentum, source, _) =>
+                Indicator.ValueTracking(ValueRole.Momentum, source, ValueTransformation.RSX(40))
+              case child => child
+            },
+            combinator
+          )
+        case _ => fail("Expected s5 to be a composite")
+      val alternative = target.indicator match
+        case Indicator.Composite(children, combinator) =>
+          Indicator.Composite(
+            children.map {
+              case Indicator.ThresholdCrossing(source, transformation, _, lower) =>
+                Indicator.ThresholdCrossing(source, transformation, 70.0, lower)
+              case child => child
+            },
+            combinator
+          )
+        case _ => fail("Expected s5 to be a composite")
+
+      val result = for
+        space     <- IO.fromEither(IndicatorSearchSpace.forStrategy(target))
+        objective <- IndicatorObjective.make[IO](
+          corpus = corpus.copy(searchFolds = corpus.searchFolds.take(1)),
+          strategy = target.rules,
+          poolSize = 1,
+          shortlistSize = 2,
+          scoringFunction = scoring,
+          searchSpace = Some(space)
+        )
+        finalists <- objective.validator.validate(
+          Vector(alias -> Fitness(3.0), target.indicator -> Fitness(2.0), alternative -> Fitness(1.0))
+        )
+        evaluated <- objective.evaluator.evaluateIndividual(alias, EvaluationPhase.Rescore)
+        replayed  <- objective.backtest(alias)
+        validated <- objective.validate(alias)
+      yield (finalists, evaluated, replayed.map(scoring.score), scoring.score(validated))
+
+      result.asserting { case (finalists, evaluated, replayed, validationScore) =>
+        alias must not be target.indicator
+        alternative must not be target.indicator
+        finalists.map(_._1).toSet mustBe Set(target.indicator, alternative)
+        evaluated._1 mustBe target.indicator
+        evaluated._2.value mustBe IndicatorObjective.FoldAggregation.combine(replayed)
+        finalists.find(_._1 == target.indicator).map(_._3.value) mustBe Some(validationScore)
+      }
+    }
+
+    "return schema failures through every effectful entry point before starting candidate backtests" in {
+      val target      = TestStrategy.s5_optimized_v2
+      val invalid     = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SMA(20))
+      val signalCalls = new AtomicInteger(0)
+      val detector    = new SignalDetector {
+        override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal] = {
+          signalCalls.incrementAndGet()
+          None
+        }
+      }
+
+      val result = for
+        space     <- IO.fromEither(IndicatorSearchSpace.forStrategy(target))
+        objective <- IndicatorObjective.make[IO](
+          corpus = corpus.copy(searchFolds = corpus.searchFolds.take(1)),
+          strategy = target.rules,
+          poolSize = 1,
+          shortlistSize = 1,
+          signalDetector = detector,
+          scoringFunction = scoring,
+          searchSpace = Some(space)
+        )
+        // Construction must succeed; only running each returned effect may fail with the schema error.
+        effects <- IO {
+          List(
+            objective.evaluator.evaluateIndividual(invalid, EvaluationPhase.Rescore).void,
+            objective.backtest(invalid).void,
+            objective.validate(invalid).void,
+            objective.validator.validate(Vector(target.indicator -> Fitness(2.0), invalid -> Fitness(1.0))).void
+          )
+        }
+        failures <- effects.traverse(_.attempt)
+      yield failures
+
+      result.asserting { failures =>
+        failures.foreach {
+          case Left(error: IllegalArgumentException) => error.getMessage mustBe "Indicator does not match this round's search-space schema"
+          case other                                 => fail(s"Expected an effect containing a schema failure, got $other")
+        }
+        signalCalls.get() mustBe 0
       }
     }
   }

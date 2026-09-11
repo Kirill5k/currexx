@@ -7,7 +7,7 @@ import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import currexx.algorithms.operators.{Evaluator, Validator}
-import currexx.algorithms.Fitness
+import currexx.algorithms.{EvaluatedPopulation, Fitness, ValidatedPopulation}
 import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.services.TestServicesPool
 import currexx.backtest.{MarketDataProvider, OrderStats, TestSettings}
@@ -93,7 +93,8 @@ object IndicatorObjective {
       shortlistSize: Int,
       otherIndicators: List[Indicator] = Nil,
       signalDetector: SignalDetector = SignalDetector.pure,
-      scoringFunction: ScoringFunction = ScoringFunction.Robust()
+      scoringFunction: ScoringFunction = ScoringFunction.Robust(),
+      searchSpace: Option[IndicatorSearchSpace] = None
   ): F[Operators[F]] =
     for
       folds      <- corpus.searchFolds.traverse(_.parTraverse(MarketDataProvider.read[F](_).compile.toList))
@@ -102,14 +103,23 @@ object IndicatorObjective {
       pool <- TestServicesPool.make[F](initialSettings, poolSize)
       // Sequential across folds and parallel within one, so that widening the corpus by a fold cannot widen how many
       // backtests contend for the pool: a fold is the same six-pair run the pool was already sized for.
-      perFold  = folds.map(fold => backtestOver[F](pool, fold, strategy, otherIndicators, signalDetector))
-      backtest = (indicator: Indicator) => perFold.traverse(_(indicator))
-      validate = backtestOver[F](pool, validation, strategy, otherIndicators, signalDetector)
+      canonicalise = (indicator: Indicator) => searchSpace.fold[Either[Throwable, Indicator]](Right(indicator))(_.canonicalise(indicator))
+      perFold      = folds.map(fold => backtestOver[F](pool, fold, strategy, otherIndicators, signalDetector))
+      backtest     = (indicator: Indicator) => Async[F].fromEither(canonicalise(indicator)).flatMap(ind => perFold.traverse(_(ind)))
+      validationBacktest = backtestOver[F](pool, validation, strategy, otherIndicators, signalDetector)
+      validate           = (indicator: Indicator) => Async[F].fromEither(canonicalise(indicator)).flatMap(validationBacktest)
       // Per-fold scores do not depend on the phase, so they can be cached without retaining full backtest histories or tying an elite's
       // aggregate fitness to the generation it was first evaluated in. Full results remain available through the uncached backtest.
-      evaluator <- FoldRotatingEvaluator.cached[F](perFold, scoringFunction)
+      evaluator <- FoldRotatingEvaluator.cached[F](perFold, scoringFunction, canonicalise)
       validator <- Validator.shortlisted[F, Indicator](shortlistSize)(ind => validate(ind).map(res => Fitness(scoringFunction.score(res))))
-    yield Operators(evaluator, validator, backtest, validate)
+      // Canonicalise before the generic validator deduplicates and truncates, so fixed-only differences cannot consume shortlist slots.
+      scopedValidator = new Validator[F, Indicator] {
+        override def validate(population: EvaluatedPopulation[Indicator]): F[ValidatedPopulation[Indicator]] =
+          Async[F]
+            .fromEither(population.map { case (ind, fitness) => canonicalise(ind).map(_ -> fitness) }.sequence)
+            .flatMap(validator.validate)
+      }
+    yield Operators(evaluator, scopedValidator, backtest, validate)
 
   private def backtestOver[F[_]: {Async, Parallel}](
       pool: TestServicesPool[F],
