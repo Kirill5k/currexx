@@ -10,7 +10,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 object BatchBacktester extends IOApp.Simple {
   inline given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
-  /** The vals worth the runtime, ordered by holdout net.
+  /** The vals worth the runtime, including research candidates, with selection history recorded on each val.
     *
     * Not all of `TestStrategy`, which keeps every val a decision was ever based on so that a report filename still resolves to something. A
     * val is dropped from here once a descendant dominates it on the holdout, or once its family has been answered - measuring it again only
@@ -20,6 +20,7 @@ object BatchBacktester extends IOApp.Simple {
     "s2_optimized_v4" -> TestStrategy.s2_optimized_v4,
     "s2_optimized_v3" -> TestStrategy.s2_optimized_v3,
     "s2_optimized"    -> TestStrategy.s2_optimized,
+    "s10_v2"          -> TestStrategy.s10_v2,
     "s5_optimized_v2" -> TestStrategy.s5_optimized_v2,
     "s5_optimized_v3" -> TestStrategy.s5_optimized_v3,
     "s1_v2_optimized" -> TestStrategy.s1_v2_optimized,
@@ -62,13 +63,13 @@ object BatchBacktester extends IOApp.Simple {
   /** The searched years separately as well as pooled, because the pooled figure hides which of them paid for the other.
     *
     * A val that nets +6000 over the two might have earned +7600 in one and lost -1600 in the other, and a single number cannot show that -
-    * see the note in `TestStrategy` on what the 2023-24 year separates. The holdout is last and is the column to read.
+    * see the note in `TestStrategy` on what the 2023-24 year separates. The later evaluation is last; s10_v2 has reused it for development.
     */
   override val run: IO[Unit] = List(
-    "searched 2023-07..2024-06 (12 months, in sample)"    -> MarketDataProvider.majors1h_202307_202406,
-    "searched 2024-07..2025-07 (12 months, in sample)"    -> MarketDataProvider.majors1h,
-    "searched 2023-07..2025-07 (24 months, in sample)"    -> MarketDataProvider.majors1hSearched,
-    "holdout 2025-12..2026-06 (7 months, never selected)" -> MarketDataProvider.majors1hHoldout
+    "searched 2023-07..2024-06 (12 months, in sample)"                      -> MarketDataProvider.majors1h_202307_202406,
+    "searched 2024-07..2025-07 (12 months, in sample)"                      -> MarketDataProvider.majors1h,
+    "searched 2023-07..2025-07 (24 months, in sample)"                      -> MarketDataProvider.majors1hSearched,
+    "historical 2025-12..2026-06 (7 months, reused for s10_v2 development)" -> MarketDataProvider.majors1hHoldout
   ).foldLeft(IO.pure(List.empty[String])) { case (acc, (label, datasets)) =>
     acc.flatMap { sections =>
       strategies

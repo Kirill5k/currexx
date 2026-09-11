@@ -68,7 +68,9 @@ object Optimiser extends IOApp.Simple {
     * both September promotions (`s2_optimized_v4`, `s5_optimized_v3`) arrived that way with a validation figure of 0.000000.
     *
     * Ordered by holdout net, best first, because a full pass is long enough to be interrupted routinely and this way the rounds most worth
-    * having are the ones already done when it is.
+    * having are the ones already done when it is. s10_v2 is an explicitly requested research seed: its later evaluation period was reused
+    * during manual development, so its historical net is not independent validation. Its rounds retain the standard search/validation
+    * corpus.
     */
   val rounds: List[OptimisationRound] = List(
     OptimisationRound(
@@ -84,6 +86,18 @@ object Optimiser extends IOApp.Simple {
       gaParameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring,
       extraSeeds = List(TestStrategy.s2_optimized_v3.indicator, TestStrategy.s2_optimized.indicator)
+    ),
+    OptimisationRound(
+      name = "s10",
+      strategy = TestStrategy.s10,
+      gaParameters = gaParameters,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s10_shuffle",
+      strategy = TestStrategy.s10,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s5_optimized_v2",

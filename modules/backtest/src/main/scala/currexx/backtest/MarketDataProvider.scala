@@ -101,8 +101,8 @@ object MarketDataProvider:
   /** The whole of the newest export, 2025-07 to 2026-06.
     *
     * Not the test set, despite reading like one: `majors1hValidationFold` is carved out of it, so four of these twelve months are what
-    * every champion's finalist ranking selected on. Measuring here mixes those four months in with the eight nobody has touched and reports
-    * the blend as out-of-sample. `majors1hHoldout` is the part that is actually untouched, and is what reporting should use.
+    * every champion's finalist ranking selected on. Measuring here mixes selection and evaluation months and reports the blend as
+    * out-of-sample. `majors1hHoldout` isolates the originally reserved evaluation period; s10_v2 has now reused it for manual development.
     */
   val majors1h_202507_202606: List[Dataset] = majorFiles1h_202507_202606.map(Dataset(_))
 
@@ -166,7 +166,8 @@ object MarketDataProvider:
     *
     * The folds and the validation segment are both spent by the time a round finishes, so neither can say whether the champion generalises.
     * This is what is left to say it, and it says it once: measuring a strategy here is fine, choosing between strategies here is selection,
-    * and there is no more data to check that against.
+    * and there is no more data to check that against. The manual s10_v2 follow-up did reuse this period for selection; its reports label it
+    * historical development data, not a fresh holdout.
     */
   val majors1hHoldout: List[Dataset] =
     majorFiles1h_202507_202606.map(f => Dataset(f, Some(DateRange(YearMonth.of(2025, 12), YearMonth.of(2026, 7)))))
