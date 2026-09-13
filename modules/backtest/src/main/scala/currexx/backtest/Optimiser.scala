@@ -59,21 +59,12 @@ object Optimiser extends IOApp.Simple {
 
   val consistentScoring: ScoringFunction = ScoringFunction.Consistent()
 
-  /** The holdout leaders the catalogue still spends GA budget on, each searched twice — file order, then shuffled.
+  /** Strategy families searched with both refining and exploring starting populations. `shuffle` changes the population mix, not the order
+    * of market data. Each round evaluates its own strategy's rules; extra seeds contribute indicator parameters only.
     *
-    * A round earns its place by being the best of its family on the holdout and by having somewhere left to go. That rules out a val a
-    * descendant already beats, because searching from the weaker seed mostly rediscovers the stronger one; a family whose problem is its
-    * rules rather than its parameters, which no amount of indicator search will fix; and a val whose parameters came from a hand grid that
-    * the GA has already failed to improve on. Everything dropped for one of those reasons stays in `TestStrategy` and can come back as an
-    * `extraSeeds` entry, which costs nothing.
-    *
-    * Both twins run because the shuffled one keeps earning it: it surfaces training-fitness leaders that validation ranking misses, and
-    * both September promotions (`s2_optimized_v4`, `s5_optimized_v3`) arrived that way with a validation figure of 0.000000.
-    *
-    * Ordered by holdout net, best first, because a full pass is long enough to be interrupted routinely and this way the rounds most worth
-    * having are the ones already done when it is. s10_v2 is an explicitly requested research seed: its later evaluation period was reused
-    * during manual development, so its historical net is not independent validation. Its rounds retain the standard search/validation
-    * corpus.
+    * s10_v2, s6 and s1_v2 have different entry or exit rules from the existing families, so they need their own rounds. s10_v2 reused the
+    * later evaluation period during manual development; its historical results are not independent validation. All rounds retain the
+    * standard search/validation corpus.
     */
   val rounds: List[OptimisationRound] = List(
     OptimisationRound(
@@ -99,6 +90,18 @@ object Optimiser extends IOApp.Simple {
     OptimisationRound(
       name = "s10_shuffle",
       strategy = TestStrategy.s10,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s10_v2",
+      strategy = TestStrategy.s10_v2,
+      gaParameters = gaParameters,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s10_v2_shuffle",
+      strategy = TestStrategy.s10_v2,
       gaParameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring
     ),
@@ -137,6 +140,32 @@ object Optimiser extends IOApp.Simple {
       gaParameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring,
       extraSeeds = List(TestStrategy.s4_optimized_v1.indicator, TestStrategy.s4_optimized_v3.indicator)
+    ),
+    OptimisationRound(
+      name = "s6_optimized",
+      strategy = TestStrategy.s6_optimized,
+      gaParameters = gaParameters,
+      scoringFunction = consistentScoring,
+      extraSeeds = List(TestStrategy.s6.indicator)
+    ),
+    OptimisationRound(
+      name = "s6_optimized_shuffle",
+      strategy = TestStrategy.s6_optimized,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring,
+      extraSeeds = List(TestStrategy.s6.indicator)
+    ),
+    OptimisationRound(
+      name = "s1_v2_optimized",
+      strategy = TestStrategy.s1_v2_optimized,
+      gaParameters = gaParameters,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s1_v2_optimized_shuffle",
+      strategy = TestStrategy.s1_v2_optimized,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring
     )
   )
 
