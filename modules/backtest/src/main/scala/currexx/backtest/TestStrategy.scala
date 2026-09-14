@@ -406,78 +406,6 @@ object TestStrategy {
     )
   )
   
-  // GA-optimized indicator params for s4_optimized (rules unchanged). Champion from
-  // ga-optimisation-2026-08-03-1820-s4_optimized.md (training 1.658671 -> validation 1.675786).
-  // Satisfies every constraint on validation data.
-  // Not in BatchBacktester. Holdout net (623) dominated by s4_optimized_v2 (1080).
-  // searched 2023-07..2025-07: net=3435.55301, closed=467, forced=4, win=69.59%, exp=7.356645, PF=1.621, DD=0.54%, Sharpe=1.984
-  // holdout 2025-12..2026-06:  net=622.99662, closed=141, forced=1, win=73.76%, exp=4.418416, PF=1.363, DD=0.49%, Sharpe=1.771
-  val s4_optimized_v1 = TestStrategy(
-    indicator = Indicator.compositeAnyOf(
-      Indicator.TrendChangeDetection(
-        source = ValueSource.HLC3,
-        transformation = ValueTransformation.JMA(length = 50, phase = -73, power = 1)
-      ),
-      Indicator.KeltnerChannel(
-        source = ValueSource.Close,
-        middleBand = ValueTransformation.EMA(length = 21),
-        atrLength = 10,
-        atrMultiplier = 2.4
-      ),
-      Indicator.ThresholdCrossing(
-        source = ValueSource.Close,
-        transformation = ValueTransformation.RSX(length = 11),
-        upperBoundary = 75.0,
-        lowerBoundary = 29.0
-      ),
-      Indicator.VolatilityRegimeDetection(
-        atrLength = 31,
-        smoothingType = ValueTransformation.SMA(length = 35)
-      )
-    ),
-    rules = TradeStrategy(
-      openRules = List(
-        Rule(
-          action = TradeAction.OpenLong,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.NoPosition,
-            Rule.Condition.trendIsUpward,
-            Rule.Condition.TrendActiveFor(1.hour),
-            Rule.Condition.volatilityIsLow,                   // Squeeze
-            Rule.Condition.UpperBandCrossed(Direction.Upward) // Breakout
-          )
-        ),
-        Rule(
-          action = TradeAction.OpenShort,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.NoPosition,
-            Rule.Condition.trendIsDownward,
-            Rule.Condition.TrendActiveFor(1.hour),
-            Rule.Condition.volatilityIsLow,
-            Rule.Condition.LowerBandCrossed(Direction.Downward)
-          )
-        )
-      ),
-      closeRules = List(
-        Rule(
-          action = TradeAction.ClosePosition,
-          conditions = Rule.Condition.anyOf(
-            Rule.Condition.TrendChangedTo(Direction.Downward),
-            Rule.Condition.TrendChangedTo(Direction.Upward),
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsBuy,
-              Rule.Condition.momentumEnteredOverbought
-            ),
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsSell,
-              Rule.Condition.momentumEnteredOversold
-            )
-          )
-        )
-      )
-    )
-  )
-
   // GA-optimized indicator params for s4_optimized_v1 (rules unchanged). Champion from
   // ga-optimisation-2026-08-24-2107-s4_optimized_v1_shuffle.md (training 1.057177 -> validation 0.485363, retaining 45.9%, shuffled GA).
   // BREACHES 1 constraint(s) on validation data:
@@ -954,7 +882,7 @@ object TestStrategy {
   // Not in BatchBacktester. Holdout net (637) dominated by s4_optimized_v2 (1080).
   // searched 2023-07..2025-07: net=3631.17661, closed=599, forced=3, win=72.29%, exp=6.062064, PF=1.559, DD=0.41%, Sharpe=2.082
   // holdout 2025-12..2026-06:  net=637.50743, closed=161, forced=2, win=73.29%, exp=3.959673, PF=1.339, DD=0.89%, Sharpe=1.053
-  val s4_optimized_v3 = TestStrategy(
+  val s4_optimized_v1 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.TrendChangeDetection(
         source = ValueSource.HLC3,

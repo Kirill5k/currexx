@@ -132,14 +132,14 @@ object Optimiser extends IOApp.Simple {
       strategy = TestStrategy.s4_optimized_v2,
       gaParameters = gaParameters,
       scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s4_optimized_v1.indicator, TestStrategy.s4_optimized_v3.indicator)
+      extraSeeds = List(TestStrategy.s4_optimized_v1.indicator, TestStrategy.s4_optimized_v1.indicator)
     ),
     OptimisationRound(
       name = "s4_optimized_v2_shuffle",
       strategy = TestStrategy.s4_optimized_v2,
       gaParameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s4_optimized_v1.indicator, TestStrategy.s4_optimized_v3.indicator)
+      extraSeeds = List(TestStrategy.s4_optimized_v1.indicator, TestStrategy.s4_optimized_v1.indicator)
     ),
     OptimisationRound(
       name = "s6_optimized",
