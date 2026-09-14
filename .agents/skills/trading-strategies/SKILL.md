@@ -39,7 +39,7 @@ an earlier genetic-algorithm process; they are history, not a workflow to resume
 | Rules and their evaluation | `modules/core/src/main/scala/currexx/core/trade/TradeStrategy.scala` |
 | Rule → order, flip logic | `modules/core/src/main/scala/currexx/core/trade/TradeService.scala` |
 | Cost model and metrics | `modules/backtest/src/main/scala/currexx/backtest/OrderStatsCollector.scala` |
-| Sane parameter ranges | `modules/backtest/src/main/scala/currexx/backtest/optimizer/GeneBounds.scala`, `IndicatorBounds.scala`, `ThresholdBounds.scala` |
+| Sane parameter ranges | `modules/backtest/src/main/scala/currexx/backtest/optimizer/bounds/GeneBounds.scala`, `IndicatorBounds.scala`, `ThresholdBounds.scala` |
 
 ## Part 1 — How a strategy actually fires
 
