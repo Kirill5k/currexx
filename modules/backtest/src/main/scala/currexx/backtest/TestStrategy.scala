@@ -341,7 +341,7 @@ object TestStrategy {
       )
     )
   )
-  
+
   // GA-optimized indicator params for s2, which is no longer in this catalogue (rules unchanged). Champion from
   // ga-optimisation-2026-08-03-1755-s2.md (training 2.047228 -> validation 0.063279).
   // BREACHES 3 constraint(s) on validation data:
@@ -405,7 +405,7 @@ object TestStrategy {
       )
     )
   )
-  
+
   // GA-optimized indicator params for s4_optimized_v1 (rules unchanged). Champion from
   // ga-optimisation-2026-08-24-2107-s4_optimized_v1_shuffle.md (training 1.057177 -> validation 0.485363, retaining 45.9%, shuffled GA).
   // BREACHES 1 constraint(s) on validation data:
@@ -729,6 +729,122 @@ object TestStrategy {
     )
   )
 
+  // S13: Bollinger re-entry and trend-aligned squeeze breakout, confirmed by CMF direction and exited at an RSX extreme.
+  //
+  // CMF(22) replaces s6's price-only RSX direction and also confirms its breakout leg. A long needs rising CMF, a short falling CMF;
+  // this does not require a zero crossing or positive CMF for longs. Exit longs on RSX entering overbought, shorts on entering oversold.
+  // NoPosition prevents flips. There is no price stop or time cap; orders use the simulator's next-bar execution.
+  //
+  // Other parameters are inherited from s6 and held fixed. CMF lengths 16/18/20/22/24 all profit in both searched years; 22 improves
+  // both years over the initial 20 and has the strongest weaker-year net. Selection used only the searched years. The inherited 2.6
+  // Bollinger multiplier remains fitted, as documented on s6; CMF length is manually selected rather than independently validated.
+  // At CMF(22), removing the trend, squeeze, breakout, re-entry and RSX exit costs 1180, 2541, 1976, 4480 and 8502 searched net.
+  // CMF itself is mixed: -773 in the first year, +898 in the second versus removing its checks, just +126 combined on 96 fewer trades.
+  //
+  // Historical net modestly beats s6 (685 vs 560) and the earlier CMF strategy s12 (-79), but PF falls from 1.543 searched to 1.217
+  // historically. Net per month falls from 248 to 98. The final candidate was fixed before that later evaluation; the period had already
+  // been reused by s10_v2, so this is historical evidence, not a pristine holdout. No variants were selected on the later result.
+  // Both sides and 4/6 pairs profit historically, with 4/7 positive months. Removing the best five trades leaves +234; best ten leaves
+  // -153. GBPUSD supplies 89% of net and shorts 82%; two forced closures contribute just +0.10. Fails the historical trade floor
+  // (166 vs 210) and per-pair monthly concentration limit. Both searched years also miss the trade floor (319/299 vs 360 each).
+  // Retained as a research strategy. Requires meaningful volume: Oanda supplies it; current AlphaVantage/TwelveData clients do not.
+  // See docs/s13-volume-strategy-2026-09-14.md for all manual comparisons, ablations, diagnostics and selection caveats.
+  // searched 2023-07..2024-06: net=2924.61298, closed=319, forced=3, win=68.65%, exp=9.168066, PF=1.528, DD=1.56%, Sharpe=2.125
+  // searched 2023-07..2025-07: net=5951.97849, closed=618, forced=6, win=68.93%, exp=9.631033, PF=1.543, DD=1.17%, Sharpe=2.012
+  // historical 2025-12..2026-06: net=685.30228, closed=166, forced=2, win=65.06%, exp=4.128327, PF=1.217, DD=1.73%, Sharpe=0.978
+  val s13 = TestStrategy(
+    indicator = Indicator.compositeAnyOf(
+      // Regime: the slow trend the breakout leg has to agree with.
+      Indicator.TrendChangeDetection(
+        source = ValueSource.HLC3,
+        transformation = ValueTransformation.JMA(length = 90, phase = -6, power = 1)
+      ),
+      // The channel both entry legs read, as a breakout through it or a re-entry back into it.
+      Indicator.BollingerBands(
+        source = ValueSource.Close,
+        middleBand = ValueTransformation.SMA(length = 35),
+        stdDevLength = 41,
+        stdDevMultiplier = 2.6
+      ),
+      // Squeeze gates the breakout leg only.
+      Indicator.VolatilityRegimeDetection(
+        atrLength = 20,
+        smoothingType = ValueTransformation.SMA(length = 50)
+      ),
+      // RSX drives the momentum zone used for profit-taking.
+      Indicator.ThresholdCrossing(
+        source = ValueSource.Close,
+        transformation = ValueTransformation.RSX(length = 11),
+        upperBoundary = 66.0,
+        lowerBoundary = 30.0
+      ),
+      // Last: CMF owns the current momentum value on every bar; RSX owns only the momentum zone.
+      // MomentumIs compares consecutive CMF values, including bars on which RSX crosses a threshold.
+      Indicator.ValueTracking(
+        role = ValueRole.Momentum,
+        source = ValueSource.Close,
+        transformation = ValueTransformation.CMF(length = 22)
+      )
+    ),
+    rules = TradeStrategy(
+      openRules = List(
+        Rule(
+          action = TradeAction.OpenLong,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.anyOf(
+              // Squeeze resolving upward with the trend.
+              Rule.Condition.allOf(
+                Rule.Condition.trendIsUpward,
+                Rule.Condition.volatilityIsLow,
+                Rule.Condition.MomentumIs(Direction.Upward),
+                Rule.Condition.UpperBandCrossed(Direction.Upward)
+              ),
+              // Price back inside the channel from below, CMF rising.
+              Rule.Condition.allOf(
+                Rule.Condition.LowerBandCrossed(Direction.Upward),
+                Rule.Condition.MomentumIs(Direction.Upward)
+              )
+            )
+          )
+        ),
+        Rule(
+          action = TradeAction.OpenShort,
+          conditions = Rule.Condition.allOf(
+            Rule.Condition.NoPosition,
+            Rule.Condition.anyOf(
+              Rule.Condition.allOf(
+                Rule.Condition.trendIsDownward,
+                Rule.Condition.volatilityIsLow,
+                Rule.Condition.MomentumIs(Direction.Downward),
+                Rule.Condition.LowerBandCrossed(Direction.Downward)
+              ),
+              Rule.Condition.allOf(
+                Rule.Condition.UpperBandCrossed(Direction.Downward),
+                Rule.Condition.MomentumIs(Direction.Downward)
+              )
+            )
+          )
+        )
+      ),
+      closeRules = List(
+        Rule(
+          action = TradeAction.ClosePosition,
+          conditions = Rule.Condition.anyOf(
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsBuy,
+              Rule.Condition.momentumEnteredOverbought
+            ),
+            Rule.Condition.allOf(
+              Rule.Condition.positionIsSell,
+              Rule.Condition.momentumEnteredOversold
+            )
+          )
+        )
+      )
+    )
+  )
+
   // S12: CMF Trend Confirmation
   // Enter when CMF confirms trend direction — buying pressure aligns with uptrend, selling pressure with downtrend.
   // CMF threshold cross acts as the primary entry trigger; Ichimoku Kijun-Sen provides trend context.
@@ -742,7 +858,7 @@ object TestStrategy {
   // (5 of 6 majors profitable). The Parabolic SAR indicator was consequently removed as dead weight.
   // The W/L and total-profit figures above predate the current cost and risk model and are not comparable to the metrics below.
   //
-  // Kept for structural coverage: this is the only strategy in the catalogue that reads volume. It is flat to slightly negative on the
+  // Earlier CMF trend-confirmation design; s13 now uses volume with channel entries and RSX exits. This val is slightly negative on the
   // holdout (net -79, PF 0.976) — the best result of any s12 val, none of which makes money there. The 2026-08-25 rounds gave it the fresh
   // optimisation its transformation-aware threshold bounds called for; the answer was that s12 is searchable but not profitable.
   // Not in BatchBacktester. Negative holdout; needs rule redesign, not more GA.

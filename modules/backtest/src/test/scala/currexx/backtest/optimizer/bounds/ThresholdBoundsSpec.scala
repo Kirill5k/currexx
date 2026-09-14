@@ -1,7 +1,8 @@
-package currexx.backtest.optimizer
+package currexx.backtest.optimizer.bounds
 
 import cats.effect.IO
 import cats.syntax.traverse.*
+import currexx.backtest.optimizer.{IndicatorCrossover, IndicatorInitialiser, IndicatorMutator}
 import currexx.domain.signal.{Condition, Indicator, ValueSource, ValueTransformation}
 import kirill5k.common.cats.test.IOWordSpec
 

@@ -3,6 +3,7 @@ package currexx.backtest.optimizer
 import cats.effect.IO
 import cats.syntax.traverse.*
 import currexx.backtest.TestStrategy
+import currexx.backtest.optimizer.bounds.IndicatorBounds
 import currexx.domain.signal.{Indicator, ValueRole, ValueSource, ValueTransformation as VT}
 import kirill5k.common.cats.test.IOWordSpec
 

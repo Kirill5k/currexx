@@ -2,6 +2,7 @@ package currexx.backtest.optimizer
 
 import cats.effect.IO
 import cats.syntax.traverse.*
+import currexx.backtest.optimizer.bounds.GeneBounds
 import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation}
 import kirill5k.common.cats.test.IOWordSpec
 

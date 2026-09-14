@@ -5,6 +5,7 @@ import cats.syntax.traverse.*
 import cats.syntax.apply.*
 import cats.syntax.applicativeError.*
 import currexx.algorithms.operators.Crossover
+import currexx.backtest.optimizer.bounds.{GeneBounds, IndicatorBounds, ThresholdBounds}
 import currexx.domain.signal.{Indicator, ValueTransformation as VT}
 
 import scala.util.Random

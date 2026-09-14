@@ -1,6 +1,6 @@
-package currexx.backtest.optimizer
+package currexx.backtest.optimizer.bounds
 
-import currexx.backtest.optimizer.GeneBounds.{DoubleRange, IntRange}
+import currexx.backtest.optimizer.bounds.GeneBounds.{DoubleRange, IntRange}
 import currexx.domain.signal.{Indicator, ValueTransformation as VT}
 
 import scala.util.Random

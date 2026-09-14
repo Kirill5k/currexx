@@ -6,7 +6,8 @@ import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import currexx.algorithms.Population
 import currexx.algorithms.operators.Initialiser
-import currexx.backtest.optimizer.GeneBounds.{DoubleRange, IntRange}
+import currexx.backtest.optimizer.bounds.GeneBounds.{DoubleRange, IntRange}
+import currexx.backtest.optimizer.bounds.{GeneBounds, IndicatorBounds, ThresholdBounds}
 import currexx.domain.signal.{Indicator, ValueTransformation as VT}
 
 import scala.util.Random

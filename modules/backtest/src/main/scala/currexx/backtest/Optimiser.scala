@@ -62,9 +62,10 @@ object Optimiser extends IOApp.Simple {
   /** Strategy families searched with both refining and exploring starting populations. `shuffle` changes the population mix, not the order
     * of market data. Each round evaluates its own strategy's rules; extra seeds contribute indicator parameters only.
     *
-    * s10_v2, s6 and s1_v2 have different entry or exit rules from the existing families, so they need their own rounds. s10_v2 reused the
-    * later evaluation period during manual development; its historical results are not independent validation. All rounds retain the
-    * standard search/validation corpus.
+    * s10_v2, s6, s13 and s1_v2 have different entry or exit rules from the existing families, so they need their own rounds. s13 keeps CMF
+    * as its momentum value tracker and RSX as its exit-zone detector; the price-momentum families have incompatible seed schemas. s10_v2
+    * reused the later evaluation period during manual development; its historical results are not independent validation. All rounds retain
+    * the standard search/validation corpus.
     */
   val rounds: List[OptimisationRound] = List(
     OptimisationRound(
@@ -154,6 +155,18 @@ object Optimiser extends IOApp.Simple {
       gaParameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring,
       extraSeeds = List(TestStrategy.s6.indicator)
+    ),
+    OptimisationRound(
+      name = "s13",
+      strategy = TestStrategy.s13,
+      gaParameters = gaParameters,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s13_shuffle",
+      strategy = TestStrategy.s13,
+      gaParameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s1_v2_optimized",

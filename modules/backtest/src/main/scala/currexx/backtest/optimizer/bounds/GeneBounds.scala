@@ -1,4 +1,4 @@
-package currexx.backtest.optimizer
+package currexx.backtest.optimizer.bounds
 
 import currexx.domain.signal.ValueTransformation as VT
 

@@ -1,8 +1,9 @@
-package currexx.backtest.optimizer
+package currexx.backtest.optimizer.bounds
 
 import cats.effect.IO
 import cats.syntax.traverse.*
 import currexx.backtest.TestStrategy
+import currexx.backtest.optimizer.{IndicatorCrossover, IndicatorInitialiser, IndicatorMutator}
 import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation as VT}
 import kirill5k.common.cats.test.IOWordSpec
 
@@ -22,7 +23,8 @@ class IndicatorBoundsSpec extends IOWordSpec {
     "s5_optimized_v2" -> TestStrategy.s5_optimized_v2,
     "s6"              -> TestStrategy.s6,
     "s12"             -> TestStrategy.s12,
-    "s12_optimized"   -> TestStrategy.s12_optimized
+    "s12_optimized"   -> TestStrategy.s12_optimized,
+    "s13"             -> TestStrategy.s13
   ).map((name, strategy) => name -> strategy.indicator)
 
   "IndicatorBounds.repair" when {
