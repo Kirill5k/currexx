@@ -17,21 +17,26 @@ final case class TestStrategy(
   * Every val carries two metrics lines because one number cannot say whether a strategy works. `searched 2023-07..2025-07` is the two years
   * the GA folds cover, so for anything named `_optimized` it reports fit to the data that chose it and is not evidence of an edge. Older
   * comments call 2025-12..2026-06 the holdout. The s10_v2 follow-up reuses that period for development, explicitly labelled `historical`;
-  * its result is not independent validation. Where searched and evaluation results disagree sharply the strategy is fitted — the clearest
-  * case left here is s12_optimized, PF 1.400 in-sample against 0.809 out, on a corpus where its whole family loses money. `BatchBacktester`
-  * prints the two searched years separately as well as pooled; vals carry a `searched 2023-07..2024-06` line where the split matters to the
-  * decision.
+  * its result is not independent validation. Sharp disagreement between searched and later results can indicate fitting to the search data.
+  * An older example is s12_optimized, PF 1.400 in-sample against 0.809 out, on a corpus where its whole family loses money.
+  * `BatchBacktester` prints the two searched years separately as well as pooled; vals carry a `searched 2023-07..2024-06` line where the
+  * split matters to the decision.
   *
   * Read the later evaluation column across strategies, not as a forecast. Its net figures cover seven months against the searched column's
   * twenty-four, so they are not comparable to each other. Compare strategies within the same period and respect each val's selection
   * history; the s10_v2 result is fitted to the reused evaluation period.
+  *
+  * The 2026-09-14 batch measured 36 distinct report top #1 and training-fitness leaders. After comparison and cleanup, only
+  * s10_optimized_v7 survives, promoted into s10 and replacing the original definition. The other 35 candidates were deleted. See
+  * docs/ga-promotions-2026-09-14.md for all measurements and decisions, including the deleted candidates. Older comparative prose and
+  * metrics record their original promotion dates; current DD and Sharpe may differ as the statistics evolve.
   *
   * Not every val here is still measured. `BatchBacktester` holds the ones worth the runtime and is the list, rather than a copy of it kept
   * in this comment; a val it has dropped carries a `Not in BatchBacktester` line saying which val dominates it. The rest stay so that a
   * report filename still resolves to the thing it selected.
   *
   * `s4_optimized_v2` shows the anti-overfit pattern most clearly: its holdout profit factor beats its in-sample one. `s5_optimized_v2`
-  * leads the file on holdout profit factor and Sharpe, `s2_optimized_v4` on holdout net. Both of the September promotions
+  * leads the file on holdout profit factor and Sharpe, `s2_optimized_v4` on holdout net. The earlier September promotions
   * (`s2_optimized_v4`, `s5_optimized_v3`) were training-fitness leaders whose validation figure was 0.000000, which is the standing
   * reminder that validation ranking is a filter that rejects and not a scoreboard that ranks.
   *
@@ -47,14 +52,14 @@ object TestStrategy {
 
   // S10 v2: Require a band re-entry to coincide with RSX entering neutral; use the production s5 volatility regime.
   //
-  // Two changes to s10: replace re-entry momentum direction with MomentumEntered(Neutral), and replace the breakout squeeze
+  // Two changes to the original s10: replace re-entry momentum direction with MomentumEntered(Neutral), and replace the breakout squeeze
   // ATR(20)/SMA(50) with ATR(28)/SMA(63). Keep the slow trend, Bollinger bands, momentum profit-taking and four-current-ATR exit.
   // Neutral is a directionless zone transition; the band crossing supplies the trade direction. Breakout band/trend conditions are unchanged.
   // Price/ATR trackers refresh the profile; the unused RSX(8) value tracker is removed after exact completed-trade comparison.
   //
-  // Manual follow-up to the rejected s10. The user requested at least USD 1000 on its December-June comparison; that previously
+  // Manual follow-up to the rejected original s10. The user requested at least USD 1000 on its December-June comparison; that previously
   // viewed holdout was explicitly reused for development. These are fitted historical results, NOT new out-of-sample evidence.
-  // Confirmation alone: historical net 969.38; regime alone: 1125.42; both: 1613.32, versus s10's 527.10 at identical sizing.
+  // Confirmation alone: historical net 969.38; regime alone: 1125.42; both: 1613.32, versus the original s10's 527.10 at identical sizing.
   // Ten one-at-a-time perturbations (ATR 26/30, smoothing 58/68, stop 3/5, upper threshold 64/68, lower 28/32) remained profitable
   // in both searched years and returned 1169.47..1662.63 historically. Kept the original combined candidate rather than a local peak.
   // Both entry legs contribute: historical net falls to 938.68 without breakout or 638.27 without re-entry.
@@ -166,74 +171,41 @@ object TestStrategy {
     )
   )
 
-  // S10: Bollinger re-entry and squeeze breakout, with a four-ATR adverse-price exit alongside momentum profit-taking.
-  //
-  // s6's entries are unchanged: enter flat on a band re-entry confirmed by momentum, or a low-volatility breakout aligned with
-  // the slow trend. Close at the opposite momentum extreme, or when the signal-bar close is four current ATR(14) from entry
-  // against the position. ATR is recalculated each bar; this is a next-bar market exit, not a broker stop or a fixed loss cap.
-  //
-  // Manual development used only the two searched years, evaluated separately. At four ATR, removing each paired rule/filter
-  // changes pooled searched net from 5554.44 by: breakout -2532.36; re-entry -4244.97; trend filter -1087.73;
-  // squeeze -3296.16; re-entry momentum direction -1009.32; flat-only guard -1783.09; momentum exit -8200.38.
-  // Removing only the price exit (retaining both trackers) matches s6 and ADDS 1807.86 in sample.
-  //
-  // Stop distances 2, 3, 4 and 6 ATR were all profitable in each searched year; four had the strongest weaker-year PF in that
-  // coarse comparison. Kept the round value after checking 3.5/4.5 (net 5146.47/5992.69) and ATR lengths 10/20
-  // (net 5498.82/5527.09): no isolated peak. Both searched years pass every Consistent constraint at four ATR.
-  // Other parameters are inherited from s6, including its historically fitted Bollinger multiplier 2.6.
-  // Not in BatchBacktester. Rejected after its frozen holdout: s6 beats it on net (559.56 vs 527.10), PF (1.163 vs 1.115),
-  // and realized drawdown (1.26% vs 1.60%). All four production baselines also earn more. Holdout Consistent failures: PF < 1.2,
-  // profitable pair-months 52.3% < 55%; removing its best five trades leaves only 8.00. Both sides are profitable, but the edge is thin.
-  // Retained only to make the rejected experiment reproducible. No parameters were revised after viewing the holdout.
-  // See docs/new-strategy-s10-2026-09-10.md for all trials, costs, diagnostics and the final rejection.
-  // searched 2023-07..2024-06: net=2994.32829, closed=417, forced=4, win=62.35%, exp=7.180643, PF=1.381, DD=1.18%, Sharpe=2.259
-  // searched 2023-07..2025-07: net=5554.43990, closed=805, forced=8, win=63.35%, exp=6.899925, PF=1.354, DD=0.60%, Sharpe=2.281
-  // holdout 2025-12..2026-06:  net=527.09968, closed=219, forced=2, win=59.36%, exp=2.406848, PF=1.115, DD=1.60%, Sharpe=1.002
+  // S10: Bollinger re-entry and squeeze breakout, with momentum profit-taking and a four-current-ATR adverse-price exit.
+  // GA-optimized indicator params for the original s10 (rules unchanged). Training fitness leader from
+  // ga-optimisation-2026-09-11-2354-s10_shuffle.md
+  // training 0.743822 -> validation 0.000000, retaining 0.0%, shuffled GA.
+  // Final shortlist rank 3; training rank 1.
+  // The report records constraint breaches only for its top #1; this candidate has no recorded constraint verdict.
+  // Promoted from s10_optimized_v7 into s10 on 2026-09-14. The original s10 definition and development history are archived
+  // in docs/ga-promotions-2026-09-14.md. Both s10 Optimiser rounds now start from these parameters.
+  // Holdout net is higher than the original s10:
+  // 768.63383 vs 527.09968; PF 1.200 vs 1.115, DD 2.04% vs 1.78%, Sharpe 1.286 vs 1.050.
+  // Searched net moves the other way: 5398.63732 vs 5554.43990 for the original base.
+  // searched 2023-07..2024-06: net=2498.82688, closed=446, forced=2, win=66.82%, exp=5.602751, PF=1.397, DD=1.05%, Sharpe=2.223
+  // searched 2023-07..2025-07: net=5398.63732, closed=860, forced=6, win=67.33%, exp=6.277485, PF=1.448, DD=0.53%, Sharpe=2.600
+  // holdout 2025-12..2026-06:  net=768.63383, closed=236, forced=2, win=62.71%, exp=3.256923, PF=1.200, DD=2.04%, Sharpe=1.286
   val s10 = TestStrategy(
     indicator = Indicator.compositeAnyOf(
-      // Regime: the slow trend the breakout leg has to agree with.
-      Indicator.TrendChangeDetection(
-        source = ValueSource.HLC3,
-        transformation = ValueTransformation.JMA(length = 90, phase = -6, power = 1)
-      ),
-      // The channel both entry legs read, as a breakout through it or a re-entry back into it.
+      Indicator
+        .TrendChangeDetection(source = ValueSource.HLC3, transformation = ValueTransformation.JMA(length = 90, phase = 47, power = 1)),
       Indicator.BollingerBands(
         source = ValueSource.Close,
         middleBand = ValueTransformation.SMA(length = 35),
         stdDevLength = 41,
         stdDevMultiplier = 2.6
       ),
-      // Squeeze gates the breakout leg only.
-      Indicator.VolatilityRegimeDetection(
-        atrLength = 20,
-        smoothingType = ValueTransformation.SMA(length = 50)
-      ),
-      // ATR and the close independently supply the price-distance exit.
-      Indicator.ValueTracking(
-        role = ValueRole.Volatility,
-        source = ValueSource.Close,
-        transformation = ValueTransformation.ATR(length = 14)
-      ),
-      Indicator.ValueTracking(
-        role = ValueRole.Price,
-        source = ValueSource.Close,
-        // Identity transform: track the raw close, not a smoothed price for the loss exit.
-        transformation = ValueTransformation.SMA(length = 1)
-      ),
-      // Drives the momentum zone, and so the exit.
+      Indicator.VolatilityRegimeDetection(atrLength = 20, smoothingType = ValueTransformation.SMA(length = 45)),
+      Indicator
+        .ValueTracking(role = ValueRole.Volatility, source = ValueSource.Close, transformation = ValueTransformation.ATR(length = 11)),
+      Indicator.ValueTracking(role = ValueRole.Price, source = ValueSource.Close, transformation = ValueTransformation.SMA(length = 1)),
       Indicator.ThresholdCrossing(
         source = ValueSource.Close,
-        transformation = ValueTransformation.RSX(length = 11),
+        transformation = ValueTransformation.RSX(length = 9),
         upperBoundary = 66.0,
-        lowerBoundary = 30.0
+        lowerBoundary = 36.0
       ),
-      // Last, so this owns lastMomentumValue rather than the ThresholdCrossing above it, which only writes on a crossing.
-      // MomentumIs compares consecutive bars, while ThresholdCrossing owns the momentum zone.
-      Indicator.ValueTracking(
-        role = ValueRole.Momentum,
-        source = ValueSource.Close,
-        transformation = ValueTransformation.RSX(length = 8)
-      )
+      Indicator.ValueTracking(role = ValueRole.Momentum, source = ValueSource.Close, transformation = ValueTransformation.RSX(length = 5))
     ),
     rules = TradeStrategy(
       openRules = List(
@@ -369,69 +341,7 @@ object TestStrategy {
       )
     )
   )
-
-  // GA-optimized indicator params for s2, which is no longer in this catalogue (rules unchanged). Champion from
-  // ga-optimisation-2026-08-08-1436-s2_shuffle.md (training 1.499322 -> validation 0.973937, shuffled GA).
-  // Satisfies every constraint on validation data. Second-best out-of-sample result in the catalogue, behind its own descendant
-  // s2_optimized_v3.
-  // searched 2023-07..2024-06: net=-1819.04934, closed=580, forced=6, win=35.69%, exp=-3.136292, PF=0.853, DD=4.84%, Sharpe=-0.900
-  // searched 2023-07..2025-07: net=5825.50423, closed=1218, forced=12, win=38.01%, exp=4.782844, PF=1.254, DD=2.43%, Sharpe=1.304
-  // holdout 2025-12..2026-06:  net=2480.22278, closed=352, forced=5, win=40.63%, exp=7.046087, PF=1.434, DD=1.74%, Sharpe=2.142
-  val s2_optimized = TestStrategy(
-    indicator = Indicator.compositeAnyOf(
-      Indicator.LinesCrossing(
-        source = ValueSource.HLC3,
-        line1Transformation = ValueTransformation.JMA(length = 19, phase = 14, power = 2),
-        line2Transformation = ValueTransformation.JMA(length = 32, phase = -43, power = 1)
-      ),
-      Indicator.ThresholdCrossing(
-        source = ValueSource.Close,
-        transformation = ValueTransformation.RSX(length = 29),
-        upperBoundary = 74.0,
-        lowerBoundary = 29.0
-      ),
-      Indicator.VolatilityRegimeDetection(
-        atrLength = 37,
-        smoothingType = ValueTransformation.SMA(length = 35)
-      )
-    ),
-    rules = TradeStrategy(
-      openRules = List(
-        Rule(
-          action = TradeAction.OpenLong,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.upwardCrossover,
-            Rule.Condition.volatilityIsLow,
-            Rule.Condition.Not(Rule.Condition.momentumIsInOverbought)
-          )
-        ),
-        Rule(
-          action = TradeAction.OpenShort,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.downwardCrossover,
-            Rule.Condition.volatilityIsLow,
-            Rule.Condition.Not(Rule.Condition.momentumIsInOversold)
-          )
-        )
-      ),
-      closeRules = List(
-        Rule(
-          action = TradeAction.ClosePosition,
-          conditions = Rule.Condition.anyOf(
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsBuy,
-              Rule.Condition.momentumEnteredOverbought
-            ),
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsSell,
-              Rule.Condition.momentumEnteredOversold
-            )
-          )
-        )
-      )
-    )
-  )
-
+  
   // GA-optimized indicator params for s2, which is no longer in this catalogue (rules unchanged). Champion from
   // ga-optimisation-2026-08-03-1755-s2.md (training 2.047228 -> validation 0.063279).
   // BREACHES 3 constraint(s) on validation data:
@@ -495,72 +405,7 @@ object TestStrategy {
       )
     )
   )
-
-  // GA-optimized indicator params for s2_optimized (rules unchanged). Champion from
-  // ga-optimisation-2026-08-24-1811-s2_optimized.md (training 1.430220 -> validation 1.043568, retaining 73.0%).
-  // Satisfies every constraint on validation data — the only champion of the 2026-08-24/25 batch that does.
-  // Best holdout net in the catalogue, and second-best Sharpe behind s5_optimized_v2: it beats s2_optimized on data neither was selected on
-  // (2660 vs 2480, Sharpe 2.628 vs 2.142)
-  // while giving up in-sample net to it (4923 vs 5826). The margin on net is 7%, thin enough that the Sharpe gap is the better reason to
-  // prefer it.
-  // searched 2023-07..2024-06: net=-1706.26914, closed=596, forced=6, win=35.07%, exp=-2.862868, PF=0.864, DD=3.94%, Sharpe=-0.811
-  // searched 2023-07..2025-07: net=4922.55728, closed=1203, forced=12, win=37.82%, exp=4.091901, PF=1.219, DD=1.98%, Sharpe=1.183
-  // holdout 2025-12..2026-06:  net=2660.48001, closed=363, forced=5, win=42.98%, exp=7.329146, PF=1.458, DD=1.70%, Sharpe=2.628
-  val s2_optimized_v3 = TestStrategy(
-    indicator = Indicator.compositeAnyOf(
-      Indicator.LinesCrossing(
-        source = ValueSource.HLC3,
-        line1Transformation = ValueTransformation.JMA(length = 20, phase = 21, power = 2),
-        line2Transformation = ValueTransformation.JMA(length = 31, phase = -40, power = 1)
-      ),
-      Indicator.ThresholdCrossing(
-        source = ValueSource.Close,
-        transformation = ValueTransformation.RSX(length = 31),
-        upperBoundary = 72.0,
-        lowerBoundary = 27.0
-      ),
-      Indicator.VolatilityRegimeDetection(
-        atrLength = 37,
-        smoothingType = ValueTransformation.SMA(length = 35)
-      )
-    ),
-    rules = TradeStrategy(
-      openRules = List(
-        Rule(
-          action = TradeAction.OpenLong,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.upwardCrossover,
-            Rule.Condition.volatilityIsLow,
-            Rule.Condition.Not(Rule.Condition.momentumIsInOverbought)
-          )
-        ),
-        Rule(
-          action = TradeAction.OpenShort,
-          conditions = Rule.Condition.allOf(
-            Rule.Condition.downwardCrossover,
-            Rule.Condition.volatilityIsLow,
-            Rule.Condition.Not(Rule.Condition.momentumIsInOversold)
-          )
-        )
-      ),
-      closeRules = List(
-        Rule(
-          action = TradeAction.ClosePosition,
-          conditions = Rule.Condition.anyOf(
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsBuy,
-              Rule.Condition.momentumEnteredOverbought
-            ),
-            Rule.Condition.allOf(
-              Rule.Condition.positionIsSell,
-              Rule.Condition.momentumEnteredOversold
-            )
-          )
-        )
-      )
-    )
-  )
-
+  
   // GA-optimized indicator params for s4_optimized (rules unchanged). Champion from
   // ga-optimisation-2026-08-03-1820-s4_optimized.md (training 1.658671 -> validation 1.675786).
   // Satisfies every constraint on validation data.
@@ -1280,7 +1125,7 @@ object TestStrategy {
   // searched 2023-07..2024-06: net=4245.00844, closed=832, forced=6, win=40.26%, exp=5.102174, PF=1.377, DD=2.01%, Sharpe=2.525
   // searched 2023-07..2025-07: net=12225.94093, closed=1717, forced=12, win=40.01%, exp=7.120525, PF=1.545, DD=1.01%, Sharpe=3.549
   // holdout 2025-12..2026-06:  net=2713.33834, closed=468, forced=6, win=39.32%, exp=5.797731, PF=1.399, DD=0.95%, Sharpe=3.149
-  val s2_optimized_v4 = TestStrategy(
+  val s2_optimized = TestStrategy(
     indicator = Indicator.compositeAnyOf(
       Indicator.LinesCrossing(
         source = ValueSource.HLC3,

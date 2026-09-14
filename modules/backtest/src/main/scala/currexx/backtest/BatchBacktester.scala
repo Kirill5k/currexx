@@ -12,14 +12,15 @@ object BatchBacktester extends IOApp.Simple {
 
   /** The vals worth the runtime, including research candidates, with selection history recorded on each val.
     *
-    * Not all of `TestStrategy`, which keeps every val a decision was ever based on so that a report filename still resolves to something. A
-    * val is dropped from here once a descendant dominates it on the holdout, or once its family has been answered - measuring it again only
-    * adds a line nothing reads. Each of those carries a `Not in BatchBacktester` line in its comment saying which val replaced it.
+    * `TestStrategy` also keeps older lineage vals outside this measured set. Deleted candidates and their results remain documented in
+    * their promotion report. A val is dropped from here once a descendant dominates it on the holdout or its family has been answered; it
+    * otherwise adds a line nothing reads. Unmeasured lineage vals carry a `Not in BatchBacktester` line saying which val replaced them. The
+    * sole survivor of the 2026-09-14 report candidates is s10_optimized_v7, promoted into s10.
     */
   val strategies: List[(String, TestStrategy)] = List(
-    "s2_optimized_v4" -> TestStrategy.s2_optimized_v4,
-    "s2_optimized_v3" -> TestStrategy.s2_optimized_v3,
     "s2_optimized"    -> TestStrategy.s2_optimized,
+    "s2_optimized_v2" -> TestStrategy.s2_optimized_v2,
+    "s10"             -> TestStrategy.s10,
     "s10_v2"          -> TestStrategy.s10_v2,
     "s5_optimized_v2" -> TestStrategy.s5_optimized_v2,
     "s5_optimized_v3" -> TestStrategy.s5_optimized_v3,

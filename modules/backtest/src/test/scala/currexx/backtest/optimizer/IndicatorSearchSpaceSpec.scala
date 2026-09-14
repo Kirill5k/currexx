@@ -47,11 +47,19 @@ class IndicatorSearchSpaceSpec extends IOWordSpec {
     "keep s10's raw close fixed while retaining its ATR and momentum search dimensions" in {
       val space   = searchSpace(TestStrategy.s10)
       val changed = replace(TestStrategy.s10.indicator, 4, Indicator.ValueTracking(ValueRole.Price, ValueSource.Close, VT.SMA(80)))
+      val atr     = TestStrategy.s10.indicator match
+        case Indicator.Composite(children, _) =>
+          children.toList
+            .collectFirst { case tracker @ Indicator.ValueTracking(ValueRole.Volatility, _, _: VT.ATR) =>
+              tracker
+            }
+            .getOrElse(fail("Expected an ATR tracker in s10"))
+        case other => fail(s"Expected a composite, got $other")
 
       space.fixedIndicators mustBe Set(raw)
       space.canonicalise(changed) mustBe Right(TestStrategy.s10.indicator)
       leaves(space.project(changed)) must have size 6
-      leaves(space.project(changed)) must contain(Indicator.ValueTracking(ValueRole.Volatility, ValueSource.Close, VT.ATR(14)))
+      leaves(space.project(changed)) must contain(atr)
       space.project(changed).flatMap(space.restore) mustBe Right(TestStrategy.s10.indicator)
     }
 

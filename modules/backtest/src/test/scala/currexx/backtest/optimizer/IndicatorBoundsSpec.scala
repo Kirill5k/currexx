@@ -17,7 +17,6 @@ class IndicatorBoundsSpec extends IOWordSpec {
     "s1_v2_optimized" -> TestStrategy.s1_v2_optimized,
     "s2_optimized"    -> TestStrategy.s2_optimized,
     "s2_optimized_v2" -> TestStrategy.s2_optimized_v2,
-    "s2_optimized_v3" -> TestStrategy.s2_optimized_v3,
     "s4_optimized_v1" -> TestStrategy.s4_optimized_v1,
     "s4_optimized_v2" -> TestStrategy.s4_optimized_v2,
     "s5_optimized_v2" -> TestStrategy.s5_optimized_v2,

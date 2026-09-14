@@ -68,18 +68,18 @@ object Optimiser extends IOApp.Simple {
     */
   val rounds: List[OptimisationRound] = List(
     OptimisationRound(
-      name = "s2_optimized_v4",
-      strategy = TestStrategy.s2_optimized_v4,
+      name = "s2_optimized",
+      strategy = TestStrategy.s2_optimized,
       gaParameters = gaParameters,
       scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s2_optimized_v3.indicator, TestStrategy.s2_optimized.indicator)
+      extraSeeds = List(TestStrategy.s2_optimized_v2.indicator)
     ),
     OptimisationRound(
-      name = "s2_optimized_v4_shuffle",
-      strategy = TestStrategy.s2_optimized_v4,
+      name = "s2_optimized_shuffle",
+      strategy = TestStrategy.s2_optimized,
       gaParameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s2_optimized_v3.indicator, TestStrategy.s2_optimized.indicator)
+      extraSeeds = List(TestStrategy.s2_optimized_v2.indicator)
     ),
     OptimisationRound(
       name = "s10",
