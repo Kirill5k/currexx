@@ -2,13 +2,14 @@ package currexx.algorithms.progress
 
 import cats.Monad
 import cats.effect.Async
+import currexx.algorithms.operators.species.SpeciesStats
 import currexx.algorithms.{EvaluatedPopulation, Fitness, Parameters, ValidatedPopulation}
 
 import java.time.Instant
 
 trait Tracker[F[_], I]:
-  def displayInitial(target: I, params: Parameters.GA): F[Unit]
-  def displayProgress(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[I]): F[Unit]
+  def displayInitial(target: I, params: Parameters[?]): F[Unit]
+  def displayProgress(progress: Progress[I]): F[Unit]
 
   /** Reports the finished run, which is the one place a population arrives carrying both of its fitnesses. Progress is reported on training
     * fitness alone because that is all a generation has; a result is not, because training fitness alone is what a run says about itself.
@@ -18,6 +19,10 @@ trait Tracker[F[_], I]:
 
   protected def progressMsg(currentGen: Int, maxGen: Int): String =
     s"Generation $currentGen out of $maxGen"
+
+  protected def speciesStatsMsg(stats: SpeciesStats): String =
+    s"Breeding species: Count=${stats.sizes.size}, Parent sizes=${stats.sizes.mkString("[", ", ", "]")}, " +
+      s"Offspring=${stats.offspringCounts.mkString("[", ", ", "]")}, Distinct parents=${stats.distinctCandidates}"
 
   private def memberMsg(idx: Int, individual: I, fitness: Fitness): String =
     s"#${idx + 1}: $fitness - $individual"
@@ -124,6 +129,7 @@ object Tracker {
     LoggingTracker.make(label, logInterval, showTopMember, showTopN, showStats, finalTopN)
 
   def markdown[F[_]: Async, I](
+      algorithmName: String,
       label: String = "",
       logInterval: Int = 10,
       showTopMember: Boolean = true,
@@ -131,7 +137,7 @@ object Tracker {
       showStats: Boolean = false,
       finalTopN: Int = 25
   ): F[Tracker[F, I]] =
-    MarkdownTracker.make(label, logInterval, showTopMember, showTopN, showStats, finalTopN)
+    MarkdownTracker.make(algorithmName, label, logInterval, showTopMember, showTopN, showStats, finalTopN)
 
   def composite[F[_]: Monad, I](trackers: Tracker[F, I]*): Tracker[F, I] =
     CompositeTracker.make(trackers*)

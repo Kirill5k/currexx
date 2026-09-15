@@ -3,16 +3,9 @@ package currexx.backtest
 import cats.effect.{IO, IOApp}
 import cats.syntax.foldable.*
 import currexx.algorithms.{Parameters, ValidatedPopulation}
-import currexx.algorithms.operators.{Elitism, Selector, Validator}
-import currexx.algorithms.progress.Tracker
+import currexx.algorithms.operators.Validator
 import currexx.backtest.MarketDataProvider.Corpus
-import currexx.backtest.optimizer.{
-  IndicatorObjective,
-  IndicatorSearchOperators,
-  IndicatorSearchSpace,
-  OptimisationAlgorithm,
-  ScoringFunction
-}
+import currexx.backtest.optimizer.{OptimisationAlgorithm, ScoringFunction}
 import currexx.domain.signal.Indicator
 
 import scala.util.Random
@@ -20,7 +13,7 @@ import scala.util.Random
 final case class OptimisationRound(
     name: String,
     strategy: TestStrategy,
-    gaParameters: Parameters.GA,
+    parameters: Parameters.GA | Parameters.SCGA,
     scoringFunction: ScoringFunction,
     corpus: Corpus = MarketDataProvider.majors1hCorpus,
     shortlistSize: Int = 25,
@@ -55,6 +48,8 @@ object Optimiser extends IOApp.Simple {
 
   // Three populations drawn and the best one's worth of members kept. Worth it here and not on an unshuffled round, whose members mostly
   // are the seed: over-drawing selects on variation, and there has to be some to select on.
+  // Opt a round into SCGA with parameters = Parameters.SCGA.fromGA(gaParameters), or convert the shuffled settings below.
+  // Radius 0.15, eight species and 10% interspecies mating are provisional defaults, not values tuned on historical results.
   val gaParametersWithShuffle = gaParameters.copy(shuffle = true, initialOversampling = 3)
 
   val consistentScoring: ScoringFunction = ScoringFunction.Consistent()
@@ -71,45 +66,45 @@ object Optimiser extends IOApp.Simple {
     OptimisationRound(
       name = "s2_optimized",
       strategy = TestStrategy.s2_optimized,
-      gaParameters = gaParameters,
+      parameters = gaParameters,
       scoringFunction = consistentScoring,
       extraSeeds = List(TestStrategy.s2_optimized_v2.indicator)
     ),
     OptimisationRound(
       name = "s2_optimized_shuffle",
       strategy = TestStrategy.s2_optimized,
-      gaParameters = gaParametersWithShuffle,
+      parameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring,
       extraSeeds = List(TestStrategy.s2_optimized_v2.indicator)
     ),
     OptimisationRound(
       name = "s10",
       strategy = TestStrategy.s10,
-      gaParameters = gaParameters,
+      parameters = gaParameters,
       scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s10_shuffle",
       strategy = TestStrategy.s10,
-      gaParameters = gaParametersWithShuffle,
+      parameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s10_v2",
       strategy = TestStrategy.s10_v2,
-      gaParameters = gaParameters,
+      parameters = gaParameters,
       scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s10_v2_shuffle",
       strategy = TestStrategy.s10_v2,
-      gaParameters = gaParametersWithShuffle,
+      parameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s5_optimized_v2",
       strategy = TestStrategy.s5_optimized_v2,
-      gaParameters = gaParameters,
+      parameters = gaParameters,
       scoringFunction = consistentScoring,
       extraSeeds = List(
         TestStrategy.s5_optimized_v3.indicator,
@@ -120,7 +115,18 @@ object Optimiser extends IOApp.Simple {
     OptimisationRound(
       name = "s5_optimized_v2_shuffle",
       strategy = TestStrategy.s5_optimized_v2,
-      gaParameters = gaParametersWithShuffle,
+      parameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring,
+      extraSeeds = List(
+        TestStrategy.s5_optimized_v3.indicator,
+        TestStrategy.s6.indicator,
+        TestStrategy.s6_optimized.indicator
+      )
+    ),
+    OptimisationRound(
+      name = "s5_optimized_v2_scga",
+      strategy = TestStrategy.s5_optimized_v2,
+      parameters = Parameters.SCGA.fromGA(gaParametersWithShuffle),
       scoringFunction = consistentScoring,
       extraSeeds = List(
         TestStrategy.s5_optimized_v3.indicator,
@@ -131,53 +137,53 @@ object Optimiser extends IOApp.Simple {
     OptimisationRound(
       name = "s4_optimized_v2",
       strategy = TestStrategy.s4_optimized_v2,
-      gaParameters = gaParameters,
+      parameters = gaParameters,
       scoringFunction = consistentScoring,
       extraSeeds = List(TestStrategy.s4_optimized_v1.indicator, TestStrategy.s4_optimized_v1.indicator)
     ),
     OptimisationRound(
       name = "s4_optimized_v2_shuffle",
       strategy = TestStrategy.s4_optimized_v2,
-      gaParameters = gaParametersWithShuffle,
+      parameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring,
       extraSeeds = List(TestStrategy.s4_optimized_v1.indicator, TestStrategy.s4_optimized_v1.indicator)
     ),
     OptimisationRound(
       name = "s6_optimized",
       strategy = TestStrategy.s6_optimized,
-      gaParameters = gaParameters,
+      parameters = gaParameters,
       scoringFunction = consistentScoring,
       extraSeeds = List(TestStrategy.s6.indicator)
     ),
     OptimisationRound(
       name = "s6_optimized_shuffle",
       strategy = TestStrategy.s6_optimized,
-      gaParameters = gaParametersWithShuffle,
+      parameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring,
       extraSeeds = List(TestStrategy.s6.indicator)
     ),
     OptimisationRound(
       name = "s13",
       strategy = TestStrategy.s13,
-      gaParameters = gaParameters,
+      parameters = gaParameters,
       scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s13_shuffle",
       strategy = TestStrategy.s13,
-      gaParameters = gaParametersWithShuffle,
+      parameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s1_v2_optimized",
       strategy = TestStrategy.s1_v2_optimized,
-      gaParameters = gaParameters,
+      parameters = gaParameters,
       scoringFunction = consistentScoring
     ),
     OptimisationRound(
       name = "s1_v2_optimized_shuffle",
       strategy = TestStrategy.s1_v2_optimized,
-      gaParameters = gaParametersWithShuffle,
+      parameters = gaParametersWithShuffle,
       scoringFunction = consistentScoring
     )
   )
@@ -185,77 +191,19 @@ object Optimiser extends IOApp.Simple {
   override def run: IO[Unit] =
     rounds.traverse_ { round =>
       for
-        space  <- IO.fromEither(IndicatorSearchSpace.forStrategy(round.strategy, round.fixedIndicators))
-        search <- IndicatorSearchOperators.make[IO](space, round.extraSeeds)
-        sel    <- Selector.tournament[IO, Indicator]
-        elit   <- Elitism.simple[IO, Indicator]
-        obj    <- IndicatorObjective.make[IO](
-          corpus = round.corpus,
-          strategy = round.strategy.rules,
-          poolSize = evaluatorPoolSize,
-          shortlistSize = round.shortlistSize,
-          scoringFunction = round.scoringFunction,
-          searchSpace = Some(space)
-        )
-        markDownProg <- Tracker.markdown[IO, Indicator](
-          label = round.name,
-          logInterval = 10,
-          showTopMember = true,
-          showTopN = 3,
-          showStats = false,
-          finalTopN = round.shortlistSize
-        )
-        loggingProg <- Tracker.logging[IO, Indicator](
-          label = round.name,
-          logInterval = 10,
-          showTopMember = true,
-          showTopN = 3,
-          showStats = false,
-          finalTopN = round.shortlistSize
-        )
-        prog = Tracker.composite(markDownProg, loggingProg)
-        finalPop <- OptimisationAlgorithm
-          .ga[IO, Indicator](search.initialiser, search.crossover, search.mutator, obj.evaluator, obj.validator, sel, elit, prog)
-          .optimise(round.strategy.indicator, round.gaParameters)
-        _ <- prog.displayNote(
-          "Search space",
-          List(
-            "Indicator structure, sources and roles are fixed; only searchable numeric parameters can evolve.",
-            "Raw-close identity inputs and value trackers unused by the rules are pinned to the target, alongside explicit fixed subtrees."
-          ) ++ (if (space.fixedIndicators.isEmpty) List("No fixed indicators.")
-                else space.fixedIndicators.toList.map(indicator => s"Fixed: $indicator").sorted)
-        )
-        _ <- reportChampion(round, obj.validate, prog, finalPop)
+        algorithm <- OptimisationAlgorithm.indicator[IO](round, evaluatorPoolSize)
+        finalPop  <- algorithm.optimise
+        title = s"Champion selection: ${round.name}"
+        _ <- finalPop.headOption match
+          case None =>
+            algorithm.tracker.displayNote(title, List("No candidates were evaluated."))
+          case Some((champion, _, _)) =>
+            algorithm
+              .validate(champion)
+              .map(round.scoringFunction.violations)
+              .flatMap(breaches => algorithm.tracker.displayNote(title, verdict(round, finalPop, breaches)))
       yield ()
     }
-
-  /** Records how a round's finalists fared on both halves of the data, and says whether the one at the top of them can be trusted.
-    *
-    * The population arrives already validated and already ranked, because `Op.ValidatePopulation` is the last step of the search itself —
-    * so the champion is `population.head` and nothing here chooses anything. That ranking leads on the held-out score and falls back to the
-    * training rank only among candidates the held-out score could not separate, by the band `Validator.defaultTieBand` sets. What is left
-    * is the reading: the whole shortlist rather than only the winner, because the distribution is the diagnosis. Finalists that hold most
-    * of their training score mean the search found something and the remaining question is which; finalists that collapse to zero mean it
-    * found nothing, however good the training figures look, and no amount of picking between them will change that.
-    *
-    * The verdict goes to the tracker rather than to stdout, so that it is recorded wherever the round's results are and lasts as long as
-    * they do. It is the shortlist in that same file that a strategy is eventually picked from, and this is what says which entry of it can
-    * be trusted, if any.
-    */
-  private def reportChampion(
-      round: OptimisationRound,
-      validate: Indicator => IO[List[OrderStats]],
-      tracker: Tracker[IO, Indicator],
-      population: ValidatedPopulation[Indicator]
-  ): IO[Unit] = {
-    val title = s"Champion selection: ${round.name}"
-    population.headOption match
-      case None                   => tracker.displayNote(title, List("No candidates were evaluated."))
-      case Some((champion, _, _)) =>
-        validate(champion)
-          .map(round.scoringFunction.violations)
-          .flatMap(breaches => tracker.displayNote(title, verdict(round, population, breaches)))
-  }
 
   /** What the tracker's own final report cannot know: which corpus this round was given, and whether the candidate at the top of it is fit
     * to use.

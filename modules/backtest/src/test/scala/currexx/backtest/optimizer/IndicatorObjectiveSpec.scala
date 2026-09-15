@@ -1,10 +1,11 @@
 package currexx.backtest.optimizer
 
-import cats.effect.IO
+import cats.effect.{IO, Ref}
 import cats.syntax.all.*
-import currexx.algorithms.{EvaluationPhase, Fitness}
+import currexx.algorithms.operators.Validator
+import currexx.algorithms.{EvaluatedPopulation, EvaluationPhase, Fitness, ValidatedPopulation}
 import currexx.backtest.MarketDataProvider.Corpus
-import currexx.backtest.{MarketDataProvider, TestStrategy}
+import currexx.backtest.{MarketDataProvider, OrderStats, TestStrategy}
 import currexx.core.signal.{Signal, SignalDetector}
 import currexx.domain.market.MarketTimeSeriesData
 import currexx.domain.signal.{Indicator, ValueRole, ValueSource, ValueTransformation}
@@ -32,7 +33,6 @@ class IndicatorObjectiveSpec extends IOWordSpec {
           corpus = corpus,
           strategy = strategy.rules,
           poolSize = 1,
-          shortlistSize = 25,
           scoringFunction = scoring
         )
         rescored <- objective.evaluator.evaluateIndividual(strategy.indicator, EvaluationPhase.Rescore)
@@ -64,7 +64,6 @@ class IndicatorObjectiveSpec extends IOWordSpec {
           corpus = corpus,
           strategy = strategy.rules,
           poolSize = 1,
-          shortlistSize = 25,
           scoringFunction = scoring
         )
         stats <- objective.backtest(strategy.indicator)
@@ -90,7 +89,6 @@ class IndicatorObjectiveSpec extends IOWordSpec {
           corpus = corpus,
           strategy = strategy.rules,
           poolSize = 1,
-          shortlistSize = 25,
           scoringFunction = scoring
         )
         trained   <- objective.backtest(strategy.indicator)
@@ -134,11 +132,12 @@ class IndicatorObjectiveSpec extends IOWordSpec {
           corpus = corpus.copy(searchFolds = corpus.searchFolds.take(1)),
           strategy = target.rules,
           poolSize = 1,
-          shortlistSize = 2,
           scoringFunction = scoring,
           searchSpace = Some(space)
         )
-        finalists <- objective.validator.validate(
+        validator <- Validator.shortlisted[IO, Indicator](2, objective.validationObjective)
+        scoped = OptimisationAlgorithm.canonicalValidator(space, validator)
+        finalists <- scoped.validate(
           Vector(alias -> Fitness(3.0), target.indicator -> Fitness(2.0), alternative -> Fitness(1.0))
         )
         evaluated <- objective.evaluator.evaluateIndividual(alias, EvaluationPhase.Rescore)
@@ -153,6 +152,80 @@ class IndicatorObjectiveSpec extends IOWordSpec {
         evaluated._1 mustBe target.indicator
         evaluated._2.value mustBe IndicatorObjective.FoldAggregation.combine(replayed)
         finalists.find(_._1 == target.indicator).map(_._3.value) mustBe Some(validationScore)
+      }
+    }
+
+    "canonicalise a configured validator's inputs before its custom selection reads validation evidence" in {
+      val target = TestStrategy.s5_optimized_v2
+      val alias  = target.indicator match
+        case Indicator.Composite(children, combinator) =>
+          Indicator.Composite(
+            children.map {
+              case Indicator.ValueTracking(ValueRole.Momentum, source, _) =>
+                Indicator.ValueTracking(ValueRole.Momentum, source, ValueTransformation.RSX(40))
+              case child => child
+            },
+            combinator
+          )
+        case _ => fail("Expected s5 to be a composite")
+      val alternative = target.indicator match
+        case Indicator.Composite(children, combinator) =>
+          Indicator.Composite(
+            children.map {
+              case Indicator.ThresholdCrossing(source, transformation, _, lower) =>
+                Indicator.ThresholdCrossing(source, transformation, 70.0, lower)
+              case child => child
+            },
+            combinator
+          )
+        case _ => fail("Expected s5 to be a composite")
+      val replayScoring = new ScoringFunction {
+        override def score(stats: List[OrderStats]): Double                               = stats.map(_.total.toDouble + 1.0).sum
+        override def violations(stats: List[OrderStats]): List[ScoringFunction.Violation] = Nil
+      }
+
+      val result = for
+        received      <- Ref.of[IO, Vector[EvaluatedPopulation[Indicator]]](Vector.empty)
+        callbackCalls <- Ref.of[IO, Int](0)
+        space         <- IO.fromEither(IndicatorSearchSpace.forStrategy(target))
+        objective     <- IndicatorObjective.make[IO](
+          corpus = corpus.copy(searchFolds = corpus.searchFolds.take(1)),
+          strategy = target.rules,
+          poolSize = 1,
+          scoringFunction = replayScoring,
+          searchSpace = Some(space)
+        )
+        validator = new Validator[IO, Indicator] {
+          override def validate(population: EvaluatedPopulation[Indicator]): IO[ValidatedPopulation[Indicator]] =
+            received.update(_ :+ population) *> population
+              .distinctBy(_._1)
+              .drop(1)
+              .take(1)
+              .toList
+              .traverse { case (individual, training) =>
+                callbackCalls
+                  .update(_ + 1) *> objective.validationObjective(individual).map(validation => (individual, training, validation))
+              }
+              .map(_.toVector)
+        }
+        scoped = OptimisationAlgorithm.canonicalValidator(space, validator)
+        _                <- objective.evaluator.evaluateIndividual(alias, EvaluationPhase.Rescore)
+        beforeValidation <- (received.get, callbackCalls.get).tupled
+        finalists        <- scoped.validate(
+          Vector(alias -> Fitness(3.0), target.indicator -> Fitness(2.0), alternative -> Fitness(1.0))
+        )
+        replayed        <- objective.validate(alternative)
+        afterValidation <- (received.get, callbackCalls.get).tupled
+      yield (beforeValidation, finalists, replayed, afterValidation)
+
+      result.asserting { case (beforeValidation, finalists, replayed, afterValidation) =>
+        beforeValidation mustBe ((Vector.empty, 0))
+        afterValidation mustBe ((
+          Vector(Vector(target.indicator -> Fitness(3.0), target.indicator -> Fitness(2.0), alternative -> Fitness(1.0))),
+          1
+        ))
+        replayed must not be empty
+        finalists mustBe Vector((alternative, Fitness(1.0), Fitness(replayScoring.score(replayed))))
       }
     }
 
@@ -173,18 +246,22 @@ class IndicatorObjectiveSpec extends IOWordSpec {
           corpus = corpus.copy(searchFolds = corpus.searchFolds.take(1)),
           strategy = target.rules,
           poolSize = 1,
-          shortlistSize = 1,
           signalDetector = detector,
           scoringFunction = scoring,
           searchSpace = Some(space)
         )
+        validator <- Validator.shortlisted[IO, Indicator](1, objective.validationObjective)
+        scoped = OptimisationAlgorithm.canonicalValidator(space, validator)
         // Construction must succeed; only running each returned effect may fail with the schema error.
         effects <- IO {
           List(
             objective.evaluator.evaluateIndividual(invalid, EvaluationPhase.Rescore).void,
             objective.backtest(invalid).void,
             objective.validate(invalid).void,
-            objective.validator.validate(Vector(target.indicator -> Fitness(2.0), invalid -> Fitness(1.0))).void
+            objective.validationObjective(invalid).void,
+            scoped
+              .validate(Vector(target.indicator -> Fitness(2.0), invalid -> Fitness(1.0)))
+              .void
           )
         }
         failures <- effects.traverse(_.attempt)

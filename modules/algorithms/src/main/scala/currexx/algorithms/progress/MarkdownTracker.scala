@@ -23,12 +23,12 @@ final class MarkdownTracker[F[_], I] private (
     F: Async[F]
 ) extends Tracker[F, I]:
 
-  override def displayInitial(target: I, params: Parameters.GA): F[Unit] =
+  override def displayInitial(target: I, params: Parameters[?]): F[Unit] =
     for
       now <- F.realTimeInstant
       _   <- startTimeRef.set(Some(now))
       content =
-        s"""# Genetic Algorithm Run${if (label.nonEmpty) s": $label" else ""}
+        s"""# ${params.displayName} Run${if (label.nonEmpty) s": $label" else ""}
            |
            |**Started at:** $now
            |**Target:** $target
@@ -39,12 +39,16 @@ final class MarkdownTracker[F[_], I] private (
       _ <- writeToFile(content, append = false)
     yield ()
 
-  override def displayProgress(currentGen: Int, maxGen: Int, population: EvaluatedPopulation[I]): F[Unit] =
-    F.whenA(currentGen % logInterval == 0) {
-      val progress   = s"### ${progressMsg(currentGen, maxGen)}"
+  override def displayProgress(progress: Progress[I]): F[Unit] =
+    F.whenA(progress.currentGen % logInterval == 0) {
+      val population = progress.population
+      val heading    = s"### ${progressMsg(progress.currentGen, progress.maxGen)}"
       val topMembers = if (showTopMember && population.nonEmpty) "\n\n**Top Members:**\n\n" + membersMsg(population, showTopN) else ""
       val stats      = if (showStats) "\n\n**Stats:**\n" + statsMsg(population) else ""
-      writeToFile(s"\n$progress$topMembers$stats\n", append = true)
+      val breeding   = progress match
+        case Progress.Population(_, _, _)       => ""
+        case Progress.Species(_, _, _, species) => "\n\n" + speciesStatsMsg(species)
+      writeToFile(s"\n$heading$topMembers$stats$breeding\n", append = true)
     }
 
   override def displayFinal(population: ValidatedPopulation[I]): F[Unit] =
@@ -114,6 +118,7 @@ object MarkdownTracker:
   private val Formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmm").withZone(ZoneId.systemDefault())
 
   def make[F[_]: Async, I](
+      algorithmName: String,
       label: String = "",
       logInterval: Int = 10,
       showTopMember: Boolean = true,
@@ -125,6 +130,5 @@ object MarkdownTracker:
       now          <- Async[F].realTimeInstant
       startTimeRef <- Ref.of[F, Option[Instant]](None)
       labelSuffix = if (label.nonEmpty) s"-$label" else ""
-      fileName    = s"ga-optimisation-${Formatter.format(now)}$labelSuffix.md"
-      path        = Path("optimisation-results") / fileName
+      path        = Path("optimisation-results") / s"${algorithmName.toLowerCase}-optimisation-${Formatter.format(now)}$labelSuffix.md"
     yield new MarkdownTracker[F, I](label, path, startTimeRef, logInterval, showTopMember, showTopN, showStats, finalTopN)

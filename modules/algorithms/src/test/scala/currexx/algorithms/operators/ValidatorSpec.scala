@@ -2,6 +2,7 @@ package currexx.algorithms.operators
 
 import cats.effect.{IO, Ref}
 import currexx.algorithms.{EvaluatedPopulation, Fitness}
+import currexx.algorithms.operators.species.{Distance, SpeciesOperators}
 import kirill5k.common.cats.test.IOWordSpec
 
 class ValidatorSpec extends IOWordSpec {
@@ -10,12 +11,28 @@ class ValidatorSpec extends IOWordSpec {
   private def validatorOver(scores: Map[String, Double], shortlistSize: Int = 3) =
     Ref.of[IO, List[String]](Nil).flatMap { scored =>
       Validator
-        .shortlisted[IO, String](shortlistSize)(ind => scored.update(_ :+ ind).as(Fitness(scores.getOrElse(ind, 0.0))))
+        .shortlisted[IO, String](shortlistSize, ind => scored.update(_ :+ ind).as(Fitness(scores.getOrElse(ind, 0.0))))
         .map(_ -> scored)
     }
 
   private def trained(members: (String, Double)*): EvaluatedPopulation[String] =
     members.toVector.map { case (individual, fitness) => (individual, Fitness(fitness)) }
+
+  private def speciesValidatorOver(scores: Map[String, Double], shortlistSize: Int = 4) =
+    val familyDistance = new Distance[String] {
+      override def between(a: String, b: String): Either[IllegalArgumentException, Double] = Right(if (a.head == b.head) 0.0 else 1.0)
+    }
+    for
+      scored    <- Ref.of[IO, List[String]](Nil)
+      species   <- SpeciesOperators.make[IO, String](familyDistance)
+      validator <- Validator.speciesShortlisted[IO, String](
+        shortlistSize,
+        species,
+        0.15,
+        8,
+        individual => scored.update(_ :+ individual).as(Fitness(scores.getOrElse(individual, 0.0)))
+      )
+    yield validator -> scored
 
   "Validator.shortlisted" should {
 
@@ -97,6 +114,66 @@ class ValidatorSpec extends IOWordSpec {
         }
   }
 
+  "Validator.speciesShortlisted" should {
+    val population = trained("a" -> 10.0, "a2" -> 9.0, "a3" -> 8.0, "b" -> 2.0, "c" -> 1.0)
+
+    "reserve final species representatives and spend the remaining slots on globally strong candidates" in
+      speciesValidatorOver(Map.empty)
+        .flatMap { case (validator, scored) =>
+          validator.validate(population).flatMap(result => scored.get.map(result -> _))
+        }
+        .asserting { case (validated, scored) =>
+          scored mustBe List("a", "a2", "b", "c")
+          validated.map(_._1) mustBe Vector("a", "a2", "b", "c")
+          validated.map(_._2) mustBe Vector(Fitness(10.0), Fitness(9.0), Fitness(2.0), Fitness(1.0))
+        }
+
+    "deduplicate before reserving and filling without treating zero distance as candidate equality" in
+      speciesValidatorOver(Map.empty)
+        .flatMap { case (validator, scored) =>
+          validator.validate(population.head +: population).flatMap(_ => scored.get)
+        }
+        .asserting(_ mustBe List("a", "a2", "b", "c"))
+
+    "sort current training scores before partitioning even when the supplied order is stale" in
+      speciesValidatorOver(Map.empty)
+        .flatMap { case (validator, _) => validator.validate(population.reverse) }
+        .asserting(_.map(_._1) mustBe Vector("a", "a2", "b", "c"))
+
+    "keep the hard limit when there are more species than available shortlist slots" in
+      speciesValidatorOver(Map.empty, shortlistSize = 2)
+        .flatMap { case (validator, scored) => validator.validate(population).flatMap(_ => scored.get) }
+        .asserting(_ mustBe List("a", "b"))
+
+    "apply the same validation gate and near-tie training preference as ordinary shortlisting" in
+      speciesValidatorOver(Map("a" -> 0.50, "b" -> 0.51))
+        .flatMap { case (validator, _) => validator.validate(population) }
+        .asserting { validated =>
+          validated.map(_._1) mustBe Vector("a", "b", "a2", "c")
+          validated.map(_._3) mustBe Vector(Fitness(0.50), Fitness(0.51), Fitness(0.0), Fitness(0.0))
+        }
+
+    "validate each available candidate only once when the population is smaller than the limit" in
+      speciesValidatorOver(Map.empty, shortlistSize = 25)
+        .flatMap { case (validator, scored) => validator.validate(population).flatMap(_ => scored.get) }
+        .asserting(_ mustBe List("a", "a2", "a3", "b", "c"))
+
+    "avoid consulting held-out evidence for empty populations or zero-sized shortlists" in
+      speciesValidatorOver(Map.empty, shortlistSize = 0)
+        .flatMap { case (validator, scored) =>
+          for
+            emptyResult <- validator.validate(Vector.empty)
+            zero        <- validator.validate(population)
+            calls       <- scored.get
+          yield (emptyResult, zero, calls)
+        }
+        .asserting { case (emptyResult, zero, calls) =>
+          emptyResult mustBe Vector.empty
+          zero mustBe Vector.empty
+          calls mustBe empty
+        }
+  }
+
   "Validator.TieBand" should {
     "decide which candidates count as tied, and say so in the words a report uses" in {
       val band = Validator.TieBand(0.05)
@@ -114,7 +191,7 @@ class ValidatorSpec extends IOWordSpec {
           .of[IO, List[String]](Nil)
           .flatMap { scored =>
             Validator
-              .shortlisted[IO, String](3, band)(ind => scored.update(_ :+ ind).as(Fitness(scores.getOrElse(ind, 0.0))))
+              .shortlisted[IO, String](3, ind => scored.update(_ :+ ind).as(Fitness(scores.getOrElse(ind, 0.0))), band)
               .flatMap(_.validate(trained("a" -> 0.9, "b" -> 0.1)))
           }
           .map(_.map(_._1))

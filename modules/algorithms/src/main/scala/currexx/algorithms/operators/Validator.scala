@@ -1,10 +1,12 @@
 package currexx.algorithms.operators
 
-import cats.Applicative
+import cats.{Applicative, MonadThrow}
 import cats.syntax.applicative.*
 import cats.syntax.functor.*
+import cats.syntax.flatMap.*
 import cats.syntax.traverse.*
 import currexx.algorithms.{EvaluatedPopulation, Fitness, ValidatedPopulation}
+import currexx.algorithms.operators.species.SpeciesOperators
 
 /** Re-scores a finished population against evidence the search was never allowed to read, so that a champion is chosen on something other
   * than how well it fitted the sample every candidate was fitted to.
@@ -37,8 +39,10 @@ object Validator:
     *   scores one individual against that evidence. Nothing here can check that it reads different data from the evaluator's; a caller that
     *   passes the training objective gets a population that has been scored twice and validated not at all.
     */
-  def shortlisted[F[_]: Applicative, I](shortlistSize: Int, tieBand: TieBand = defaultTieBand)(
-      objectiveFn: I => F[Fitness]
+  def shortlisted[F[_]: Applicative, I](
+      shortlistSize: Int,
+      objectiveFn: I => F[Fitness],
+      tieBand: TieBand = defaultTieBand
   ): F[Validator[F, I]] =
     new Validator[F, I] {
       override def validate(population: EvaluatedPopulation[I]): F[ValidatedPopulation[I]] =
@@ -51,6 +55,32 @@ object Validator:
             objectiveFn(individual).map(validationFitness => (individual, trainingFitness, validationFitness))
           }
           .map(consensusOrder(_, tieBand))
+    }.pure[F]
+
+  /** Reserves a representative of each final species before filling the same bounded validation shortlist by training fitness. The caller
+    * supplies canonical candidates already rescored on the complete training evidence. Distinctness uses candidate equality, not distance:
+    * two different candidates may have zero distance in a caller's search space.
+    */
+  def speciesShortlisted[F[_]: MonadThrow, I](
+      shortlistSize: Int,
+      species: SpeciesOperators[F, I],
+      radius: Double,
+      maxSpecies: Int,
+      objectiveFn: I => F[Fitness],
+      tieBand: TieBand = defaultTieBand
+  ): F[Validator[F, I]] =
+    new Validator[F, I] {
+      override def validate(population: EvaluatedPopulation[I]): F[ValidatedPopulation[I]] =
+        val distinct = population.sortBy(_._2)(using Ordering[Fitness].reverse).distinctBy(_._1)
+        for
+          groups   <- species.speciation.partition(distinct, radius, maxSpecies).flatMap(MonadThrow[F].fromEither)
+          retained <- species.conservation.conserve(groups, shortlistSize).flatMap(MonadThrow[F].fromEither)
+          selected  = retained.population.toSet
+          shortlist = distinct.filter(member => selected.contains(member._1))
+          validated <- shortlist.traverse { case (individual, trainingFitness) =>
+            objectiveFn(individual).map(validationFitness => (individual, trainingFitness, validationFitness))
+          }
+        yield consensusOrder(validated, tieBand)
     }.pure[F]
 
   /** How close to the best held-out score a candidate has to come before the training rank is allowed to separate them, and how to say so.

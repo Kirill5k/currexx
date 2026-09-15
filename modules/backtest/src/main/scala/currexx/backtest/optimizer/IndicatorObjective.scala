@@ -6,8 +6,8 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import currexx.algorithms.operators.{Evaluator, Validator}
-import currexx.algorithms.{EvaluatedPopulation, Fitness, ValidatedPopulation}
+import currexx.algorithms.operators.Evaluator
+import currexx.algorithms.Fitness
 import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.services.TestServicesPool
 import currexx.backtest.{MarketDataProvider, OrderStats, TestSettings}
@@ -81,7 +81,7 @@ object IndicatorObjective {
 
   final case class Operators[F[_]](
       evaluator: Evaluator[F, Indicator],
-      validator: Validator[F, Indicator],
+      validationObjective: Indicator => F[Fitness],
       backtest: Indicator => F[List[List[OrderStats]]],
       validate: Indicator => F[List[OrderStats]]
   )
@@ -90,7 +90,6 @@ object IndicatorObjective {
       corpus: Corpus,
       strategy: TradeStrategy,
       poolSize: Int,
-      shortlistSize: Int,
       otherIndicators: List[Indicator] = Nil,
       signalDetector: SignalDetector = SignalDetector.pure,
       scoringFunction: ScoringFunction = ScoringFunction.Robust(),
@@ -111,15 +110,8 @@ object IndicatorObjective {
       // Per-fold scores do not depend on the phase, so they can be cached without retaining full backtest histories or tying an elite's
       // aggregate fitness to the generation it was first evaluated in. Full results remain available through the uncached backtest.
       evaluator <- FoldRotatingEvaluator.cached[F](perFold, scoringFunction, canonicalise)
-      validator <- Validator.shortlisted[F, Indicator](shortlistSize)(ind => validate(ind).map(res => Fitness(scoringFunction.score(res))))
-      // Canonicalise before the generic validator deduplicates and truncates, so fixed-only differences cannot consume shortlist slots.
-      scopedValidator = new Validator[F, Indicator] {
-        override def validate(population: EvaluatedPopulation[Indicator]): F[ValidatedPopulation[Indicator]] =
-          Async[F]
-            .fromEither(population.map { case (ind, fitness) => canonicalise(ind).map(_ -> fitness) }.sequence)
-            .flatMap(validator.validate)
-      }
-    yield Operators(evaluator, scopedValidator, backtest, validate)
+      validationObjective = (ind: Indicator) => validate(ind).map(res => Fitness(scoringFunction.score(res)))
+    yield Operators(evaluator, validationObjective, backtest, validate)
 
   private def backtestOver[F[_]: {Async, Parallel}](
       pool: TestServicesPool[F],

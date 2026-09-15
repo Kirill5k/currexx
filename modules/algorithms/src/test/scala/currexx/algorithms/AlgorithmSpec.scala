@@ -3,6 +3,7 @@ package currexx.algorithms
 import cats.data.State
 import cats.~>
 import cats.syntax.flatMap.*
+import currexx.algorithms.progress.Progress
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -55,7 +56,7 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
       case Op.InitPopulation(seed, size, shuffle) =>
         State.modify[List[String]](_ :+ s"Initialise population of size $size with shuffle=$shuffle\n") >>
           State.pure(Vector.fill(size)(seed))
-      case Op.DisplayProgress(i, maxGen, _) =>
+      case Op.DisplayProgress(Progress.Population(i, maxGen, _)) =>
         State.modify[List[String]](_ :+ s"Iteration $i of $maxGen\n")
       case Op.DisplayFinal(_) =>
         State.modify[List[String]](_ :+ "Final population displayed\n")

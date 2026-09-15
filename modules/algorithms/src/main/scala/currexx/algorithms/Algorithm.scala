@@ -1,12 +1,17 @@
 package currexx.algorithms
 
 import cats.free.Free
+import currexx.algorithms.operators.species.SpeciesStats
+import currexx.algorithms.progress.Progress
 
 sealed trait Alg
 object Alg:
-  sealed abstract class GA extends Alg
+  sealed abstract class GA   extends Alg
+  sealed abstract class SCGA extends Alg
 
-sealed trait Parameters[A <: Alg]
+sealed trait Parameters[A <: Alg]:
+  def name: String
+  def displayName: String
 object Parameters {
   final case class GA(
       populationSize: Int,
@@ -16,7 +21,38 @@ object Parameters {
       elitismRatio: Double,
       shuffle: Boolean,
       initialOversampling: Int = 1
-  ) extends Parameters[Alg.GA]
+  ) extends Parameters[Alg.GA]:
+    val name: String        = "GA"
+    val displayName: String = "Genetic Algorithm"
+
+  /** Species settings are initial defaults, not values fitted to an optimisation corpus. Champions occupy population slots; there is no
+    * additional global elite population. Small populations automatically reduce the species cap so every species can breed.
+    */
+  final case class SCGA(
+      populationSize: Int,
+      maxGen: Int,
+      crossoverProbability: Double,
+      mutationProbability: Double,
+      shuffle: Boolean,
+      initialOversampling: Int = 1,
+      speciesRadius: Double = 0.15,
+      maxSpecies: Int = 8,
+      interspeciesMatingProbability: Double = 0.10
+  ) extends Parameters[Alg.SCGA]:
+    val name: String             = "SCGA"
+    val displayName: String      = "Species-Conserving Genetic Algorithm (SCGA)"
+    def effectiveMaxSpecies: Int = math.min(maxSpecies, math.max(1, populationSize / 2))
+
+  object SCGA:
+    /** Copy the search budget and variation settings; conserved species replace GA's elitism ratio. */
+    def fromGA(params: GA): SCGA = SCGA(
+      populationSize = params.populationSize,
+      maxGen = params.maxGen,
+      crossoverProbability = params.crossoverProbability,
+      mutationProbability = params.mutationProbability,
+      shuffle = params.shuffle,
+      initialOversampling = params.initialOversampling
+    )
 }
 
 sealed trait Algorithm[A <: Alg, P <: Parameters[A]]:
@@ -43,7 +79,7 @@ object Algorithm {
             mutated   <- Op.ApplyToAll(crossed1 ++ crossed2, (ind: I) => Op.Mutate(ind, params.mutationProbability)).freeM
             evPop     <- Op.EvaluatePopulation(mutated ++ elites, EvaluationPhase.Search(i)).freeM
             sortedPop <- Op.SortByFitness(evPop).freeM
-            _         <- Op.DisplayProgress(i, params.maxGen, sortedPop).freeM
+            _         <- Op.DisplayProgress(Progress.Population(i, params.maxGen, sortedPop)).freeM
           yield sortedPop
         }
         // Scored once more on everything the objective has, because the ranking selection finished with was made under whatever reading
@@ -59,6 +95,40 @@ object Algorithm {
         validatedPop <- Op.ValidatePopulation(ranked).freeM
         _            <- Op.DisplayFinal(validatedPop).freeM
       yield validatedPop
+  }
+
+  /** A bounded species-conserving GA with protected representatives and species-aware reproduction.
+    *
+    * Species are rebuilt each generation; conservation protects each current representative for one transition, not a permanent species
+    * identity. Selection allocates one champion and at least one child per species before distributing the remaining budget by rank. The
+    * injected validator controls the final shortlist; use Validator.speciesShortlisted to retain diversity at validation too.
+    */
+  case object SCGA extends Algorithm[Alg.SCGA, Parameters.SCGA] {
+    override def optimise[I](target: I, params: Parameters.SCGA): Free[Op[*, I], ValidatedPopulation[I]] =
+      for
+        _              <- Op.DisplayInitial(target, params).freeM
+        initial        <- Op.InitPopulation(target, params.populationSize * params.initialOversampling, params.shuffle).freeM
+        initialEval    <- Op.EvaluatePopulation(initial, EvaluationPhase.Search(0)).freeM
+        initialSpecies <- Op.IdentifySpecies(initialEval, params.speciesRadius, params.effectiveMaxSpecies).freeM
+        conserved      <- Op.ConserveSpecies(initialSpecies, params.populationSize).freeM
+        finalSpecies   <- iterate(conserved, params.maxGen) { (current, generation) =>
+          for
+            breeding  <- Op.SelectSpeciesPairs(current, params.populationSize, params.interspeciesMatingProbability).freeM
+            crossed   <- Op.ApplyToAll(breeding.pairs, (pair: (I, I)) => Op.Cross(pair._1, pair._2, params.crossoverProbability)).freeM
+            mutated   <- Op.ApplyToAll(crossed, (individual: I) => Op.Mutate(individual, params.mutationProbability)).freeM
+            evaluated <- Op.EvaluatePopulation(mutated ++ current.representatives, EvaluationPhase.Search(generation)).freeM
+            next      <- Op.SortByFitness(evaluated).freeM
+            speciesStats = SpeciesStats(current.sizes, breeding.offspringCounts, current.distinctCandidates)
+            _             <- Op.DisplayProgress(Progress.Species(generation, params.maxGen, next, speciesStats)).freeM
+            nextSpecies   <- Op.IdentifySpecies(next, params.speciesRadius, params.effectiveMaxSpecies).freeM
+            nextConserved <- Op.ConserveSpecies(nextSpecies, params.populationSize).freeM
+          yield nextConserved
+        }
+        rescored  <- Op.EvaluatePopulation(finalSpecies.population, EvaluationPhase.Rescore).freeM
+        ranked    <- Op.SortByFitness(rescored).freeM
+        validated <- Op.ValidatePopulation(ranked).freeM
+        _         <- Op.DisplayFinal(validated).freeM
+      yield validated
   }
 
   private def iterate[F[_], A](a: A, n: Int)(f: (A, Int) => Free[F, A]): Free[F, A] =

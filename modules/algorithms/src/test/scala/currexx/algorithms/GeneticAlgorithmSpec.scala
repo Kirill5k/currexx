@@ -47,7 +47,18 @@ class GeneticAlgorithmSpec extends IOWordSpec {
       )
       result <- Algorithm.GA
         .optimise[Array[Int]](Array.fill(genomeLength)(0), params)
-        .foldMap(Op.ioInterpreter[IO, Array[Int]](initialiser, crossover, mutator, evaluator, validator, selector, elitism, tracker))
+        .foldMap(
+          Op.ioInterpreter[IO, Array[Int]](
+            initialiser,
+            crossover,
+            mutator,
+            evaluator,
+            validator,
+            selector,
+            elitism,
+            tracker
+          )
+        )
     yield result
 
   "Algorithm.GA" should {
