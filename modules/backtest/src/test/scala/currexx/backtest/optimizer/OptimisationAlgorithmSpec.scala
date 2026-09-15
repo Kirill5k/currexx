@@ -157,7 +157,7 @@ class OptimisationAlgorithmSpec extends IOWordSpec {
         reports must have size 1
         val (path, content) = reports.head
         path.fileName.toString must startWith("scga-optimisation-")
-        content must include(s"# Species-Conserving Genetic Algorithm (SCGA) Run: $label")
+        content must include(s"# Species-Conserving Genetic Algorithm Run: $label")
         content must include(s"**Parameters:** $params")
         content must include("## Final Results")
         content must include("**Top 2 members:**")

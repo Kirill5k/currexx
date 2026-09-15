@@ -30,7 +30,7 @@ object SpeciesSelection:
         F.delay {
           for
             species = population.species
-            _ <- errorOnCond(populationSize >= 0, "Population size must be positive")
+            _ <- errorOnCond(populationSize > 0, "Population size must be positive")
             _ <- errorOnCond(species.nonEmpty && species.forall(_.members.nonEmpty), "Breeding requires nonempty species")
             _ <- errorOnCond(
               interspeciesProbability.isFinite && interspeciesProbability >= 0.0 && interspeciesProbability <= 1.0,
