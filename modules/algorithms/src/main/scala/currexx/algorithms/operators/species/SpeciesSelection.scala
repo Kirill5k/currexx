@@ -6,34 +6,39 @@ import currexx.algorithms.EvaluatedPopulation
 import scala.util.Random
 
 trait SpeciesSelection[F[_], I]:
-  def select(population: SpeciesPopulation[I], populationSize: Int, interspeciesProbability: Double)(using
+  def select(
+      population: SpeciesPopulation[I],
+      populationSize: Int,
+      interspeciesProbability: Double
+  )(using
       Random
   ): F[Either[IllegalArgumentException, SpeciesBreeding[I]]]
 
 object SpeciesSelection:
+  private def errorOnCond(test: Boolean, message: String): Either[IllegalArgumentException, Unit] =
+    Either.cond(test, (), new IllegalArgumentException(message))
+
   def make[F[_], I](using F: Sync[F]): F[SpeciesSelection[F, I]] =
     F.pure(new SpeciesSelection[F, I] {
-      override def select(population: SpeciesPopulation[I], populationSize: Int, interspeciesProbability: Double)(using
+      override def select(
+          population: SpeciesPopulation[I],
+          populationSize: Int,
+          interspeciesProbability: Double
+      )(using
           random: Random
       ): F[Either[IllegalArgumentException, SpeciesBreeding[I]]] =
         F.delay {
-          val species = population.species
           for
-            _ <- Either.cond(populationSize > 0, (), new IllegalArgumentException("Population size must be positive"))
-            _ <- Either.cond(
-              species.nonEmpty && species.forall(_.members.nonEmpty),
-              (),
-              new IllegalArgumentException("Breeding requires nonempty species")
-            )
-            _ <- Either.cond(
+            species = population.species
+            _ <- errorOnCond(populationSize >= 0, "Population size must be positive")
+            _ <- errorOnCond(species.nonEmpty && species.forall(_.members.nonEmpty), "Breeding requires nonempty species")
+            _ <- errorOnCond(
               interspeciesProbability.isFinite && interspeciesProbability >= 0.0 && interspeciesProbability <= 1.0,
-              (),
-              new IllegalArgumentException("Interspecies probability must be between zero and one")
+              "Interspecies probability must be between zero and one"
             )
-            _ <- Either.cond(
+            _ <- errorOnCond(
               (populationSize == 1 && species.size == 1) || species.size <= populationSize / 2,
-              (),
-              new IllegalArgumentException("Population must fit a representative and a child per species")
+              "Population must fit a representative and a child per species"
             )
           yield {
             val counts = offspringCounts(species, populationSize)
