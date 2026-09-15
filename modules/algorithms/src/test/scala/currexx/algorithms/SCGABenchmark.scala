@@ -72,7 +72,7 @@ private[algorithms] object MultimodalExperiment:
   def run(seed: Long, scga: Boolean, maxGen: Int = 60): IO[Result] = IO.defer {
     given Random   = new Random(seed)
     val gaParams   = Parameters.GA(PopulationSize, maxGen, 0.8, 0.6, 0.1, shuffle = true)
-    val scgaParams = Parameters.SCGA.fromGA(gaParams).copy(speciesRadius = 0.2, maxSpecies = 2, interspeciesMatingProbability = 0.1)
+    val scgaParams = Parameters.SCGA.from(gaParams).copy(speciesRadius = 0.2, maxSpecies = 2, interspeciesMatingProbability = 0.1)
     for
       requests       <- Ref.of[IO, Int](0)
       objectiveCalls <- Ref.of[IO, Int](0)

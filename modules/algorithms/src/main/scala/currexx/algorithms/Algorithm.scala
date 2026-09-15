@@ -40,12 +40,12 @@ object Parameters {
       interspeciesMatingProbability: Double = 0.10
   ) extends Parameters[Alg.SCGA]:
     val name: String             = "SCGA"
-    val displayName: String      = "Species-Conserving Genetic Algorithm (SCGA)"
+    val displayName: String      = "Species-Conserving Genetic Algorithm"
     def effectiveMaxSpecies: Int = math.min(maxSpecies, math.max(1, populationSize / 2))
 
   object SCGA:
     /** Copy the search budget and variation settings; conserved species replace GA's elitism ratio. */
-    def fromGA(params: GA): SCGA = SCGA(
+    def from(params: GA): SCGA = SCGA(
       populationSize = params.populationSize,
       maxGen = params.maxGen,
       crossoverProbability = params.crossoverProbability,

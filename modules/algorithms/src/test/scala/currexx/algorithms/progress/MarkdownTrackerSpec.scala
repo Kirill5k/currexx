@@ -84,7 +84,7 @@ class MarkdownTrackerSpec extends IOWordSpec {
       result.asserting { case (reports, content) =>
         reports.size mustBe 1
         reports.head.fileName.toString must startWith("scga-optimisation-")
-        content must include("# Species-Conserving Genetic Algorithm (SCGA) Run")
+        content must include("# Species-Conserving Genetic Algorithm Run")
         content must include(s"**Parameters:** $scgaParams")
         (content must not).include("Generation 1 out of 20")
         (content must not).include("skipped-candidate")

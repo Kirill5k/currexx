@@ -126,7 +126,7 @@ object Optimiser extends IOApp.Simple {
     OptimisationRound(
       name = "s5_optimized_v2_scga",
       strategy = TestStrategy.s5_optimized_v2,
-      parameters = Parameters.SCGA.fromGA(gaParametersWithShuffle),
+      parameters = Parameters.SCGA.from(gaParametersWithShuffle),
       scoringFunction = consistentScoring,
       extraSeeds = List(
         TestStrategy.s5_optimized_v3.indicator,

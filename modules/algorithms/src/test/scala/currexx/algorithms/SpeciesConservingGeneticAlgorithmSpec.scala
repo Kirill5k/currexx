@@ -223,7 +223,7 @@ class SpeciesConservingGeneticAlgorithmSpec extends IOWordSpec {
   "Parameters.SCGA" should {
     "copy GA budgets and variation settings without copying global elitism" in {
       val ga = Parameters.GA(301, 17, 0.6, 0.2, 0.03, shuffle = true, initialOversampling = 3)
-      Parameters.SCGA.fromGA(ga) mustBe Parameters.SCGA(301, 17, 0.6, 0.2, shuffle = true, initialOversampling = 3)
+      Parameters.SCGA.from(ga) mustBe Parameters.SCGA(301, 17, 0.6, 0.2, shuffle = true, initialOversampling = 3)
       params.copy(populationSize = 3, maxSpecies = 8).effectiveMaxSpecies mustBe 1
       params.copy(populationSize = 1).effectiveMaxSpecies mustBe 1
     }
