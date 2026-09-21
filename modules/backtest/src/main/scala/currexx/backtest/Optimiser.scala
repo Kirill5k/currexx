@@ -78,6 +78,13 @@ object Optimiser extends IOApp.Simple {
       extraSeeds = List(TestStrategy.s2_optimized_v2.indicator)
     ),
     OptimisationRound(
+      name = "s2_optimized_shuffle",
+      strategy = TestStrategy.s2_optimized,
+      parameters = Parameters.SCGA.from(gaParametersWithShuffle),
+      scoringFunction = consistentScoring,
+      extraSeeds = List(TestStrategy.s2_optimized_v2.indicator)
+    ),
+    OptimisationRound(
       name = "s10",
       strategy = TestStrategy.s10,
       parameters = gaParameters,
@@ -99,6 +106,12 @@ object Optimiser extends IOApp.Simple {
       name = "s10_v2_shuffle",
       strategy = TestStrategy.s10_v2,
       parameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s10_v2_shuffle",
+      strategy = TestStrategy.s10_v2,
+      parameters = Parameters.SCGA.from(gaParametersWithShuffle),
       scoringFunction = consistentScoring
     ),
     OptimisationRound(
@@ -184,6 +197,12 @@ object Optimiser extends IOApp.Simple {
       name = "s1_v2_optimized_shuffle",
       strategy = TestStrategy.s1_v2_optimized,
       parameters = gaParametersWithShuffle,
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
+      name = "s1_v2_optimized_shuffle",
+      strategy = TestStrategy.s1_v2_optimized,
+      parameters = Parameters.SCGA.from(gaParametersWithShuffle),
       scoringFunction = consistentScoring
     )
   )
