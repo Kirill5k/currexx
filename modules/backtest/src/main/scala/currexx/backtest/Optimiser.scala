@@ -188,6 +188,12 @@ object Optimiser extends IOApp.Simple {
       scoringFunction = consistentScoring
     ),
     OptimisationRound(
+      name = "s13_shuffle",
+      strategy = TestStrategy.s13,
+      parameters = Parameters.SCGA.from(gaParametersWithShuffle),
+      scoringFunction = consistentScoring
+    ),
+    OptimisationRound(
       name = "s1_v2_optimized",
       strategy = TestStrategy.s1_v2_optimized,
       parameters = gaParameters,
