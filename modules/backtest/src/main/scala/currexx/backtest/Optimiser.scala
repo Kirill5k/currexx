@@ -17,12 +17,9 @@ final case class OptimisationRound(
     scoringFunction: ScoringFunction,
     corpus: Corpus = MarketDataProvider.majors1hCorpus,
     shortlistSize: Int = 25,
-    /** Champions of the same indicator shape, mixed into the starting population alongside the strategy's own indicator.
-      *
-      * The catalogue is a record of what has already scored well under these rules, and starting from several points known to work costs
-      * nothing over starting from one. Both mixes use them: a shuffled round leans on them heavily, having thrown everything else away, and
-      * an unshuffled one keeps enough of them to have something worth crossing its seed with. Only shapes that can be crossed with the
-      * target are usable. The round's search space filters incompatible schemas and restores fixed values before mixing seeds.
+    /** Compatible parameter sets mixed into the starting population alongside the target, always evaluated under the target's rules. Both
+      * refinement and exploration divide their clone/jitter allocation among these seeds. The search space filters incompatible schemas,
+      * restores fixed values and removes duplicate projections before mixing them.
       */
     extraSeeds: List[Indicator] = Nil,
     /** Additional indicators or composite subtrees to keep at their target values. All identical occurrences are fixed; values absent from
@@ -46,172 +43,73 @@ object Optimiser extends IOApp.Simple {
     shuffle = false
   )
 
-  // Three populations drawn and the best one's worth of members kept. Worth it here and not on an unshuffled round, whose members mostly
-  // are the seed: over-drawing selects on variation, and there has to be some to select on.
-  // Opt a round into SCGA with parameters = Parameters.SCGA.fromGA(gaParameters), or convert the shuffled settings below.
-  // Radius 0.15, eight species and 10% interspecies mating are provisional defaults, not values tuned on historical results.
-  val gaParametersWithShuffle = gaParameters.copy(shuffle = true, initialOversampling = 3)
-
+  // Exploration draws three populations and retains the best population's worth of members.
+  // SCGA.from preserves these settings; its species defaults remain unchanged for the comparison.
+  val gaParametersWithShuffle            = gaParameters.copy(shuffle = true, initialOversampling = 3)
   val consistentScoring: ScoringFunction = ScoringFunction.Consistent()
 
-  /** Strategy families searched with both refining and exploring starting populations. `shuffle` changes the population mix, not the order
-    * of market data. Each round evaluates its own strategy's rules; extra seeds contribute indicator parameters only.
-    *
-    * s10_v2, s6, s13 and s1_v2 have different entry or exit rules from the existing families, so they need their own rounds. s13 keeps CMF
-    * as its momentum value tracker and RSX as its exit-zone detector; the price-momentum families have incompatible seed schemas. s10_v2
-    * reused the later evaluation period during manual development; its historical results are not independent validation. All rounds retain
-    * the standard search/validation corpus.
-    */
-  val rounds: List[OptimisationRound] = List(
-    OptimisationRound(
-      name = "s2_optimized",
-      strategy = TestStrategy.s2_optimized,
-      parameters = gaParameters,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s2_optimized_v2.indicator)
-    ),
-    OptimisationRound(
-      name = "s2_optimized_shuffle",
-      strategy = TestStrategy.s2_optimized,
-      parameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s2_optimized_v2.indicator)
-    ),
-    OptimisationRound(
-      name = "s2_optimized_shuffle",
-      strategy = TestStrategy.s2_optimized,
-      parameters = Parameters.SCGA.from(gaParametersWithShuffle),
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s2_optimized_v2.indicator)
-    ),
-    OptimisationRound(
-      name = "s10",
-      strategy = TestStrategy.s10,
-      parameters = gaParameters,
-      scoringFunction = consistentScoring
-    ),
-    OptimisationRound(
-      name = "s10_shuffle",
-      strategy = TestStrategy.s10,
-      parameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring
-    ),
-    OptimisationRound(
-      name = "s10_v2",
-      strategy = TestStrategy.s10_v2,
-      parameters = gaParameters,
-      scoringFunction = consistentScoring
-    ),
-    OptimisationRound(
-      name = "s10_v2_shuffle",
-      strategy = TestStrategy.s10_v2,
-      parameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring
-    ),
-    OptimisationRound(
-      name = "s10_v2_shuffle",
-      strategy = TestStrategy.s10_v2,
-      parameters = Parameters.SCGA.from(gaParametersWithShuffle),
-      scoringFunction = consistentScoring
-    ),
-    OptimisationRound(
-      name = "s5_optimized_v2",
-      strategy = TestStrategy.s5_optimized_v2,
-      parameters = gaParameters,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(
-        TestStrategy.s5_optimized_v3.indicator,
-        TestStrategy.s6.indicator,
-        TestStrategy.s6_optimized.indicator
-      )
-    ),
-    OptimisationRound(
-      name = "s5_optimized_v2_shuffle",
-      strategy = TestStrategy.s5_optimized_v2,
-      parameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(
-        TestStrategy.s5_optimized_v3.indicator,
-        TestStrategy.s6.indicator,
-        TestStrategy.s6_optimized.indicator
-      )
-    ),
-    OptimisationRound(
-      name = "s5_optimized_v2_scga",
-      strategy = TestStrategy.s5_optimized_v2,
-      parameters = Parameters.SCGA.from(gaParametersWithShuffle),
-      scoringFunction = consistentScoring,
-      extraSeeds = List(
-        TestStrategy.s5_optimized_v3.indicator,
-        TestStrategy.s6.indicator,
-        TestStrategy.s6_optimized.indicator
-      )
-    ),
-    OptimisationRound(
-      name = "s4_optimized_v2",
-      strategy = TestStrategy.s4_optimized_v2,
-      parameters = gaParameters,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s4_optimized_v1.indicator, TestStrategy.s4_optimized_v1.indicator)
-    ),
-    OptimisationRound(
-      name = "s4_optimized_v2_shuffle",
-      strategy = TestStrategy.s4_optimized_v2,
-      parameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s4_optimized_v1.indicator, TestStrategy.s4_optimized_v1.indicator)
-    ),
-    OptimisationRound(
-      name = "s6_optimized",
-      strategy = TestStrategy.s6_optimized,
-      parameters = gaParameters,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s6.indicator)
-    ),
-    OptimisationRound(
-      name = "s6_optimized_shuffle",
-      strategy = TestStrategy.s6_optimized,
-      parameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring,
-      extraSeeds = List(TestStrategy.s6.indicator)
-    ),
-    OptimisationRound(
-      name = "s13",
-      strategy = TestStrategy.s13,
-      parameters = gaParameters,
-      scoringFunction = consistentScoring
-    ),
-    OptimisationRound(
-      name = "s13_shuffle",
-      strategy = TestStrategy.s13,
-      parameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring
-    ),
-    OptimisationRound(
-      name = "s13_shuffle",
-      strategy = TestStrategy.s13,
-      parameters = Parameters.SCGA.from(gaParametersWithShuffle),
-      scoringFunction = consistentScoring
-    ),
-    OptimisationRound(
-      name = "s1_v2_optimized",
-      strategy = TestStrategy.s1_v2_optimized,
-      parameters = gaParameters,
-      scoringFunction = consistentScoring
-    ),
-    OptimisationRound(
-      name = "s1_v2_optimized_shuffle",
-      strategy = TestStrategy.s1_v2_optimized,
-      parameters = gaParametersWithShuffle,
-      scoringFunction = consistentScoring
-    ),
-    OptimisationRound(
-      name = "s1_v2_optimized_shuffle",
-      strategy = TestStrategy.s1_v2_optimized,
-      parameters = Parameters.SCGA.from(gaParametersWithShuffle),
-      scoringFunction = consistentScoring
-    )
+  final private case class Family(
+      name: String,
+      strategy: TestStrategy,
+      extraSeeds: List[Indicator] = Nil,
+      // Include one additional SCGA exploration round.
+      runScga: Boolean = false
   )
+
+  private val families = List(
+    Family(
+      "s2_optimized",
+      TestStrategy.s2_optimized,
+      List(TestStrategy.s2_optimized_v2.indicator)
+    ),
+    Family(
+      "s10_optimized",
+      TestStrategy.s10_optimized,
+      List(TestStrategy.s10.indicator)
+    ),
+    Family(
+      "s5_optimized_v2",
+      TestStrategy.s5_optimized_v2,
+      List(TestStrategy.s5_optimized_v3.indicator, TestStrategy.s6.indicator, TestStrategy.s6_optimized.indicator)
+    ),
+    Family(
+      "s4_optimized_v2",
+      TestStrategy.s4_optimized_v2,
+      List(TestStrategy.s4_optimized_v1.indicator)
+    ),
+    Family(
+      "s6_optimized",
+      TestStrategy.s6_optimized,
+      List(TestStrategy.s6.indicator, TestStrategy.s5_optimized_v2.indicator, TestStrategy.s5_optimized_v3.indicator)
+    ),
+    Family("s10_v2", TestStrategy.s10_v2, runScga = true),
+    Family("s13", TestStrategy.s13, runScga = true),
+    Family("s1_v2_optimized", TestStrategy.s1_v2_optimized, runScga = true)
+  )
+
+  private def round(
+      family: Family,
+      params: Parameters.GA | Parameters.SCGA,
+      mode: String
+  ): OptimisationRound =
+    OptimisationRound(
+      name = s"${family.name}_${params.name.toLowerCase}_$mode",
+      strategy = family.strategy,
+      parameters = params,
+      scoringFunction = consistentScoring,
+      extraSeeds = family.extraSeeds
+    )
+
+  /** Every family receives refining and exploring GA rounds, plus an exploring SCGA round when enabled. `shuffle` changes the initial
+    * population mix, not market-data order. Compatible extra seeds contribute parameters only; each round retains its own rules and fixed
+    * inputs. All rounds use the standard search/validation corpus, excluding the historical period reused during development.
+    */
+  val rounds: List[OptimisationRound] = families.flatMap { family =>
+    List(
+      round(family, gaParameters, "refine"),
+      round(family, gaParametersWithShuffle, "explore")
+    ) ::: Option.when(family.runScga)(round(family, Parameters.SCGA.from(gaParametersWithShuffle), "explore")).toList
+  }
 
   override def run: IO[Unit] =
     rounds.traverse_ { round =>
