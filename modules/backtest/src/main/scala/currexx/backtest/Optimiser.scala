@@ -54,7 +54,16 @@ object Optimiser extends IOApp.Simple {
       extraSeeds: List[Indicator] = Nil,
       // Include one additional SCGA exploration round.
       runScga: Boolean = false
-  )
+  ) {
+    def toRound(params: Parameters.GA | Parameters.SCGA, mode: String): OptimisationRound =
+      OptimisationRound(
+        name = s"${name}_${params.name.toLowerCase}_$mode",
+        strategy = strategy,
+        parameters = params,
+        scoringFunction = consistentScoring,
+        extraSeeds = extraSeeds
+      )
+  }
 
   private val families = List(
     Family(
@@ -87,28 +96,15 @@ object Optimiser extends IOApp.Simple {
     Family("s1_v2_optimized", TestStrategy.s1_v2_optimized, runScga = true)
   )
 
-  private def round(
-      family: Family,
-      params: Parameters.GA | Parameters.SCGA,
-      mode: String
-  ): OptimisationRound =
-    OptimisationRound(
-      name = s"${family.name}_${params.name.toLowerCase}_$mode",
-      strategy = family.strategy,
-      parameters = params,
-      scoringFunction = consistentScoring,
-      extraSeeds = family.extraSeeds
-    )
-
   /** Every family receives refining and exploring GA rounds, plus an exploring SCGA round when enabled. `shuffle` changes the initial
     * population mix, not market-data order. Compatible extra seeds contribute parameters only; each round retains its own rules and fixed
     * inputs. All rounds use the standard search/validation corpus, excluding the historical period reused during development.
     */
   val rounds: List[OptimisationRound] = families.flatMap { family =>
     List(
-      round(family, gaParameters, "refine"),
-      round(family, gaParametersWithShuffle, "explore")
-    ) ::: Option.when(family.runScga)(round(family, Parameters.SCGA.from(gaParametersWithShuffle), "explore")).toList
+      family.toRound(gaParameters, "refine"),
+      family.toRound(gaParametersWithShuffle, "explore")
+    ) ::: Option.when(family.runScga)(family.toRound(Parameters.SCGA.from(gaParametersWithShuffle), "explore")).toList
   }
 
   override def run: IO[Unit] =
