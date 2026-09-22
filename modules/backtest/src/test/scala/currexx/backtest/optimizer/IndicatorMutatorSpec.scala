@@ -136,6 +136,59 @@ class IndicatorMutatorSpec extends IOWordSpec {
       }
     }
 
+    "mutating JMA power" should {
+      "take an inward neighbouring step at either boundary" in {
+        val result = List(1, 10).traverse { power =>
+          given Random = controlledRandom(List(0.9, 0.9, 0.0, 0.0))
+          IndicatorMutator.make[IO].flatMap(_.mutate(jma(power), 0.1))
+        }
+
+        result.asserting(_ mustBe List(jma(2), jma(9)))
+      }
+
+      "visit either neighbour of an interior power" in {
+        val result = List(false, true).traverse { upwards =>
+          given Random = controlledRandom(List(0.9, 0.9, 0.0, 0.0), upwards = upwards)
+          IndicatorMutator.make[IO].flatMap(_.mutate(jma(5), 0.1))
+        }
+
+        result.asserting(_ mustBe List(jma(4), jma(6)))
+      }
+
+      "still require the per-gene mutation coin flip" in {
+        given Random = controlledRandom(List(0.9, 0.9, 0.2))
+
+        IndicatorMutator.make[IO].flatMap(_.mutate(jma(1), 0.1)).asserting(_ mustBe jma(1))
+      }
+
+      "leave the indicator unchanged with zero mutation probability" in {
+        given Random = controlledRandom(List(0.0, 0.0, 0.0))
+
+        IndicatorMutator.make[IO].flatMap(_.mutate(jma(1), 0.0)).asserting(_ mustBe jma(1))
+      }
+
+      "retain Gaussian steps larger than one and clamp them to the power bounds" in {
+        val result = List(2.0, -100.0, 100.0).traverse { gaussian =>
+          given Random = controlledRandom(List(0.9, 0.9, 0.0, 0.9), gaussian = gaussian)
+          IndicatorMutator.make[IO].flatMap(_.mutate(jma(5), 0.1))
+        }
+
+        result.asserting(_ mustBe List(jma(8), jma(1), jma(10)))
+      }
+
+      "retain wider Gaussian jitter for initialisation" in {
+        given Random = controlledRandom(List(0.9, 0.9, 0.0, 0.9), gaussian = 1.0)
+
+        IndicatorMutator.scaled[IO](6.0).flatMap(_.mutate(jma(1), 0.1)).asserting(_ mustBe jma(4))
+      }
+
+      "leave power unchanged when the jitter scale is zero" in {
+        given Random = controlledRandom(List(0.9, 0.9, 0.0))
+
+        IndicatorMutator.scaled[IO](0.0).flatMap(_.mutate(jma(1), 0.1)).asserting(_ mustBe jma(1))
+      }
+    }
+
     "step a proportional gene by the same fraction of itself wherever it sits in its range" in {
       // The property log-space buys, and the reason `GeneBounds.Scale` exists. A linear tenth of [5, 100] is 9.5 bars: from a fast line at
       // 10 that is a rewrite, and from a slow one at 50 it is a nudge, so a linear walk would show roughly a fivefold difference in the
@@ -160,6 +213,17 @@ class IndicatorMutatorSpec extends IOWordSpec {
       }
     }
   }
+
+  private def jma(power: Int): Indicator =
+    Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.JMA(20, 0, power))
+
+  private def controlledRandom(draws: List[Double], upwards: Boolean = false, gaussian: Double = 0.0): Random =
+    new Random(0L) {
+      private val remaining               = draws.iterator
+      override def nextDouble(): Double   = remaining.next()
+      override def nextBoolean(): Boolean = upwards
+      override def nextGaussian(): Double = gaussian
+    }
 
   /** The one length of a single-transformation indicator, so a test can read what the mutator did to it. */
   private def lengthOf(indicator: Indicator): Int = indicator match

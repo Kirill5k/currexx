@@ -12,9 +12,9 @@ object IndicatorMutator {
 
   def make[F[_]](using F: Sync[F]): F[Mutator[F, Indicator]] = scaled(1.0)
 
-  /** The same walk with a wider step. A scale of 1.0 is the search's own mutation, a standard deviation of a tenth of each gene's range;
-    * larger scales are how `IndicatorInitialiser` builds a population that sits at a chosen distance from its seed rather than on top of
-    * it. Nothing in the search itself should pass anything but 1.0.
+  /** The same walk with a wider Gaussian step. A scale of 1.0 is the search's own mutation, a standard deviation of a tenth of each gene's
+    * range; larger scales are how `IndicatorInitialiser` builds a population that sits at a chosen distance from its seed rather than on
+    * top of it. Nothing in the search itself should pass anything but 1.0.
     */
   def scaled[F[_]](sigmaScale: Double)(using F: Sync[F]): F[Mutator[F, Indicator]] = F.pure {
     new Mutator[F, Indicator] {
@@ -38,13 +38,30 @@ object IndicatorMutator {
           * range's ratio rather than of its width, which is what keeps the step the same size at both ends of something like [5, 100] and
           * what makes it match the distribution `IndicatorInitialiser` draws from.
           */
-        def mutInt(value: Int, range: IntRange): Int =
-          if (!geneMutates) value
-          else if (range.isLogarithmic) {
+        def walkInt(value: Int, range: IntRange): Int =
+          if (range.isLogarithmic) {
             val logSpan = math.log(range.max.toDouble) - math.log(range.min.toDouble)
             val walked  = math.log(range.clamp(value).toDouble) + r.nextGaussian() * logSpan * 0.1 * sigmaScale
             range.clamp(rounded(math.exp(walked)))
           } else range.clamp(value + rounded(r.nextGaussian() * range.span * 0.1 * sigmaScale))
+
+        def mutInt(value: Int, range: IntRange): Int =
+          if (!geneMutates) value else walkInt(value, range)
+
+        /** JMA power is a small discrete parameter, so a rounded log-space walk rarely leaves its lower bound. After the usual mutation
+          * coin flip, half its steps visit a neighbouring value and half keep the Gaussian walk, including wider initialisation jitter.
+          * Boundary steps point inward; lookback genes keep their proportional walk even when their feasible range happens to be small.
+          */
+        def mutJmaPower(value: Int): Int =
+          val range = GeneBounds.jmaPower
+          if (!geneMutates) value
+          else if (sigmaScale == 0.0) range.clamp(value)
+          else if (r.nextDouble() < 0.5) {
+            val current = range.clamp(value)
+            if (current == range.min) current + 1
+            else if (current == range.max) current - 1
+            else current + (if (r.nextBoolean()) 1 else -1)
+          } else walkInt(value, range)
 
         /** The same walk for a continuous gene, snapped to the step the gene is placed on. */
         def mutDouble(value: Double, range: DoubleRange): Double =
@@ -77,7 +94,7 @@ object IndicatorMutator {
           case VT.HMA(length) =>
             VT.HMA(mutInt(length, GeneBounds.maLength))
           case VT.JMA(length, phase, power) =>
-            VT.JMA(mutInt(length, GeneBounds.jmaLength), mutInt(phase, GeneBounds.jmaPhase), mutInt(power, GeneBounds.jmaPower))
+            VT.JMA(mutInt(length, GeneBounds.jmaLength), mutInt(phase, GeneBounds.jmaPhase), mutJmaPower(power))
           case VT.NMA(length, signalLength, lambda, maCalc) =>
             VT.NMA(
               mutInt(length, GeneBounds.nmaLength),

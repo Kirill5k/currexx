@@ -132,7 +132,7 @@ object Optimiser extends IOApp.Simple {
     * things only the round holds: the datasets, which the population has no memory of, and the verdict on the champion, which needs the
     * scoring function that produced it.
     */
-  private def verdict(
+  private[backtest] def verdict(
       round: OptimisationRound,
       population: ValidatedPopulation[Indicator],
       championBreaches: List[ScoringFunction.Violation]
@@ -141,22 +141,21 @@ object Optimiser extends IOApp.Simple {
     val retained                                         =
       if (championTraining.value > 0.0) f"${championValidation.value / championTraining.value * 100}%.1f%%" else "n/a"
 
-    val datasets = round.corpus.describe :+ ""
+    val datasets    = round.corpus.describe :+ ""
+    val breachLines =
+      if (championBreaches.isEmpty) List("Satisfies every constraint on validation data.")
+      else s"BREACHES ${championBreaches.size} constraint(s) on validation data:" :: championBreaches.map(breach => s"  - $breach")
 
     val outcome =
       if (championValidation.value <= 0.0)
         List(
           "NOTHING SELECTED: no finalist scored above zero on data it was never searched against.",
-          "Whatever the training figures say, this round did not find an edge that exists outside its own sample.",
-          s"Best by validation, recorded so the round leaves a trace and not as a candidate: $champion"
-        )
+          "No finalist cleared the configured validation fitness gate."
+        ) ::: breachLines ::: List(s"Leading finalist, recorded for diagnostics only: $champion")
       else {
         val summary =
           f"SELECTED (from ${population.size} after validation, ties inside ${Validator.defaultTieBand.describe}%s broken on training): " +
             f"training ${championTraining.value}%.6f -> validation ${championValidation.value}%.6f, retaining $retained%s"
-        val breachLines =
-          if (championBreaches.isEmpty) List("Satisfies every constraint on validation data.")
-          else s"BREACHES ${championBreaches.size} constraint(s) on validation data:" :: championBreaches.map(breach => s"  - $breach")
         summary :: breachLines ::: List(s"Indicator: $champion")
       }
 

@@ -11,6 +11,7 @@ project/plugins/project/
 .history
 .cache
 .lib/
+docs/*
 
 ### JEnv template
 # JEnv local Java version configuration file

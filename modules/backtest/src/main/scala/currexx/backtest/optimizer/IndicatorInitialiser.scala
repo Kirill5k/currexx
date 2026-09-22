@@ -37,7 +37,7 @@ object IndicatorInitialiser:
   /** Refining a shape the round already believes in, so the population stays within a step of it - but not entirely, because a population
     * that is nothing but its seed can only move as fast as mutation alone, and crossover between near-identical parents does nothing.
     */
-  private val Refining = PopulationMix(cloneShare = 0.70, jitterShare = 0.20, jitterRadii = List(1.0))
+  private val Refining = PopulationMix(cloneShare = 0.30, jitterShare = 0.60, jitterRadii = List(1.0))
 
   def make[F[_]](using F: Sync[F], rand: Random): F[Initialiser[F, Indicator]] = seeded(Nil)
 

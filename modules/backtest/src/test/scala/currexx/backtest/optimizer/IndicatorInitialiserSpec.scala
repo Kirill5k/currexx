@@ -41,9 +41,8 @@ class IndicatorInitialiserSpec extends IOWordSpec {
   "An IndicatorInitialiser" when {
 
     "shuffle is false" should {
-      "keep seventy copies of the seed and draw the remaining thirty" in {
-        // A refining round is mostly its own seed, but not entirely: a population that is nothing but copies can only move at the speed of
-        // mutation, because crossover between identical parents produces the parent. The thirty are what give it anything to cross with.
+      "keep thirty copies of the seed and draw the remaining seventy" in {
+        // Most refining candidates are now neighbours of the seed, giving crossover more distinct parents while preserving the seed.
         given Random = Random(42)
         val result   = for
           init <- IndicatorInitialiser.make[IO]
@@ -52,15 +51,14 @@ class IndicatorInitialiserSpec extends IOWordSpec {
 
         result.asserting { pop =>
           pop must have size 100
-          pop.count(_ == seed) mustBe 70
-          pop.distinct.size must be > 20
+          pop.take(30) mustBe Vector.fill(30)(seed)
+          pop.distinct.size must be > 50
           pop.filterNot(genesWithinBounds) mustBe Vector.empty
         }
       }
 
       "stay nearer the seed than a shuffled draw does" in {
-        // What the two mixes are for, and the only difference between them that matters. Refining spends 90% of the population within one
-        // mutation step of the seed; exploring spends 85% of it further out than that, at three and six steps or drawn outright.
+        // Refining puts 90% of the population in seed copies or one-step neighbours; exploring adds wider jitter and more immigrants.
         given Random = Random(42)
         val result   = for
           init      <- IndicatorInitialiser.make[IO]
@@ -88,6 +86,9 @@ class IndicatorInitialiserSpec extends IOWordSpec {
         yield pop
 
         result.asserting { pop =>
+          pop must have size 100
+          pop.take(30).count(_ == seed) mustBe 15
+          pop.take(30).count(_ == sibling) mustBe 15
           pop must contain(seed)
           pop must contain(sibling)
         }
