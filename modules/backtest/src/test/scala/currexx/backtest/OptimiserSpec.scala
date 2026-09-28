@@ -6,11 +6,12 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 class OptimiserSpec extends AnyWordSpec with Matchers {
-  private val reportRound = OptimisationRound(
+  private val consistentScoring = ScoringFunction.Consistent()
+  private val reportRound       = OptimisationRound(
     "verdict-test",
     TestStrategy.s10,
     Optimiser.gaParameters,
-    Optimiser.consistentScoring
+    consistentScoring
   )
 
   private def verdict(validation: Double, breaches: List[ScoringFunction.Violation]): List[String] =
@@ -18,9 +19,11 @@ class OptimiserSpec extends AnyWordSpec with Matchers {
 
   "Optimiser rounds" should {
     "give every family two GA rounds and add SCGA only for enabled families" in {
-      val rounds         = Optimiser.rounds
-      val byStrategy     = rounds.groupBy(_.strategy)
-      val scgaStrategies = Set(TestStrategy.s10_v2, TestStrategy.s13, TestStrategy.s1_v2_optimized)
+      val rounds                  = Optimiser.rounds
+      val byStrategy              = rounds.groupBy(_.strategy)
+      val scgaStrategies          = Set(TestStrategy.s10_v2, TestStrategy.s13, TestStrategy.s1_v2_optimized)
+      val gaParametersWithShuffle = Optimiser.gaParameters.copy(shuffle = true, initialOversampling = 3)
+      val emptyStats              = List(OrderStats())
 
       rounds must have size 19
       rounds.map(_.name).distinct must have size 19
@@ -35,18 +38,18 @@ class OptimiserSpec extends AnyWordSpec with Matchers {
         TestStrategy.s1_v2_optimized
       )
       byStrategy.foreach { case (strategy, familyRounds) =>
-        val expected: List[Parameters.GA | Parameters.SCGA] = List(Optimiser.gaParameters, Optimiser.gaParametersWithShuffle) :::
-          Option.when(scgaStrategies.contains(strategy))(Parameters.SCGA.from(Optimiser.gaParametersWithShuffle)).toList
+        val expected: List[Parameters.GA | Parameters.SCGA] = List(Optimiser.gaParameters, gaParametersWithShuffle) :::
+          Option.when(scgaStrategies.contains(strategy))(Parameters.SCGA.from(gaParametersWithShuffle)).toList
         familyRounds.map(_.parameters) mustBe expected
         familyRounds.head.name must endWith("_ga_refine")
         familyRounds(1).name must endWith("_ga_explore")
         familyRounds.drop(2).foreach(_.name must endWith("_scga_explore"))
       }
       Optimiser.gaParameters mustBe Parameters.GA(300, 150, 0.7, 0.1, 0.02, shuffle = false)
-      Optimiser.gaParametersWithShuffle mustBe Optimiser.gaParameters.copy(shuffle = true, initialOversampling = 3)
       rounds.foreach { round =>
         round.corpus mustBe MarketDataProvider.majors1hCorpus
-        round.scoringFunction mustBe Optimiser.consistentScoring
+        round.scoringFunction.score(emptyStats) mustBe consistentScoring.score(emptyStats)
+        round.scoringFunction.violations(emptyStats) mustBe consistentScoring.violations(emptyStats)
         round.shortlistSize mustBe 25
         round.fixedIndicators mustBe Set.empty
       }

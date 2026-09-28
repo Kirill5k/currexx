@@ -43,11 +43,6 @@ object Optimiser extends IOApp.Simple {
     shuffle = false
   )
 
-  // Exploration draws three populations and retains the best population's worth of members.
-  // SCGA.from preserves these settings; its species defaults remain unchanged for the comparison.
-  val gaParametersWithShuffle            = gaParameters.copy(shuffle = true, initialOversampling = 3)
-  val consistentScoring: ScoringFunction = ScoringFunction.Consistent()
-
   final private case class Family(
       name: String,
       strategy: TestStrategy,
@@ -60,7 +55,7 @@ object Optimiser extends IOApp.Simple {
         name = s"${name}_${params.name.toLowerCase}_$mode",
         strategy = strategy,
         parameters = params,
-        scoringFunction = consistentScoring,
+        scoringFunction = ScoringFunction.Consistent(),
         extraSeeds = extraSeeds
       )
   }
@@ -101,10 +96,12 @@ object Optimiser extends IOApp.Simple {
     * inputs. All rounds use the standard search/validation corpus, excluding the historical period reused during development.
     */
   val rounds: List[OptimisationRound] = families.flatMap { family =>
-    List(
-      family.toRound(gaParameters, "refine"),
-      family.toRound(gaParametersWithShuffle, "explore")
-    ) ::: Option.when(family.runScga)(family.toRound(Parameters.SCGA.from(gaParametersWithShuffle), "explore")).toList
+    // Exploration draws three populations and retains the best population's worth of members.
+    // SCGA.from preserves these settings; its species defaults remain unchanged for the comparison.
+    val gaParametersWithShuffle = gaParameters.copy(shuffle = true, initialOversampling = 3)
+    family.toRound(gaParameters, "refine")
+      :: family.toRound(gaParametersWithShuffle, "explore")
+      :: Option.when(family.runScga)(family.toRound(Parameters.SCGA.from(gaParametersWithShuffle), "explore")).toList
   }
 
   override def run: IO[Unit] =
