@@ -8,6 +8,7 @@ import fs2.Stream
 import org.typelevel.log4cats.Logger
 import sttp.capabilities.fs2.Fs2Streams
 import sttp.client4.{Request, Response, WebSocketStreamBackend}
+import sttp.model.Method
 
 import scala.concurrent.duration.*
 import scala.util.Random
@@ -32,7 +33,8 @@ trait Fs2HttpClient[F[_]] {
   }
 
   protected def dispatch[T](request: Request[T])(using F: Temporal[F], logger: Logger[F]): F[Response[T]] =
-    dispatchWithRetry(request)
+    if Method.isSafe(request.method) then dispatchWithRetry(request)
+    else request.send[F](backend)
 
   private def dispatchWithRetry[T](
       request: Request[T],

@@ -2,6 +2,7 @@ package currexx.clients.broker.oanda
 
 import cats.data.NonEmptyList
 import cats.syntax.applicative.*
+import cats.syntax.applicativeError.*
 import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -20,6 +21,7 @@ import sttp.client4.WebSocketStreamBackend
 import sttp.model.StatusCode
 
 import java.time.Instant
+import java.util.UUID
 import scala.concurrent.duration.*
 
 private[clients] trait OandaBrokerClient[F[_]] extends Fs2HttpClient[F]:
@@ -126,31 +128,57 @@ final private class LiveOandaBrokerClient[F[_]](
   }
 
   private def openPosition(accountId: String, params: BrokerParameters.Oanda, position: TradeOrder.Enter): F[OrderPlacementStatus] =
-    dispatch {
-      basicRequest
-        .post(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/orders")
-        .auth
-        .bearer(params.apiKey)
-        .body(asJson(OandaBrokerClient.OpenPositionRequest.from(position)))
-        .response(asJson[OandaBrokerClient.OpenPositionResponse])
-    }.flatMap { r =>
-      r.code match
-        case StatusCode.Created =>
-          r.body match
-            case Right(res) =>
-              if res.isCancelled then F.pure(OrderPlacementStatus.Cancelled(res.orderCancelTransaction.get.reason))
-              else if res.orderFillTransaction.isDefined then F.pure(OrderPlacementStatus.Success)
-              else F.pure(OrderPlacementStatus.Pending)
-            case Left(err) =>
-              logger.warn(s"$name-client/open-position: Created but couldn't parse response: $err").as(OrderPlacementStatus.Pending)
-        case StatusCode.Forbidden =>
-          logger.warn(s"$name-client/open-position: Rate limited, retrying in 30s") >>
-            clock.sleep(30.seconds) >> openPosition(accountId, params, position)
-        case status =>
-          val errorBody = r.body.fold(identity, _ => "")
-          logger.error(s"$name-client/open-position-${status.code}\n$errorBody") >>
-            F.raiseError(AppError.ClientFailure(name, s"Open position returned ${status.code}"))
+    F.delay(UUID.randomUUID().toString).flatMap { clientOrderId =>
+      dispatch {
+        basicRequest
+          .post(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/orders")
+          .auth
+          .bearer(params.apiKey)
+          .body(asJson(OandaBrokerClient.OpenPositionRequest.from(position, clientOrderId)))
+          .response(asJson[OandaBrokerClient.OpenPositionResponse])
+      }.attempt.flatMap {
+        case Right(r) =>
+          r.code match
+            case StatusCode.Created =>
+              r.body match
+                case Right(res) =>
+                  if res.isCancelled then F.pure(OrderPlacementStatus.Cancelled(res.orderCancelTransaction.get.reason))
+                  else if res.orderFillTransaction.isDefined then F.pure(OrderPlacementStatus.Success)
+                  else F.pure(OrderPlacementStatus.Pending)
+                case Left(err) =>
+                  logger.warn(s"$name-client/open-position: Created but couldn't parse response: $err").as(OrderPlacementStatus.Pending)
+            case StatusCode.Forbidden =>
+              logger.warn(s"$name-client/open-position: Rate limited, retrying in 30s") >>
+                clock.sleep(30.seconds) >> openPosition(accountId, params, position)
+            case status if status.isServerError =>
+              logger.warn(s"$name-client/open-position-${status.code}: looking up order $clientOrderId") >>
+                findOrderStatus(accountId, params, clientOrderId)
+            case status =>
+              val errorBody = r.body.fold(identity, _ => "")
+              logger.error(s"$name-client/open-position-${status.code}\n$errorBody") >>
+                F.raiseError(AppError.ClientFailure(name, s"Open position returned ${status.code}"))
+        case Left(error) =>
+          logger.warn(s"$name-client/open-position-${error.getClass.getSimpleName.toLowerCase}: looking up order $clientOrderId") >>
+            findOrderStatus(accountId, params, clientOrderId)
+      }
     }
+
+  // Resubmitting after a lost response could open a duplicate position, so the order is looked up by its client id instead
+  private def findOrderStatus(accountId: String, params: BrokerParameters.Oanda, clientOrderId: String): F[OrderPlacementStatus] =
+    clock.sleep(5.seconds) >>
+      dispatch {
+        basicRequest
+          .get(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/orders/${s"@$clientOrderId"}")
+          .auth
+          .bearer(params.apiKey)
+          .response(asJson[OandaBrokerClient.OrderResponse])
+      }.flatMap { r =>
+        r.body match
+          case Right(res)                               => F.pure(res.order.status)
+          case Left(_) if r.code == StatusCode.NotFound =>
+            F.raiseError(AppError.ClientFailure(name, s"Open position order $clientOrderId was not created"))
+          case Left(err) => handleError("get-order", err)
+      }
 
   private def getAccountId(params: BrokerParameters.Oanda): F[String] =
     dispatch {
@@ -274,7 +302,7 @@ object OandaBrokerClient {
   ) derives Codec.AsObject
 
   object OpenPositionRequest:
-    def from(order: TradeOrder.Enter): OpenPositionRequest =
+    def from(order: TradeOrder.Enter, clientOrderId: String): OpenPositionRequest =
       val units = order.position match
         case TradeOrder.Position.Buy  => (order.volume * LotSize).toInt
         case TradeOrder.Position.Sell => -(order.volume * LotSize).toInt
@@ -283,7 +311,8 @@ object OandaBrokerClient {
           instrument = s"${order.currencyPair.base}_${order.currencyPair.quote}",
           units = units,
           `type` = "MARKET",
-          positionFill = "DEFAULT"
+          positionFill = "DEFAULT",
+          clientExtensions = ClientExtensions(clientOrderId)
         )
       )
 
@@ -291,8 +320,19 @@ object OandaBrokerClient {
       instrument: String,
       units: Int,
       `type`: String,
-      positionFill: String
+      positionFill: String,
+      clientExtensions: ClientExtensions
   ) derives Codec.AsObject
+
+  final case class ClientExtensions(id: String) derives Codec.AsObject
+
+  final case class OrderResponse(order: Order) derives Codec.AsObject
+
+  final case class Order(id: String, state: String) derives Codec.AsObject:
+    def status: OrderPlacementStatus = state match
+      case "FILLED"    => OrderPlacementStatus.Success
+      case "CANCELLED" => OrderPlacementStatus.Cancelled(s"Order $id was cancelled")
+      case _           => OrderPlacementStatus.Pending
 
   final case class AccountsResponse(accounts: List[Account]) derives Codec.AsObject
 

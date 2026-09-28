@@ -152,39 +152,41 @@ final private class LiveTradeService[F[_]](
   private def executeAction(action: TradeAction, state: MarketState, settings: TradeSettings): F[Unit] = {
     def submit(order: TradeOrder, time: Instant, skipEvent: Boolean = false): F[OrderPlacementStatus] =
       submitOrderPlacement(TradeOrderPlacement(state.userId, order, settings.broker, time), skipEvent)
+
+    def open(position: TradeOrder.Position, price: BigDecimal, time: Instant, closeFirst: Boolean): F[Unit] = {
+      val openOrder = settings.trading.toOrder(position, state.currencyPair, price)
+      brokerClient.find(settings.broker, NonEmptyList.one(state.currencyPair)).flatMap { openedOrders =>
+        // An action retried after its entry was filled but not recorded must neither close nor repeat that entry
+        openedOrders.find(_.position == position) match
+          case Some(opened) =>
+            val filledOrder = TradeOrder.Enter(position, state.currencyPair, opened.openPrice, opened.volume)
+            recordOrderPlacement(TradeOrderPlacement(state.userId, filledOrder, settings.broker, time), OrderPlacementStatus.Success)
+          case None if closeFirst =>
+            submit(TradeOrder.Exit(state.currencyPair, price), time, skipEvent = true)
+              .flatMap(status => F.whenA(canOpenAfterClose(status))(submit(openOrder, time).void))
+          case None => submit(openOrder, time).void
+      }
+    }
+
     for
       time  <- clock.now
       price <- marketDataClient.latestPrice(state.currencyPair)
       _     <- action match
-        case TradeAction.OpenLong =>
-          val order = settings.trading.toOrder(TradeOrder.Position.Buy, state.currencyPair, price.close)
-          submit(order, time).void
-
-        case TradeAction.FlipToLong =>
-          val exitOrder = TradeOrder.Exit(state.currencyPair, price.close)
-          val openOrder = settings.trading.toOrder(TradeOrder.Position.Buy, state.currencyPair, price.close)
-          submit(exitOrder, time, skipEvent = true).flatMap(status => F.whenA(canOpenAfterClose(status))(submit(openOrder, time).void))
-
-        case TradeAction.OpenShort =>
-          val order = settings.trading.toOrder(TradeOrder.Position.Sell, state.currencyPair, price.close)
-          submit(order, time).void
-
-        case TradeAction.FlipToShort =>
-          val exitOrder = TradeOrder.Exit(state.currencyPair, price.close)
-          val openOrder = settings.trading.toOrder(TradeOrder.Position.Sell, state.currencyPair, price.close)
-          submit(exitOrder, time, skipEvent = true).flatMap(status => F.whenA(canOpenAfterClose(status))(submit(openOrder, time).void))
-
-        case TradeAction.ClosePosition =>
-          val order = TradeOrder.Exit(state.currencyPair, price.close)
-          submit(order, time).void
+        case TradeAction.OpenLong      => open(TradeOrder.Position.Buy, price.close, time, closeFirst = false)
+        case TradeAction.FlipToLong    => open(TradeOrder.Position.Buy, price.close, time, closeFirst = true)
+        case TradeAction.OpenShort     => open(TradeOrder.Position.Sell, price.close, time, closeFirst = false)
+        case TradeAction.FlipToShort   => open(TradeOrder.Position.Sell, price.close, time, closeFirst = true)
+        case TradeAction.ClosePosition => submit(TradeOrder.Exit(state.currencyPair, price.close), time).void
     yield ()
   }
 
   private def submitOrderPlacement(top: TradeOrderPlacement, skipEvent: Boolean = false): F[OrderPlacementStatus] =
+    brokerClient.submit(top.broker, top.order).flatTap(recordOrderPlacement(top, _, skipEvent))
+
+  private def recordOrderPlacement(top: TradeOrderPlacement, status: OrderPlacementStatus, skipEvent: Boolean = false): F[Unit] =
     for
-      status <- brokerClient.submit(top.broker, top.order)
-      _      <- orderStatusRepository.save(top, status)
-      _      <- status match
+      _ <- orderStatusRepository.save(top, status)
+      _ <- status match
         case OrderPlacementStatus.Pending if !top.order.isEnter =>
           logger.warn(s"Close order is pending at broker: ${top.order}")
         case OrderPlacementStatus.Success | OrderPlacementStatus.Pending =>
@@ -195,7 +197,7 @@ final private class LiveTradeService[F[_]](
         case OrderPlacementStatus.NoPosition =>
           logger.warn(s"Order skipped, no open position to close: ${top.order}") *>
             F.whenA(!skipEvent)(dispatcher.dispatch(Action.ProcessTradeOrderPlacement(top)))
-    yield status
+    yield ()
 }
 
 object TradeService:

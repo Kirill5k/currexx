@@ -8,11 +8,16 @@ import currexx.domain.market.Currency.{EUR, GBP, USD}
 import currexx.domain.market.{CurrencyPair, OrderPlacementStatus, TradeOrder}
 import io.circe.Json
 import io.circe.parser.parse
+import kirill5k.common.cats.Clock
 import kirill5k.common.sttp.test.Sttp4WordSpec
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import sttp.client4.testing.ResponseStub
 import sttp.model.StatusCode
+
+import java.net.SocketTimeoutException
+import java.time.Instant
+import java.util.concurrent.atomic.AtomicReference
 
 class OandaBrokerClientSpec extends Sttp4WordSpec {
 
@@ -321,6 +326,32 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
       result.assertThrows(AppError.ClientFailure("oanda", "Open position returned 400"))
     }
 
+    List(("a server error", false), ("a timeout", true)).foreach { case (description, timeout) =>
+      s"look up an entry order instead of resubmitting it after $description" in
+        submitEnterWithUnknownOutcome(timeout, """{"order":{"id":"42","state":"FILLED"},"lastTransactionID":"43"}""")
+          .asserting(_ mustBe (Right(OrderPlacementStatus.Success), 1))
+    }
+
+    List(
+      ("PENDING", OrderPlacementStatus.Pending),
+      ("TRIGGERED", OrderPlacementStatus.Pending),
+      ("CANCELLED", OrderPlacementStatus.Cancelled("Order 42 was cancelled"))
+    ).foreach { case (state, expectedStatus) =>
+      s"return $expectedStatus when an entry order with unknown outcome is $state" in
+        submitEnterWithUnknownOutcome(timeout = false, s"""{"order":{"id":"42","state":"$state"},"lastTransactionID":"43"}""")
+          .asserting(_ mustBe (Right(expectedStatus), 1))
+    }
+
+    "fail without resubmitting when an entry order with unknown outcome cannot be looked up" in
+      submitEnterWithUnknownOutcome(timeout = true, "Unauthorized", StatusCode.Unauthorized)
+        .asserting(_ mustBe (Left(AppError.ClientFailure("oanda", "get-order returned 401: Unauthorized")), 1))
+
+    "fail without resubmitting when an entry order with unknown outcome was not created" in
+      submitEnterWithUnknownOutcome(timeout = true, """{"errorMessage":"Order not found"}""", StatusCode.NotFound).asserting {
+        case (Left(AppError.ClientFailure("oanda", message)), 1) => message must endWith("was not created")
+        case result                                              => fail(s"Expected a client failure, received $result")
+      }
+
     "handle JSON parsing errors" in {
       val testingBackend = fs2BackendStub
         .whenRequestMatchesPartial {
@@ -423,6 +454,35 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
       field -> response.hcursor.downField(field).focus.get
     }
     Json.obj((fields :+ ("lastTransactionID" -> Json.fromString("204")))*).noSpaces
+  }
+
+  private def submitEnterWithUnknownOutcome(
+      timeout: Boolean,
+      orderResponse: String,
+      orderResponseStatus: StatusCode = StatusCode.Ok
+  ): IO[(Either[Throwable, OrderPlacementStatus], Int)] = {
+    given Clock[IO]                                  = Clock.mock[IO](Instant.parse("2026-09-28T09:00:00Z"))
+    val submissions                                  = AtomicReference(List.empty[String])
+    def isSubmitted(orderSpecifier: String): Boolean =
+      orderSpecifier.startsWith("@") && submissions.get.exists(_.contains(s""""clientExtensions":{"id":"${orderSpecifier.tail}"}"""))
+
+    val testingBackend = fs2BackendStub
+      .whenRequestMatchesPartial {
+        case r if r.isGet && r.hasPath("/v3/accounts") =>
+          ResponseStub.adjust(readJson("oanda/accounts-success-response.json"))
+        case r if r.isPost && r.hasPath("/v3/accounts/123-456-789/orders") =>
+          submissions.updateAndGet(r.body.toString :: _)
+          if timeout then throw new SocketTimeoutException("Read timed out")
+          else ResponseStub.adjust("Server error", StatusCode.ServiceUnavailable)
+        case r if r.isGet && r.uri.path.init == List("v3", "accounts", "123-456-789", "orders") && isSubmitted(r.uri.path.last) =>
+          ResponseStub.adjust(orderResponse, orderResponseStatus)
+        case _ => throw new RuntimeException("Unexpected request")
+      }
+
+    for
+      client <- OandaBrokerClient.make[IO](config, testingBackend)
+      status <- client.submit(params, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0"))).attempt
+    yield (status, submissions.get.size)
   }
 
   private def submitExit(
