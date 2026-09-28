@@ -44,9 +44,9 @@ final private class LiveTwelveDataClient[F[_]](
   override def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] =
     for
       now            <- C.now
-      timeSeriesData <- fetchTimeSeriesData(pair, interval, 150, now)
+      timeSeriesData <- fetchTimeSeriesData(pair, interval, config.fetchCandleCount, now)
       result         <- filterIncompleteCandleIfNeeded(timeSeriesData, interval, now)
-    yield result
+    yield result.copy(prices = NonEmptyList.fromListUnsafe(result.prices.take(config.signalCandleCount)))
 
   private def filterIncompleteCandleIfNeeded(
       data: MarketTimeSeriesData,
