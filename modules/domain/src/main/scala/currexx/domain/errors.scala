@@ -43,6 +43,12 @@ object errors {
     final case class AccountAlreadyExists(email: UserEmail) extends Conflict:
       override val message: String = s"An account with email $email already exists"
 
+    final case class OrderPlacementBlocked(currencyPair: CurrencyPair, reason: String) extends Conflict:
+      override val message: String = s"Order for $currencyPair was not submitted: $reason"
+
+    final case class OrderPlacementCancelled(currencyPair: CurrencyPair, reason: String) extends Conflict:
+      override val message: String = s"Order for $currencyPair was cancelled by broker: $reason"
+
     final case class EntityDoesNotExist(entityName: String, id: String) extends NotFound:
       override val message: String = s"$entityName with id $id does not exist"
 

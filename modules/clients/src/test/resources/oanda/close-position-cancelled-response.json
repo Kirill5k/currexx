@@ -1,0 +1,54 @@
+{
+  "longOrderCreateTransaction": {
+    "id": "201",
+    "time": "2026-09-28T09:00:00Z",
+    "userID": 123,
+    "accountID": "123-456-789",
+    "batchID": "201",
+    "requestID": "close-position-request",
+    "type": "MARKET_ORDER",
+    "instrument": "EUR_USD",
+    "units": "-100000",
+    "timeInForce": "FOK",
+    "positionFill": "REDUCE_ONLY",
+    "reason": "POSITION_CLOSEOUT"
+  },
+  "longOrderCancelTransaction": {
+    "id": "202",
+    "time": "2026-09-28T09:00:00Z",
+    "userID": 123,
+    "accountID": "123-456-789",
+    "batchID": "201",
+    "requestID": "close-position-request",
+    "type": "ORDER_CANCEL",
+    "orderID": "201",
+    "reason": "FOK_ORDER_IMMEDIATE_PARTIAL_FILL"
+  },
+  "shortOrderCreateTransaction": {
+    "id": "203",
+    "time": "2026-09-28T09:00:00Z",
+    "userID": 123,
+    "accountID": "123-456-789",
+    "batchID": "203",
+    "requestID": "close-position-request",
+    "type": "MARKET_ORDER",
+    "instrument": "EUR_USD",
+    "units": "100000",
+    "timeInForce": "FOK",
+    "positionFill": "REDUCE_ONLY",
+    "reason": "POSITION_CLOSEOUT"
+  },
+  "shortOrderCancelTransaction": {
+    "id": "204",
+    "time": "2026-09-28T09:00:00Z",
+    "userID": 123,
+    "accountID": "123-456-789",
+    "batchID": "203",
+    "requestID": "close-position-request",
+    "type": "ORDER_CANCEL",
+    "orderID": "203",
+    "reason": "MARKET_HALTED"
+  },
+  "relatedTransactionIDs": ["201", "202", "203", "204"],
+  "lastTransactionID": "204"
+}

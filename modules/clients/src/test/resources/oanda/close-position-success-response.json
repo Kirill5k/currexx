@@ -1,0 +1,78 @@
+{
+  "longOrderCreateTransaction": {
+    "id": "201",
+    "time": "2026-09-28T09:00:00Z",
+    "userID": 123,
+    "accountID": "123-456-789",
+    "batchID": "201",
+    "requestID": "close-position-request",
+    "type": "MARKET_ORDER",
+    "instrument": "EUR_USD",
+    "units": "-100000",
+    "timeInForce": "FOK",
+    "positionFill": "REDUCE_ONLY",
+    "reason": "POSITION_CLOSEOUT"
+  },
+  "longOrderFillTransaction": {
+    "id": "202",
+    "time": "2026-09-28T09:00:00Z",
+    "userID": 123,
+    "accountID": "123-456-789",
+    "batchID": "201",
+    "requestID": "close-position-request",
+    "type": "ORDER_FILL",
+    "orderID": "201",
+    "instrument": "EUR_USD",
+    "units": "-100000",
+    "price": "1.1055",
+    "pl": "50.00",
+    "reason": "MARKET_ORDER_POSITION_CLOSEOUT",
+    "tradesClosed": [
+      {
+        "tradeID": "123",
+        "units": "100000",
+        "price": "1.1055",
+        "realizedPL": "50.00"
+      }
+    ]
+  },
+  "shortOrderCreateTransaction": {
+    "id": "203",
+    "time": "2026-09-28T09:00:00Z",
+    "userID": 123,
+    "accountID": "123-456-789",
+    "batchID": "203",
+    "requestID": "close-position-request",
+    "type": "MARKET_ORDER",
+    "instrument": "EUR_USD",
+    "units": "100000",
+    "timeInForce": "FOK",
+    "positionFill": "REDUCE_ONLY",
+    "reason": "POSITION_CLOSEOUT"
+  },
+  "shortOrderFillTransaction": {
+    "id": "204",
+    "time": "2026-09-28T09:00:00Z",
+    "userID": 123,
+    "accountID": "123-456-789",
+    "batchID": "203",
+    "requestID": "close-position-request",
+    "type": "ORDER_FILL",
+    "orderID": "203",
+    "instrument": "EUR_USD",
+    "units": "100000",
+    "price": "1.1057",
+    "pl": "-70.00",
+    "reason": "MARKET_ORDER_POSITION_CLOSEOUT",
+    "tradesClosed": [
+      {
+        "tradeID": "124",
+        "units": "-100000",
+        "price": "1.1057",
+        "realizedPL": "-70.00"
+      }
+    ]
+  },
+  "relatedTransactionIDs": ["201", "202", "203", "204"],
+  "lastTransactionID": "204"
+}

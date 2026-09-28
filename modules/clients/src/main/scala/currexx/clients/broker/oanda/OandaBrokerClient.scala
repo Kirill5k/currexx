@@ -10,7 +10,7 @@ import currexx.clients.broker.BrokerParameters
 import currexx.clients.broker.oanda.OandaBrokerClient.ClosePositionRequest
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, OpenedTradeOrder, OrderPlacementStatus, TradeOrder}
-import io.circe.Codec
+import io.circe.{Codec, JsonObject}
 import kirill5k.common.cats.Clock
 import org.typelevel.log4cats.Logger
 import sttp.capabilities.fs2.Fs2Streams
@@ -47,7 +47,7 @@ final private class LiveOandaBrokerClient[F[_]](
         accountId <- getAccountId(params)
         position  <- getPosition(accountId, params, exit.currencyPair)
         status    <- F.ifM(F.pure(position.exists(_.isOpen)))(
-          closePosition(accountId, params, position.get).as(OrderPlacementStatus.Success),
+          closePosition(accountId, params, position.get),
           F.pure(OrderPlacementStatus.NoPosition)
         )
       yield status
@@ -95,19 +95,35 @@ final private class LiveOandaBrokerClient[F[_]](
           handleError("get-position", err)
     }
 
-  private def closePosition(accountId: String, params: BrokerParameters.Oanda, position: OandaBrokerClient.Position): F[Unit] =
+  private def closePosition(
+      accountId: String,
+      params: BrokerParameters.Oanda,
+      position: OandaBrokerClient.Position
+  ): F[OrderPlacementStatus] = {
+    val request = position.toClosePositionRequest
     dispatch {
       basicRequest
         .put(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/positions/${position.instrument}/close")
         .auth
         .bearer(params.apiKey)
-        .body(asJson(position.toClosePositionRequest))
+        .body(asJson(request))
         .response(asJson[OandaBrokerClient.ClosePositionResponse])
     }.flatMap { r =>
       r.body match
-        case Right(_)  => F.unit
+        case Right(res) =>
+          val cancellations = List(res.longOrderCancelTransaction, res.shortOrderCancelTransaction).flatten
+          val missingFills  = List(
+            Option.when(request.longUnits == "ALL" && res.longOrderFillTransaction.isEmpty)("long"),
+            Option.when(request.shortUnits == "ALL" && res.shortOrderFillTransaction.isEmpty)("short")
+          ).flatten
+          if cancellations.nonEmpty then F.pure(OrderPlacementStatus.Cancelled(cancellations.map(_.reason).mkString("; ")))
+          else if missingFills.isEmpty then F.pure(OrderPlacementStatus.Success)
+          else
+            val message = s"close-position for ${position.instrument} missing fill confirmation for ${missingFills.mkString(", ")}"
+            logger.error(s"$name-client/$message") >> F.raiseError(AppError.ClientFailure(name, message))
         case Left(err) => handleError("close-position", err)
     }
+  }
 
   private def openPosition(accountId: String, params: BrokerParameters.Oanda, position: TradeOrder.Enter): F[OrderPlacementStatus] =
     dispatch {
@@ -183,7 +199,16 @@ object OandaBrokerClient {
 
   final case class OpenPositionRequest(order: OpenPositionOrder) derives Codec.AsObject
 
-  final case class ClosePositionResponse(lastTransactionID: String) derives Codec.AsObject
+  // Close outcomes depend on fill presence and cancellation reasons, not transaction metadata.
+  final case class ClosePositionResponse(
+      lastTransactionID: String,
+      longOrderFillTransaction: Option[JsonObject],
+      longOrderCancelTransaction: Option[CloseOrderCancelTransaction],
+      shortOrderFillTransaction: Option[JsonObject],
+      shortOrderCancelTransaction: Option[CloseOrderCancelTransaction]
+  ) derives Codec.AsObject
+
+  final case class CloseOrderCancelTransaction(reason: String) derives Codec.AsObject
 
   final case class OpenPositionResponse(
       orderCreateTransaction: OrderTransaction,
@@ -199,7 +224,7 @@ object OandaBrokerClient {
       userID: Int,
       accountID: String,
       batchID: String,
-      requestID: String
+      requestID: Option[String]
   ) derives Codec.AsObject
 
   final case class OrderFillTransaction(
@@ -208,7 +233,7 @@ object OandaBrokerClient {
       userID: Int,
       accountID: String,
       batchID: String,
-      requestID: String,
+      requestID: Option[String],
       `type`: String,
       units: String,
       pl: BigDecimal,
@@ -226,14 +251,14 @@ object OandaBrokerClient {
   final case class TradeClosed(
       tradeID: String,
       units: String,
-      price: BigDecimal,
+      price: Option[BigDecimal],
       realizedPL: BigDecimal
   ) derives Codec.AsObject
 
   final case class TradeReduced(
       tradeID: String,
       units: String,
-      price: BigDecimal,
+      price: Option[BigDecimal],
       realizedPL: BigDecimal
   ) derives Codec.AsObject
 
@@ -243,7 +268,7 @@ object OandaBrokerClient {
       userID: Int,
       accountID: String,
       batchID: String,
-      requestID: String,
+      requestID: Option[String],
       `type`: String,
       reason: String
   ) derives Codec.AsObject

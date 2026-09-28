@@ -11,6 +11,7 @@ import currexx.core.fixtures.{Markets, Settings, Trades, Users}
 import currexx.core.market.{MarketProfile, TrendState}
 import currexx.core.trade.db.{OrderStatusRepository, TradeOrderRepository, TradeSettingsRepository}
 import kirill5k.common.cats.test.IOWordSpec
+import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, OrderPlacementStatus, TradeOrder}
 import currexx.domain.monitor.Limits
 import currexx.domain.signal.Direction
@@ -23,6 +24,12 @@ import java.time.Instant
 
 class TradeServiceSpec extends IOWordSpec {
   given Logger[IO] = Slf4jLogger.getLogger[IO]
+
+  private val unsuccessfulCloses: List[(String, Either[Throwable, OrderPlacementStatus])] = List(
+    "cancelled" -> Right(OrderPlacementStatus.Cancelled("MARKET_HALTED")),
+    "pending"   -> Right(OrderPlacementStatus.Pending),
+    "failed"    -> Left(new RuntimeException("Close response could not be confirmed"))
+  )
 
   "A TradeService" when {
     val now         = Instant.now()
@@ -75,7 +82,7 @@ class TradeServiceSpec extends IOWordSpec {
         }
       }
 
-      "save cancelled order status when broker rejects order" in {
+      "save cancelled entry status and fail when broker rejects the requested order" in {
         val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
         val cancelReason                                                           = "Insufficient funds"
         when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
@@ -88,7 +95,7 @@ class TradeServiceSpec extends IOWordSpec {
           _   <- svc.placeOrder(Users.uid, order, false)
         yield ()
 
-        result.asserting { res =>
+        result.attempt.asserting { res =>
           val placedOrder = TradeOrderPlacement(Users.uid, order, Settings.trade.broker, now)
           verifyNoInteractions(dataClient)
           verify(settRepo).get(Users.uid)
@@ -97,7 +104,7 @@ class TradeServiceSpec extends IOWordSpec {
           verify(orderRepo, never).save(any[TradeOrderPlacement])
           verify(orderRepo, never).findLatestBy(any[UserId], any[CurrencyPair])
           disp.submittedActions mustBe empty
-          res mustBe ()
+          res mustBe Left(AppError.OrderPlacementCancelled(Markets.gbpeur, cancelReason))
         }
       }
 
@@ -126,30 +133,156 @@ class TradeServiceSpec extends IOWordSpec {
         }
       }
 
-      "close existing orders before submitting the actual placement" in {
-        val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
-        when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
-        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(OrderPlacementStatus.Success)
-        when(orderStatusRepo.save(any[TradeOrderPlacement], any[OrderPlacementStatus])).thenReturnUnit
-        when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturnNone
-        when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
-        when(orderStatusRepo.save(any[TradeOrderPlacement], any[OrderPlacementStatus])).thenReturnUnit
+      List(OrderPlacementStatus.Cancelled("MARKET_HALTED"), OrderPlacementStatus.Pending).foreach { status =>
+        s"record $status exits without persisting or publishing an exit" in {
+          val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
+          val order                                                                  = TradeOrder.Exit(Markets.gbpeur, 1.3)
+          val placedOrder = TradeOrderPlacement(Users.uid, order, Settings.trade.broker, now)
+          when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
+          when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(status)
+          when(orderStatusRepo.save(any[TradeOrderPlacement], any[OrderPlacementStatus])).thenReturnUnit
 
-        val order  = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, BigDecimal(1.3), BigDecimal(0.1))
+          val result = for
+            svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+            _   <- svc.placeOrder(Users.uid, order, false)
+          yield ()
+
+          result.attempt.asserting { res =>
+            status match
+              case OrderPlacementStatus.Cancelled(reason) => res mustBe Left(AppError.OrderPlacementCancelled(Markets.gbpeur, reason))
+              case _                                      => res mustBe Right(())
+            verify(brokerClient).submit(Settings.trade.broker, order)
+            verify(orderStatusRepo).save(placedOrder, status)
+            verifyNoInteractions(orderRepo, dataClient)
+            disp.submittedActions mustBe empty
+          }
+        }
+      }
+
+      "continue persisting and publishing pending entries" in {
+        val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
+        val order       = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, 1.3, 0.1)
+        val placedOrder = TradeOrderPlacement(Users.uid, order, Settings.trade.broker, now)
+        when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(OrderPlacementStatus.Pending)
+        when(orderStatusRepo.save(any[TradeOrderPlacement], any[OrderPlacementStatus])).thenReturnUnit
+        when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
+
         val result = for
           svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
-          _   <- svc.placeOrder(Users.uid, order, true)
+          _   <- svc.placeOrder(Users.uid, order, false)
         yield ()
 
-        result.asserting { res =>
-          val placedOrder = TradeOrderPlacement(Users.uid, order, Trades.broker, now)
-          verifyNoInteractions(dataClient)
-          verify(settRepo).get(Users.uid)
-          verify(brokerClient).submit(Trades.broker, order)
-          verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
+        result.asserting { _ =>
+          verify(brokerClient).submit(Settings.trade.broker, order)
+          verify(orderStatusRepo).save(placedOrder, OrderPlacementStatus.Pending)
           verify(orderRepo).save(placedOrder)
+          verifyNoInteractions(dataClient)
           disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
-          res mustBe ()
+        }
+      }
+
+      unsuccessfulCloses.foreach { case (description, closeResult) =>
+        s"not submit an entry after a $description prerequisite close" in {
+          val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
+          val order           = TradeOrder.Enter(TradeOrder.Position.Sell, Markets.gbpeur, 1.3, 0.1)
+          val exitOrder       = TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close)
+          val placedExitOrder = Trades.order.copy(time = now, order = exitOrder)
+          when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturnSome(Trades.order)
+          when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
+          when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.fromEither(closeResult))
+          when(orderStatusRepo.save(any[TradeOrderPlacement], any[OrderPlacementStatus])).thenReturnUnit
+
+          val result = for
+            svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+            _   <- svc.placeOrder(Users.uid, order, true)
+          yield ()
+
+          result.attempt.asserting { res =>
+            closeResult match
+              case Right(OrderPlacementStatus.Cancelled(reason)) =>
+                res mustBe Left(AppError.OrderPlacementBlocked(Markets.gbpeur, s"prerequisite close was cancelled by broker: $reason"))
+              case Right(OrderPlacementStatus.Pending) =>
+                res mustBe Left(AppError.OrderPlacementBlocked(Markets.gbpeur, "prerequisite close is still pending"))
+              case Left(error)  => res mustBe Left(error)
+              case Right(other) => fail(s"Unexpected prerequisite-close status: $other")
+            verify(brokerClient).submit(Trades.broker, exitOrder)
+            verifyNoMoreInteractions(brokerClient)
+            closeResult match
+              case Right(status) => verify(orderStatusRepo).save(placedExitOrder, status)
+              case Left(_)       => verifyNoInteractions(orderStatusRepo)
+            verify(orderRepo, never).save(any[TradeOrderPlacement])
+            verifyNoInteractions(settRepo)
+            disp.submittedActions mustBe empty
+          }
+        }
+      }
+
+      List(OrderPlacementStatus.Success, OrderPlacementStatus.NoPosition).foreach { closeStatus =>
+        s"submit an entry after a $closeStatus prerequisite close" in {
+          val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
+          val order           = TradeOrder.Enter(TradeOrder.Position.Sell, Markets.gbpeur, 1.3, 0.1)
+          val exitOrder       = TradeOrder.Exit(Markets.gbpeur, Markets.priceRange.close)
+          val placedExitOrder = Trades.order.copy(time = now, order = exitOrder)
+          val placedOrder     = TradeOrderPlacement(Users.uid, order, Settings.trade.broker, now)
+          when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturnSome(Trades.order)
+          when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
+          when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
+          when(brokerClient.submit(Trades.broker, exitOrder)).thenReturnIO(closeStatus)
+          when(brokerClient.submit(Settings.trade.broker, order)).thenReturnIO(OrderPlacementStatus.Success)
+          when(orderStatusRepo.save(any[TradeOrderPlacement], any[OrderPlacementStatus])).thenReturnUnit
+          when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
+
+          val result = for
+            svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+            _   <- svc.placeOrder(Users.uid, order, true)
+          yield ()
+
+          result.asserting { _ =>
+            verify(brokerClient).submit(Trades.broker, exitOrder)
+            verify(brokerClient).submit(Settings.trade.broker, order)
+            verify(orderStatusRepo).save(placedExitOrder, closeStatus)
+            verify(orderStatusRepo).save(placedOrder, OrderPlacementStatus.Success)
+            if closeStatus == OrderPlacementStatus.Success then verify(orderRepo).save(placedExitOrder)
+            else verify(orderRepo, never).save(placedExitOrder)
+            verify(orderRepo).save(placedOrder)
+            disp.submittedActions mustBe List(
+              Action.ProcessTradeOrderPlacement(placedExitOrder),
+              Action.ProcessTradeOrderPlacement(placedOrder)
+            )
+          }
+        }
+      }
+
+      List(
+        "no orders"     -> None,
+        "a latest exit" -> Some(Trades.order.copy(order = TradeOrder.Exit(Markets.gbpeur, 1.5)))
+      ).foreach { case (description, latestOrder) =>
+        s"submit an entry without closing when there is $description" in {
+          val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
+          when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
+          when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(OrderPlacementStatus.Success)
+          when(orderStatusRepo.save(any[TradeOrderPlacement], any[OrderPlacementStatus])).thenReturnUnit
+          when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturnIO(latestOrder)
+          when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
+
+          val order  = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, BigDecimal(1.3), BigDecimal(0.1))
+          val result = for
+            svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+            _   <- svc.placeOrder(Users.uid, order, true)
+          yield ()
+
+          result.asserting { res =>
+            val placedOrder = TradeOrderPlacement(Users.uid, order, Trades.broker, now)
+            verifyNoInteractions(dataClient)
+            verify(settRepo).get(Users.uid)
+            verify(brokerClient).submit(Trades.broker, order)
+            verifyNoMoreInteractions(brokerClient)
+            verify(orderRepo).findLatestBy(Users.uid, Markets.gbpeur)
+            verify(orderRepo).save(placedOrder)
+            disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOrder))
+            res mustBe ()
+          }
         }
       }
     }
@@ -424,37 +557,74 @@ class TradeServiceSpec extends IOWordSpec {
         }
       }
 
-      "flip to short when in long position and open-short rule is triggered" in {
-        val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
-        val openShortRule = Rule(TradeAction.OpenShort, Rule.Condition.TrendIs(Direction.Upward))
-        val settings      = Settings.trade.copy(strategy = TradeStrategy(openRules = List(openShortRule), closeRules = Nil))
-        when(settRepo.get(any[UserId])).thenReturnIO(settings)
-        when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
-        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(OrderPlacementStatus.Success)
-        when(orderStatusRepo.save(any[TradeOrderPlacement], any[OrderPlacementStatus])).thenReturnUnit
-        when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
+      List(
+        (TradeOrder.Position.Buy, TradeAction.OpenShort, TradeOrder.Position.Sell),
+        (TradeOrder.Position.Sell, TradeAction.OpenLong, TradeOrder.Position.Buy)
+      ).foreach { case (initialPosition, openAction, targetPosition) =>
+        unsuccessfulCloses.foreach { case (description, closeResult) =>
+          s"not flip from $initialPosition to $targetPosition after a $description close" in {
+            val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
+            val openRule        = Rule(openAction, Rule.Condition.TrendIs(Direction.Upward))
+            val settings        = Settings.trade.copy(strategy = TradeStrategy(List(openRule), Nil))
+            val tradeState      = state.copy(currentPosition = state.currentPosition.map(_.copy(position = initialPosition)))
+            val exitOrder       = TradeOrder.Exit(state.currencyPair, Markets.priceRange.close)
+            val placedExitOrder = TradeOrderPlacement(Users.uid, exitOrder, settings.broker, now)
+            when(settRepo.get(any[UserId])).thenReturnIO(settings)
+            when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
+            when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturn(IO.fromEither(closeResult))
+            when(orderStatusRepo.save(any[TradeOrderPlacement], any[OrderPlacementStatus])).thenReturnUnit
 
-        val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
-          _   <- svc.processMarketStateUpdate(state)
-        yield ()
+            val result = for
+              svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+              _   <- svc.processMarketStateUpdate(tradeState)
+            yield ()
 
-        result.asserting { res =>
-          val exitOrder       = TradeOrder.Exit(state.currencyPair, Markets.priceRange.close)
-          val placedExitOrder = TradeOrderPlacement(Users.uid, exitOrder, Trades.broker, now)
-          val openOrder       = settings.trading.toOrder(TradeOrder.Position.Sell, state.currencyPair, Markets.priceRange.close)
-          val placedOpenOrder = TradeOrderPlacement(Users.uid, openOrder, Trades.broker, now)
+            result.attempt.asserting { res =>
+              res mustBe closeResult.map(_ => ())
+              verify(brokerClient).submit(settings.broker, exitOrder)
+              verifyNoMoreInteractions(brokerClient)
+              closeResult match
+                case Right(status) => verify(orderStatusRepo).save(placedExitOrder, status)
+                case Left(_)       => verifyNoInteractions(orderStatusRepo)
+              verifyNoInteractions(orderRepo)
+              disp.submittedActions mustBe empty
+            }
+          }
+        }
 
-          verify(settRepo).get(state.userId)
-          verify(dataClient).latestPrice(state.currencyPair)
-          verify(brokerClient).submit(settings.broker, exitOrder)
-          verify(orderStatusRepo).save(placedExitOrder, OrderPlacementStatus.Success)
-          verify(brokerClient).submit(settings.broker, openOrder)
-          verify(orderStatusRepo).save(placedOpenOrder, OrderPlacementStatus.Success)
-          verify(orderRepo).save(placedExitOrder)
-          verify(orderRepo).save(placedOpenOrder)
-          disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOpenOrder))
-          res mustBe ()
+        List(OrderPlacementStatus.Success, OrderPlacementStatus.NoPosition).foreach { closeStatus =>
+          s"flip from $initialPosition to $targetPosition after a $closeStatus close" in {
+            val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
+            val openRule        = Rule(openAction, Rule.Condition.TrendIs(Direction.Upward))
+            val settings        = Settings.trade.copy(strategy = TradeStrategy(List(openRule), Nil))
+            val tradeState      = state.copy(currentPosition = state.currentPosition.map(_.copy(position = initialPosition)))
+            val exitOrder       = TradeOrder.Exit(state.currencyPair, Markets.priceRange.close)
+            val placedExitOrder = TradeOrderPlacement(Users.uid, exitOrder, settings.broker, now)
+            val openOrder       = settings.trading.toOrder(targetPosition, state.currencyPair, Markets.priceRange.close)
+            val placedOpenOrder = TradeOrderPlacement(Users.uid, openOrder, settings.broker, now)
+            when(settRepo.get(any[UserId])).thenReturnIO(settings)
+            when(dataClient.latestPrice(any[CurrencyPair])).thenReturnIO(Markets.priceRange)
+            when(brokerClient.submit(settings.broker, exitOrder)).thenReturnIO(closeStatus)
+            when(brokerClient.submit(settings.broker, openOrder)).thenReturnIO(OrderPlacementStatus.Success)
+            when(orderStatusRepo.save(any[TradeOrderPlacement], any[OrderPlacementStatus])).thenReturnUnit
+            when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
+
+            val result = for
+              svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+              _   <- svc.processMarketStateUpdate(tradeState)
+            yield ()
+
+            result.asserting { _ =>
+              verify(brokerClient).submit(settings.broker, exitOrder)
+              verify(brokerClient).submit(settings.broker, openOrder)
+              verify(orderStatusRepo).save(placedExitOrder, closeStatus)
+              verify(orderStatusRepo).save(placedOpenOrder, OrderPlacementStatus.Success)
+              if closeStatus == OrderPlacementStatus.Success then verify(orderRepo).save(placedExitOrder)
+              else verify(orderRepo, never).save(placedExitOrder)
+              verify(orderRepo).save(placedOpenOrder)
+              disp.submittedActions mustBe List(Action.ProcessTradeOrderPlacement(placedOpenOrder))
+            }
+          }
         }
       }
 

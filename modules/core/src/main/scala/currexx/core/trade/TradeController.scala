@@ -104,7 +104,9 @@ object TradeController extends TapirSchema with TapirJson with TapirCodecs {
     .in(jsonBody[TradeOrder])
     .in(query[Boolean]("closePendingOrders").description("Close pending orders").default(true))
     .out(statusCode(StatusCode.Created))
-    .description("Submit trade order placement")
+    .description(
+      "Submit trade order placement. Returns 409 if a prerequisite close is pending or cancelled, or the requested order is cancelled."
+    )
 
   val closeCurrentPositionsEndpoint = Controller.securedEndpoint.delete
     .in(ordersPath)

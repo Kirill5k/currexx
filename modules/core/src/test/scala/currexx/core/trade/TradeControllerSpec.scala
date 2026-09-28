@@ -5,6 +5,7 @@ import currexx.core.auth.Authenticator
 import currexx.core.common.http.SearchParams
 import kirill5k.common.http4s.test.HttpRoutesWordSpec
 import currexx.core.fixtures.{Markets, Sessions, Trades, Users}
+import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, TradeOrder}
 import currexx.domain.user.UserId
 import org.http4s.implicits.*
@@ -18,19 +19,19 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
     given Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
     "POST /trade/orders" should {
+      val requestBody = """
+           |{
+           |  "kind" : "enter",
+           |  "currencyPair" : "GBP/EUR",
+           |  "position" : "buy",
+           |  "volume" : 0.1,
+           |  "price" : 3.0
+           |}
+           |""".stripMargin
+
       "submit order placement request" in {
         val svc = mock[TradeService[IO]]
         when(svc.placeOrder(any[UserId], any[TradeOrder], any[Boolean])).thenReturn(IO.unit)
-
-        val requestBody = """
-             |{
-             |  "kind" : "enter",
-             |  "currencyPair" : "GBP/EUR",
-             |  "position" : "buy",
-             |  "volume" : 0.1,
-             |  "price" : 3.0
-             |}
-             |""".stripMargin
 
         val req = Request[IO](Method.POST, uri"/trade/orders?closePendingOrders=false")
           .withAuthHeader()
@@ -39,6 +40,40 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
 
         res mustHaveStatus (Status.Created, None)
         verify(svc).placeOrder(Users.uid, Trades.order.order, false)
+      }
+
+      List(
+        (
+          "a cancelled prerequisite close",
+          true,
+          AppError.OrderPlacementBlocked(Markets.gbpeur, "prerequisite close was cancelled by broker: MARKET_HALTED"),
+          "Order for GBPEUR was not submitted: prerequisite close was cancelled by broker: MARKET_HALTED"
+        ),
+        (
+          "a pending prerequisite close",
+          true,
+          AppError.OrderPlacementBlocked(Markets.gbpeur, "prerequisite close is still pending"),
+          "Order for GBPEUR was not submitted: prerequisite close is still pending"
+        ),
+        (
+          "a cancelled requested order",
+          false,
+          AppError.OrderPlacementCancelled(Markets.gbpeur, "INSUFFICIENT_MARGIN"),
+          "Order for GBPEUR was cancelled by broker: INSUFFICIENT_MARGIN"
+        )
+      ).foreach { case (description, closePendingOrders, error, message) =>
+        s"return conflict with a clear reason for $description" in {
+          val svc = mock[TradeService[IO]]
+          when(svc.placeOrder(any[UserId], any[TradeOrder], any[Boolean])).thenRaiseError(error)
+
+          val req = Request[IO](Method.POST, uri"/trade/orders".withQueryParam("closePendingOrders", closePendingOrders))
+            .withAuthHeader()
+            .withBody(requestBody)
+          val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+          res mustHaveStatus (Status.Conflict, Some(s"""{"message":"$message"}"""))
+          verify(svc).placeOrder(Users.uid, Trades.order.order, closePendingOrders)
+        }
       }
     }
 
