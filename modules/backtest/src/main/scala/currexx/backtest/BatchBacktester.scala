@@ -16,9 +16,11 @@ object BatchBacktester extends IOApp.Simple {
     * their promotion report. A val is dropped from here once a descendant dominates it on the holdout or its family has been answered; it
     * otherwise adds a line nothing reads. Unmeasured lineage vals carry a `Not in BatchBacktester` line saying which val replaced them. The
     * sole survivor of the 2026-09-14 report candidates is s10_optimized_v7, promoted into s10. User review of the 2026-09-21 batch promoted
-    * s1_v2_optimized_v7 into s1_v2_optimized, s6_optimized_v3 into s6_optimized, and s4_optimized_v6 into s4_optimized_v2. s10_optimized_v2
-    * remains alongside s10; the other 30 new candidates were deleted. See docs/ga-promotions-2026-09-21.md for all measurements and the
-    * final selection.
+    * s1_v2_optimized_v7 into s1_v2_optimized, s6_optimized_v3 into s6_optimized, and s4_optimized_v6 into s4_optimized_v2. The retained
+    * s10_optimized_v2 was subsequently renamed s10_optimized; the other 30 new candidates were deleted. See
+    * docs/ga-promotions-2026-09-21.md for all measurements and the final selection. The 2026-09-28 batch adds every distinct report #1 and
+    * final training-fitness leader from September 22-25; all remain registered for comparison, including candidates with zero validation
+    * fitness. See docs/ga-promotions-2026-09-28.md.
     */
   val strategies: List[(String, TestStrategy)] = List(
     "s2_optimized"    -> TestStrategy.s2_optimized,
@@ -33,7 +35,37 @@ object BatchBacktester extends IOApp.Simple {
     "s4_optimized_v2" -> TestStrategy.s4_optimized_v2,
     "s6_optimized"    -> TestStrategy.s6_optimized,
     "s6"              -> TestStrategy.s6,
-    "s13"             -> TestStrategy.s13
+    "s13"             -> TestStrategy.s13,
+
+    "s2_optimized_v3"     -> TestStrategy.s2_optimized_v3,
+    "s2_optimized_v4"     -> TestStrategy.s2_optimized_v4,
+    "s2_optimized_v5"     -> TestStrategy.s2_optimized_v5,
+    "s2_optimized_v6"     -> TestStrategy.s2_optimized_v6,
+    "s10_optimized_v2"    -> TestStrategy.s10_optimized_v2,
+    "s5_optimized_v4"     -> TestStrategy.s5_optimized_v4,
+    "s5_optimized_v5"     -> TestStrategy.s5_optimized_v5,
+    "s5_optimized_v6"     -> TestStrategy.s5_optimized_v6,
+    "s4_optimized_v3"     -> TestStrategy.s4_optimized_v3,
+    "s6_optimized_v2"     -> TestStrategy.s6_optimized_v2,
+    "s6_optimized_v3"     -> TestStrategy.s6_optimized_v3,
+    "s10_v2_optimized"    -> TestStrategy.s10_v2_optimized,
+    "s10_v2_optimized_v2" -> TestStrategy.s10_v2_optimized_v2,
+    "s10_v2_optimized_v3" -> TestStrategy.s10_v2_optimized_v3,
+    "s10_v2_optimized_v4" -> TestStrategy.s10_v2_optimized_v4,
+    "s10_v2_optimized_v5" -> TestStrategy.s10_v2_optimized_v5,
+    "s10_v2_optimized_v6" -> TestStrategy.s10_v2_optimized_v6,
+    "s13_optimized"       -> TestStrategy.s13_optimized,
+    "s13_optimized_v2"    -> TestStrategy.s13_optimized_v2,
+    "s13_optimized_v3"    -> TestStrategy.s13_optimized_v3,
+    "s13_optimized_v4"    -> TestStrategy.s13_optimized_v4,
+    "s13_optimized_v5"    -> TestStrategy.s13_optimized_v5,
+    "s13_optimized_v6"    -> TestStrategy.s13_optimized_v6,
+    "s1_v2_optimized_v2"  -> TestStrategy.s1_v2_optimized_v2,
+    "s1_v2_optimized_v3"  -> TestStrategy.s1_v2_optimized_v3,
+    "s1_v2_optimized_v4"  -> TestStrategy.s1_v2_optimized_v4,
+    "s1_v2_optimized_v5"  -> TestStrategy.s1_v2_optimized_v5,
+    "s1_v2_optimized_v6"  -> TestStrategy.s1_v2_optimized_v6,
+    "s1_v2_optimized_v7"  -> TestStrategy.s1_v2_optimized_v7
   )
 
   val riskSettings: RiskSettings = RiskSettings()
