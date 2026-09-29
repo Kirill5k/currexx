@@ -1,6 +1,7 @@
 package currexx.core.trade
 
 import cats.syntax.applicative.*
+import cats.syntax.applicativeError.*
 import cats.data.NonEmptyList
 import cats.effect.implicits.parallelForGenSpawn
 import cats.effect.kernel.Temporal
@@ -150,8 +151,8 @@ final private class LiveTradeService[F[_]](
   }
 
   private def executeAction(action: TradeAction, state: MarketState, settings: TradeSettings): F[Unit] = {
-    def submit(order: TradeOrder, time: Instant, skipEvent: Boolean = false): F[OrderPlacementStatus] =
-      submitOrderPlacement(TradeOrderPlacement(state.userId, order, settings.broker, time), skipEvent)
+    def submit(order: TradeOrder, time: Instant): F[OrderPlacementStatus] =
+      submitOrderPlacement(TradeOrderPlacement(state.userId, order, settings.broker, time))
 
     def open(position: TradeOrder.Position, price: BigDecimal, time: Instant, closeFirst: Boolean): F[Unit] = {
       val openOrder = settings.trading.toOrder(position, state.currencyPair, price)
@@ -162,8 +163,20 @@ final private class LiveTradeService[F[_]](
             val filledOrder = TradeOrder.Enter(position, state.currencyPair, opened.openPrice, opened.volume)
             recordOrderPlacement(TradeOrderPlacement(state.userId, filledOrder, settings.broker, time), OrderPlacementStatus.Success)
           case None if closeFirst =>
-            submit(TradeOrder.Exit(state.currencyPair, price), time, skipEvent = true)
-              .flatMap(status => F.whenA(canOpenAfterClose(status))(submit(openOrder, time).void))
+            val exit                 = TradeOrderPlacement(state.userId, TradeOrder.Exit(state.currencyPair, price), settings.broker, time)
+            def publishExit: F[Unit] = dispatcher.dispatch(Action.ProcessTradeOrderPlacement(exit))
+            submitOrderPlacement(exit, skipEvent = true).flatMap { closeStatus =>
+              F.whenA(canOpenAfterClose(closeStatus)) {
+                // ActionProcessor handles events concurrently, so publishing both could apply the exit after the entry.
+                // Publish only the entry on success, or the confirmed exit if opening fails.
+                submit(openOrder, time)
+                  .onError { case _ => publishExit }
+                  .flatMap {
+                    case OrderPlacementStatus.Cancelled(_) => publishExit
+                    case _                                 => F.unit
+                  }
+              }
+            }
           case None => submit(openOrder, time).void
       }
     }

@@ -1,6 +1,7 @@
 package currexx.core
 
 import cats.Monad
+import cats.syntax.functor.*
 import currexx.core.common.action.{Action, ActionDispatcher}
 import fs2.Stream
 
@@ -12,10 +13,8 @@ final private class MockActionDispatcher[F[_]](
     F: Monad[F]
 ) extends ActionDispatcher[F]:
 
-  override def dispatch(action: Action): F[Unit] = {
-    submittedActions.addOne(action)
-    F.unit
-  }
+  override def dispatch(action: Action): F[Unit] =
+    F.unit.map(_ => submittedActions.addOne(action)).void
 
   override def actions: fs2.Stream[F, Action] =
     Stream.emits(submittedActions)
