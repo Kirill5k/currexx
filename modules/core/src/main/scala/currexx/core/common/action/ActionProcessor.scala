@@ -69,6 +69,9 @@ final private class LiveActionProcessor[F[_]](
     case Action.ProcessSignals(uid, cp, signals) =>
       logger.info(s"processing ${signals.size} submitted signals for $uid/$cp") *>
         marketService.processSignals(uid, cp, signals)
+    case Action.ProcessManualSignal(signal) =>
+      logger.info(s"processing manual signal for ${signal.userId}/${signal.currencyPair}") *>
+        marketService.processManualSignal(signal)
     case Action.AssertProfit(uid, cps, limits) =>
       logger.info(s"verifying current position for $uid/$cps") *>
         tradeService.closeOrderIfProfitIsOutsideRange(uid, cps, limits)

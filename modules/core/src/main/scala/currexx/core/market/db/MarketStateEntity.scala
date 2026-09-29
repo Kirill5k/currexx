@@ -17,7 +17,10 @@ final case class MarketStateEntity(
     profile: MarketProfile,
     lastUpdatedAt: Instant,
     createdAt: Instant,
-    previousProfile: Option[MarketProfile] = None
+    previousProfile: Option[MarketProfile] = None,
+    lastCandleTime: Option[Instant] = None,
+    lastTimeStateCandle: Option[Instant] = None,
+    version: Option[Long] = None
 ) derives Codec.AsObject:
   def toDomain: MarketState = MarketState(
     userId = UserId(userId),
@@ -26,5 +29,9 @@ final case class MarketStateEntity(
     profile = profile,
     lastUpdatedAt = lastUpdatedAt,
     createdAt = createdAt,
-    previousProfile = previousProfile
+    previousProfile = previousProfile,
+    lastCandleTime = lastCandleTime,
+    lastTimeStateCandle = lastTimeStateCandle,
+    // Documents written before versioning are stored, so they must never be treated as new.
+    version = Some(version.getOrElse(0L))
   )

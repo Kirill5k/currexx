@@ -1,8 +1,10 @@
 package currexx.core.market.db
 
 import cats.effect.Async
+import cats.syntax.applicativeError.*
 import cats.syntax.functor.*
 import cats.syntax.flatMap.*
+import com.mongodb.MongoWriteException
 import com.mongodb.client.model.ReturnDocument
 import currexx.domain.market.CurrencyPair
 import currexx.domain.user.UserId
@@ -11,15 +13,15 @@ import currexx.core.common.db.Repository
 import currexx.core.market.{MarketProfile, MarketState, PositionState}
 import kirill5k.common.cats.syntax.applicative.*
 import mongo4cats.circe.MongoJsonCodecs
-import mongo4cats.models.collection.{FindOneAndUpdateOptions, IndexOptions}
+import mongo4cats.models.collection.{FindOneAndUpdateOptions, IndexOptions, UpdateOptions}
 import mongo4cats.collection.MongoCollection
-import mongo4cats.operations.{Index, Update}
+import mongo4cats.operations.{Filter, Index, Update}
 import mongo4cats.database.MongoDatabase
 
 trait MarketStateRepository[F[_]]:
-  def update(uid: UserId, pair: CurrencyPair, profile: MarketProfile, previousProfile: MarketProfile): F[MarketState]
+  // Returns false when the stored state no longer matches the snapshot. A state without a version is created.
+  def save(state: MarketState): F[Boolean]
   def update(uid: UserId, pair: CurrencyPair, position: Option[PositionState]): F[MarketState]
-  def update(uid: UserId, pair: CurrencyPair, profile: MarketProfile, position: Option[PositionState]): F[MarketState]
   def getAll(uid: UserId): F[List[MarketState]]
   def deleteAll(uid: UserId): F[Unit]
   def delete(uid: UserId, cp: CurrencyPair): F[Unit]
@@ -30,7 +32,7 @@ final private class LiveMarketStateRepository[F[_]](
 )(using
     F: Async[F]
 ) extends MarketStateRepository[F] with Repository[F] {
-
+  private val VersionField  = "version"
   private val updateOptions = FindOneAndUpdateOptions(returnDocument = ReturnDocument.AFTER, upsert = true)
 
   override def deleteAll(uid: UserId): F[Unit] =
@@ -41,37 +43,34 @@ final private class LiveMarketStateRepository[F[_]](
       .deleteOne(userIdAndCurrencyPairEq(uid, cp))
       .flatMap(errorIfNotDeleted(AppError.NotTracked(List(cp))))
 
-  override def update(uid: UserId, cp: CurrencyPair, profile: MarketProfile, previousProfile: MarketProfile): F[MarketState] =
-    collection
-      .findOneAndUpdate(
-        userIdAndCurrencyPairEq(uid, cp),
-        Update
-          .set("profile", profile)
-          .set("previousProfile", previousProfile)
-          .currentDate(Repository.Field.LastUpdatedAt)
-          .setOnInsert("userId", uid.toObjectId)
-          .setOnInsert("currencyPair", cp)
-          .setOnInsert("createdAt", java.time.Instant.now()),
-        updateOptions
-      )
-      .flatMap(opt => F.fromOption(opt, AppError.Internal("could not upsert market state")))
-      .map(_.toDomain)
+  // Version 0 is a document stored before versioning was introduced. createdAt tells apart a state that was deleted
+  // and recreated, whose version starts again from 1.
+  private def sameSnapshot(state: MarketState): Filter =
+    state.version match
+      case None          => Filter.notExists(VersionField)
+      case Some(0L)      => Filter.notExists(VersionField) && Filter.eq("createdAt", state.createdAt)
+      case Some(version) => Filter.eq(VersionField, version) && Filter.eq("createdAt", state.createdAt)
 
-  override def update(uid: UserId, pair: CurrencyPair, profile: MarketProfile, position: Option[PositionState]): F[MarketState] =
+  override def save(state: MarketState): F[Boolean] =
     collection
-      .findOneAndUpdate(
-        userIdAndCurrencyPairEq(uid, pair),
+      .updateOne(
+        userIdAndCurrencyPairEq(state.userId, state.currencyPair) && sameSnapshot(state),
         Update
-          .set("profile", profile)
-          .set("currentPosition", position)
+          .set("profile", state.profile)
+          .set("previousProfile", state.previousProfile)
+          .set("currentPosition", state.currentPosition)
+          .set("lastCandleTime", state.lastCandleTime)
+          .set("lastTimeStateCandle", state.lastTimeStateCandle)
+          .inc(VersionField, 1)
           .currentDate(Repository.Field.LastUpdatedAt)
-          .setOnInsert("userId", uid.toObjectId)
-          .setOnInsert("currencyPair", pair)
-          .setOnInsert("createdAt", java.time.Instant.now()),
-        updateOptions
+          .setOnInsert("userId", state.userId.toObjectId)
+          .setOnInsert("currencyPair", state.currencyPair)
+          .setOnInsert("createdAt", state.createdAt),
+        UpdateOptions(upsert = state.version.isEmpty)
       )
-      .flatMap(opt => F.fromOption(opt, AppError.Internal("could not upsert market state")))
-      .map(_.toDomain)
+      .map(res => res.getMatchedCount > 0 || res.getUpsertedId != null)
+      // A rejected upsert of a new state collides with the unique user/pair index: the state was created concurrently.
+      .recover { case error: MongoWriteException if error.getError.getCode == 11000 => false }
 
   override def update(uid: UserId, pair: CurrencyPair, position: Option[PositionState]): F[MarketState] =
     collection
@@ -79,6 +78,7 @@ final private class LiveMarketStateRepository[F[_]](
         userIdAndCurrencyPairEq(uid, pair),
         Update
           .set("currentPosition", position)
+          .inc(VersionField, 1)
           .currentDate(Repository.Field.LastUpdatedAt)
           .setOnInsert("userId", uid.toObjectId)
           .setOnInsert("currencyPair", pair)

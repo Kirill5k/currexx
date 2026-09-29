@@ -28,7 +28,8 @@ final private class LiveSignalService[F[_]](
     logger: Logger[F]
 ) extends SignalService[F] {
   override def getAll(uid: UserId, sp: SearchParams): F[List[Signal]] = signalRepo.getAll(uid, sp)
-  override def submit(signal: Signal): F[Unit] = saveAndDispatchAction(signal.userId, signal.currencyPair, List(signal))
+  override def submit(signal: Signal): F[Unit]                        =
+    signalRepo.saveAll(List(signal)) >> dispatcher.dispatch(Action.ProcessManualSignal(signal))
 
   override def processMarketData(uid: UserId, data: MarketTimeSeriesData, detector: SignalDetector): F[Unit] =
     clock

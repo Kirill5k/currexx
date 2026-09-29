@@ -17,6 +17,7 @@ enum Action:
   case AssertProfit(uid: UserId, cps: NonEmptyList[CurrencyPair], limits: Limits)
   case ProcessMarketData(uid: UserId, data: MarketTimeSeriesData)
   case ProcessSignals(uid: UserId, currencyPair: CurrencyPair, signals: List[Signal])
+  case ProcessManualSignal(signal: Signal)
   case ProcessMarketStateUpdate(uid: UserId, currencyPair: CurrencyPair)
   case ProcessTradeOrderPlacement(order: TradeOrderPlacement)
   case CloseOpenOrders(uid: UserId, currencyPair: CurrencyPair)

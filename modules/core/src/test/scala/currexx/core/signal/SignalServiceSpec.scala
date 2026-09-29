@@ -33,7 +33,7 @@ class SignalServiceSpec extends IOWordSpec {
 
         result.asserting { res =>
           verify(signRepo).saveAll(List(signal))
-          disp.submittedActions mustBe List(Action.ProcessSignals(Users.uid, Markets.gbpeur, List(signal)))
+          disp.submittedActions mustBe List(Action.ProcessManualSignal(signal))
           res mustBe ()
         }
       }

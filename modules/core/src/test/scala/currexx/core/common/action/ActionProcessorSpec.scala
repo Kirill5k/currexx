@@ -21,6 +21,25 @@ class ActionProcessorSpec extends IOWordSpec {
   given Logger[IO] = Slf4jLogger.getLogger[IO]
 
   "An ActionProcessor" should {
+    "process manual signals separately from detected candle batches" in {
+      val (monsvc, sigsvc, marksvc, tradesvc, settvc) = mocks
+      when(marksvc.processManualSignal(any[Signal])).thenReturn(IO.unit)
+
+      val signal = Signals.trend(Direction.Upward)
+      val result = for
+        dispatcher <- ActionDispatcher.make[IO]
+        processor  <- ActionProcessor.make[IO](dispatcher, monsvc, sigsvc, marksvc, tradesvc, settvc)
+        _          <- dispatcher.dispatch(Action.ProcessManualSignal(signal))
+        res        <- processor.run.interruptAfter(2.second).compile.drain
+      yield res
+
+      result.asserting { r =>
+        verify(marksvc).processManualSignal(signal)
+        verifyNoMoreInteractions(marksvc)
+        r mustBe ()
+      }
+    }
+
     "process submitted signals" in {
       val (monsvc, sigsvc, marksvc, tradesvc, settvc) = mocks
 
