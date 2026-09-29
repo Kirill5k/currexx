@@ -364,7 +364,7 @@ object OandaBrokerClient {
           currentPrice = side.averagePrice
             .getOrElse(BigDecimal(0)) + Option.when(side.units != 0)(side.unrealizedPL / side.units).getOrElse(BigDecimal(0)),
           volume = side.units.abs / LotSize,
-          profit = side.trueUnrealizedPL
+          profit = side.unrealizedPL
         )
       }
   }
@@ -373,7 +373,6 @@ object OandaBrokerClient {
       units: BigDecimal,
       tradeIDs: Option[List[String]],
       averagePrice: Option[BigDecimal],
-      trueUnrealizedPL: BigDecimal,
       unrealizedPL: BigDecimal
   ) derives Codec.AsObject
 

@@ -6,7 +6,7 @@ import currexx.clients.broker.BrokerParameters
 import currexx.domain.errors.AppError
 import currexx.domain.market.Currency.{EUR, GBP, USD}
 import currexx.domain.market.{CurrencyPair, OrderPlacementStatus, TradeOrder}
-import io.circe.Json
+import io.circe.{Json, JsonObject}
 import io.circe.parser.parse
 import kirill5k.common.cats.Clock
 import kirill5k.common.sttp.test.Sttp4WordSpec
@@ -237,6 +237,19 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
       submitExit(100000, 0, "Close rejected", StatusCode.BadRequest)
         .assertThrows(AppError.ClientFailure("oanda", "close-position returned 400: Close rejected"))
 
+    List(
+      ("missing units", (side: JsonObject) => side.remove("units")),
+      ("malformed units", (side: JsonObject) => side.add("units", Json.fromString("invalid"))),
+      ("missing unrealizedPL", (side: JsonObject) => side.remove("unrealizedPL")),
+      ("malformed unrealizedPL", (side: JsonObject) => side.add("unrealizedPL", Json.fromString("invalid")))
+    ).foreach { case (description, adjustSide) =>
+      s"reject a position with $description without sending a close" in
+        submitExit(100000, 0, closeResponse("longOrderFillTransaction"), adjustSide = adjustSide, expectClose = false).attempt.asserting {
+          case Left(AppError.JsonParsingFailure(_, _)) => succeed
+          case result                                  => fail(s"Expected a JSON parsing failure, received $result")
+        }
+    }
+
     "return no-position status when no position exists" in {
       val testingBackend = fs2BackendStub
         .whenRequestMatchesPartial {
@@ -255,35 +268,55 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
       result.asserting(_ mustBe OrderPlacementStatus.NoPosition)
     }
 
-    "retrieve current orders successfully" in {
-      val testingBackend = fs2BackendStub
-        .whenRequestMatchesPartial {
-          case r if r.isGet && r.hasPath("/v3/accounts") =>
-            ResponseStub.adjust(readJson("oanda/accounts-success-response.json"))
-          case r if r.isGet && r.hasPath("/v3/accounts/123-456-789/positions") =>
-            ResponseStub.adjust(readJson("oanda/positions-success-response.json"))
-          case _ => throw new RuntimeException("Unexpected request")
+    List(
+      ("absent", Option.empty[Json]),
+      ("a conflicting number", Some(Json.fromInt(999))),
+      ("null", Some(Json.Null)),
+      ("malformed", Some(Json.obj("unexpected" -> Json.True)))
+    ).foreach { case (description, extension) =>
+      val adjustSide: JsonObject => JsonObject =
+        side => extension.fold(side.remove("trueUnrealizedPL"))(value => side.add("trueUnrealizedPL", value))
+
+      s"submit an exit when trueUnrealizedPL is $description" in
+        submitExit(100000, 0, closeResponse("longOrderFillTransaction"), adjustSide = adjustSide)
+          .asserting(_ mustBe OrderPlacementStatus.Success)
+
+      s"retrieve current orders using documented profit when trueUnrealizedPL is $description" in {
+        val response = parse(readJson("oanda/positions-success-response.json")).toOption.get.hcursor
+          .downField("positions")
+          .withFocus(_.mapArray(_.map(position => mapPositionSides(position, adjustSide))))
+          .top
+          .get
+          .noSpaces
+        val testingBackend = fs2BackendStub
+          .whenRequestMatchesPartial {
+            case r if r.isGet && r.hasPath("/v3/accounts") =>
+              ResponseStub.adjust(readJson("oanda/accounts-success-response.json"))
+            case r if r.isGet && r.hasPath("/v3/accounts/123-456-789/positions") =>
+              ResponseStub.adjust(response)
+            case _ => throw new RuntimeException("Unexpected request")
+          }
+
+        val result = for
+          client <- OandaBrokerClient.make[IO](config, testingBackend)
+          orders <- client.getCurrentOrders(params, NonEmptyList.of(eurUsdPair, gbpUsdPair))
+        yield orders
+
+        result.asserting { orders =>
+          orders must have size 2
+
+          val eurUsdOrder = orders.find(_.currencyPair == eurUsdPair).get
+          eurUsdOrder.position mustBe TradeOrder.Position.Buy
+          eurUsdOrder.openPrice mustBe BigDecimal("1.1050")
+          eurUsdOrder.volume mustBe BigDecimal("1.0")
+          eurUsdOrder.profit mustBe BigDecimal("52.00")
+
+          val gbpUsdOrder = orders.find(_.currencyPair == gbpUsdPair).get
+          gbpUsdOrder.position mustBe TradeOrder.Position.Sell
+          gbpUsdOrder.openPrice mustBe BigDecimal("1.2500")
+          gbpUsdOrder.volume mustBe BigDecimal("0.5")
+          gbpUsdOrder.profit mustBe BigDecimal("-27.00")
         }
-
-      val result = for
-        client <- OandaBrokerClient.make[IO](config, testingBackend)
-        orders <- client.getCurrentOrders(params, NonEmptyList.of(eurUsdPair, gbpUsdPair))
-      yield orders
-
-      result.asserting { orders =>
-        orders must have size 2
-
-        val eurUsdOrder = orders.find(_.currencyPair == eurUsdPair).get
-        eurUsdOrder.position mustBe TradeOrder.Position.Buy
-        eurUsdOrder.openPrice mustBe BigDecimal("1.1050")
-        eurUsdOrder.volume mustBe BigDecimal("1.0")
-        eurUsdOrder.profit mustBe BigDecimal("50.00")
-
-        val gbpUsdOrder = orders.find(_.currencyPair == gbpUsdPair).get
-        gbpUsdOrder.position mustBe TradeOrder.Position.Sell
-        gbpUsdOrder.openPrice mustBe BigDecimal("1.2500")
-        gbpUsdOrder.volume mustBe BigDecimal("0.5")
-        gbpUsdOrder.profit mustBe BigDecimal("-25.00")
       }
     }
 
@@ -485,19 +518,32 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
     yield (status, submissions.get.size)
   }
 
+  private def mapPositionSides(position: Json, adjustSide: JsonObject => JsonObject): Json =
+    List("long", "short").foldLeft(position) { (json, side) =>
+      json.hcursor.downField(side).withFocus(_.mapObject(adjustSide)).top.get
+    }
+
   private def submitExit(
       longUnits: Int,
       shortUnits: Int,
       response: String,
-      responseStatus: StatusCode = StatusCode.Ok
+      responseStatus: StatusCode = StatusCode.Ok,
+      adjustSide: JsonObject => JsonObject = identity,
+      expectClose: Boolean = true
   ): IO[OrderPlacementStatus] = {
-    val positionResponse = s"""{
+    val positionResponse = parse(s"""{
       "position": {
         "instrument": "EUR_USD",
-        "long": {"units": "$longUnits", "trueUnrealizedPL": "0.00", "unrealizedPL": "0.00"},
-        "short": {"units": "$shortUnits", "trueUnrealizedPL": "0.00", "unrealizedPL": "0.00"}
+        "long": {"units": "$longUnits", "unrealizedPL": "0.00"},
+        "short": {"units": "$shortUnits", "unrealizedPL": "0.00"}
       }
-    }"""
+    }""").toOption.get.hcursor
+      .downField("position")
+      .withFocus(position => mapPositionSides(position, adjustSide))
+      .top
+      .get
+      .noSpaces
+    val closeRequests  = AtomicReference(List.empty[String])
     val testingBackend = fs2BackendStub
       .whenRequestMatchesPartial {
         case r if r.isGet && r.hasPath("/v3/accounts") =>
@@ -505,13 +551,24 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
         case r if r.isGet && r.hasPath("/v3/accounts/123-456-789/positions/EUR_USD") =>
           ResponseStub.adjust(positionResponse)
         case r if r.isPut && r.hasPath("/v3/accounts/123-456-789/positions/EUR_USD/close") =>
+          closeRequests.updateAndGet(r.body.toString :: _)
           ResponseStub.adjust(response, responseStatus)
         case _ => throw new RuntimeException("Unexpected request")
       }
 
     for
       client <- OandaBrokerClient.make[IO](config, testingBackend)
-      status <- client.submit(params, TradeOrder.Exit(eurUsdPair, BigDecimal(1)))
+      result <- client.submit(params, TradeOrder.Exit(eurUsdPair, BigDecimal(1))).attempt
+      _      <- IO {
+        if expectClose then {
+          closeRequests.get must have size 1
+          val expectedLong  = if longUnits == 0 then "NONE" else "ALL"
+          val expectedShort = if shortUnits == 0 then "NONE" else "ALL"
+          closeRequests.get.head must include(s""""longUnits":"$expectedLong"""")
+          closeRequests.get.head must include(s""""shortUnits":"$expectedShort"""")
+        } else closeRequests.get mustBe empty
+      }
+      status <- IO.fromEither(result)
     yield status
   }
 }
