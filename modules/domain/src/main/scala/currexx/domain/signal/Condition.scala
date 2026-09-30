@@ -151,12 +151,13 @@ object Condition {
     line match
       case current :: previous :: _ =>
         (current, previous) match {
+          // Prioritize entry into the destination zone when one move crosses both boundaries.
           case (c, p) if c >= upperBoundary && p < upperBoundary =>
             Some(Condition.ThresholdCrossing(BigDecimal.valueOf(upperBoundary), BigDecimal.valueOf(c), Direction.Upward, Boundary.Upper))
-          case (c, p) if c < upperBoundary && p >= upperBoundary =>
-            Some(Condition.ThresholdCrossing(BigDecimal.valueOf(upperBoundary), BigDecimal.valueOf(c), Direction.Downward, Boundary.Upper))
           case (c, p) if c <= lowerBoundary && p > lowerBoundary =>
             Some(Condition.ThresholdCrossing(BigDecimal.valueOf(lowerBoundary), BigDecimal.valueOf(c), Direction.Downward, Boundary.Lower))
+          case (c, p) if c < upperBoundary && p >= upperBoundary =>
+            Some(Condition.ThresholdCrossing(BigDecimal.valueOf(upperBoundary), BigDecimal.valueOf(c), Direction.Downward, Boundary.Upper))
           case (c, p) if c > lowerBoundary && p <= lowerBoundary =>
             Some(Condition.ThresholdCrossing(BigDecimal.valueOf(lowerBoundary), BigDecimal.valueOf(c), Direction.Upward, Boundary.Lower))
           case _ => None

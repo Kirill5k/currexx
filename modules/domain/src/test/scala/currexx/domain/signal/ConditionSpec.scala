@@ -52,6 +52,59 @@ class ConditionSpec extends AnyWordSpec with Matchers {
 
         Condition.thresholdCrossing(line, 1.0, 4.0) mustBe None
       }
+
+      "report the destination boundary when a move crosses both thresholds" in {
+        val crossings = List(
+          (90.0, 10.0, 20.0, Direction.Downward, Boundary.Lower),
+          (10.0, 90.0, 80.0, Direction.Upward, Boundary.Upper),
+          (90.0, 20.0, 20.0, Direction.Downward, Boundary.Lower),
+          (10.0, 80.0, 80.0, Direction.Upward, Boundary.Upper),
+          (80.0, 10.0, 20.0, Direction.Downward, Boundary.Lower),
+          (20.0, 90.0, 80.0, Direction.Upward, Boundary.Upper),
+          (80.0, 20.0, 20.0, Direction.Downward, Boundary.Lower),
+          (20.0, 80.0, 80.0, Direction.Upward, Boundary.Upper)
+        )
+
+        crossings.foreach { (previous, current, threshold, direction, boundary) =>
+          withClue(s"$previous -> $current: ") {
+            Condition.thresholdCrossing(List(current, previous), 20.0, 80.0) mustBe
+              Some(Condition.ThresholdCrossing(BigDecimal.valueOf(threshold), BigDecimal.valueOf(current), direction, boundary))
+          }
+        }
+      }
+
+      "include the boundaries in the extreme zones and detect departures into neutral" in {
+        val crossings = List(
+          (50.0, 80.0, 80.0, Direction.Upward, Boundary.Upper),
+          (50.0, 20.0, 20.0, Direction.Downward, Boundary.Lower),
+          (80.0, 79.0, 80.0, Direction.Downward, Boundary.Upper),
+          (20.0, 21.0, 20.0, Direction.Upward, Boundary.Lower),
+          (90.0, 50.0, 80.0, Direction.Downward, Boundary.Upper),
+          (10.0, 50.0, 20.0, Direction.Upward, Boundary.Lower)
+        )
+
+        crossings.foreach { (previous, current, threshold, direction, boundary) =>
+          withClue(s"$previous -> $current: ") {
+            Condition.thresholdCrossing(List(current, previous), 20.0, 80.0) mustBe
+              Some(Condition.ThresholdCrossing(BigDecimal.valueOf(threshold), BigDecimal.valueOf(current), direction, boundary))
+          }
+        }
+      }
+
+      "return None when both values remain in the same zone" in {
+        val moves = List((90.0, 85.0), (10.0, 15.0), (50.0, 55.0), (90.0, 80.0), (10.0, 20.0), (80.0, 80.0), (20.0, 20.0))
+
+        moves.foreach { (previous, current) =>
+          withClue(s"$previous -> $current: ") {
+            Condition.thresholdCrossing(List(current, previous), 20.0, 80.0) mustBe None
+          }
+        }
+      }
+
+      "return None without two values" in {
+        Condition.thresholdCrossing(Nil, 20.0, 80.0) mustBe None
+        Condition.thresholdCrossing(List(10.0), 20.0, 80.0) mustBe None
+      }
     }
 
     "linesCrossing" should {

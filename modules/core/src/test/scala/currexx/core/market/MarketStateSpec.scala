@@ -1,15 +1,19 @@
 package currexx.core.market
 
+import cats.data.NonEmptyList
 import currexx.core.fixtures.{Markets, Signals, Users}
-import currexx.domain.market.TradeOrder
-import currexx.domain.signal.{Boundary, Direction, ValueRole}
+import currexx.core.signal.{SignalDetector, ValueTransformer}
+import currexx.core.trade.{Rule, TradeAction}
+import currexx.domain.market.{PriceRange, TradeOrder}
+import currexx.domain.signal.{Boundary, Condition, Direction, Indicator, ValueRole, ValueSource, ValueTransformation}
+import org.scalatest.OptionValues
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
 import scala.concurrent.duration.*
 
-class MarketStateSpec extends AnyWordSpec with Matchers {
+class MarketStateSpec extends AnyWordSpec with Matchers with OptionValues {
 
   val ts: Instant         = Instant.parse("2026-01-02T20:00:00Z")
   val reopenedAt: Instant = ts.plusSeconds(72 * 3600)
@@ -23,6 +27,52 @@ class MarketStateSpec extends AnyWordSpec with Matchers {
     )
 
   "MarketState.applyCandleSignals" should {
+    "enter oversold and trigger a short exit when the oscillator jumps across both thresholds" in {
+      val indicator: Indicator.ThresholdCrossing =
+        Indicator.ThresholdCrossing(ValueSource.Close, ValueTransformation.RSX(14), 70.0, 30.0)
+      val candleTime = ts.plusSeconds(3600)
+      // Alternate small gains and losses to establish overbought momentum, then drop 20 pips in one candle.
+      val history = (1 to 40)
+        .scanLeft(1.25) { (price, index) =>
+          price + (if (index % 2 == 1) 0.00002 else -0.000002)
+        }
+        .toList
+      val closes = history :+ (history.last - 0.002)
+      val prices = closes.zipWithIndex.map { (close, index) =>
+        val open = if (index == 0) close else closes(index - 1)
+        PriceRange(open, open.max(close), open.min(close), close, 1000.0, candleTime.minusSeconds((closes.size - 1 - index) * 3600L))
+      }.reverse
+      val data        = Markets.timeSeriesData.copy(prices = NonEmptyList.fromListUnsafe(prices))
+      val transformed = ValueTransformer.pure.transformTo(data.closings, data, indicator.transformation)
+
+      transformed(1) must be >= indicator.upperBoundary
+      transformed.head must be <= indicator.lowerBoundary
+
+      val previous = state.copy(
+        currentPosition = Some(PositionState(TradeOrder.Position.Sell, ts)),
+        profile = state.profile.copy(
+          momentum = Some(MomentumState(MomentumZone.Overbought, ts)),
+          lastMomentumValue = Some(BigDecimal.valueOf(transformed(1)))
+        )
+      )
+      val signal = SignalDetector.pure.detect(Users.uid, data)(indicator).value
+      signal.condition mustBe Condition.ThresholdCrossing(30.0, BigDecimal.valueOf(transformed.head), Direction.Downward, Boundary.Lower)
+
+      val updated = previous.applyCandleSignals(List(signal), candleTime).value
+      updated.profile.momentum mustBe Some(MomentumState(MomentumZone.Oversold, candleTime))
+      updated.profile.lastMomentumValue mustBe Some(BigDecimal.valueOf(transformed.head))
+      updated.previousProfile mustBe Some(previous.profile)
+
+      val exitRule = Rule(
+        TradeAction.ClosePosition,
+        Rule.Condition.allOf(Rule.Condition.positionIsSell, Rule.Condition.momentumEnteredOversold)
+      )
+      val neutralRule = Rule(TradeAction.OpenShort, Rule.Condition.MomentumEntered(MomentumZone.Neutral))
+
+      Rule.findTriggeredAction(List(exitRule), updated, updated.previousProfile.value) mustBe Some(TradeAction.ClosePosition)
+      Rule.findTriggeredAction(List(neutralRule), updated, updated.previousProfile.value) mustBe None
+    }
+
     "apply signals from a newer candle and record it" in {
       val candleTime = ts.plusSeconds(3600)
       val signals    = List(Signals.trend(Direction.Downward, time = candleTime), Signals.crossover(Direction.Upward, time = candleTime))
