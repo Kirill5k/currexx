@@ -3,14 +3,48 @@ package currexx.backtest.services
 import cats.Monad
 import cats.data.NonEmptyList
 import cats.effect.{Concurrent, Ref}
+import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.clients.broker.{BrokerClient, BrokerParameters}
 import currexx.clients.data.MarketDataClient
-import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, OpenedTradeOrder, OrderPlacementStatus, PriceRange, TradeOrder}
+import currexx.domain.market.{
+  CurrencyPair,
+  Interval,
+  MarketTimeSeriesData,
+  OpenedTradeOrder,
+  OrderExecution,
+  OrderPlacementResult,
+  PriceRange,
+  TradeOrder
+}
+import kirill5k.common.cats.Clock
 
-final class TestBrokerClient[F[_]](using F: Monad[F]) extends BrokerClient[F]:
-  override def find(parameters: BrokerParameters, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]] = F.pure(Nil)
-  override def submit(parameters: BrokerParameters, order: TradeOrder): F[OrderPlacementStatus] = F.pure(OrderPlacementStatus.Success)
+final class TestBrokerClient[F[_]](
+    clock: Clock[F],
+    positions: Ref[F, Map[CurrencyPair, OpenedTradeOrder]]
+)(using F: Monad[F])
+    extends BrokerClient[F]:
+  override def find(parameters: BrokerParameters, cps: NonEmptyList[CurrencyPair]): F[List[OpenedTradeOrder]] =
+    positions.get.map(opened => cps.toList.flatMap(opened.get))
+  override def findEntryExecutions(
+      parameters: BrokerParameters,
+      cp: CurrencyPair,
+      position: TradeOrder.Position
+  ): F[List[OrderExecution]] = F.pure(Nil)
+
+  // Orders fill instantly at their requested price, and an entry replaces any position held in its currency pair
+  override def submit(parameters: BrokerParameters, order: TradeOrder): F[OrderPlacementResult] =
+    for
+      time   <- clock.now
+      volume <- positions.modify { opened =>
+        order match
+          case enter: TradeOrder.Enter =>
+            val position = OpenedTradeOrder(enter.currencyPair, enter.position, enter.price, enter.price, enter.volume, BigDecimal(0))
+            (opened.updated(enter.currencyPair, position), enter.volume)
+          case exit: TradeOrder.Exit =>
+            (opened - exit.currencyPair, opened.get(exit.currencyPair).fold(BigDecimal(0))(_.volume))
+      }
+    yield OrderPlacementResult.filled(OrderExecution(order.price, time, volume, orderId = "", transactionId = "", tradeIds = Nil))
 
 final class TestMarketDataClient[F[_]](
     private val priceRef: Ref[F, Option[MarketTimeSeriesData]]
@@ -27,11 +61,12 @@ final class TestClients[F[_]](
 )
 
 object TestClients {
-  def make[F[_]: Concurrent]: F[TestClients[F]] =
-    Ref.of[F, Option[MarketTimeSeriesData]](None).map { price =>
-      TestClients[F](
-        TestBrokerClient[F],
-        TestMarketDataClient[F](price)
-      )
-    }
+  def make[F[_]: Concurrent](clock: Clock[F]): F[TestClients[F]] =
+    for
+      price     <- Ref.of[F, Option[MarketTimeSeriesData]](None)
+      positions <- Ref.of[F, Map[CurrencyPair, OpenedTradeOrder]](Map.empty)
+    yield TestClients[F](
+      TestBrokerClient[F](clock, positions),
+      TestMarketDataClient[F](price)
+    )
 }

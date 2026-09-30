@@ -102,9 +102,9 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
     }
 
     "GET /trade/orders" should {
-      "return placed orders" in {
+      "return placed orders with their executions" in {
         val svc = mock[TradeService[IO]]
-        when(svc.getAllOrders(any[UserId], any[SearchParams])).thenReturnIO(List(Trades.order))
+        when(svc.getAllOrders(any[UserId], any[SearchParams])).thenReturnIO(List(Trades.order.copy(executions = List(Trades.execution))))
 
         val req = Request[IO](Method.GET, uri"/trade/orders?from=2020-01-01&currencyPair=GBP/EUR").withAuthHeader()
         val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
@@ -125,7 +125,19 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
              |    "demo" : true,
              |    "broker" : "oanda"
              |  },
-             |  "time" : "${Trades.ts}"
+             |  "time" : "${Trades.ts}",
+             |  "executions" : [
+             |    {
+             |      "price" : 3.0002,
+             |      "time" : "${Trades.execution.time}",
+             |      "volume" : 0.1,
+             |      "orderId" : "42",
+             |      "transactionId" : "43",
+             |      "tradeIds" : [
+             |        "43"
+             |      ]
+             |    }
+             |  ]
              |}
              |]""".stripMargin
         res mustHaveStatus (Status.Ok, Some(responseBody))

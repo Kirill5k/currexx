@@ -8,7 +8,7 @@ import cats.syntax.foldable.*
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.signal.Signal
 import currexx.core.market.db.MarketStateRepository
-import currexx.core.trade.TradeOrderPlacement
+import currexx.core.trade.{BrokerPosition, TradeOrderPlacement}
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, MarketTimeSeriesData, TradeOrder}
 import currexx.domain.user.UserId
@@ -45,11 +45,32 @@ final private class LiveMarketService[F[_]](
   override def clearState(uid: UserId, cp: CurrencyPair, closePendingOrders: Boolean): F[Unit] =
     stateRepo.delete(uid, cp) >> F.whenA(closePendingOrders)(dispatcher.dispatch(Action.CloseOpenOrders(uid, cp)))
 
-  override def processTradeOrderPlacement(top: TradeOrderPlacement): F[Unit] = {
-    val position = top.order match
-      case enter: TradeOrder.Enter => Some(PositionState(enter.position, top.time, Some(enter.price)))
-      case _: TradeOrder.Exit      => None
-    stateRepo.update(top.userId, top.order.currencyPair, position).void
+  override def processTradeOrderPlacement(top: TradeOrderPlacement): F[Unit] =
+    top.order match
+      case _: TradeOrder.Exit      => stateRepo.update(top.userId, top.order.currencyPair, None).void
+      case enter: TradeOrder.Enter =>
+        modifyState(top.userId, enter.currencyPair) { state =>
+          val position = positionAfterEntry(state.currentPosition, enter, top)
+          Option.when(position != state.currentPosition)(state.copy(currentPosition = position))
+        }.void
+
+  // A filled entry takes the broker's position as a whole, so applying the same placement again changes nothing.
+  // An entry that has not filled yet leaves a position on its side as it was, or opens one without a price.
+  private def positionAfterEntry(
+      current: Option[PositionState],
+      enter: TradeOrder.Enter,
+      top: TradeOrderPlacement
+  ): Option[PositionState] = {
+    def onSide(side: TradeOrder.Position): Option[PositionState]                        = current.filter(_.position == side)
+    def filled(side: TradeOrder.Position, openPrice: Option[BigDecimal]): PositionState =
+      val filledAt = top.executions.map(_.time).minOption.getOrElse(top.time)
+      PositionState(side, onSide(side).fold(filledAt)(_.openedAt), openPrice)
+
+    top.brokerPosition match
+      case Some(BrokerPosition.Flat)              => None
+      case Some(BrokerPosition.Open(side, price)) => Some(filled(side, Some(price)))
+      case Some(BrokerPosition.Unknown)           => Some(filled(enter.position, None))
+      case None                                   => Some(onSide(enter.position).getOrElse(PositionState(enter.position, top.time)))
   }
 
   override def processSignals(uid: UserId, cp: CurrencyPair, signals: List[Signal]): F[Unit] =

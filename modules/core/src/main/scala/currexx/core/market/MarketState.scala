@@ -81,7 +81,7 @@ final case class MarketProfile(
 final case class PositionState(
     position: TradeOrder.Position,
     openedAt: Instant,
-    // Entry price of the open position; used by price-distance stops. Optional for codec
+    // Entry price of the open position as reported by the broker; used by price-distance stops. Optional for codec
     // backward-compatibility with states persisted before this field existed.
     openPrice: Option[BigDecimal] = None
 ) derives Codec.AsObject

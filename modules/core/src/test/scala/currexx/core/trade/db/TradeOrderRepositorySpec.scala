@@ -3,11 +3,13 @@ package currexx.core.trade.db
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
+import currexx.core.common.db.Repository
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Trades, Users}
 import currexx.domain.market.TradeOrder
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
+import mongo4cats.operations.{Filter, Update}
 
 import scala.concurrent.Future
 
@@ -27,6 +29,29 @@ class TradeOrderRepositorySpec extends MongoSpec {
         yield res
 
         result.map(_ mustBe List(Trades.order, Trades.order.copy(time = Trades.ts.minusSeconds(100))))
+      }
+
+      "store the order's executions" in withEmbeddedMongoDb { db =>
+        val order  = Trades.order.copy(executions = List(Trades.execution))
+        val result = for
+          repo <- TradeOrderRepository.make(db)
+          _    <- repo.save(order)
+          res  <- repo.getAll(Users.uid, emptySearchParams)
+        yield res
+
+        result.map(_ mustBe List(order))
+      }
+
+      "read orders stored before executions were recorded" in withEmbeddedMongoDb { db =>
+        val result = for
+          repo       <- TradeOrderRepository.make(db)
+          _          <- repo.save(Trades.order)
+          collection <- db.getCollection(Repository.Collection.TradeOrders)
+          _          <- collection.updateMany(Filter.empty, Update.unset("executions"))
+          res        <- repo.getAll(Users.uid, emptySearchParams)
+        yield res
+
+        result.map(_ mustBe List(Trades.order))
       }
     }
 

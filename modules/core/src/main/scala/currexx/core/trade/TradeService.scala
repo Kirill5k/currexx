@@ -21,7 +21,7 @@ import currexx.core.settings.TradeSettings
 import currexx.core.trade.TradeAction
 import currexx.core.trade.db.{OrderStatusRepository, TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{CurrencyPair, Interval, OrderPlacementStatus, TradeOrder}
+import currexx.domain.market.{CurrencyPair, Interval, OrderPlacementResult, OrderPlacementStatus, TradeOrder}
 import currexx.domain.monitor.Limits
 import kirill5k.common.cats.Clock
 import currexx.domain.user.UserId
@@ -160,12 +160,28 @@ final private class LiveTradeService[F[_]](
         // An action retried after its entry was filled but not recorded must neither close nor repeat that entry
         openedOrders.find(_.position == position) match
           case Some(opened) =>
-            val filledOrder = TradeOrder.Enter(position, state.currencyPair, opened.openPrice, opened.volume)
-            recordOrderPlacement(TradeOrderPlacement(state.userId, filledOrder, settings.broker, time), OrderPlacementStatus.Success)
+            // The position is confirmed open, so it is recorded even when its fills cannot be retrieved
+            brokerClient
+              .findEntryExecutions(settings.broker, state.currencyPair, position)
+              .handleErrorWith { error =>
+                logger.warn(s"Could not retrieve fills of the open $position position on ${state.currencyPair}: $error").as(Nil)
+              }
+              .flatMap { executions =>
+                val filledOrder = TradeOrder.Enter(position, state.currencyPair, opened.openPrice, opened.volume)
+                val recovered   = TradeOrderPlacement(
+                  state.userId,
+                  filledOrder,
+                  settings.broker,
+                  time,
+                  executions,
+                  Some(BrokerPosition.from(opened))
+                )
+                recordOrderPlacement(recovered, OrderPlacementStatus.Success)
+              }
           case None if closeFirst =>
-            val exit                 = TradeOrderPlacement(state.userId, TradeOrder.Exit(state.currencyPair, price), settings.broker, time)
-            def publishExit: F[Unit] = dispatcher.dispatch(Action.ProcessTradeOrderPlacement(exit))
-            submitOrderPlacement(exit, skipEvent = true).flatMap { closeStatus =>
+            val exit = TradeOrderPlacement(state.userId, TradeOrder.Exit(state.currencyPair, price), settings.broker, time)
+            placeWithBroker(exit, skipEvent = true).flatMap { (placedExit, closeStatus) =>
+              def publishExit: F[Unit] = dispatcher.dispatch(Action.ProcessTradeOrderPlacement(placedExit))
               F.whenA(canOpenAfterClose(closeStatus)) {
                 // ActionProcessor handles events concurrently, so publishing both could apply the exit after the entry.
                 // Publish only the entry on success, or the confirmed exit if opening fails.
@@ -194,7 +210,34 @@ final private class LiveTradeService[F[_]](
   }
 
   private def submitOrderPlacement(top: TradeOrderPlacement, skipEvent: Boolean = false): F[OrderPlacementStatus] =
-    brokerClient.submit(top.broker, top.order).flatTap(recordOrderPlacement(top, _, skipEvent))
+    placeWithBroker(top, skipEvent).map(_._2)
+
+  private def placeWithBroker(top: TradeOrderPlacement, skipEvent: Boolean): F[(TradeOrderPlacement, OrderPlacementStatus)] =
+    for
+      result         <- brokerClient.submit(top.broker, top.order)
+      brokerPosition <- (top.order, result.status) match
+        case (_: TradeOrder.Enter, OrderPlacementStatus.Success) => brokerPositionAfterFill(top).map(Some(_))
+        case _                                                   => F.pure(None)
+      placed = top.copy(executions = result.executions, brokerPosition = brokerPosition)
+      _ <- result match
+        case OrderPlacementResult.Pending(ref) if top.order.isEnter =>
+          logger.warn(s"Entry order is pending at broker ($ref), its entry price is unknown until it fills: ${top.order}")
+        case OrderPlacementResult.FilledWithoutExecution(orderId) =>
+          logger.warn(s"Order filled at broker (order $orderId) without execution details, its fill price is unknown: ${top.order}")
+        case _ => F.unit
+      _ <- recordOrderPlacement(placed, result.status, skipEvent)
+    yield placed -> result.status
+
+  // The broker tracks the position's entry price across all of its trades, so it is read back rather than derived from fills
+  private def brokerPositionAfterFill(top: TradeOrderPlacement): F[BrokerPosition] = {
+    val cp = top.order.currencyPair
+    brokerClient
+      .find(top.broker, NonEmptyList.one(cp))
+      .map(_.find(_.currencyPair == cp).fold(BrokerPosition.Flat)(BrokerPosition.from))
+      .handleErrorWith { error =>
+        logger.warn(s"Could not read the $cp position after a fill, its entry price is unknown: $error").as(BrokerPosition.Unknown)
+      }
+  }
 
   private def recordOrderPlacement(top: TradeOrderPlacement, status: OrderPlacementStatus, skipEvent: Boolean = false): F[Unit] =
     for

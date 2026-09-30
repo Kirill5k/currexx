@@ -1,9 +1,12 @@
 package currexx.domain.market
 
+import cats.data.NonEmptyList
 import currexx.domain.JsonSyntax
 import currexx.domain.types.EnumType
 import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder}
 import org.latestbit.circe.adt.codec.*
+
+import java.time.Instant
 
 sealed trait TradeOrder(val kind: String):
   def isEnter: Boolean
@@ -51,6 +54,39 @@ final case class OpenedTradeOrder(
     volume: BigDecimal,
     profit: BigDecimal
 )
+
+final case class OrderExecution(
+    price: BigDecimal,
+    time: Instant,
+    volume: BigDecimal,
+    orderId: String,
+    transactionId: String,
+    tradeIds: List[String]
+) derives Codec.AsObject
+
+final case class OrderRef(clientOrderId: String, brokerOrderId: Option[String])
+
+enum OrderPlacementResult:
+  // An entry has a single execution; closing a hedged position fills each side separately
+  case Filled(fills: NonEmptyList[OrderExecution])
+  // The broker confirmed the fill, but its execution details could not be retrieved
+  case FilledWithoutExecution(brokerOrderId: Option[String])
+  case Pending(ref: OrderRef)
+  case Cancelled(reason: String)
+  case NoPosition
+
+  def status: OrderPlacementStatus = this match
+    case Filled(_) | FilledWithoutExecution(_) => OrderPlacementStatus.Success
+    case Pending(_)                            => OrderPlacementStatus.Pending
+    case Cancelled(reason)                     => OrderPlacementStatus.Cancelled(reason)
+    case NoPosition                            => OrderPlacementStatus.NoPosition
+
+  def executions: List[OrderExecution] = this match
+    case Filled(fills) => fills.toList
+    case _             => Nil
+
+object OrderPlacementResult:
+  def filled(execution: OrderExecution): OrderPlacementResult = Filled(NonEmptyList.one(execution))
 
 enum OrderPlacementStatus derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
   case Success

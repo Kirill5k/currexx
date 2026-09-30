@@ -15,10 +15,12 @@ class MarketStateSpec extends AnyWordSpec with Matchers {
   val reopenedAt: Instant = ts.plusSeconds(72 * 3600)
   val gap: FiniteDuration = 71.hours
 
-  val state: MarketState = MarketState.initial(Users.uid, Markets.gbpeur, ts).copy(
-    profile = MarketProfile(trend = Some(TrendState(Direction.Upward, ts))),
-    lastCandleTime = Some(ts)
-  )
+  val state: MarketState = MarketState
+    .initial(Users.uid, Markets.gbpeur, ts)
+    .copy(
+      profile = MarketProfile(trend = Some(TrendState(Direction.Upward, ts))),
+      lastCandleTime = Some(ts)
+    )
 
   "MarketState.applyCandleSignals" should {
     "apply signals from a newer candle and record it" in {

@@ -11,7 +11,7 @@ import currexx.core.common.action.Action
 import currexx.core.market.MarketState
 import currexx.core.settings.{SignalSettings, TradeSettings}
 import currexx.core.trade.TradeOrderPlacement
-import currexx.domain.market.MarketTimeSeriesData
+import currexx.domain.market.{CurrencyPair, MarketTimeSeriesData, OpenedTradeOrder}
 import currexx.domain.user.UserId
 import kirill5k.common.syntax.time.*
 
@@ -29,7 +29,8 @@ final class ApplicationState[F[_]](
     val marketMarksRef: Ref[F, List[MarketMark]],
     val dataWindowRef: Ref[F, Option[DataWindow]],
     val dispatcherQueue: Queue[F, Action],
-    val userIdRef: Ref[F, UserId]
+    val userIdRef: Ref[F, UserId],
+    val brokerPositionsRef: Ref[F, Map[CurrencyPair, OpenedTradeOrder]]
 )(using F: Monad[F]) {
 
   private val fetchTimeOffset: FiniteDuration = 100.seconds
@@ -71,6 +72,7 @@ final class ApplicationState[F[_]](
       _ <- dataWindowRef.set(None)
       _ <- dispatcherQueue.tryTakeN(None).void
       _ <- userIdRef.set(newSettings.userId)
+      _ <- brokerPositionsRef.set(Map.empty)
     yield ()
 }
 
@@ -87,6 +89,7 @@ object ApplicationState {
       tradeOrdersRef    <- Ref.of[F, ListBuffer[TradeOrderPlacement]](ListBuffer.empty)
       signalSettingsRef <- Ref.of[F, SignalSettings](settings.signal)
       userIdRef         <- Ref.of[F, UserId](settings.userId)
+      brokerPositions   <- Ref.of[F, Map[CurrencyPair, OpenedTradeOrder]](Map.empty)
     yield ApplicationState[F](
       marketStateRef = marketStateRef,
       tradeSettingsRef = tradeSettingsRef,
@@ -97,6 +100,7 @@ object ApplicationState {
       marketMarksRef = marketMarksRef,
       dataWindowRef = dataWindowRef,
       dispatcherQueue = dispatcherQueue,
-      userIdRef = userIdRef
+      userIdRef = userIdRef,
+      brokerPositionsRef = brokerPositions
     )
 }

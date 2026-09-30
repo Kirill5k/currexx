@@ -9,7 +9,7 @@ import currexx.clients.broker.BrokerParameters
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{CurrencyPair, TradeOrder}
+import currexx.domain.market.{CurrencyPair, OrderExecution, TradeOrder}
 import io.circe.Codec
 import org.http4s.HttpRoutes
 import sttp.model.StatusCode
@@ -77,12 +77,13 @@ object TradeController extends TapirSchema with TapirJson with TapirCodecs {
   final case class TradeOrderView(
       order: TradeOrder,
       broker: BrokerParameters,
-      time: Instant
+      time: Instant,
+      executions: List[OrderExecution]
   ) derives Codec.AsObject
 
   object TradeOrderView:
     def from(top: TradeOrderPlacement): TradeOrderView =
-      TradeOrderView(top.order, top.broker, top.time)
+      TradeOrderView(top.order, top.broker, top.time, top.executions)
 
   private val basePath   = "trade"
   private val ordersPath = basePath / "orders"

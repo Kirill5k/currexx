@@ -96,7 +96,7 @@ object TestServices:
         dispatcher = dispatcher
       )
 
-      clients = TestClients[F](TestBrokerClient[F], TestMarketDataClient[F](appState.dataRef))
+      clients = TestClients[F](TestBrokerClient[F](clock, appState.brokerPositionsRef), TestMarketDataClient[F](appState.dataRef))
 
       trade <- TradeService.make[F](
         settingsRepo = new TestTradeSettingsRepository[F](appState.tradeSettingsRef),

@@ -3,12 +3,14 @@ package currexx.core.trade.db
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import currexx.core.MongoSpec
+import currexx.core.common.db.Repository
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Trades, Users}
 import currexx.core.trade.{CurrencyStatistics, EnterOrderStats, OrderStatistics}
 import currexx.domain.market.{OrderPlacementStatus, TradeOrder}
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
+import mongo4cats.operations.{Filter, Update}
 
 import scala.concurrent.Future
 
@@ -27,6 +29,20 @@ class OrderStatusRepositorySpec extends MongoSpec {
         yield res
 
         result.map(_.totalOrders mustBe 1)
+      }
+
+      "store the executions and still read statuses stored without them" in withEmbeddedMongoDb { db =>
+        val result = for
+          repo       <- OrderStatusRepository.make(db)
+          _          <- repo.save(Trades.order, OrderPlacementStatus.Success)
+          collection <- db.getCollection(Repository.Collection.OrderStatus)
+          _          <- collection.updateMany(Filter.empty, Update.unset("executions"))
+          _          <- repo.save(Trades.order.copy(executions = List(Trades.execution)), OrderPlacementStatus.Success)
+          stored     <- collection.find.all
+          stats      <- repo.getStatistics(Users.uid, emptySearchParams)
+        yield (stored.toList.map(_.contains("executions")), stats.successfulOrders)
+
+        result.map(_ mustBe (List(false, true), 2))
       }
     }
 

@@ -2,7 +2,7 @@ package currexx.core.trade.db
 
 import currexx.clients.broker.Broker
 import currexx.core.trade.TradeOrderPlacement
-import currexx.domain.market.{CurrencyPair, OrderPlacementStatus, TradeOrder}
+import currexx.domain.market.{CurrencyPair, OrderExecution, OrderPlacementStatus, TradeOrder}
 import io.circe.Codec
 import io.circe.generic.semiauto.deriveCodec
 import mongo4cats.bson.ObjectId
@@ -20,7 +20,9 @@ final case class OrderStatusEntity(
     price: BigDecimal,
     broker: Broker,
     status: OrderPlacementStatus,
-    time: Instant
+    time: Instant,
+    // Optional so that statuses stored before executions were recorded still decode
+    executions: Option[List[OrderExecution]]
 ) {
   val isEnter: Boolean      = orderKind == "enter"
   val isExit: Boolean       = orderKind == "exit"
@@ -50,5 +52,6 @@ object OrderStatusEntity extends MongoJsonCodecs:
       price = top.order.price,
       broker = top.broker.broker,
       status = status,
-      time = top.time
+      time = top.time,
+      executions = Some(top.executions)
     )

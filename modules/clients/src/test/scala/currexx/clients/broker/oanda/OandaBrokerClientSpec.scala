@@ -5,7 +5,7 @@ import cats.effect.IO
 import currexx.clients.broker.BrokerParameters
 import currexx.domain.errors.AppError
 import currexx.domain.market.Currency.{EUR, GBP, USD}
-import currexx.domain.market.{CurrencyPair, OrderPlacementStatus, TradeOrder}
+import currexx.domain.market.{CurrencyPair, OpenedTradeOrder, OrderExecution, OrderPlacementResult, OrderRef, TradeOrder}
 import io.circe.{Json, JsonObject}
 import io.circe.parser.parse
 import kirill5k.common.cats.Clock
@@ -28,32 +28,33 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
   val eurUsdPair                     = CurrencyPair(EUR, USD)
   val gbpUsdPair                     = CurrencyPair(GBP, USD)
 
+  val fillTime                = Instant.parse("2026-09-28T09:00:00Z")
+  val longCloseExecution      = OrderExecution(BigDecimal("1.1055"), fillTime, BigDecimal(1), "201", "202", List("123"))
+  val shortCloseExecution     = OrderExecution(BigDecimal("1.1057"), fillTime, BigDecimal(1), "203", "204", List("124"))
+  val lookedUpEntryExecution  = OrderExecution(BigDecimal("1.10502"), fillTime.plusSeconds(1), BigDecimal(1), "42", "43", List("43"))
+  val fillTransactionResponse = """{
+    "transaction": {
+      "id": "43", "time": "2026-09-28T09:00:01Z", "userID": 123, "accountID": "123-456-789", "batchID": "42",
+      "type": "ORDER_FILL", "orderID": "42", "instrument": "EUR_USD", "units": "100000",
+      "price": "1.1050", "fullVWAP": "1.10502", "pl": "0.0000",
+      "tradeOpened": {"tradeID": "43", "units": "100000", "price": "1.10502"}
+    },
+    "lastTransactionID": "43"
+  }"""
+
   "An OandaBrokerClient" should {
-    "submit enter buy order successfully without response" in {
-      val testingBackend = fs2BackendStub
-        .whenRequestMatchesPartial {
-          case r if r.isGet && r.hasPath("/v3/accounts") =>
-            ResponseStub.adjust(readJson("oanda/accounts-success-response.json"))
-          case r if r.isPost && r.hasPath("/v3/accounts/123-456-789/orders") =>
-            ResponseStub.adjust("", StatusCode.Created)
-          case _ => throw new RuntimeException("Unexpected request")
-        }
-
-      val result = for
-        client <- OandaBrokerClient.make[IO](config, testingBackend)
-        status <- client.submit(params, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0")))
-      yield status
-
-      result.asserting(_ mustBe OrderPlacementStatus.Pending)
-    }
-
     List(
-      ("filled", "orderFillTransaction", """{"type":"ORDER_FILL","units":"-50000","pl":"0.0"}""", OrderPlacementStatus.Success),
+      (
+        "filled",
+        "orderFillTransaction",
+        """{"type":"ORDER_FILL","orderID":"201","units":"-50000","price":"1.1050","pl":"0.0","tradeOpened":{"tradeID":"202"}}""",
+        OrderPlacementResult.filled(OrderExecution(BigDecimal("1.1050"), fillTime, BigDecimal("0.5"), "201", "202", List("202")))
+      ),
       (
         "cancelled",
         "orderCancelTransaction",
         """{"type":"ORDER_CANCEL","reason":"MARKET_HALTED"}""",
-        OrderPlacementStatus.Cancelled("MARKET_HALTED")
+        OrderPlacementResult.Cancelled("MARKET_HALTED")
       )
     ).foreach { case (description, outcomeField, outcome, expectedStatus) =>
       s"report a $description entry when create and outcome transactions omit request IDs" in {
@@ -87,26 +88,56 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
       }
     }
 
+    "return a pending entry referencing both order IDs when the order is created without an outcome" in
+      submitEnterWithUnknownOutcome(
+        EntrySubmission.CreatedWith(
+          """{
+            "orderCreateTransaction": {"id":"201", "time":"2026-09-28T09:00:00Z", "userID":123, "accountID":"123-456-789", "batchID":"201"},
+            "relatedTransactionIDs": ["201"],
+            "lastTransactionID": "201"
+          }"""
+        ),
+        "unused"
+      ).asserting {
+        case (Right(OrderPlacementResult.Pending(OrderRef(clientOrderId, Some("201")))), List(submission)) =>
+          submission must include(clientOrderId)
+        case result => fail(s"Expected a pending entry, received $result")
+      }
+
     List(
-      ("long", 100000, 0, List("longOrderFillTransaction")),
-      ("short", 0, -100000, List("shortOrderFillTransaction")),
-      ("long and short", 100000, -100000, List("longOrderFillTransaction", "shortOrderFillTransaction"))
-    ).foreach { case (sides, longUnits, shortUnits, transactions) =>
-      s"submit an exit successfully when every requested $sides side is filled" in
+      ("long", 100000, 0, List("longOrderFillTransaction"), longCloseExecution),
+      ("short", 0, -100000, List("shortOrderFillTransaction"), shortCloseExecution)
+    ).foreach { case (side, longUnits, shortUnits, transactions, expectedExecution) =>
+      s"return the execution of a filled $side close" in
         submitExit(longUnits, shortUnits, closeResponse(transactions*))
-          .asserting(_ mustBe OrderPlacementStatus.Success)
+          .asserting(_ mustBe OrderPlacementResult.filled(expectedExecution))
+    }
+
+    "return the executions of both sides when a close fills long and short" in
+      submitExit(100000, -100000, closeResponse("longOrderFillTransaction", "shortOrderFillTransaction"))
+        .asserting(_ mustBe OrderPlacementResult.Filled(NonEmptyList.of(longCloseExecution, shortCloseExecution)))
+
+    "return a fill without execution details when one side of a two-sided close cannot be decoded" in {
+      val longFill = parse(closeResponse("longOrderFillTransaction")).toOption.get.hcursor.downField("longOrderFillTransaction").focus.get
+      val response = Json
+        .obj(
+          "lastTransactionID"         -> Json.fromString("204"),
+          "longOrderFillTransaction"  -> longFill,
+          "shortOrderFillTransaction" -> Json.obj("orderID" -> Json.fromString("203"))
+        )
+        .noSpaces
+
+      submitExit(100000, -100000, response).asserting(_ mustBe OrderPlacementResult.FilledWithoutExecution(Some("201")))
     }
 
     List(
-      ("long", 100000, 0, """"longOrderFillTransaction":{}"""),
-      ("short", 0, -100000, """"shortOrderFillTransaction":{}"""),
-      ("both sides", 100000, -100000, """"longOrderFillTransaction":{},"shortOrderFillTransaction":{}"""),
-      ("long with only an ID in the fill", 100000, 0, """"longOrderFillTransaction":{"id":"1"}""")
-    ).foreach { case (description, longUnits, shortUnits, transactions) =>
-      s"accept a $description close with minimal fill objects" in {
+      ("an empty fill", """"longOrderFillTransaction":{}""", None),
+      ("a fill with only an order ID", """"longOrderFillTransaction":{"orderID":"201"}""", Some("201"))
+    ).foreach { case (description, transactions, orderId) =>
+      s"return a fill without execution details for a close with $description" in {
         val response = s"""{"lastTransactionID":"1",$transactions}"""
 
-        submitExit(longUnits, shortUnits, response).asserting(_ mustBe OrderPlacementStatus.Success)
+        submitExit(100000, 0, response).asserting(_ mustBe OrderPlacementResult.FilledWithoutExecution(orderId))
       }
     }
 
@@ -130,24 +161,28 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
       s"accept minimal transaction objects for $description" in {
         val response = s"""{"lastTransactionID":"1",$transactions}"""
 
-        submitExit(100000, -100000, response).asserting(_ mustBe OrderPlacementStatus.Cancelled(reason))
+        submitExit(100000, -100000, response).asserting(_ mustBe OrderPlacementResult.Cancelled(reason))
       }
     }
 
     List(
-      ("fill", "longOrderFillTransaction", Json.obj(), OrderPlacementStatus.Success),
+      (
+        "fill",
+        "longOrderFillTransaction",
+        parse(readJson("oanda/close-position-success-response.json")).toOption.get.hcursor.downField("longOrderFillTransaction").focus.get,
+        OrderPlacementResult.filled(longCloseExecution)
+      ),
       (
         "cancellation",
         "longOrderCancelTransaction",
         Json.obj("reason" -> Json.fromString("MARKET_HALTED")),
-        OrderPlacementStatus.Cancelled("MARKET_HALTED")
+        OrderPlacementResult.Cancelled("MARKET_HALTED")
       )
     ).foreach { case (description, field, requiredFields, expectedStatus) =>
       s"ignore unused $description metadata with unexpected shapes" in {
         val metadata = parse("""{
           "id": 1, "time": [], "userID": "user", "accountID": false,
-          "batchID": {}, "requestID": 2, "type": {}, "units": {}, "pl": "unknown",
-          "tradeOpened": {}, "tradesClosed": 3, "tradeReduced": "changed"
+          "batchID": {}, "requestID": 2, "type": {}, "units": {}, "pl": "unknown", "reason": 5
         }""").toOption.get
         val response = Json
           .obj(
@@ -194,7 +229,7 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
     ).foreach { case (sides, longUnits, shortUnits, transactions, reason) =>
       s"return cancelled when closing $sides is cancelled in an HTTP 200 response" in
         submitExit(longUnits, shortUnits, closeResponse(transactions*))
-          .asserting(_ mustBe OrderPlacementStatus.Cancelled(reason))
+          .asserting(_ mustBe OrderPlacementResult.Cancelled(reason))
     }
 
     List(
@@ -265,7 +300,7 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
         status <- client.submit(params, TradeOrder.Exit(eurUsdPair, BigDecimal(1)))
       yield status
 
-      result.asserting(_ mustBe OrderPlacementStatus.NoPosition)
+      result.asserting(_ mustBe OrderPlacementResult.NoPosition)
     }
 
     List(
@@ -279,7 +314,7 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
 
       s"submit an exit when trueUnrealizedPL is $description" in
         submitExit(100000, 0, closeResponse("longOrderFillTransaction"), adjustSide = adjustSide)
-          .asserting(_ mustBe OrderPlacementStatus.Success)
+          .asserting(_ mustBe OrderPlacementResult.filled(longCloseExecution))
 
       s"retrieve current orders using documented profit when trueUnrealizedPL is $description" in {
         val response = parse(readJson("oanda/positions-success-response.json")).toOption.get.hcursor
@@ -341,6 +376,13 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
       }
     }
 
+    "fail to retrieve current orders when a requested position is open on both sides" in
+      currentOrdersWithHedgedEurUsd(NonEmptyList.of(eurUsdPair, gbpUsdPair))
+        .assertThrows(AppError.ClientFailure("oanda", "get-positions for EUR_USD has both sides open, hedging is not supported"))
+
+    "ignore a position open on both sides when it is not requested" in
+      currentOrdersWithHedgedEurUsd(NonEmptyList.of(gbpUsdPair)).asserting(_.map(_.currencyPair) mustBe List(gbpUsdPair))
+
     "handle API errors when submitting orders" in {
       val testingBackend = fs2BackendStub
         .whenRequestMatchesPartial {
@@ -359,31 +401,82 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
       result.assertThrows(AppError.ClientFailure("oanda", "Open position returned 400"))
     }
 
-    List(("a server error", false), ("a timeout", true)).foreach { case (description, timeout) =>
-      s"look up an entry order instead of resubmitting it after $description" in
-        submitEnterWithUnknownOutcome(timeout, """{"order":{"id":"42","state":"FILLED"},"lastTransactionID":"43"}""")
-          .asserting(_ mustBe (Right(OrderPlacementStatus.Success), 1))
-    }
+    val filledOrderResponse = """{"order":{"id":"42","state":"FILLED","fillingTransactionID":"43"},"lastTransactionID":"43"}"""
 
     List(
-      ("PENDING", OrderPlacementStatus.Pending),
-      ("TRIGGERED", OrderPlacementStatus.Pending),
-      ("CANCELLED", OrderPlacementStatus.Cancelled("Order 42 was cancelled"))
-    ).foreach { case (state, expectedStatus) =>
-      s"return $expectedStatus when an entry order with unknown outcome is $state" in
-        submitEnterWithUnknownOutcome(timeout = false, s"""{"order":{"id":"42","state":"$state"},"lastTransactionID":"43"}""")
-          .asserting(_ mustBe (Right(expectedStatus), 1))
+      ("a server error", EntrySubmission.ServerError),
+      ("a timeout", EntrySubmission.TimedOut),
+      ("an unparseable created response", EntrySubmission.CreatedWith(""))
+    ).foreach { case (description, submission) =>
+      s"look up an entry order and its fill instead of resubmitting it after $description" in
+        submitEnterWithUnknownOutcome(submission, filledOrderResponse)
+          .asserting { case (result, submissions) =>
+            result mustBe Right(OrderPlacementResult.filled(lookedUpEntryExecution))
+            submissions must have size 1
+          }
+    }
+
+    List("PENDING", "TRIGGERED").foreach { state =>
+      s"return a pending entry referencing the order when an entry order with unknown outcome is $state" in
+        submitEnterWithUnknownOutcome(EntrySubmission.ServerError, s"""{"order":{"id":"42","state":"$state"},"lastTransactionID":"43"}""")
+          .asserting {
+            case (Right(OrderPlacementResult.Pending(OrderRef(clientOrderId, Some("42")))), List(submission)) =>
+              submission must include(clientOrderId)
+            case result => fail(s"Expected a pending entry, received $result")
+          }
+    }
+
+    "return cancelled when an entry order with unknown outcome is CANCELLED" in
+      submitEnterWithUnknownOutcome(EntrySubmission.ServerError, """{"order":{"id":"42","state":"CANCELLED"},"lastTransactionID":"43"}""")
+        .asserting(_._1 mustBe Right(OrderPlacementResult.Cancelled("Order 42 was cancelled")))
+
+    "keep the fill of a looked-up entry order that has no filling transaction" in
+      submitEnterWithUnknownOutcome(EntrySubmission.ServerError, """{"order":{"id":"42","state":"FILLED"},"lastTransactionID":"43"}""")
+        .asserting(_._1 mustBe Right(OrderPlacementResult.FilledWithoutExecution(Some("42"))))
+
+    List(
+      ("an HTTP error", ("Unauthorized", StatusCode.Unauthorized)),
+      ("an unparseable transaction", ("""{"transaction":{"id":"43"}}""", StatusCode.Ok))
+    ).foreach { case (description, transactionResponse) =>
+      s"keep the fill of a looked-up entry order when fetching its fill fails with $description" in
+        submitEnterWithUnknownOutcome(EntrySubmission.ServerError, filledOrderResponse, transactionResponse = transactionResponse)
+          .asserting { case (result, submissions) =>
+            result mustBe Right(OrderPlacementResult.FilledWithoutExecution(Some("42")))
+            submissions must have size 1
+          }
     }
 
     "fail without resubmitting when an entry order with unknown outcome cannot be looked up" in
-      submitEnterWithUnknownOutcome(timeout = true, "Unauthorized", StatusCode.Unauthorized)
-        .asserting(_ mustBe (Left(AppError.ClientFailure("oanda", "get-order returned 401: Unauthorized")), 1))
+      submitEnterWithUnknownOutcome(EntrySubmission.TimedOut, "Unauthorized", StatusCode.Unauthorized)
+        .asserting { case (result, submissions) =>
+          result mustBe Left(AppError.ClientFailure("oanda", "get-order returned 401: Unauthorized"))
+          submissions must have size 1
+        }
 
     "fail without resubmitting when an entry order with unknown outcome was not created" in
-      submitEnterWithUnknownOutcome(timeout = true, """{"errorMessage":"Order not found"}""", StatusCode.NotFound).asserting {
-        case (Left(AppError.ClientFailure("oanda", message)), 1) => message must endWith("was not created")
-        case result                                              => fail(s"Expected a client failure, received $result")
+      submitEnterWithUnknownOutcome(EntrySubmission.TimedOut, """{"errorMessage":"Order not found"}""", StatusCode.NotFound).asserting {
+        case (Left(AppError.ClientFailure("oanda", message)), List(_)) => message must endWith("was not created")
+        case result                                                    => fail(s"Expected a client failure, received $result")
       }
+
+    "find the fills of every trade open on the requested side" in
+      findEntryExecutions(TradeOrder.Position.Buy, tradeIds = List("40", "43")).asserting { case (executions, requestedTransactions) =>
+        executions mustBe List(tradeOpeningExecution("40"), tradeOpeningExecution("43"))
+        requestedTransactions mustBe List("40", "43")
+      }
+
+    "find no fills when the requested side has no trades" in
+      findEntryExecutions(TradeOrder.Position.Sell, tradeIds = List("43")).asserting { case (executions, requestedTransactions) =>
+        executions mustBe empty
+        requestedTransactions mustBe empty
+      }
+
+    "find no fills when any transaction did not open its trade" in
+      findEntryExecutions(TradeOrder.Position.Buy, tradeIds = List("40", "43"), notOpenedTradeIds = Set("43")).asserting(_._1 mustBe empty)
+
+    "propagate a failure to retrieve any trade's fill" in
+      findEntryExecutions(TradeOrder.Position.Buy, tradeIds = List("40", "43"), unavailableTradeIds = Set("43"))
+        .assertThrows(AppError.ClientFailure("oanda", "get-transaction returned 401: Unauthorized"))
 
     "handle JSON parsing errors" in {
       val testingBackend = fs2BackendStub
@@ -412,7 +505,11 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
           case r if r.isGet && r.hasHost("api-fxtrade.oanda.com") && r.hasPath("/v3/accounts") =>
             ResponseStub.adjust(readJson("oanda/accounts-success-response.json"))
           case r if r.isPost && r.hasHost("api-fxtrade.oanda.com") && r.hasPath("/v3/accounts/123-456-789/orders") =>
-            ResponseStub.adjust("", StatusCode.Created)
+            ResponseStub.adjust(
+              """{"orderCreateTransaction":{"id":"201","time":"2026-09-28T09:00:00Z","userID":123,"accountID":"123-456-789","batchID":"201"},
+                |"relatedTransactionIDs":["201"],"lastTransactionID":"201"}""".stripMargin,
+              StatusCode.Created
+            )
           case _ => throw new RuntimeException("Unexpected request")
         }
 
@@ -422,7 +519,10 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
         status <- client.submit(liveParams, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0")))
       yield status
 
-      result.asserting(_ mustBe OrderPlacementStatus.Pending)
+      result.asserting {
+        case OrderPlacementResult.Pending(OrderRef(_, Some("201"))) => succeed
+        case result                                                 => fail(s"Expected a pending entry, received $result")
+      }
     }
 
     "handle invalid account id" in {
@@ -489,12 +589,17 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
     Json.obj((fields :+ ("lastTransactionID" -> Json.fromString("204")))*).noSpaces
   }
 
+  private enum EntrySubmission:
+    case TimedOut, ServerError
+    case CreatedWith(body: String)
+
   private def submitEnterWithUnknownOutcome(
-      timeout: Boolean,
+      submission: EntrySubmission,
       orderResponse: String,
-      orderResponseStatus: StatusCode = StatusCode.Ok
-  ): IO[(Either[Throwable, OrderPlacementStatus], Int)] = {
-    given Clock[IO]                                  = Clock.mock[IO](Instant.parse("2026-09-28T09:00:00Z"))
+      orderResponseStatus: StatusCode = StatusCode.Ok,
+      transactionResponse: (String, StatusCode) = (fillTransactionResponse, StatusCode.Ok)
+  ): IO[(Either[Throwable, OrderPlacementResult], List[String])] = {
+    given Clock[IO]                                  = Clock.mock[IO](fillTime)
     val submissions                                  = AtomicReference(List.empty[String])
     def isSubmitted(orderSpecifier: String): Boolean =
       orderSpecifier.startsWith("@") && submissions.get.exists(_.contains(s""""clientExtensions":{"id":"${orderSpecifier.tail}"}"""))
@@ -505,23 +610,101 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
           ResponseStub.adjust(readJson("oanda/accounts-success-response.json"))
         case r if r.isPost && r.hasPath("/v3/accounts/123-456-789/orders") =>
           submissions.updateAndGet(r.body.toString :: _)
-          if timeout then throw new SocketTimeoutException("Read timed out")
-          else ResponseStub.adjust("Server error", StatusCode.ServiceUnavailable)
+          submission match
+            case EntrySubmission.TimedOut          => throw new SocketTimeoutException("Read timed out")
+            case EntrySubmission.ServerError       => ResponseStub.adjust("Server error", StatusCode.ServiceUnavailable)
+            case EntrySubmission.CreatedWith(body) => ResponseStub.adjust(body, StatusCode.Created)
         case r if r.isGet && r.uri.path.init == List("v3", "accounts", "123-456-789", "orders") && isSubmitted(r.uri.path.last) =>
           ResponseStub.adjust(orderResponse, orderResponseStatus)
+        case r if r.isGet && r.hasPath("/v3/accounts/123-456-789/transactions/43") =>
+          ResponseStub.adjust(transactionResponse._1, transactionResponse._2)
         case _ => throw new RuntimeException("Unexpected request")
       }
 
     for
       client <- OandaBrokerClient.make[IO](config, testingBackend)
-      status <- client.submit(params, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0"))).attempt
-    yield (status, submissions.get.size)
+      result <- client.submit(params, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0"))).attempt
+    yield (result, submissions.get)
+  }
+
+  private def tradeOpeningExecution(tradeId: String): OrderExecution =
+    OrderExecution(BigDecimal(s"1.10$tradeId"), fillTime.plusSeconds(1), BigDecimal(1), s"order-$tradeId", tradeId, List(tradeId))
+
+  private def findEntryExecutions(
+      position: TradeOrder.Position,
+      tradeIds: List[String],
+      notOpenedTradeIds: Set[String] = Set.empty,
+      unavailableTradeIds: Set[String] = Set.empty
+  ): IO[(List[OrderExecution], List[String])] = {
+    val positionResponse = s"""{
+      "position": {
+        "instrument": "EUR_USD",
+        "long": {"units": "100000", "tradeIDs": ${tradeIds
+        .map(id => s""""$id"""")
+        .mkString("[", ",", "]")}, "averagePrice": "1.1050", "unrealizedPL": "0.00"},
+        "short": {"units": "0", "unrealizedPL": "0.00"}
+      }
+    }"""
+    def transactionResponse(transactionId: String) =
+      val openedTradeId = if notOpenedTradeIds.contains(transactionId) then "other" else transactionId
+      if unavailableTradeIds.contains(transactionId) then ResponseStub.adjust("Unauthorized", StatusCode.Unauthorized)
+      else ResponseStub.adjust(s"""{
+          "transaction": {
+            "id": "$transactionId", "time": "2026-09-28T09:00:01Z", "orderID": "order-$transactionId",
+            "units": "100000", "price": "1.10$transactionId", "tradeOpened": {"tradeID": "$openedTradeId"}
+          },
+          "lastTransactionID": "$transactionId"
+        }""")
+    val transactionRequests = AtomicReference(List.empty[String])
+    val testingBackend      = fs2BackendStub
+      .whenRequestMatchesPartial {
+        case r if r.isGet && r.hasPath("/v3/accounts") =>
+          ResponseStub.adjust(readJson("oanda/accounts-success-response.json"))
+        case r if r.isGet && r.hasPath("/v3/accounts/123-456-789/positions/EUR_USD") =>
+          ResponseStub.adjust(positionResponse)
+        case r if r.isGet && r.uri.path.init == List("v3", "accounts", "123-456-789", "transactions") =>
+          transactionRequests.updateAndGet(_ :+ r.uri.path.last)
+          transactionResponse(r.uri.path.last)
+        case _ => throw new RuntimeException("Unexpected request")
+      }
+
+    for
+      client     <- OandaBrokerClient.make[IO](config, testingBackend)
+      executions <- client.findEntryExecutions(params, eurUsdPair, position)
+    yield (executions, transactionRequests.get)
   }
 
   private def mapPositionSides(position: Json, adjustSide: JsonObject => JsonObject): Json =
     List("long", "short").foldLeft(position) { (json, side) =>
       json.hcursor.downField(side).withFocus(_.mapObject(adjustSide)).top.get
     }
+
+  private def currentOrdersWithHedgedEurUsd(cps: NonEmptyList[CurrencyPair]): IO[List[OpenedTradeOrder]] = {
+    val hedgedShort = Json.obj(
+      "units"        -> Json.fromString("-30000"),
+      "tradeIDs"     -> Json.arr(Json.fromString("789")),
+      "averagePrice" -> Json.fromString("1.1100"),
+      "unrealizedPL" -> Json.fromString("-5.00")
+    )
+    val response = parse(readJson("oanda/positions-success-response.json")).toOption.get.hcursor
+      .downField("positions")
+      .downArray
+      .downField("short")
+      .set(hedgedShort)
+      .top
+      .get
+      .noSpaces
+    val testingBackend = fs2BackendStub
+      .whenRequestMatchesPartial {
+        case r if r.isGet && r.hasPath("/v3/accounts") =>
+          ResponseStub.adjust(readJson("oanda/accounts-success-response.json"))
+        case r if r.isGet && r.hasPath("/v3/accounts/123-456-789/positions") =>
+          ResponseStub.adjust(response)
+        case _ => throw new RuntimeException("Unexpected request")
+      }
+
+    OandaBrokerClient.make[IO](config, testingBackend).flatMap(_.getCurrentOrders(params, cps))
+  }
 
   private def submitExit(
       longUnits: Int,
@@ -530,7 +713,7 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
       responseStatus: StatusCode = StatusCode.Ok,
       adjustSide: JsonObject => JsonObject = identity,
       expectClose: Boolean = true
-  ): IO[OrderPlacementStatus] = {
+  ): IO[OrderPlacementResult] = {
     val positionResponse = parse(s"""{
       "position": {
         "instrument": "EUR_USD",

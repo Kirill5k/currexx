@@ -6,7 +6,8 @@ import currexx.domain.user.UserId
 import currexx.core.common.action.Action
 import currexx.core.market.db.MarketStateRepository
 import currexx.core.fixtures.{Markets, Signals, Trades, Users}
-import currexx.domain.market.{CurrencyPair, TradeOrder}
+import currexx.core.trade.BrokerPosition
+import currexx.domain.market.{CurrencyPair, OrderExecution, TradeOrder}
 import currexx.domain.signal.{Condition, Direction, ValueRole}
 import kirill5k.common.cats.Clock
 import kirill5k.common.cats.test.IOWordSpec
@@ -90,21 +91,104 @@ class MarketServiceSpec extends IOWordSpec {
     }
 
     "processTradeOrderPlacement" should {
-      "update state with current position" in {
+      val openedAt  = Markets.ts.minusSeconds(600)
+      val filledAt  = Trades.execution.time
+      val longAt    = (price: String) => Some(PositionState(TradeOrder.Position.Buy, openedAt, Some(BigDecimal(price))))
+      val shortAt   = (price: String) => Some(PositionState(TradeOrder.Position.Sell, openedAt, Some(BigDecimal(price))))
+      val long      = (price: String) => Some(BrokerPosition.Open(TradeOrder.Position.Buy, BigDecimal(price)))
+      val short     = (price: String) => Some(BrokerPosition.Open(TradeOrder.Position.Sell, BigDecimal(price)))
+      val execution = List(Trades.execution)
+
+      def placeEntry(current: Option[PositionState], executions: List[OrderExecution], brokerPosition: Option[BrokerPosition]) = {
+        val (stateRepo, disp) = mocks
+        val state             = Markets.state.copy(currentPosition = current)
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(state)
+        when(stateRepo.save(any[MarketState])).thenReturnIO(true)
+
+        val result = for
+          svc <- MarketService.make[IO](stateRepo, disp)
+          _   <- svc.processTradeOrderPlacement(Trades.order.copy(executions = executions, brokerPosition = brokerPosition))
+        yield ()
+        result.map { _ =>
+          verify(stateRepo).find(Users.uid, Markets.gbpeur)
+          disp.submittedActions mustBe empty
+          (stateRepo, state)
+        }
+      }
+
+      List[(String, Option[PositionState], List[OrderExecution], Option[BrokerPosition], Option[PositionState])](
+        (
+          "open the position at the broker's entry price and the time it filled",
+          None,
+          execution,
+          long("1.15"),
+          Some(PositionState(TradeOrder.Position.Buy, filledAt, Some(BigDecimal("1.15"))))
+        ),
+        (
+          "open a position without an entry price when the broker's position is unknown after the fill",
+          None,
+          execution,
+          Some(BrokerPosition.Unknown),
+          Some(PositionState(TradeOrder.Position.Buy, filledAt))
+        ),
+        (
+          "open a position without an entry price while its entry is pending",
+          None,
+          Nil,
+          None,
+          Some(PositionState(TradeOrder.Position.Buy, Trades.ts))
+        ),
+        (
+          "take the broker's entry price after adding to a position, keeping when it opened",
+          longAt("1.10"),
+          execution,
+          long("1.15"),
+          longAt("1.15")
+        ),
+        (
+          "drop the entry price after adding to a position when the broker's position is unknown",
+          longAt("1.10"),
+          Nil,
+          Some(BrokerPosition.Unknown),
+          Some(PositionState(TradeOrder.Position.Buy, openedAt))
+        ),
+        (
+          "replace a position on the opposite side",
+          shortAt("1.10"),
+          execution,
+          long("1.15"),
+          Some(PositionState(TradeOrder.Position.Buy, filledAt, Some(BigDecimal("1.15"))))
+        ),
+        ("clear a position that the entry closed at the broker", shortAt("1.10"), execution, Some(BrokerPosition.Flat), None)
+      ).foreach { case (description, current, executions, brokerPosition, expected) =>
+        description in placeEntry(current, executions, brokerPosition).asserting { (stateRepo, state) =>
+          verify(stateRepo).save(state.copy(currentPosition = expected))
+          succeed
+        }
+      }
+
+      List[(String, Option[PositionState], List[OrderExecution], Option[BrokerPosition])](
+        ("a replayed fill", longAt("1.15"), execution, long("1.15")),
+        ("an entry that only reduces the opposite side at the broker", shortAt("1.10"), execution, short("1.10")),
+        ("an entry on the same side that is pending", longAt("1.10"), Nil, None)
+      ).foreach { case (description, current, executions, brokerPosition) =>
+        s"leave the position unchanged by $description" in placeEntry(current, executions, brokerPosition).asserting { (stateRepo, _) =>
+          verifyNoMoreInteractions(stateRepo)
+          succeed
+        }
+      }
+
+      "clear the position on exit" in {
         val (stateRepo, disp) = mocks
         when(stateRepo.update(any[UserId], any[CurrencyPair], any[Option[PositionState]])).thenReturn(IO.unit)
 
         val result = for
           svc   <- MarketService.make[IO](stateRepo, disp)
-          state <- svc.processTradeOrderPlacement(Trades.order)
+          state <- svc.processTradeOrderPlacement(Trades.order.copy(order = TradeOrder.Exit(Markets.gbpeur, 1.3)))
         yield state
 
         result.asserting { res =>
-          verify(stateRepo).update(
-            Users.uid,
-            Markets.gbpeur,
-            Some(PositionState(TradeOrder.Position.Buy, Trades.ts, Some(Trades.order.order.price)))
-          )
+          verify(stateRepo).update(Users.uid, Markets.gbpeur, None)
           disp.submittedActions mustBe empty
           res mustBe ()
         }

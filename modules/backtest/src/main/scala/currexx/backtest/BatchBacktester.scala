@@ -46,8 +46,8 @@ object BatchBacktester extends IOApp.Simple {
     Stream
       .emits(datasets)
       .parEvalMap(6) { dataset =>
-        val settings = TestSettings.make(dataset.currencyPair, ts.rules, List(ts.indicator))
         for
+          settings = TestSettings.make(dataset.currencyPair, ts.rules, List(ts.indicator))
           services <- TestServices.make[IO](settings)
           _        <- MarketDataProvider
             .read[IO](dataset)
