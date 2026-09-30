@@ -2,12 +2,12 @@ package currexx.core.common.action
 
 import cats.effect.IO
 import currexx.core.fixtures.{Markets, Signals, Users}
-import currexx.core.market.MarketService
+import currexx.core.market.{MarketService, MarketState}
 import currexx.core.monitor.MonitorService
 import currexx.core.signal.{Signal, SignalService}
-import currexx.core.trade.TradeService
+import currexx.core.trade.{BrokerPosition, TradeService}
 import currexx.core.settings.SettingsService
-import currexx.domain.market.CurrencyPair
+import currexx.domain.market.{CurrencyPair, TradeOrder}
 import currexx.domain.signal.Direction
 import currexx.domain.user.UserId
 import kirill5k.common.cats.test.IOWordSpec
@@ -55,6 +55,52 @@ class ActionProcessorSpec extends IOWordSpec {
 
       result.asserting { r =>
         verify(marksvc).processSignals(Users.uid, Markets.gbpeur, List(signal))
+        r mustBe ()
+      }
+    }
+
+    "read the entry price from the broker before evaluating rules for a position held without one" in {
+      val (monsvc, sigsvc, marksvc, tradesvc, settvc) = mocks
+      val brokerPosition                              = BrokerPosition.Open(TradeOrder.Position.Buy, BigDecimal("1.1002"))
+      val repaired = Markets.state.copy(currentPosition = Some(Markets.positionState.copy(openPrice = Some(BigDecimal("1.1002")))))
+      when(marksvc.getState(any[UserId], any[CurrencyPair])).thenReturnIO(Markets.state)
+      when(tradesvc.findBrokerPosition(any[UserId], any[CurrencyPair])).thenReturnIO(brokerPosition)
+      when(marksvc.reconcileEntryPrice(any[MarketState], any[BrokerPosition])).thenReturnIO(repaired)
+      when(tradesvc.processMarketStateUpdate(any[MarketState])).thenReturn(IO.unit)
+
+      val result = for
+        dispatcher <- ActionDispatcher.make[IO]
+        processor  <- ActionProcessor.make[IO](dispatcher, monsvc, sigsvc, marksvc, tradesvc, settvc)
+        _          <- dispatcher.dispatch(Action.ProcessMarketStateUpdate(Users.uid, Markets.gbpeur))
+        res        <- processor.run.interruptAfter(2.second).compile.drain
+      yield res
+
+      result.asserting { r =>
+        verify(marksvc).getState(Users.uid, Markets.gbpeur)
+        verify(tradesvc).findBrokerPosition(Users.uid, Markets.gbpeur)
+        verify(marksvc).reconcileEntryPrice(Markets.state, brokerPosition)
+        verify(tradesvc).processMarketStateUpdate(repaired)
+        r mustBe ()
+      }
+    }
+
+    "evaluate rules without reading the broker when the entry price is known" in {
+      val (monsvc, sigsvc, marksvc, tradesvc, settvc) = mocks
+      val priced = Markets.state.copy(currentPosition = Some(Markets.positionState.copy(openPrice = Some(BigDecimal("1.1002")))))
+      when(marksvc.getState(any[UserId], any[CurrencyPair])).thenReturnIO(priced)
+      when(tradesvc.processMarketStateUpdate(any[MarketState])).thenReturn(IO.unit)
+
+      val result = for
+        dispatcher <- ActionDispatcher.make[IO]
+        processor  <- ActionProcessor.make[IO](dispatcher, monsvc, sigsvc, marksvc, tradesvc, settvc)
+        _          <- dispatcher.dispatch(Action.ProcessMarketStateUpdate(Users.uid, Markets.gbpeur))
+        res        <- processor.run.interruptAfter(2.second).compile.drain
+      yield res
+
+      result.asserting { r =>
+        verify(marksvc).getState(Users.uid, Markets.gbpeur)
+        verify(tradesvc).processMarketStateUpdate(priced)
+        verifyNoMoreInteractions(marksvc, tradesvc)
         r mustBe ()
       }
     }

@@ -6,7 +6,7 @@ import cats.syntax.apply.*
 import cats.syntax.applicativeError.*
 import cats.syntax.flatMap.*
 import currexx.core.monitor.MonitorService
-import currexx.core.market.MarketService
+import currexx.core.market.{MarketService, MarketState}
 import currexx.core.settings.SettingsService
 import currexx.core.signal.SignalService
 import currexx.core.trade.TradeService
@@ -83,7 +83,7 @@ final private class LiveActionProcessor[F[_]](
         tradeService.closeOpenOrders(uid, pair)
     case Action.ProcessMarketStateUpdate(uid, cp) =>
       logger.info(s"processing market state update for $uid/$cp") *>
-        marketService.getState(uid, cp).flatMap(tradeService.processMarketStateUpdate)
+        marketService.getState(uid, cp).flatMap(withEntryPrice).flatMap(tradeService.processMarketStateUpdate)
     case Action.ProcessTradeOrderPlacement(order) =>
       logger.info(s"processing trade order placement $order") *>
         marketService.processTradeOrderPlacement(order)
@@ -91,6 +91,14 @@ final private class LiveActionProcessor[F[_]](
       logger.info(s"setting up new user account for $uid") *>
         settingsService.createFor(uid)
     case _: Action.Retried => F.unit
+
+  // No other path revisits a held position, so one whose entry price is unknown is read from the broker on every evaluation
+  private def withEntryPrice(state: MarketState): F[MarketState] =
+    if state.currentPosition.exists(_.openPrice.isEmpty) then
+      tradeService
+        .findBrokerPosition(state.userId, state.currencyPair)
+        .flatMap(marketService.reconcileEntryPrice(state, _))
+    else F.pure(state)
 }
 
 object ActionProcessor:

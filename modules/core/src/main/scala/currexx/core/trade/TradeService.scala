@@ -11,7 +11,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import cats.syntax.parallel.*
-import currexx.clients.broker.BrokerClient
+import currexx.clients.broker.{BrokerClient, BrokerParameters}
 import currexx.clients.data.MarketDataClient
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
@@ -39,6 +39,7 @@ trait TradeService[F[_]]:
   def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
   def closeOrderIfProfitIsOutsideRange(uid: UserId, cps: NonEmptyList[CurrencyPair], limits: Limits): F[Unit]
   def fetchMarketData(uid: UserId, cps: NonEmptyList[CurrencyPair], interval: Interval): F[Unit]
+  def findBrokerPosition(uid: UserId, cp: CurrencyPair): F[BrokerPosition]
 
 final private class LiveTradeService[F[_]](
     private val settingsRepository: TradeSettingsRepository[F],
@@ -216,8 +217,8 @@ final private class LiveTradeService[F[_]](
     for
       result         <- brokerClient.submit(top.broker, top.order)
       brokerPosition <- (top.order, result.status) match
-        case (_: TradeOrder.Enter, OrderPlacementStatus.Success) => brokerPositionAfterFill(top).map(Some(_))
-        case _                                                   => F.pure(None)
+        case (enter: TradeOrder.Enter, OrderPlacementStatus.Success) => readBrokerPosition(top.broker, enter.currencyPair).map(Some(_))
+        case _                                                       => F.pure(None)
       placed = top.copy(executions = result.executions, brokerPosition = brokerPosition)
       _ <- result match
         case OrderPlacementResult.Pending(ref) if top.order.isEnter =>
@@ -228,16 +229,17 @@ final private class LiveTradeService[F[_]](
       _ <- recordOrderPlacement(placed, result.status, skipEvent)
     yield placed -> result.status
 
+  override def findBrokerPosition(uid: UserId, cp: CurrencyPair): F[BrokerPosition] =
+    settingsRepository.get(uid).flatMap(ts => readBrokerPosition(ts.broker, cp))
+
   // The broker tracks the position's entry price across all of its trades, so it is read back rather than derived from fills
-  private def brokerPositionAfterFill(top: TradeOrderPlacement): F[BrokerPosition] = {
-    val cp = top.order.currencyPair
+  private def readBrokerPosition(broker: BrokerParameters, cp: CurrencyPair): F[BrokerPosition] =
     brokerClient
-      .find(top.broker, NonEmptyList.one(cp))
+      .find(broker, NonEmptyList.one(cp))
       .map(_.find(_.currencyPair == cp).fold(BrokerPosition.Flat)(BrokerPosition.from))
       .handleErrorWith { error =>
-        logger.warn(s"Could not read the $cp position after a fill, its entry price is unknown: $error").as(BrokerPosition.Unknown)
+        logger.warn(s"Could not read the $cp position at the broker, its entry price is unknown: $error").as(BrokerPosition.Unknown)
       }
-  }
 
   private def recordOrderPlacement(top: TradeOrderPlacement, status: OrderPlacementStatus, skipEvent: Boolean = false): F[Unit] =
     for

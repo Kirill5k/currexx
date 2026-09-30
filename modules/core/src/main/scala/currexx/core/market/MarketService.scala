@@ -24,6 +24,7 @@ trait MarketService[F[_]]:
   def processSignals(uid: UserId, cp: CurrencyPair, signals: List[Signal]): F[Unit]
   def processManualSignal(signal: Signal): F[Unit]
   def processTradeOrderPlacement(top: TradeOrderPlacement): F[Unit]
+  def reconcileEntryPrice(state: MarketState, brokerPosition: BrokerPosition): F[MarketState]
   def updateTimeState(uid: UserId, data: MarketTimeSeriesData): F[Unit]
 
 final private class LiveMarketService[F[_]](
@@ -71,6 +72,26 @@ final private class LiveMarketService[F[_]](
       case Some(BrokerPosition.Open(side, price)) => Some(filled(side, Some(price)))
       case Some(BrokerPosition.Unknown)           => Some(filled(enter.position, None))
       case None                                   => Some(onSide(enter.position).getOrElse(PositionState(enter.position, top.time)))
+  }
+
+  // The broker's position describes the one held when `state` was read, so its price is saved only against that snapshot.
+  // Only a missing price is filled in: a flat broker position may still have an entry pending, so it clears nothing.
+  override def reconcileEntryPrice(state: MarketState, brokerPosition: BrokerPosition): F[MarketState] = {
+    def warnIfUnpriced(s: MarketState): F[Unit] =
+      s.currentPosition.filter(_.openPrice.isEmpty).traverse_ { pos =>
+        logger.warn(
+          s"entry price of the ${pos.position} position on ${s.userId}/${s.currencyPair} is unknown, price-distance exits cannot trigger"
+        )
+      }
+
+    (state.currentPosition, brokerPosition) match
+      case (Some(pos), BrokerPosition.Open(side, price)) if pos.openPrice.isEmpty && pos.position == side =>
+        val repaired = state.copy(currentPosition = Some(pos.copy(openPrice = Some(price))))
+        stateRepo.save(repaired).flatMap {
+          case true  => F.pure(repaired)
+          case false => getState(state.userId, state.currencyPair).flatTap(warnIfUnpriced)
+        }
+      case _ => warnIfUnpriced(state).as(state)
   }
 
   override def processSignals(uid: UserId, cp: CurrencyPair, signals: List[Signal]): F[Unit] =

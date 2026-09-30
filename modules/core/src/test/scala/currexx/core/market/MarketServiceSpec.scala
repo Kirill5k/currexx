@@ -195,6 +195,83 @@ class MarketServiceSpec extends IOWordSpec {
       }
     }
 
+    "reconcileEntryPrice" should {
+      val unpriced = Markets.state.copy(currentPosition = Some(PositionState(TradeOrder.Position.Buy, Markets.ts)), version = Some(1))
+      val price    = BigDecimal("1.1002")
+      val repaired = unpriced.copy(currentPosition = Some(PositionState(TradeOrder.Position.Buy, Markets.ts, Some(price))))
+
+      "save the broker's entry price against the state read before the broker" in {
+        val (stateRepo, disp) = mocks
+        when(stateRepo.save(any[MarketState])).thenReturnIO(true)
+
+        val result = for
+          svc   <- MarketService.make[IO](stateRepo, disp)
+          state <- svc.reconcileEntryPrice(unpriced, BrokerPosition.Open(TradeOrder.Position.Buy, price))
+        yield state
+
+        result.asserting { res =>
+          verify(stateRepo).save(repaired)
+          verifyNoMoreInteractions(stateRepo)
+          disp.submittedActions mustBe empty
+          res mustBe repaired
+        }
+      }
+
+      List[(String, MarketState, BrokerPosition)](
+        ("the broker's position is flat", unpriced, BrokerPosition.Flat),
+        ("the broker's position is unknown", unpriced, BrokerPosition.Unknown),
+        ("the broker's position is on the opposite side", unpriced, BrokerPosition.Open(TradeOrder.Position.Sell, price)),
+        (
+          "the entry price is already known",
+          unpriced.copy(currentPosition = Some(PositionState(TradeOrder.Position.Buy, Markets.ts, Some(BigDecimal("1.2"))))),
+          BrokerPosition.Open(TradeOrder.Position.Buy, price)
+        ),
+        ("no position is held", unpriced.copy(currentPosition = None), BrokerPosition.Open(TradeOrder.Position.Buy, price))
+      ).foreach { case (description, state, brokerPosition) =>
+        s"return the state as it was read when $description" in {
+          val (stateRepo, disp) = mocks
+
+          val result = for
+            svc <- MarketService.make[IO](stateRepo, disp)
+            res <- svc.reconcileEntryPrice(state, brokerPosition)
+          yield res
+
+          result.asserting { res =>
+            verifyNoInteractions(stateRepo)
+            disp.submittedActions mustBe empty
+            res mustBe state
+          }
+        }
+      }
+
+      List[(String, MarketState)](
+        ("closed", unpriced.copy(currentPosition = None, version = Some(2))),
+        (
+          "replaced by another same-side position without a price",
+          unpriced.copy(currentPosition = Some(PositionState(TradeOrder.Position.Buy, Markets.ts.plusSeconds(60))), version = Some(3))
+        )
+      ).foreach { case (description, latest) =>
+        s"discard the broker's price when the position was $description while it was being read" in {
+          val (stateRepo, disp) = mocks
+          when(stateRepo.save(any[MarketState])).thenReturnIO(false)
+          when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(latest)
+
+          val result = for
+            svc <- MarketService.make[IO](stateRepo, disp)
+            res <- svc.reconcileEntryPrice(unpriced, BrokerPosition.Open(TradeOrder.Position.Buy, price))
+          yield res
+
+          result.asserting { res =>
+            verify(stateRepo).save(repaired)
+            verify(stateRepo).find(Users.uid, Markets.gbpeur)
+            verifyNoMoreInteractions(stateRepo)
+            disp.submittedActions mustBe empty
+            res mustBe latest
+          }
+        }
+      }
+    }
+
     "processSignals" should {
       "save the updated state and evaluate rules when the profile changes" in {
         val signal            = Signals.trend(Direction.Downward)

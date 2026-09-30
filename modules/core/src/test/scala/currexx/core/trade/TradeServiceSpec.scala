@@ -397,6 +397,34 @@ class TradeServiceSpec extends IOWordSpec {
       }
     }
 
+    "findBrokerPosition" should
+      List(
+        ("the broker's position", IO.pure(List(Trades.openedOrder)), filledPosition),
+        ("a flat broker position", IO.pure(Nil), BrokerPosition.Flat),
+        ("a broker position without an average price", IO.pure(List(Trades.openedOrder.copy(openPrice = 0))), BrokerPosition.Unknown),
+        ("an unreadable broker position", IO.raiseError(new RuntimeException("Positions unavailable")), BrokerPosition.Unknown)
+      ).foreach { case (description, positionLookup, expected) =>
+        s"return $description" in {
+          val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
+          when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
+          when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]])).thenReturn(positionLookup)
+
+          val result = for
+            svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+            res <- svc.findBrokerPosition(Users.uid, Markets.gbpeur)
+          yield res
+
+          result.asserting { res =>
+            verify(settRepo).get(Users.uid)
+            verify(brokerClient).find(Trades.broker, NonEmptyList.one(Markets.gbpeur))
+            verifyNoMoreInteractions(brokerClient)
+            verifyNoInteractions(orderRepo, orderStatusRepo, dataClient)
+            disp.submittedActions mustBe empty
+            res mustBe expected
+          }
+        }
+      }
+
     "closeOrderIfProfitIsOutsideRange" should {
       "submit close order if profit is above max" in {
         val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
