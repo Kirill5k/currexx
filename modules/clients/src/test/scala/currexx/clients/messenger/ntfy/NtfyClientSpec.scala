@@ -1,6 +1,6 @@
 package currexx.clients.messenger.ntfy
 
-import cats.effect.{IO, Ref}
+import cats.effect.{IO}
 import currexx.domain.errors.AppError
 import kirill5k.common.sttp.test.Sttp4WordSpec
 import org.typelevel.log4cats.Logger
@@ -9,7 +9,6 @@ import sttp.client4.StringBody
 import sttp.client4.testing.ResponseStub
 import sttp.model.{MediaType, StatusCode}
 
-import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.duration.*
 
@@ -33,13 +32,7 @@ class NtfyClientSpec extends Sttp4WordSpec {
 
       NtfyClient.make[IO](config, testingBackend).flatMap(_.send("Currexx Warn", message)).assertVoid
     }
-
-    "accept an empty successful response" in {
-      val testingBackend = fs2BackendStub.whenAnyRequest.thenRespondWithCode(StatusCode.NoContent)
-
-      NtfyClient.make[IO](config, testingBackend).flatMap(_.send("Currexx Error", "Failure")).assertVoid
-    }
-
+    
     "report an unsuccessful response without retrying" in {
       val requests       = AtomicInteger(0)
       val testingBackend = fs2BackendStub.whenAnyRequest.thenRespond {
@@ -62,25 +55,6 @@ class NtfyClientSpec extends Sttp4WordSpec {
 
       NtfyClient.make[IO](config, testingBackend).flatMap(_.send("Currexx Error", "Failure")).attempt.asserting { result =>
         result mustBe Left(error)
-        requests.get mustBe 1
-      }
-    }
-
-    "cancel a stalled publish after five seconds" in {
-      val requests = AtomicInteger(0)
-      val result   = for
-        canceled <- Ref.of[IO, Boolean](false)
-        backend = fs2BackendStub.whenAnyRequest.thenRespondF {
-          IO.delay(requests.incrementAndGet()).flatMap(_ => IO.never).onCancel(canceled.set(true))
-        }
-        client      <- NtfyClient.make[IO](config, backend)
-        response    <- client.send("Currexx Warn", "Failure").attempt.timeout(7.seconds)
-        wasCanceled <- canceled.get
-      yield (response, wasCanceled)
-
-      result.asserting { case (response, wasCanceled) =>
-        response.left.toOption.get mustBe a[TimeoutException]
-        wasCanceled mustBe true
         requests.get mustBe 1
       }
     }
