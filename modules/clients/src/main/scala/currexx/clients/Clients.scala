@@ -9,6 +9,8 @@ import currexx.clients.data.MarketDataClient
 import currexx.clients.data.alphavantage.AlphaVantageConfig
 import currexx.clients.data.twelvedata.{TwelveDataClient, TwelveDataConfig}
 import currexx.clients.data.oanda.{OandaDataClient, OandaDataConfig}
+import currexx.clients.messenger.MessengerClient
+import currexx.clients.messenger.ntfy.{NtfyClient, NtfyConfig}
 import org.typelevel.log4cats.Logger
 import sttp.capabilities.fs2.Fs2Streams
 import sttp.client4.WebSocketStreamBackend
@@ -19,12 +21,14 @@ final case class ClientsConfig(
     alphaVantage: AlphaVantageConfig,
     twelveData: TwelveDataConfig,
     oandaBroker: OandaBrokerConfig,
-    oandaData: OandaDataConfig
+    oandaData: OandaDataConfig,
+    ntfy: NtfyConfig
 )
 
 final class Clients[F[_]] private (
     val marketData: MarketDataClient[F],
-    val broker: BrokerClient[F]
+    val broker: BrokerClient[F],
+    val messenger: MessengerClient[F]
 )
 
 object Clients:
@@ -38,4 +42,7 @@ object Clients:
       oandabroker <- OandaBrokerClient.make[F](config.oandaBroker, fs2Backend)
       broker      <- BrokerClient.make[F](oandabroker)
       data        <- MarketDataClient.make[F](twelvedata, oandadata)
-    yield Clients[F](data, broker)
+      messenger   <-
+        if config.ntfy.enabled then NtfyClient.make[F](config.ntfy, fs2Backend).flatMap(MessengerClient.make[F])
+        else Async[F].pure(MessengerClient.noop[F])
+    yield Clients[F](data, broker, messenger)

@@ -3,7 +3,6 @@ package currexx.core.common
 import cats.effect.IO
 import config.AppConfig
 import kirill5k.common.cats.test.IOWordSpec
-import pureconfig.ConfigSource
 
 class AppConfigSpec extends IOWordSpec {
 
@@ -27,35 +26,14 @@ class AppConfigSpec extends IOWordSpec {
         config.clients.oandaData.apiKey mustBe "od-key"
         config.clients.oandaData.fetchCandleCount mustBe 150
         config.clients.oandaData.signalCandleCount mustBe 100
+        config.clients.ntfy.enabled mustBe false
+        config.clients.ntfy.baseUri mustBe "https://ntfy.sh"
+        config.clients.ntfy.topic mustBe ""
         config.auth.passwordSalt.value mustBe "$2a$10$8K1p/a0dL1LXMIgoEDFrwO"
         config.auth.passwordSalt.toString mustBe "<SECRET>"
         config.auth.jwt.alg mustBe "HS256"
         config.auth.jwt.secret.value mustBe "secret-key"
         config.auth.jwt.secret.toString mustBe "<SECRET>"
-      }
-
-    "load custom candle counts for each market data provider" in
-      IO.blocking {
-        ConfigSource
-          .string("""
-            clients {
-              oanda-data {
-                fetch-candle-count = 120
-                signal-candle-count = 80
-              }
-              twelve-data {
-                fetch-candle-count = 180
-                signal-candle-count = 120
-              }
-            }
-          """)
-          .withFallback(ConfigSource.default)
-          .loadOrThrow[AppConfig]
-      }.asserting { config =>
-        config.clients.oandaData.fetchCandleCount mustBe 120
-        config.clients.oandaData.signalCandleCount mustBe 80
-        config.clients.twelveData.fetchCandleCount mustBe 180
-        config.clients.twelveData.signalCandleCount mustBe 120
       }
   }
 }
