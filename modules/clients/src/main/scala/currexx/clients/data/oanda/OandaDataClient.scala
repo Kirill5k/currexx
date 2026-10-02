@@ -38,6 +38,7 @@ final private class LiveOandaDataClient[F[_]](
 
   override protected val name: String                                   = "oanda-data"
   override protected val delayBetweenConnectionFailures: FiniteDuration = 5.seconds
+  override protected val additionalRetryableStatusCodes: Set[StatusCode] = Set(StatusCode.Unauthorized)
 
   override def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] =
     for

@@ -1,6 +1,7 @@
 package currexx.clients.data.oanda
 
 import cats.effect.{IO, Temporal}
+import currexx.domain.errors.AppError
 import currexx.domain.market.Currency.{EUR, USD}
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import kirill5k.common.sttp.test.Sttp4WordSpec
@@ -8,8 +9,10 @@ import kirill5k.common.cats.{Cache, Clock}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import sttp.client4.testing.ResponseStub
+import sttp.model.StatusCode
 
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.duration.*
 
 class OandaDataClientSpec extends Sttp4WordSpec {
@@ -131,6 +134,96 @@ class OandaDataClientSpec extends Sttp4WordSpec {
       an[IllegalArgumentException] must be thrownBy config.copy(signalCandleCount = 0)
       an[IllegalArgumentException] must be thrownBy config.copy(fetchCandleCount = 100)
       an[IllegalArgumentException] must be thrownBy config.copy(fetchCandleCount = 99)
+    }
+
+    "retry unauthorized responses and cache the successful response" in {
+      given Clock[IO] = Clock.mock[IO](Instant.parse("2026-02-06T22:00:00Z"))
+
+      val requests       = AtomicInteger(0)
+      val response       = readJson("oanda/instruments-rud-usd-success-response.json")
+      val testingBackend = fs2BackendStub.whenAnyRequest.thenRespond {
+        if requests.incrementAndGet() == 1 then ResponseStub.adjust("Unauthorized", StatusCode.Unauthorized)
+        else ResponseStub.adjust(response)
+      }
+
+      val result = for
+        cache <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+        client = LiveOandaDataClient[IO](testingBackend, config, cache)
+        res    <- client.timeSeriesData(pair, Interval.H1)
+        cached <- client.timeSeriesData(pair, Interval.H1)
+      yield (res, cached)
+
+      result.asserting { case (timeSeriesData, cached) =>
+        timeSeriesData.currencyPair mustBe pair
+        timeSeriesData.interval mustBe Interval.H1
+        timeSeriesData.prices must have size 100
+        cached mustBe timeSeriesData
+        requests.get mustBe 2
+      }
+    }
+
+    "fail after three unauthorized retries" in {
+      given Clock[IO] = Clock.mock[IO](Instant.parse("2026-02-06T22:00:00Z"))
+
+      val requests       = AtomicInteger(0)
+      val testingBackend = fs2BackendStub.whenAnyRequest.thenRespond {
+        requests.incrementAndGet()
+        ResponseStub.adjust("Unauthorized", StatusCode.Unauthorized)
+      }
+
+      val result = for
+        cache <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+        client = LiveOandaDataClient[IO](testingBackend, config, cache)
+        res <- client.timeSeriesData(pair, Interval.H1).attempt
+      yield res
+
+      result.asserting { res =>
+        res mustBe Left(AppError.AccessDenied("oanda-data authentication has expired or is invalid"))
+        requests.get mustBe 4
+      }
+    }
+
+    "fail immediately on forbidden responses" in {
+      given Clock[IO] = Clock.mock[IO](Instant.parse("2026-02-06T22:00:00Z"))
+
+      val requests       = AtomicInteger(0)
+      val testingBackend = fs2BackendStub.whenAnyRequest.thenRespond {
+        requests.incrementAndGet()
+        ResponseStub.adjust("Forbidden", StatusCode.Forbidden)
+      }
+
+      val result = for
+        cache <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+        client = LiveOandaDataClient[IO](testingBackend, config, cache)
+        res <- client.timeSeriesData(pair, Interval.H1).attempt
+      yield res
+
+      result.asserting { res =>
+        res mustBe Left(AppError.AccessDenied("oanda-data authentication has expired or is invalid"))
+        requests.get mustBe 1
+      }
+    }
+
+    "retry an unauthorized response when retrieving the latest price" in {
+      given Clock[IO] = Clock.mock[IO](Instant.parse("2026-02-06T22:00:00Z"))
+
+      val requests       = AtomicInteger(0)
+      val response       = readJson("oanda/instruments-rud-usd-success-response.json")
+      val testingBackend = fs2BackendStub.whenAnyRequest.thenRespond {
+        if requests.incrementAndGet() == 1 then ResponseStub.adjust("Unauthorized", StatusCode.Unauthorized)
+        else ResponseStub.adjust(response)
+      }
+
+      val result = for
+        cache <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+        client = LiveOandaDataClient[IO](testingBackend, config, cache)
+        res <- client.latestPrice(pair)
+      yield res
+
+      result.asserting { price =>
+        price mustBe PriceRange(1.18222, 1.18241, 1.18134, 1.18168, 1859.0, Instant.parse("2026-02-06T21:00:00Z"))
+        requests.get mustBe 2
+      }
     }
 
     "retrieve the current quote without filtering an incomplete candle" in {

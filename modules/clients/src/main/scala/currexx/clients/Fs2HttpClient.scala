@@ -8,7 +8,7 @@ import fs2.Stream
 import org.typelevel.log4cats.Logger
 import sttp.capabilities.fs2.Fs2Streams
 import sttp.client4.{Request, Response, WebSocketStreamBackend}
-import sttp.model.Method
+import sttp.model.{Method, StatusCode}
 
 import scala.concurrent.duration.*
 import scala.util.Random
@@ -18,6 +18,7 @@ trait Fs2HttpClient[F[_]] {
   protected val backend: WebSocketStreamBackend[F, Fs2Streams[F]]
 
   protected val delayBetweenConnectionFailures: FiniteDuration = 10.seconds
+  protected val additionalRetryableStatusCodes: Set[StatusCode] = Set.empty
 
   protected def calculateBackoffDelay(
       attempt: Int,
@@ -47,8 +48,8 @@ trait Fs2HttpClient[F[_]] {
     request
       .send[F](backend)
       .flatMap { response =>
-        if (response.code.code >= 500 && attempt < maxRetries) {
-          val message = s"$name-client/server-error-${response.code.code}-attempt-$attempt: ${response.body}"
+        if ((response.code.code >= 500 || additionalRetryableStatusCodes.contains(response.code)) && attempt < maxRetries) {
+          val message = s"$name-client/http-error-${response.code.code}-attempt-$attempt: ${response.body}"
           logger.warn(message) *> F.sleep(calculateBackoffDelay(attempt)) *> dispatchWithRetry(request, attempt + 1, maxRetries)
         } else F.pure(response)
       }
