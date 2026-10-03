@@ -55,7 +55,7 @@ class OptimiserSpec extends AnyWordSpec with Matchers {
       }
     }
 
-    "search the retained s10 and reciprocal s6 parameters while retaining separate indicator families" in {
+    "search retained alternatives and reciprocal s6 parameters while retaining separate indicator families" in {
       val rounds = Optimiser.rounds.map(round => round.strategy -> round).toMap
       rounds(TestStrategy.s10_optimized).extraSeeds mustBe List(TestStrategy.s10.indicator)
       rounds(TestStrategy.s6_optimized).extraSeeds mustBe List(
@@ -70,7 +70,8 @@ class OptimiserSpec extends AnyWordSpec with Matchers {
       )
       rounds(TestStrategy.s4_optimized_v2).extraSeeds mustBe List(TestStrategy.s4_optimized_v1.indicator)
       rounds(TestStrategy.s10_v2).extraSeeds mustBe Nil
-      rounds(TestStrategy.s13).extraSeeds mustBe Nil
+      rounds(TestStrategy.s13).extraSeeds mustBe List(TestStrategy.s13_optimized.indicator)
+      rounds(TestStrategy.s1_v2_optimized).extraSeeds mustBe List(TestStrategy.s1_v2_optimized_v4.indicator)
     }
   }
 

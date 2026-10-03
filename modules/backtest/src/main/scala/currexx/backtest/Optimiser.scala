@@ -87,8 +87,8 @@ object Optimiser extends IOApp.Simple {
       List(TestStrategy.s6.indicator, TestStrategy.s5_optimized_v2.indicator, TestStrategy.s5_optimized_v3.indicator)
     ),
     Family("s10_v2", TestStrategy.s10_v2, runScga = true),
-    Family("s13", TestStrategy.s13, runScga = true),
-    Family("s1_v2_optimized", TestStrategy.s1_v2_optimized, runScga = true)
+    Family("s13", TestStrategy.s13, List(TestStrategy.s13_optimized.indicator), runScga = true),
+    Family("s1_v2_optimized", TestStrategy.s1_v2_optimized, List(TestStrategy.s1_v2_optimized_v4.indicator), runScga = true)
   )
 
   /** Every family receives refining and exploring GA rounds, plus an exploring SCGA round when enabled. `shuffle` changes the initial
