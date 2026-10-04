@@ -7,7 +7,8 @@ import currexx.algorithms.operators.*
 import currexx.algorithms.operators.species.SpeciesOperators
 import currexx.algorithms.progress.Tracker
 import currexx.algorithms.*
-import currexx.backtest.{OptimisationRound, OrderStats}
+import currexx.backtest.{OptimisationRound, OrderStats, StrategyCatalogue}
+import currexx.backtest.optimizer.reporting.{OptimisationReportBuilder, OptimisationReportRenderer, ReportingTracker, RunDiagnostics}
 import currexx.domain.signal.Indicator
 
 import scala.util.Random
@@ -15,7 +16,7 @@ import scala.util.Random
 trait OptimisationAlgorithm[F[_], A <: Alg, P <: Parameters[A], T]:
   def optimise(target: T, params: P)(using rand: Random): F[ValidatedPopulation[T]]
 
-/** A configured indicator search, retaining the search space and validation backtest used by its reports. */
+/** A configured indicator search that appends diagnostics after selection, retaining explicit replay access for callers. */
 trait IndicatorOptimisation[F[_]]:
   def optimise(using Random): F[ValidatedPopulation[Indicator]]
   def searchSpace: IndicatorSearchSpace
@@ -25,10 +26,12 @@ trait IndicatorOptimisation[F[_]]:
 object OptimisationAlgorithm:
   def indicator[F[_]: {Async, Parallel}](
       round: OptimisationRound,
-      evaluatorPoolSize: Int
+      evaluatorPoolSize: Int,
+      catalogue: List[StrategyCatalogue.Entry] = StrategyCatalogue.entries
   )(using Random): F[IndicatorOptimisation[F]] =
     for
-      markdown <- Tracker.markdown[F, Indicator](
+      diagnostics <- RunDiagnostics.make[F]
+      markdown    <- Tracker.markdown[F, Indicator](
         algorithmName = round.parameters.name,
         label = round.name,
         logInterval = 10,
@@ -45,21 +48,23 @@ object OptimisationAlgorithm:
         showStats = false,
         finalTopN = round.shortlistSize
       )
-      progressTracker = Tracker.composite(markdown, logging)
+      progressTracker = new ReportingTracker(Tracker.composite(markdown, logging), diagnostics, round.corpus.foldCount)
       algorithm <- round.parameters match
-        case params: Parameters.GA   => ga[F](round, params, progressTracker, evaluatorPoolSize)
-        case params: Parameters.SCGA => scga[F](round, params, progressTracker, evaluatorPoolSize)
+        case params: Parameters.GA   => ga[F](round, params, progressTracker, evaluatorPoolSize, diagnostics, catalogue)
+        case params: Parameters.SCGA => scga[F](round, params, progressTracker, evaluatorPoolSize, diagnostics, catalogue)
     yield algorithm
 
   private def ga[F[_]: {Async, Parallel}](
       round: OptimisationRound,
       params: Parameters.GA,
       progressTracker: Tracker[F, Indicator],
-      evaluatorPoolSize: Int
+      evaluatorPoolSize: Int,
+      diagnostics: RunDiagnostics[F],
+      catalogue: List[StrategyCatalogue.Entry]
   )(using Random): F[IndicatorOptimisation[F]] =
     for
       space     <- Async[F].fromEither(IndicatorSearchSpace.forStrategy(round.strategy, round.fixedIndicators))
-      search    <- IndicatorSearchOperators.make[F](space, round.extraSeeds)
+      search    <- IndicatorSearchOperators.make[F](space, round.extraSeeds.map(_.indicator))
       selector  <- Selector.tournament[F, Indicator]
       elitism   <- Elitism.simple[F, Indicator]
       objective <- IndicatorObjective.make[F](
@@ -67,7 +72,8 @@ object OptimisationAlgorithm:
         strategy = round.strategy.rules,
         poolSize = evaluatorPoolSize,
         scoringFunction = round.scoringFunction,
-        searchSpace = Some(space)
+        searchSpace = Some(space),
+        diagnostics = Some(diagnostics)
       )
       validator <- Validator.shortlisted[F, Indicator](round.shortlistSize, objective.validationObjective)
       algorithm = ga[F, Indicator](
@@ -80,24 +86,27 @@ object OptimisationAlgorithm:
         elitism,
         progressTracker
       )
-    yield prepared(round, params, space, objective, algorithm, progressTracker)
+    yield prepared(round, params, space, objective, algorithm, progressTracker, diagnostics, catalogue)
 
   private def scga[F[_]: {Async, Parallel}](
       round: OptimisationRound,
       params: Parameters.SCGA,
       progressTracker: Tracker[F, Indicator],
-      evaluatorPoolSize: Int
+      evaluatorPoolSize: Int,
+      diagnostics: RunDiagnostics[F],
+      catalogue: List[StrategyCatalogue.Entry]
   )(using Random): F[IndicatorOptimisation[F]] =
     for
       space     <- Async[F].fromEither(IndicatorSearchSpace.forStrategy(round.strategy, round.fixedIndicators))
-      search    <- IndicatorSearchOperators.make[F](space, round.extraSeeds)
+      search    <- IndicatorSearchOperators.make[F](space, round.extraSeeds.map(_.indicator))
       species   <- SpeciesOperators.make[F, Indicator](IndicatorDistance.make(space))
       objective <- IndicatorObjective.make[F](
         corpus = round.corpus,
         strategy = round.strategy.rules,
         poolSize = evaluatorPoolSize,
         scoringFunction = round.scoringFunction,
-        searchSpace = Some(space)
+        searchSpace = Some(space),
+        diagnostics = Some(diagnostics)
       )
       validator <- Validator.speciesShortlisted[F, Indicator](
         round.shortlistSize,
@@ -115,7 +124,7 @@ object OptimisationAlgorithm:
         species,
         progressTracker
       )
-    yield prepared(round, params, space, objective, algorithm, progressTracker)
+    yield prepared(round, params, space, objective, algorithm, progressTracker, diagnostics, catalogue)
 
   private[optimizer] def canonicalValidator[F[_]: Async](
       space: IndicatorSearchSpace,
@@ -127,16 +136,39 @@ object OptimisationAlgorithm:
         .fromEither(population.map { case (ind, fitness) => space.canonicalise(ind).map(_ -> fitness) }.sequence)
         .flatMap(validator.validate)
 
-  private def prepared[F[_], A <: Alg, P <: Parameters[A]](
+  private def prepared[F[_]: Async, A <: Alg, P <: Parameters[A]](
       round: OptimisationRound,
       params: P,
       space: IndicatorSearchSpace,
       objective: IndicatorObjective.Operators[F],
       algorithm: OptimisationAlgorithm[F, A, P, Indicator],
-      progressTracker: Tracker[F, Indicator]
+      progressTracker: Tracker[F, Indicator],
+      diagnostics: RunDiagnostics[F],
+      catalogue: List[StrategyCatalogue.Entry]
   ): IndicatorOptimisation[F] = new IndicatorOptimisation[F]:
     override def optimise(using Random): F[ValidatedPopulation[Indicator]] =
-      algorithm.optimise(round.strategy.indicator, params)
+      for
+        started   <- Async[F].monotonic
+        finalists <- algorithm.optimise(round.strategy.indicator, params)
+        finished  <- Async[F].monotonic
+        snapshot  <- diagnostics.snapshot
+        builder = new OptimisationReportBuilder(round, space, objective.inspect, diagnostics, catalogue)
+        _ <- builder
+          .build(finalists, snapshot, finished - started)
+          .flatMap(report =>
+            OptimisationReportRenderer.sections(report).traverse_ { case (title, lines) =>
+              progressTracker.displayNote(title, lines)
+            }
+          )
+          .handleErrorWith { error =>
+            progressTracker
+              .displayNote(
+                s"Incomplete diagnostics: ${round.name}",
+                List("Optimisation results above are complete; diagnostic reporting failed.", error.toString)
+              )
+              .attempt *> Async[F].raiseError(error)
+          }
+      yield finalists
     override val searchSpace: IndicatorSearchSpace                   = space
     override val tracker: Tracker[F, Indicator]                      = progressTracker
     override def validate(indicator: Indicator): F[List[OrderStats]] = objective.validate(indicator)

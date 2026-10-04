@@ -4,7 +4,7 @@ import cats.effect.IO
 import cats.syntax.all.*
 import currexx.algorithms.Parameters
 import currexx.backtest.MarketDataProvider.{Corpus, Dataset, DateRange}
-import currexx.backtest.{OptimisationRound, OrderStats, TestStrategy}
+import currexx.backtest.{NamedIndicator, OptimisationRound, OrderStats, TestStrategy}
 import currexx.core.trade.{Rule, TradeAction, TradeStrategy}
 import currexx.domain.signal.{Indicator, ValueRole, ValueSource, ValueTransformation as VT}
 import fs2.io.file.{Files, Path}
@@ -59,7 +59,7 @@ class OptimisationAlgorithmSpec extends IOWordSpec {
     scoringFunction = scoring,
     corpus = corpus,
     shortlistSize = 2,
-    extraSeeds = List(seedAlias),
+    extraSeeds = List(NamedIndicator("alternative", seedAlias)),
     fixedIndicators = Set(frozen)
   )
 
@@ -115,6 +115,9 @@ class OptimisationAlgorithmSpec extends IOWordSpec {
         content must include("## Final Results")
         content must include("**Top 2 members:**")
         content must include("2 finalist(s) validated")
+        content must include(s"## Champion selection: $label")
+        content must include("alternative")
+        content must include("first successful search")
         finalists.foreach { case (individual, _, _) => content must include(individual.toString) }
         content must include("Replayed both finalists through the configured validation corpus.")
         content.indexOf("## Validation replay") must be > content.indexOf("## Final Results")
@@ -162,10 +165,39 @@ class OptimisationAlgorithmSpec extends IOWordSpec {
         content must include("## Final Results")
         content must include("**Top 2 members:**")
         content must include("2 finalist(s) validated")
+        content must include(s"## Champion selection: $label")
         finalists.foreach { case (individual, _, _) => content must include(individual.toString) }
         content must include("SCGA validation replay completed.")
         content.indexOf("## Validation replay") must be > content.indexOf("## Final Results")
         (content must not).include("### Generation")
+      }
+    }
+
+    "preserve final results and propagate a diagnostic replay failure" in {
+      given Random           = Random(17)
+      val params             = Parameters.GA(2, 0, 0.0, 0.0, 0.0, shuffle = false)
+      val label              = s"diagnostics-failure-test-${UUID.randomUUID()}"
+      val failure            = new IllegalStateException("Deliberate diagnostics failure")
+      val failingDiagnostics = new ScoringFunction {
+        override def score(stats: List[OrderStats]): Double                               = scoring.score(stats)
+        override def violations(stats: List[OrderStats]): List[ScoringFunction.Violation] = throw failure
+      }
+
+      val result = for
+        algorithm <- OptimisationAlgorithm.indicator[IO](round(label, params).copy(scoringFunction = failingDiagnostics), 1)
+        outcome   <- algorithm.optimise.attempt
+        reports   <- readReports(label)
+      yield (outcome, reports)
+
+      result.asserting { case (outcome, reports) =>
+        outcome mustBe Left(failure)
+        reports must have size 1
+        val content = reports.head._2
+        content must include("## Final Results")
+        content must include("2 finalist(s) validated")
+        content must include(s"## Incomplete diagnostics: $label")
+        content must include("Deliberate diagnostics failure")
+        content.indexOf("## Incomplete diagnostics") must be > content.indexOf("## Final Results")
       }
     }
 

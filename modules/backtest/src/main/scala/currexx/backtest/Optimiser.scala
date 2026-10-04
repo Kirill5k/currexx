@@ -2,8 +2,7 @@ package currexx.backtest
 
 import cats.effect.{IO, IOApp}
 import cats.syntax.foldable.*
-import currexx.algorithms.{Parameters, ValidatedPopulation}
-import currexx.algorithms.operators.Validator
+import currexx.algorithms.Parameters
 import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.optimizer.{OptimisationAlgorithm, ScoringFunction}
 import currexx.domain.signal.Indicator
@@ -21,7 +20,7 @@ final case class OptimisationRound(
       * refinement and exploration divide their clone/jitter allocation among these seeds. The search space filters incompatible schemas,
       * restores fixed values and removes duplicate projections before mixing them.
       */
-    extraSeeds: List[Indicator] = Nil,
+    extraSeeds: List[NamedIndicator] = Nil,
     /** Additional indicators or composite subtrees to keep at their target values. All identical occurrences are fixed; values absent from
       * the strategy produce a validation error. Raw-close identity inputs and value trackers unused by these rules are fixed automatically.
       */
@@ -46,7 +45,7 @@ object Optimiser extends IOApp.Simple {
   final private case class Family(
       name: String,
       strategy: TestStrategy,
-      extraSeeds: List[Indicator] = Nil,
+      extraSeeds: List[NamedIndicator] = Nil,
       // Include one additional SCGA exploration round.
       runScga: Boolean = false
   ) {
@@ -64,31 +63,44 @@ object Optimiser extends IOApp.Simple {
     Family(
       "s2_optimized",
       TestStrategy.s2_optimized,
-      List(TestStrategy.s2_optimized_v2.indicator)
+      List(NamedIndicator("s2_optimized_v2", TestStrategy.s2_optimized_v2.indicator))
     ),
     Family(
       "s10_optimized",
       TestStrategy.s10_optimized,
-      List(TestStrategy.s10.indicator)
+      List(NamedIndicator("s10", TestStrategy.s10.indicator))
     ),
     Family(
       "s5_optimized_v2",
       TestStrategy.s5_optimized_v2,
-      List(TestStrategy.s5_optimized_v3.indicator, TestStrategy.s6.indicator, TestStrategy.s6_optimized.indicator)
+      List(
+        NamedIndicator("s5_optimized_v3", TestStrategy.s5_optimized_v3.indicator),
+        NamedIndicator("s6", TestStrategy.s6.indicator),
+        NamedIndicator("s6_optimized", TestStrategy.s6_optimized.indicator)
+      )
     ),
     Family(
       "s4_optimized_v2",
       TestStrategy.s4_optimized_v2,
-      List(TestStrategy.s4_optimized_v1.indicator)
+      List(NamedIndicator("s4_optimized_v1", TestStrategy.s4_optimized_v1.indicator))
     ),
     Family(
       "s6_optimized",
       TestStrategy.s6_optimized,
-      List(TestStrategy.s6.indicator, TestStrategy.s5_optimized_v2.indicator, TestStrategy.s5_optimized_v3.indicator)
+      List(
+        NamedIndicator("s6", TestStrategy.s6.indicator),
+        NamedIndicator("s5_optimized_v2", TestStrategy.s5_optimized_v2.indicator),
+        NamedIndicator("s5_optimized_v3", TestStrategy.s5_optimized_v3.indicator)
+      )
     ),
     Family("s10_v2", TestStrategy.s10_v2, runScga = true),
-    Family("s13", TestStrategy.s13, List(TestStrategy.s13_optimized.indicator), runScga = true),
-    Family("s1_v2_optimized", TestStrategy.s1_v2_optimized, List(TestStrategy.s1_v2_optimized_v4.indicator), runScga = true)
+    Family("s13", TestStrategy.s13, List(NamedIndicator("s13_optimized", TestStrategy.s13_optimized.indicator)), runScga = true),
+    Family(
+      "s1_v2_optimized",
+      TestStrategy.s1_v2_optimized,
+      List(NamedIndicator("s1_v2_optimized_v4", TestStrategy.s1_v2_optimized_v4.indicator)),
+      runScga = true
+    )
   )
 
   /** Every family receives refining and exploring GA rounds, plus an exploring SCGA round when enabled. `shuffle` changes the initial
@@ -107,55 +119,8 @@ object Optimiser extends IOApp.Simple {
   override def run: IO[Unit] =
     rounds.traverse_ { round =>
       for
-        algorithm <- OptimisationAlgorithm.indicator[IO](round, evaluatorPoolSize)
-        finalPop  <- algorithm.optimise
-        title = s"Champion selection: ${round.name}"
-        _ <- finalPop.headOption match
-          case None =>
-            algorithm.tracker.displayNote(title, List("No candidates were evaluated."))
-          case Some((champion, _, _)) =>
-            algorithm
-              .validate(champion)
-              .map(round.scoringFunction.violations)
-              .flatMap(breaches => algorithm.tracker.displayNote(title, verdict(round, finalPop, breaches)))
+        algorithm <- OptimisationAlgorithm.indicator[IO](round, evaluatorPoolSize, StrategyCatalogue.entries)
+        _         <- algorithm.optimise
       yield ()
     }
-
-  /** What the tracker's own final report cannot know: which corpus this round was given, and whether the candidate at the top of it is fit
-    * to use.
-    *
-    * Everything derivable from the population itself — the table, the count that scored zero, whether validating changed the answer — is
-    * rendered by the tracker, because it is true of any validated run and not of this one in particular. What is left here is the two
-    * things only the round holds: the datasets, which the population has no memory of, and the verdict on the champion, which needs the
-    * scoring function that produced it.
-    */
-  private[backtest] def verdict(
-      round: OptimisationRound,
-      population: ValidatedPopulation[Indicator],
-      championBreaches: List[ScoringFunction.Violation]
-  ): List[String] = {
-    val (champion, championTraining, championValidation) = population.head
-    val retained                                         =
-      if (championTraining.value > 0.0) f"${championValidation.value / championTraining.value * 100}%.1f%%" else "n/a"
-
-    val datasets    = round.corpus.describe :+ ""
-    val breachLines =
-      if (championBreaches.isEmpty) List("Satisfies every constraint on validation data.")
-      else s"BREACHES ${championBreaches.size} constraint(s) on validation data:" :: championBreaches.map(breach => s"  - $breach")
-
-    val outcome =
-      if (championValidation.value <= 0.0)
-        List(
-          "NOTHING SELECTED: no finalist scored above zero on data it was never searched against.",
-          "No finalist cleared the configured validation fitness gate."
-        ) ::: breachLines ::: List(s"Leading finalist, recorded for diagnostics only: $champion")
-      else {
-        val summary =
-          f"SELECTED (from ${population.size} after validation, ties inside ${Validator.defaultTieBand.describe}%s broken on training): " +
-            f"training ${championTraining.value}%.6f -> validation ${championValidation.value}%.6f, retaining $retained%s"
-        summary :: breachLines ::: List(s"Indicator: $champion")
-      }
-
-    datasets ::: outcome
-  }
 }

@@ -6,6 +6,7 @@ import currexx.algorithms.operators.Validator
 import currexx.algorithms.{EvaluatedPopulation, EvaluationPhase, Fitness, ValidatedPopulation}
 import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.{MarketDataProvider, OrderStats, TestStrategy}
+import currexx.backtest.optimizer.reporting.{FoldDiagnostics, RunDiagnostics}
 import currexx.core.signal.{Signal, SignalDetector}
 import currexx.domain.market.MarketTimeSeriesData
 import currexx.domain.signal.{Indicator, ValueRole, ValueSource, ValueTransformation}
@@ -241,14 +242,16 @@ class IndicatorObjectiveSpec extends IOWordSpec {
       }
 
       val result = for
-        space     <- IO.fromEither(IndicatorSearchSpace.forStrategy(target))
-        objective <- IndicatorObjective.make[IO](
+        space       <- IO.fromEither(IndicatorSearchSpace.forStrategy(target))
+        diagnostics <- RunDiagnostics.make[IO]
+        objective   <- IndicatorObjective.make[IO](
           corpus = corpus.copy(searchFolds = corpus.searchFolds.take(1)),
           strategy = target.rules,
           poolSize = 1,
           signalDetector = detector,
           scoringFunction = scoring,
-          searchSpace = Some(space)
+          searchSpace = Some(space),
+          diagnostics = Some(diagnostics)
         )
         validator <- Validator.shortlisted[IO, Indicator](1, objective.validationObjective)
         scoped = OptimisationAlgorithm.canonicalValidator(space, validator)
@@ -259,20 +262,98 @@ class IndicatorObjectiveSpec extends IOWordSpec {
             objective.backtest(invalid).void,
             objective.validate(invalid).void,
             objective.validationObjective(invalid).void,
+            objective.inspect(invalid).void,
             scoped
               .validate(Vector(target.indicator -> Fitness(2.0), invalid -> Fitness(1.0)))
               .void
           )
         }
         failures <- effects.traverse(_.attempt)
-      yield failures
+        snapshot <- diagnostics.snapshot
+      yield (failures, snapshot)
 
-      result.asserting { failures =>
+      result.asserting { case (failures, snapshot) =>
         failures.foreach {
           case Left(error: IllegalArgumentException) => error.getMessage mustBe "Indicator does not match this round's search-space schema"
           case other                                 => fail(s"Expected an effect containing a schema failure, got $other")
         }
         signalCalls.get() mustBe 0
+        snapshot mustBe RunDiagnostics.Snapshot()
+      }
+    }
+
+    "inspect the same fold results while keeping replay work separate from search and validation" in {
+      val smallCorpus                                        = corpus.copy(searchFolds = corpus.searchFolds.take(2))
+      def expected(stats: List[OrderStats]): FoldDiagnostics = {
+        val pooled = OrderStats.combine(stats)
+        FoldDiagnostics(
+          score = scoring.score(stats),
+          netProfit = pooled.totalProfit,
+          closedTrades = pooled.total,
+          forcedClosures = pooled.forcedClosureCount,
+          costs = pooled.totalCosts,
+          maxDrawdownPercent = pooled.maxDrawdownPercent,
+          violations = scoring.violations(stats)
+        )
+      }
+      val result = for
+        diagnostics <- RunDiagnostics.make[IO]
+        objective   <- IndicatorObjective.make[IO](
+          corpus = smallCorpus,
+          strategy = strategy.rules,
+          poolSize = 1,
+          scoringFunction = scoring,
+          diagnostics = Some(diagnostics)
+        )
+        _             <- objective.evaluator.evaluateIndividual(strategy.indicator, EvaluationPhase.Search(0))
+        rescored      <- objective.evaluator.evaluateIndividual(strategy.indicator, EvaluationPhase.Rescore)
+        selected      <- objective.validationObjective(strategy.indicator)
+        before        <- diagnostics.snapshot
+        inspected     <- objective.inspect(strategy.indicator)
+        after         <- diagnostics.snapshot
+        rawSearch     <- objective.backtest(strategy.indicator)
+        rawValidation <- objective.validate(strategy.indicator)
+      yield (rescored, selected, before, inspected, after, rawSearch, rawValidation)
+
+      result.asserting { case (rescored, selected, before, inspected, after, rawSearch, rawValidation) =>
+        inspected.indicator mustBe strategy.indicator
+        inspected.searchFolds mustBe rawSearch.map(expected)
+        inspected.validation mustBe Some(expected(rawValidation))
+        IndicatorObjective.FoldAggregation.combine(inspected.searchFolds.map(_.score)) mustBe rescored._2.value
+        inspected.validation.map(_.score) mustBe Some(selected.value)
+        before.workloads(RunDiagnostics.Stage.Search) mustBe RunDiagnostics.Workload(2, 2, 2, 2, 2)
+        before.workloads(RunDiagnostics.Stage.Validation) mustBe RunDiagnostics.Workload(1, 1, 1, 1, 1)
+        before.workloads(RunDiagnostics.Stage.Reporting) mustBe RunDiagnostics.Workload()
+        after.workloads(RunDiagnostics.Stage.Search) mustBe before.workloads(RunDiagnostics.Stage.Search)
+        after.workloads(RunDiagnostics.Stage.Validation) mustBe before.workloads(RunDiagnostics.Stage.Validation)
+        after.workloads(RunDiagnostics.Stage.Reporting) mustBe RunDiagnostics.Workload(1, 3, 3, 3, 3)
+        after.firstSeen mustBe before.firstSeen
+        after.bestSeen mustBe before.bestSeen
+        after.computationAttempts mustBe 1L
+        after.cacheReuses mustBe 1L
+      }
+    }
+
+    "leave validation absent in diagnostics when the corpus has no validation data" in {
+      val result = for
+        diagnostics <- RunDiagnostics.make[IO]
+        objective   <- IndicatorObjective.make[IO](
+          corpus = Corpus(corpus.searchFolds.take(1)),
+          strategy = strategy.rules,
+          poolSize = 1,
+          scoringFunction = scoring,
+          diagnostics = Some(diagnostics)
+        )
+        inspected <- objective.inspect(strategy.indicator)
+        snapshot  <- diagnostics.snapshot
+      yield (inspected, snapshot)
+
+      result.asserting { case (inspected, snapshot) =>
+        inspected.searchFolds must have size 1
+        inspected.validation mustBe None
+        snapshot.workloads(RunDiagnostics.Stage.Reporting) mustBe RunDiagnostics.Workload(1, 1, 1, 1, 1)
+        snapshot.workloads(RunDiagnostics.Stage.Validation) mustBe RunDiagnostics.Workload()
+        snapshot.firstSeen mustBe empty
       }
     }
   }

@@ -22,23 +22,7 @@ object BatchBacktester extends IOApp.Simple {
     * s13_optimized, and promotes s13_optimized_v5 into s13 after user review. The other 26 additions were deleted. See
     * docs/ga-promotions-2026-09-28.md for all measurements and final decisions.
     */
-  val strategies: List[(String, TestStrategy)] = List(
-    "s2_optimized"       -> TestStrategy.s2_optimized,
-    "s2_optimized_v2"    -> TestStrategy.s2_optimized_v2,
-    "s10"                -> TestStrategy.s10,
-    "s10_optimized"      -> TestStrategy.s10_optimized,
-    "s10_v2"             -> TestStrategy.s10_v2,
-    "s5_optimized_v2"    -> TestStrategy.s5_optimized_v2,
-    "s5_optimized_v3"    -> TestStrategy.s5_optimized_v3,
-    "s1_v2_optimized"    -> TestStrategy.s1_v2_optimized,
-    "s1_v2_optimized_v4" -> TestStrategy.s1_v2_optimized_v4,
-    "s4_optimized_v1"    -> TestStrategy.s4_optimized_v1,
-    "s4_optimized_v2"    -> TestStrategy.s4_optimized_v2,
-    "s6_optimized"       -> TestStrategy.s6_optimized,
-    "s6"                 -> TestStrategy.s6,
-    "s13"                -> TestStrategy.s13,
-    "s13_optimized"      -> TestStrategy.s13_optimized
-  )
+  val strategies: List[(String, TestStrategy)] = StrategyCatalogue.batch
 
   val riskSettings: RiskSettings = RiskSettings()
 

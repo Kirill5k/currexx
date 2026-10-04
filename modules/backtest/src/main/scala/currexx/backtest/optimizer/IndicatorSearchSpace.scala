@@ -16,7 +16,7 @@ final class IndicatorSearchSpace private (
     val fixedIndicators: Set[Indicator],
     private val fixedPaths: Set[Vector[Int]]
 ) {
-  import IndicatorSearchSpace.sameSchema
+  import IndicatorSearchSpace.{ResolvedSeed, SeedDisposition, sameSchema}
 
   private def activeLeaves(indicator: Indicator, path: Vector[Int]): List[(Vector[Int], Indicator)] =
     if (fixedPaths.contains(path)) Nil
@@ -57,12 +57,35 @@ final class IndicatorSearchSpace private (
         .map(Indicator.Composite(_, CombinationLogic.Any))
     }
 
+  /** Resolve every configured seed under this round's fixed values, preserving aliases for reporting. */
+  def resolveSeeds(extraSeeds: List[Indicator]): Either[Throwable, List[ResolvedSeed]] =
+    project(template).flatMap { target =>
+      extraSeeds.zipWithIndex
+        .foldLeft[Either[Throwable, (List[ResolvedSeed], Map[Option[Indicator], Int])]](Right((Nil, Map.empty))) {
+          case (acc, (seed, index)) =>
+            acc.flatMap { case (resolved, seen) =>
+              if (!accepts(seed)) Right((ResolvedSeed(index, None, SeedDisposition.Incompatible) :: resolved, seen))
+              else
+                for
+                  effective <- canonicalise(seed)
+                  projected <- project(effective)
+                yield {
+                  val disposition =
+                    if (projected == target) SeedDisposition.TargetDuplicate
+                    else seen.get(projected).fold[SeedDisposition](SeedDisposition.Accepted)(SeedDisposition.SeedDuplicate.apply)
+                  val firstIndex = seen.updatedWith(projected)(_.orElse(Some(index)))
+                  (ResolvedSeed(index, Some(effective), disposition) :: resolved, firstIndex)
+                }
+            }
+        }
+        .map(_._1.reverse)
+    }
+
   /** Project compatible extra seeds, excluding the target's genes and duplicate projections. */
   def projectSeeds(extraSeeds: List[Indicator]): Either[Throwable, List[Indicator]] =
-    for
-      target    <- project(template)
-      projected <- extraSeeds.filter(accepts).traverse(project)
-    yield projected.flatten.filterNot(target.contains).distinct
+    resolveSeeds(extraSeeds).flatMap { resolved =>
+      resolved.filter(_.disposition == SeedDisposition.Accepted).flatMap(_.effective).traverse(project).map(_.flatten)
+    }
 
   /** Rebuild the full strategy before scoring or reporting; gene values are not repaired here. */
   def restore(genes: Option[Indicator]): Either[Throwable, Indicator] = {
@@ -92,6 +115,13 @@ final class IndicatorSearchSpace private (
 }
 
 object IndicatorSearchSpace {
+  enum SeedDisposition {
+    case Accepted, TargetDuplicate, Incompatible
+    case SeedDuplicate(index: Int)
+  }
+
+  final case class ResolvedSeed(index: Int, effective: Option[Indicator], disposition: SeedDisposition)
+
   def forStrategy(
       strategy: TestStrategy,
       fixedIndicators: Set[Indicator] = Set.empty

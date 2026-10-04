@@ -3,6 +3,7 @@ package currexx.backtest.optimizer
 import cats.Parallel
 import cats.effect.Async
 import cats.syntax.flatMap.*
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
@@ -10,6 +11,7 @@ import currexx.algorithms.operators.Evaluator
 import currexx.algorithms.Fitness
 import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.services.TestServicesPool
+import currexx.backtest.optimizer.reporting.{CandidateDiagnostics, FoldDiagnostics, RunDiagnostics}
 import currexx.backtest.{MarketDataProvider, OrderStats, TestSettings}
 import currexx.core.signal.SignalDetector
 import currexx.core.trade.TradeStrategy
@@ -83,7 +85,8 @@ object IndicatorObjective {
       evaluator: Evaluator[F, Indicator],
       validationObjective: Indicator => F[Fitness],
       backtest: Indicator => F[List[List[OrderStats]]],
-      validate: Indicator => F[List[OrderStats]]
+      validate: Indicator => F[List[OrderStats]],
+      inspect: Indicator => F[CandidateDiagnostics]
   )
 
   def make[F[_]: {Async, Parallel}](
@@ -93,7 +96,8 @@ object IndicatorObjective {
       otherIndicators: List[Indicator] = Nil,
       signalDetector: SignalDetector = SignalDetector.pure,
       scoringFunction: ScoringFunction = ScoringFunction.Robust(),
-      searchSpace: Option[IndicatorSearchSpace] = None
+      searchSpace: Option[IndicatorSearchSpace] = None,
+      diagnostics: Option[RunDiagnostics[F]] = None
   ): F[Operators[F]] =
     for
       folds      <- corpus.searchFolds.traverse(_.parTraverse(MarketDataProvider.read[F](_).compile.toList))
@@ -103,33 +107,89 @@ object IndicatorObjective {
       // Sequential across folds and parallel within one, so that widening the corpus by a fold cannot widen how many
       // backtests contend for the pool: a fold is the same six-pair run the pool was already sized for.
       canonicalise = (indicator: Indicator) => searchSpace.fold[Either[Throwable, Indicator]](Right(indicator))(_.canonicalise(indicator))
-      perFold      = folds.map(fold => backtestOver[F](pool, fold, strategy, otherIndicators, signalDetector))
-      backtest     = (indicator: Indicator) => Async[F].fromEither(canonicalise(indicator)).flatMap(ind => perFold.traverse(_(ind)))
-      validationBacktest = backtestOver[F](pool, validation, strategy, otherIndicators, signalDetector)
-      validate           = (indicator: Indicator) => Async[F].fromEither(canonicalise(indicator)).flatMap(validationBacktest)
+      perFold      = folds.map(fold =>
+        backtestOver[F](pool, fold, strategy, otherIndicators, signalDetector, diagnostics, RunDiagnostics.Stage.Search)
+      )
+      reportingFolds = folds.map { fold => (indicator: Indicator) =>
+        observedFold(diagnostics, RunDiagnostics.Stage.Reporting)(
+          backtestOver[F](pool, fold, strategy, otherIndicators, signalDetector, diagnostics, RunDiagnostics.Stage.Reporting)(indicator)
+        )
+      }
+      validationBacktest = (indicator: Indicator, stage: RunDiagnostics.Stage) =>
+        if (validation.isEmpty) Async[F].pure(List.empty[OrderStats])
+        else
+          observedFold(diagnostics, stage)(
+            backtestOver[F](pool, validation, strategy, otherIndicators, signalDetector, diagnostics, stage)(indicator)
+          )
+      backtest = (indicator: Indicator) =>
+        Async[F].fromEither(canonicalise(indicator)).flatMap { ind =>
+          diagnostics.traverse_(_.candidateRequested(RunDiagnostics.Stage.Reporting)).flatMap(_ => reportingFolds.traverse(_(ind)))
+        }
+      validate = (indicator: Indicator) =>
+        Async[F].fromEither(canonicalise(indicator)).flatMap { ind =>
+          diagnostics
+            .traverse_(_.candidateRequested(RunDiagnostics.Stage.Reporting))
+            .flatMap(_ => validationBacktest(ind, RunDiagnostics.Stage.Reporting))
+        }
       // Per-fold scores do not depend on the phase, so they can be cached without retaining full backtest histories or tying an elite's
       // aggregate fitness to the generation it was first evaluated in. Full results remain available through the uncached backtest.
-      evaluator <- FoldRotatingEvaluator.cached[F](perFold, scoringFunction, canonicalise)
-      validationObjective = (ind: Indicator) => validate(ind).map(res => Fitness(scoringFunction.score(res)))
-    yield Operators(evaluator, validationObjective, backtest, validate)
+      evaluator <- FoldRotatingEvaluator.cached[F](perFold, scoringFunction, canonicalise, diagnostics.map(_.evaluatorObserver))
+      validationObjective = (indicator: Indicator) =>
+        Async[F].fromEither(canonicalise(indicator)).flatMap { ind =>
+          diagnostics.traverse_(_.candidateRequested(RunDiagnostics.Stage.Validation)).flatMap { _ =>
+            validationBacktest(ind, RunDiagnostics.Stage.Validation).map(res => Fitness(scoringFunction.score(res)))
+          }
+        }
+      inspect = (indicator: Indicator) =>
+        Async[F].fromEither(canonicalise(indicator)).flatMap { ind =>
+          for
+            _ <- diagnostics.traverse_(_.candidateRequested(RunDiagnostics.Stage.Reporting))
+            // Reduce each fold immediately; retaining every fold's equity curves is unnecessary even for a report replay.
+            search  <- reportingFolds.traverse(backtest => backtest(ind).map(summarise(_, scoringFunction)))
+            checked <-
+              if (validation.isEmpty) Async[F].pure(Option.empty[FoldDiagnostics])
+              else validationBacktest(ind, RunDiagnostics.Stage.Reporting).map(stats => Some(summarise(stats, scoringFunction)))
+          yield CandidateDiagnostics(ind, search, checked)
+        }
+    yield Operators(evaluator, validationObjective, backtest, validate, inspect)
+
+  private def observedFold[F[_]: Async, A](diagnostics: Option[RunDiagnostics[F]], stage: RunDiagnostics.Stage)(run: F[A]): F[A] =
+    diagnostics.traverse_(_.foldStarted(stage)).flatMap(_ => run.flatTap(_ => diagnostics.traverse_(_.foldCompleted(stage))))
+
+  private def summarise(stats: List[OrderStats], scoringFunction: ScoringFunction): FoldDiagnostics = {
+    val portfolio = OrderStats.combine(stats)
+    FoldDiagnostics(
+      score = scoringFunction.score(stats),
+      netProfit = portfolio.totalProfit,
+      closedTrades = portfolio.total,
+      forcedClosures = portfolio.forcedClosureCount,
+      costs = portfolio.totalCosts,
+      maxDrawdownPercent = portfolio.maxDrawdownPercent,
+      violations = scoringFunction.violations(stats)
+    )
+  }
 
   private def backtestOver[F[_]: {Async, Parallel}](
       pool: TestServicesPool[F],
       dataSets: List[List[MarketTimeSeriesData]],
       strategy: TradeStrategy,
       otherIndicators: List[Indicator],
-      signalDetector: SignalDetector
+      signalDetector: SignalDetector,
+      diagnostics: Option[RunDiagnostics[F]],
+      stage: RunDiagnostics.Stage
   ): Indicator => F[List[OrderStats]] =
     indicator =>
       dataSets.parTraverse { testData =>
         pool.use(TestSettings.make(testData.head.currencyPair, strategy, indicator :: otherIndicators)) { services =>
           for
+            _ <- diagnostics.traverse_(_.pairStarted(stage))
             _ <- Stream
               .emits(testData)
               .through(services.processMarketData(signalDetector))
               .compile
               .drain
             orderStats <- services.getOrderStats()
+            _          <- diagnostics.traverse_(_.pairCompleted(stage))
           yield orderStats
         }
       }

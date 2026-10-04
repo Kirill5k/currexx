@@ -2,6 +2,7 @@ package currexx.backtest.optimizer
 
 import cats.data.NonEmptyList
 import currexx.backtest.TestStrategy
+import currexx.backtest.optimizer.IndicatorSearchSpace.{ResolvedSeed, SeedDisposition}
 import currexx.core.market.MomentumZone
 import currexx.core.trade.{Rule, TradeAction, TradeStrategy}
 import currexx.domain.market.TradeOrder
@@ -118,6 +119,55 @@ class IndicatorSearchSpaceSpec extends IOWordSpec {
       space.canonicalise(replace(base, 1, Indicator.TrendChangeDetection(ValueSource.Close, VT.SMA(1000)))) mustBe Right(base)
       space.restore(Some(Indicator.compositeAnyOf(trend))).left.map(_.getMessage) mustBe
         Left("Search genes do not match the number of active indicator leaves")
+    }
+
+    "resolve seed aliases after restoring fixed values while preserving original order and indexes" in {
+      val base         = Indicator.compositeAnyOf(trend, raw)
+      val space        = searchSpace(strategy(base))
+      val changedTrend = Indicator.TrendChangeDetection(ValueSource.Close, VT.SMA(30))
+      val otherTrend   = Indicator.TrendChangeDetection(ValueSource.Close, VT.SMA(40))
+      val changedRaw   = Indicator.ValueTracking(ValueRole.Price, ValueSource.Close, VT.SMA(20))
+      val accepted     = Indicator.compositeAnyOf(changedTrend, raw)
+      val other        = Indicator.compositeAnyOf(otherTrend, raw)
+      val seeds        = List(
+        Indicator.compositeAnyOf(trend, changedRaw),
+        Indicator.compositeAllOf(trend, raw),
+        Indicator.compositeAnyOf(changedTrend, changedRaw),
+        accepted,
+        other,
+        accepted,
+        base
+      )
+
+      space.resolveSeeds(seeds) mustBe Right(
+        List(
+          ResolvedSeed(0, Some(base), SeedDisposition.TargetDuplicate),
+          ResolvedSeed(1, None, SeedDisposition.Incompatible),
+          ResolvedSeed(2, Some(accepted), SeedDisposition.Accepted),
+          ResolvedSeed(3, Some(accepted), SeedDisposition.SeedDuplicate(2)),
+          ResolvedSeed(4, Some(other), SeedDisposition.Accepted),
+          ResolvedSeed(5, Some(accepted), SeedDisposition.SeedDuplicate(2)),
+          ResolvedSeed(6, Some(base), SeedDisposition.TargetDuplicate)
+        )
+      )
+      space.projectSeeds(seeds) mustBe Right(List(Indicator.compositeAnyOf(changedTrend), Indicator.compositeAnyOf(otherTrend)))
+    }
+
+    "classify every compatible seed as a target duplicate when all leaves are fixed" in {
+      val base    = Indicator.compositeAnyOf(trend, raw)
+      val space   = searchSpace(strategy(base), Set(base))
+      val changed = replace(base, 0, Indicator.TrendChangeDetection(ValueSource.Close, VT.SMA(30)))
+      val seeds   = List(changed, base, Indicator.compositeAllOf(trend, raw))
+
+      space.resolveSeeds(seeds) mustBe Right(
+        List(
+          ResolvedSeed(0, Some(base), SeedDisposition.TargetDuplicate),
+          ResolvedSeed(1, Some(base), SeedDisposition.TargetDuplicate),
+          ResolvedSeed(2, None, SeedDisposition.Incompatible)
+        )
+      )
+      space.projectSeeds(seeds) mustBe Right(Nil)
+      space.resolveSeeds(Nil) mustBe Right(Nil)
     }
 
     "fix a raw close even when the price value is read directly" in {

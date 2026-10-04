@@ -2,6 +2,7 @@ package currexx.backtest
 
 import currexx.algorithms.{Fitness, Parameters}
 import currexx.backtest.optimizer.ScoringFunction
+import currexx.backtest.optimizer.reporting.OptimisationReportRenderer
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -15,7 +16,7 @@ class OptimiserSpec extends AnyWordSpec with Matchers {
   )
 
   private def verdict(validation: Double, breaches: List[ScoringFunction.Violation]): List[String] =
-    Optimiser.verdict(reportRound, Vector((reportRound.strategy.indicator, Fitness(1.0), Fitness(validation))), breaches)
+    OptimisationReportRenderer.verdict(reportRound, Vector((reportRound.strategy.indicator, Fitness(1.0), Fitness(validation))), breaches)
 
   "Optimiser rounds" should {
     "give every family two GA rounds and add SCGA only for enabled families" in {
@@ -57,25 +58,28 @@ class OptimiserSpec extends AnyWordSpec with Matchers {
 
     "search retained alternatives and reciprocal s6 parameters while retaining separate indicator families" in {
       val rounds = Optimiser.rounds.map(round => round.strategy -> round).toMap
-      rounds(TestStrategy.s10_optimized).extraSeeds mustBe List(TestStrategy.s10.indicator)
+      rounds(TestStrategy.s2_optimized).extraSeeds mustBe List(NamedIndicator("s2_optimized_v2", TestStrategy.s2_optimized_v2.indicator))
+      rounds(TestStrategy.s10_optimized).extraSeeds mustBe List(NamedIndicator("s10", TestStrategy.s10.indicator))
       rounds(TestStrategy.s6_optimized).extraSeeds mustBe List(
-        TestStrategy.s6.indicator,
-        TestStrategy.s5_optimized_v2.indicator,
-        TestStrategy.s5_optimized_v3.indicator
+        NamedIndicator("s6", TestStrategy.s6.indicator),
+        NamedIndicator("s5_optimized_v2", TestStrategy.s5_optimized_v2.indicator),
+        NamedIndicator("s5_optimized_v3", TestStrategy.s5_optimized_v3.indicator)
       )
       rounds(TestStrategy.s5_optimized_v2).extraSeeds mustBe List(
-        TestStrategy.s5_optimized_v3.indicator,
-        TestStrategy.s6.indicator,
-        TestStrategy.s6_optimized.indicator
+        NamedIndicator("s5_optimized_v3", TestStrategy.s5_optimized_v3.indicator),
+        NamedIndicator("s6", TestStrategy.s6.indicator),
+        NamedIndicator("s6_optimized", TestStrategy.s6_optimized.indicator)
       )
-      rounds(TestStrategy.s4_optimized_v2).extraSeeds mustBe List(TestStrategy.s4_optimized_v1.indicator)
+      rounds(TestStrategy.s4_optimized_v2).extraSeeds mustBe List(NamedIndicator("s4_optimized_v1", TestStrategy.s4_optimized_v1.indicator))
       rounds(TestStrategy.s10_v2).extraSeeds mustBe Nil
-      rounds(TestStrategy.s13).extraSeeds mustBe List(TestStrategy.s13_optimized.indicator)
-      rounds(TestStrategy.s1_v2_optimized).extraSeeds mustBe List(TestStrategy.s1_v2_optimized_v4.indicator)
+      rounds(TestStrategy.s13).extraSeeds mustBe List(NamedIndicator("s13_optimized", TestStrategy.s13_optimized.indicator))
+      rounds(TestStrategy.s1_v2_optimized).extraSeeds mustBe List(
+        NamedIndicator("s1_v2_optimized_v4", TestStrategy.s1_v2_optimized_v4.indicator)
+      )
     }
   }
 
-  "Optimiser verdict" should {
+  "Optimisation report verdict" should {
     "explain every constraint breach when the leading finalist scores zero" in {
       val breaches = List(
         ScoringFunction.Violation("median period profit", "-1.25", "> 0"),
