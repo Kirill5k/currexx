@@ -173,10 +173,11 @@ class OptimisationAlgorithmSpec extends IOWordSpec {
       }
     }
 
-    "preserve final results and propagate a diagnostic replay failure" in {
+    "return completed finalists and continue queued rounds after a diagnostic replay failure" in {
       given Random           = Random(17)
       val params             = Parameters.GA(2, 0, 0.0, 0.0, 0.0, shuffle = false)
       val label              = s"diagnostics-failure-test-${UUID.randomUUID()}"
+      val nextLabel          = s"diagnostics-next-round-test-${UUID.randomUUID()}"
       val failure            = new IllegalStateException("Deliberate diagnostics failure")
       val failingDiagnostics = new ScoringFunction {
         override def score(stats: List[OrderStats]): Double                               = scoring.score(stats)
@@ -184,7 +185,46 @@ class OptimisationAlgorithmSpec extends IOWordSpec {
       }
 
       val result = for
-        algorithm <- OptimisationAlgorithm.indicator[IO](round(label, params).copy(scoringFunction = failingDiagnostics), 1)
+        finalists <- List(round(label, params).copy(scoringFunction = failingDiagnostics), round(nextLabel, params)).traverse { config =>
+          OptimisationAlgorithm.indicator[IO](config, 1).flatMap(_.optimise)
+        }
+        reports     <- readReports(label)
+        nextReports <- readReports(nextLabel)
+      yield (finalists, reports, nextReports)
+
+      result.asserting { case (finalists, reports, nextReports) =>
+        finalists must have size 2
+        finalists.head mustBe finalists.last
+        finalists.head.map(_._1).toSet mustBe Set(strategy.indicator, indicator(70))
+        finalists.head.foreach { case (_, training, validation) =>
+          training.value mustBe IndicatorObjective.FoldAggregation.combine(List(8.0, 9.0))
+          validation.value mustBe 10.0
+        }
+        reports must have size 1
+        val content = reports.head._2
+        content must include("## Final Results")
+        content must include("2 finalist(s) validated")
+        content must include(s"## Incomplete diagnostics: $label")
+        content must include("Deliberate diagnostics failure")
+        content must include("Remaining rounds can continue.")
+        content.indexOf("## Incomplete diagnostics") must be > content.indexOf("## Final Results")
+        nextReports must have size 1
+        nextReports.head._2 must include(s"## Champion selection: $nextLabel")
+      }
+    }
+
+    "propagate search failures without labelling them as incomplete diagnostics" in {
+      given Random      = Random(17)
+      val params        = Parameters.GA(2, 0, 0.0, 0.0, 0.0, shuffle = false)
+      val label         = s"search-failure-test-${UUID.randomUUID()}"
+      val failure       = new IllegalStateException("Deliberate search failure")
+      val failingSearch = new ScoringFunction {
+        override def score(stats: List[OrderStats]): Double                               = throw failure
+        override def violations(stats: List[OrderStats]): List[ScoringFunction.Violation] = Nil
+      }
+
+      val result = for
+        algorithm <- OptimisationAlgorithm.indicator[IO](round(label, params).copy(scoringFunction = failingSearch), 1)
         outcome   <- algorithm.optimise.attempt
         reports   <- readReports(label)
       yield (outcome, reports)
@@ -192,12 +232,8 @@ class OptimisationAlgorithmSpec extends IOWordSpec {
       result.asserting { case (outcome, reports) =>
         outcome mustBe Left(failure)
         reports must have size 1
-        val content = reports.head._2
-        content must include("## Final Results")
-        content must include("2 finalist(s) validated")
-        content must include(s"## Incomplete diagnostics: $label")
-        content must include("Deliberate diagnostics failure")
-        content.indexOf("## Incomplete diagnostics") must be > content.indexOf("## Final Results")
+        (reports.head._2 must not).include("## Final Results")
+        (reports.head._2 must not).include("## Incomplete diagnostics")
       }
     }
 

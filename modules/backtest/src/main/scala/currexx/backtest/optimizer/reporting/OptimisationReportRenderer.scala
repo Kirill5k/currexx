@@ -8,6 +8,12 @@ import currexx.domain.signal.Indicator
 
 /** Text is derived from completed measurements; rendering never evaluates a candidate. */
 object OptimisationReportRenderer:
+  def incompleteDiagnostics(roundName: String, error: Throwable): (String, List[String]) =
+    s"Incomplete diagnostics: $roundName" -> List(
+      "Optimisation results above are complete; diagnostic reporting failed. Remaining rounds can continue.",
+      error.toString
+    )
+
   val progressIntro: List[String] = List(
     "Top-member fitness uses the generation's rotating search folds; values across generations are not directly comparable.",
     "Stable progress uses all search folds. First seen means the first successful search evaluation; initial population is generation 0."
@@ -35,7 +41,7 @@ object OptimisationReportRenderer:
         validationAvailable
       )),
       "Baseline measurements"            -> baselineLines(report),
-      "Fitness comparisons"              -> comparisonLines(report),
+      "Baseline comparisons"             -> comparisonLines(report),
       "Leader fold diagnostics"          -> leaderLines(report),
       "Finalist provenance"              -> provenanceLines(report),
       "Search observations and workload" -> workloadLines(report)
@@ -78,19 +84,23 @@ object OptimisationReportRenderer:
       val disposition = baseline.disposition.fold("target") {
         case IndicatorSearchSpace.SeedDisposition.Accepted             => "accepted seed"
         case IndicatorSearchSpace.SeedDisposition.TargetDuplicate      => "duplicate of target"
-        case IndicatorSearchSpace.SeedDisposition.SeedDuplicate(index) => s"duplicate of configured seed ${index + 1}"
-        case IndicatorSearchSpace.SeedDisposition.Incompatible         => "incompatible; excluded from search and replay"
+        case IndicatorSearchSpace.SeedDisposition.SeedDuplicate(index) =>
+          val name = report.baselines.filter(_.disposition.nonEmpty).lift(index).fold(s"#${index + 1}")(_.name)
+          s"duplicate of seed '$name'"
+        case IndicatorSearchSpace.SeedDisposition.Incompatible => "incompatible; excluded from search and replay"
       }
       val measurement = baseline.effective.flatMap(report.candidates.get).fold("not evaluated") { candidate =>
         val validation = candidate.validation.fold("n/a")(fold => f"${fold.score}%.6f")
         f"training=${candidate.trainingFitness}%.6f; validation=$validation"
       }
       val matches = baseline.effective.toList.flatMap(indicator => report.catalogueMatches.getOrElse(indicator, Nil))
-      List(s"${baselineLabel(baseline)}: $disposition; $measurement", s"  Catalogue: ${matchesText(matches)}")
+      List(s"${baselineLabel(baseline)}: $disposition; $measurement", s"  ${catalogueText(matches)}")
     }
 
   private def comparisonLines(report: OptimisationReport): List[String] =
-    report.finalists.headOption.fold(List("No leading finalist to compare.")) { first =>
+    val leaders = reportCandidates(report)
+    if (leaders.isEmpty) List("No searched candidate to compare.")
+    else
       val target = report.baselines.find(_.disposition.isEmpty).flatMap(_.effective).flatMap(report.candidates.get)
       val seeds  = report.baselines
         .filter(_.disposition.nonEmpty)
@@ -104,42 +114,69 @@ object OptimisationReportRenderer:
         .flatMap { case (name, candidate) => candidate.validation.map(fold => name -> fold.score) }
         .sortBy { case (name, score) => (-score, name) }
         .headOption
-      val trainingLeader = report.finalists.sortBy(c => -c._2.value).headOption.filter(_._1 != first._1)
-      val leaders        = List("Leading finalist" -> first) ++ trainingLeader.map("Final training leader" -> _).toList
-      leaders.flatMap { case (label, (_, training, validation)) =>
-        target.toList.flatMap { candidate =>
-          List(s"$label vs target, all-fold training fitness: ${delta(training.value, candidate.trainingFitness)}") :::
-            candidate.validation.toList.map(fold => s"$label vs target, validation fitness: ${delta(validation.value, fold.score)}")
-        } ::: trainingSeed.toList.map { case (name, candidate) =>
-          s"$label vs strongest seed on training ($name): ${delta(training.value, candidate.trainingFitness)}"
-        } ::: validationSeed.toList.map { case (name, score) =>
-          s"$label vs strongest seed on validation ($name): ${delta(validation.value, score)}"
-        }
+      leaders.flatMap { case (label, candidate) =>
+        target.toList.flatMap(reference => foldComparisons(label, candidate, reference)) :::
+          target.toList.flatMap { reference =>
+            List(s"$label vs target, all-fold training fitness: ${delta(candidate.trainingFitness, reference.trainingFitness)}") :::
+              (for {
+                validation <- candidate.validation.toList
+                baseline   <- reference.validation.toList
+              } yield s"$label vs target, validation fitness: ${delta(validation.score, baseline.score)}")
+          } ::: trainingSeed.toList.map { case (name, reference) =>
+            s"$label vs strongest seed on training ($name): ${delta(candidate.trainingFitness, reference.trainingFitness)}"
+          } ::: validationSeed.toList.flatMap { case (name, score) =>
+            candidate.validation.toList.map(validation =>
+              s"$label vs strongest seed on validation ($name): ${delta(validation.score, score)}"
+            )
+          }
       } ::: List("Fitness improvements describe these datasets; they do not establish independent out-of-sample improvement.")
-    }
+
+  private def foldComparisons(label: String, candidate: CandidateDiagnostics, target: CandidateDiagnostics): List[String] =
+    candidate.searchFolds.zip(target.searchFolds).zipWithIndex.map { case ((fold, reference), index) =>
+      s"$label vs target, search fold ${index + 1}: ${foldDelta(fold, reference)}"
+    } ::: (for {
+      fold      <- candidate.validation.toList
+      reference <- target.validation.toList
+    } yield s"$label vs target, validation period: ${foldDelta(fold, reference)}")
+
+  private def foldDelta(fold: FoldDiagnostics, target: FoldDiagnostics): String =
+    f"net=${fold.netProfit - target.netProfit}%+.5f; closed=${fold.closedTrades - target.closedTrades}%+d; " +
+      f"forced=${fold.forcedClosures - target.forcedClosures}%+d; costs=${fold.costs - target.costs}%+.5f; " +
+      f"portfolio drawdown=${fold.maxDrawdownPercent - target.maxDrawdownPercent}%+.2f percentage points; " +
+      s"constraint breaches=${target.violations.size} -> ${fold.violations.size}"
 
   private def delta(value: Double, baseline: Double): String =
     val relative = if (baseline > 0.0) f"${(value - baseline) / baseline * 100}%+.2f%%" else "n/a (baseline is zero)"
     f"${value - baseline}%+.6f ($relative)"
 
   private def leaderLines(report: OptimisationReport): List[String] =
-    val first    = report.finalists.headOption.map(_._1)
-    val training = report.finalists.sortBy(c => -c._2.value).headOption.map(_._1)
-    (first.toList ++ training.toList).distinct.flatMap { indicator =>
-      val roles = List(
-        Option.when(first.contains(indicator))("Leading finalist"),
-        Option.when(training.contains(indicator))("Final training leader")
-      ).flatten.mkString(" / ")
-      List(s"$roles:", s"Indicator: $indicator") ::: report.candidates.get(indicator).toList.flatMap { candidate =>
+    List(
+      "Each fold is a separate simulation: state resets between folds and open positions are liquidated at each fold's end.",
+      "Their net results are not a continuous multi-year backtest and should not be interpreted as BatchBacktester's continuous net."
+    ) ::: reportCandidates(report).flatMap { case (label, candidate) =>
+      List(s"$label:", s"Indicator: ${candidate.indicator}") :::
         candidate.searchFolds.zipWithIndex.flatMap { case (fold, index) => foldLines(s"Search fold ${index + 1}", fold) } :::
-          candidate.validation.fold(List("Validation: unavailable."))(foldLines("Validation", _))
-      }
+        candidate.validation.fold(List("Validation: unavailable."))(foldLines("Validation", _))
     }
+
+  private def reportCandidates(report: OptimisationReport): List[(String, CandidateDiagnostics)] =
+    val first    = report.finalists.headOption.map(_._1)
+    val training = report.finalists.sortBy(c => -c._2.value).headOption.map(_._1).filterNot(first.contains)
+    val best     =
+      report.diagnostics.bestSeen.map(_.indicator).filterNot(indicator => first.contains(indicator) || training.contains(indicator))
+    val roles = first.toList.map("Leading finalist" -> _) ++ training.toList.map("Final training leader" -> _) ++ best.toList.map {
+      indicator =>
+        val label =
+          if (report.finalists.exists(_._1 == indicator)) "Best all-fold search candidate"
+          else "Best all-fold search candidate (diagnostic only; absent from final shortlist)"
+        label -> indicator
+    }
+    roles.flatMap { case (label, indicator) => report.candidates.get(indicator).map(label -> _) }
 
   private def foldLines(label: String, fold: FoldDiagnostics): List[String] =
     List(
-      f"$label: score=${fold.score}%.6f; net=${fold.netProfit}; closed=${fold.closedTrades}; forced=${fold.forcedClosures}; " +
-        s"costs=${fold.costs}; portfolio drawdown=${fold.maxDrawdownPercent}%"
+      f"$label: score=${fold.score}%.6f; net=${fold.netProfit}%.5f; closed=${fold.closedTrades}; forced=${fold.forcedClosures}; " +
+        f"costs=${fold.costs}%.5f; portfolio drawdown=${fold.maxDrawdownPercent}%.2f%%"
     ) :::
       (if (fold.violations.isEmpty) List("  No constraint breaches.") else fold.violations.map(v => s"  BREACH: $v"))
 
@@ -149,7 +186,7 @@ object OptimisationReportRenderer:
         val generation = report.diagnostics.firstSeen.get(indicator).fold("not observed")(_.toString)
         val baselines  = report.baselines.filter(_.effective.contains(indicator)).map(baselineLabel)
         s"#${index + 1}: first seen=$generation; baselines=${if (baselines.isEmpty) "none" else baselines.mkString(", ")}; " +
-          s"catalogue=${matchesText(report.catalogueMatches.getOrElse(indicator, Nil))}"
+          catalogueText(report.catalogueMatches.getOrElse(indicator, Nil))
       }
 
   private def baselineLabel(baseline: BaselineReport): String =
@@ -166,6 +203,10 @@ object OptimisationReportRenderer:
           s"${entry.name} ($kind)"
         }
         .mkString(", ")
+
+  private def catalogueText(matches: List[CatalogueMatch]): String =
+    s"catalogue strategies=${matchesText(matches.filter(_.sameRules))}; " +
+      s"parameter-only catalogue matches (different rules)=${matchesText(matches.filterNot(_.sameRules))}"
 
   private def workloadLines(report: OptimisationReport): List[String] =
     val snapshot = report.diagnostics
@@ -184,7 +225,7 @@ object OptimisationReportRenderer:
         s"unique computed candidates: ${snapshot.uniqueComputedCandidates}.",
       s"Search cache reuses: ${snapshot.cacheReuses} (includes waiting on an in-flight computation)."
     ) ::: List(
-      workload("Search", snapshot.workloads.getOrElse(RunDiagnostics.Stage.Search, RunDiagnostics.Workload())),
+      workload("Search + rescore", snapshot.workloads.getOrElse(RunDiagnostics.Stage.Search, RunDiagnostics.Workload())),
       workload("Validation", snapshot.workloads.getOrElse(RunDiagnostics.Stage.Validation, RunDiagnostics.Workload())),
       workload("Reporting replay", report.reportingWorkload),
       s"Optimisation duration: ${report.optimisationDuration.toMillis} ms; reporting duration: ${report.reportingDuration.toMillis} ms.",

@@ -42,9 +42,9 @@ final case class TestStrategy(
   * additions were deleted. All three selected definitions remain in `BatchBacktester`; measurements, final decisions and the original s13
   * definition are archived in docs/ga-promotions-2026-09-28.md.
   *
-  * Not every val here is still measured. `BatchBacktester` holds the ones worth the runtime and is the list, rather than a copy of it kept
-  * in this comment; a val it has dropped carries a `Not in BatchBacktester` line saying which val dominates it. The rest stay so that a
-  * report filename still resolves to the thing it selected.
+  * Register every public strategy val in `StrategyCatalogue`, which controls batch membership and order. Its completeness test catches
+  * omitted definitions. A val excluded from batch runs carries a `Not in BatchBacktester` line saying which val dominates it; these lineage
+  * entries remain in the catalogue so a report filename still resolves to the thing it selected.
   *
   * In the earlier catalogue, the original `s4_optimized_v2` had higher holdout profit factor than in sample. `s5_optimized_v2` led on
   * holdout profit factor and Sharpe, and the strategy now named `s2_optimized` led on holdout net. The earlier September promotions

@@ -28,7 +28,7 @@ class OptimisationReportSpec extends IOWordSpec {
     CandidateDiagnostics(ind, List(fold(training)), validation.map(fold))
 
   "OptimisationReportBuilder" should {
-    "replay canonical baselines and both leaders once, but discover catalogue aliases for every finalist" in {
+    "replay canonical baselines, both leaders, and a lost best candidate once, but discover catalogue aliases for every finalist" in {
       val incompatible = Indicator.ThresholdCrossing(ValueSource.Close, VT.RSX(12), 70, 30)
       val configured   = round.copy(extraSeeds =
         List(
@@ -51,30 +51,43 @@ class OptimisationReportSpec extends IOWordSpec {
         StrategyCatalogue.Entry("different rules", TestStrategy(indicator(30), otherRules), true),
         StrategyCatalogue.Entry("unreplayed finalist", TestStrategy(indicator(50), rules), false)
       )
+      val frozen = RunDiagnostics.Snapshot(
+        firstSeen = Map(indicator(60) -> 2),
+        bestSeen = Some(RunDiagnostics.Discovery(indicator(60), 1.1, 2))
+      )
       val result = for {
         space       <- IO.fromEither(IndicatorSearchSpace.forStrategy(configured.strategy))
         diagnostics <- RunDiagnostics.make[IO]
         calls       <- Ref.of[IO, List[Indicator]](Nil)
         inspect = (ind: Indicator) => calls.update(_ :+ ind).as(measured(ind))
         report <- new OptimisationReportBuilder(configured, space, inspect, diagnostics, catalogue)
-          .build(finalists, RunDiagnostics.Snapshot(), 2.seconds)
+          .build(finalists, frozen, 2.seconds)
         called <- calls.get
       } yield (report, called)
       result.asserting { case (report, called) =>
-        called mustBe List(indicator(10), indicator(20), indicator(30), indicator(40))
+        called mustBe List(indicator(10), indicator(20), indicator(30), indicator(40), indicator(60))
         report.baselines.map(_.name) mustBe List("target", "seed", "seed alias", "literal seed", "target alias", "incompatible")
         report.baselines.find(_.name == "seed").map(_.fixedInputsRestored) mustBe Some(true)
         report.baselines.find(_.name == "literal seed").map(_.fixedInputsRestored) mustBe Some(false)
         report.baselines.last.effective mustBe None
         report.catalogueMatches(indicator(30)) mustBe List(
           CatalogueMatch("exact", DuplicateKind.Exact),
-          CatalogueMatch("restored", DuplicateKind.FixedInputsRestored)
+          CatalogueMatch("restored", DuplicateKind.FixedInputsRestored),
+          CatalogueMatch("different rules", DuplicateKind.Exact, sameRules = false)
         )
         report.catalogueMatches(indicator(50)) mustBe List(CatalogueMatch("unreplayed finalist", DuplicateKind.Exact))
         report.candidates.contains(indicator(50)) mustBe false
-        report.diagnostics.firstSeen mustBe empty
+        report.candidates.contains(indicator(60)) mustBe true
+        report.finalists mustBe finalists
+        report.diagnostics mustBe frozen
         report.optimisationDuration mustBe 2.seconds
         report.reportingWorkload mustBe RunDiagnostics.Workload()
+        val text = OptimisationReportRenderer.sections(report).flatMap(_._2).mkString("\n")
+        text must include("seed alias (fixed inputs restored): duplicate of seed 'seed'")
+        text must include(
+          "catalogue strategies=exact (exact), restored (after restoring fixed inputs); " +
+            "parameter-only catalogue matches (different rules)=different rules (exact)"
+        )
       }
     }
     "count only this report's deduplicated replay work and preserve the frozen search snapshot" in {
@@ -146,9 +159,66 @@ class OptimisationReportSpec extends IOWordSpec {
       text must include("#1: first seen=7")
       text must include("retained (exact)")
       text must include("closed=20; forced=1; costs=3")
-      text must include("portfolio drawdown=0.5%")
+      text must include("portfolio drawdown=0.50%")
+      text must include("Search + rescore: candidate requests=")
       text must include("Search cache reuses: 9 (includes waiting on an in-flight computation).")
       text must include("reporting duration: 20 ms")
+    }
+
+    "compare a lost best candidate's segment net and trading activity while keeping its validation result separate" in {
+      val target     = indicator(10)
+      val champion   = indicator(20)
+      val lost       = indicator(30)
+      val breach     = ScoringFunction.Violation("trade count", "20", "at least 24")
+      val targetFold = fold(0.5).copy(
+        netProfit = BigDecimal("100.1234567"),
+        costs = BigDecimal("3.1234567"),
+        maxDrawdownPercent = BigDecimal("0.55555"),
+        violations = List(breach)
+      )
+      val lostFold = fold(1.0).copy(
+        netProfit = BigDecimal("125.1234567"),
+        closedTrades = 24,
+        forcedClosures = 2,
+        costs = BigDecimal(4),
+        maxDrawdownPercent = BigDecimal("1.236")
+      )
+      val report = OptimisationReport(
+        round.name,
+        round.corpus,
+        Vector((champion, Fitness(0.5), Fitness(0.2))),
+        List(BaselineReport("target", Some(target), None)),
+        Map(
+          target   -> CandidateDiagnostics(target, List(targetFold, fold(0.5)), Some(fold(0.2))),
+          champion -> CandidateDiagnostics(champion, List(fold(0.5), fold(0.5)), Some(fold(0.2))),
+          lost     -> CandidateDiagnostics(
+            lost,
+            List(lostFold, fold(1).copy(netProfit = BigDecimal(95))),
+            Some(fold(0.1).copy(netProfit = BigDecimal(80)))
+          )
+        ),
+        Map.empty,
+        RunDiagnostics.Snapshot(bestSeen = Some(RunDiagnostics.Discovery(lost, 1.0, 0))),
+        RunDiagnostics.Workload(),
+        1.second,
+        10.millis
+      )
+      val sections    = OptimisationReportRenderer.sections(report).toMap
+      val comparisons = sections("Baseline comparisons").mkString("\n")
+      val details     = sections("Leader fold diagnostics").mkString("\n")
+      val label       = "Best all-fold search candidate (diagnostic only; absent from final shortlist)"
+      comparisons must include(
+        s"$label vs target, search fold 1: net=+25.00000; closed=+4; forced=+1; " +
+          "costs=+0.87654; portfolio drawdown=+0.68 percentage points; constraint breaches=1 -> 0"
+      )
+      comparisons must include(s"$label vs target, search fold 2: net=-5.00000")
+      comparisons must include(s"$label vs target, validation period: net=-20.00000")
+      comparisons must include(s"$label vs target, all-fold training fitness: +0.500000")
+      comparisons must include(s"$label vs target, validation fitness: -0.100000")
+      comparisons.indexOf("net=+25.00000") must be < comparisons.indexOf(s"$label vs target, all-fold training fitness")
+      details must include("state resets between folds and open positions are liquidated at each fold's end")
+      details must include("not a continuous multi-year backtest")
+      details must include("net=125.12346; closed=24; forced=2; costs=4.00000; portfolio drawdown=1.24%")
     }
 
     "include seeds equivalent to the target in comparisons and distinguish restored aliases from literal matches" in {

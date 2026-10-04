@@ -90,7 +90,7 @@ final class RunDiagnostics[F[_]] private (state: Ref[F, RunDiagnostics.State])(u
 
 object RunDiagnostics {
   enum Stage {
-    case Search, Validation, Reporting
+    case Search, Validation, Reporting, Backtest
   }
 
   final case class Workload(

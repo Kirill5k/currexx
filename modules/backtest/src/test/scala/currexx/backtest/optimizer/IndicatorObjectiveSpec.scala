@@ -313,9 +313,10 @@ class IndicatorObjectiveSpec extends IOWordSpec {
         after         <- diagnostics.snapshot
         rawSearch     <- objective.backtest(strategy.indicator)
         rawValidation <- objective.validate(strategy.indicator)
-      yield (rescored, selected, before, inspected, after, rawSearch, rawValidation)
+        afterDirect   <- diagnostics.snapshot
+      yield (rescored, selected, before, inspected, after, rawSearch, rawValidation, afterDirect)
 
-      result.asserting { case (rescored, selected, before, inspected, after, rawSearch, rawValidation) =>
+      result.asserting { case (rescored, selected, before, inspected, after, rawSearch, rawValidation, afterDirect) =>
         inspected.indicator mustBe strategy.indicator
         inspected.searchFolds mustBe rawSearch.map(expected)
         inspected.validation mustBe Some(expected(rawValidation))
@@ -331,6 +332,13 @@ class IndicatorObjectiveSpec extends IOWordSpec {
         after.bestSeen mustBe before.bestSeen
         after.computationAttempts mustBe 1L
         after.cacheReuses mustBe 1L
+        afterDirect.workloads(RunDiagnostics.Stage.Validation) mustBe RunDiagnostics.Workload(2, 2, 2, 2, 2)
+        afterDirect.workloads(RunDiagnostics.Stage.Backtest) mustBe RunDiagnostics.Workload(1, 2, 2, 2, 2)
+        afterDirect.workloads(RunDiagnostics.Stage.Reporting) mustBe after.workloads(RunDiagnostics.Stage.Reporting)
+        afterDirect.workloads(RunDiagnostics.Stage.Search) mustBe after.workloads(RunDiagnostics.Stage.Search)
+        afterDirect.searchRequests mustBe after.searchRequests
+        afterDirect.rescoreRequests mustBe after.rescoreRequests
+        afterDirect.firstSeen mustBe after.firstSeen
       }
     }
 

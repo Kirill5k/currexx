@@ -8,7 +8,7 @@ import currexx.algorithms.operators.species.SpeciesOperators
 import currexx.algorithms.progress.Tracker
 import currexx.algorithms.*
 import currexx.backtest.{OptimisationRound, OrderStats, StrategyCatalogue}
-import currexx.backtest.optimizer.reporting.{OptimisationReportBuilder, OptimisationReportRenderer, ReportingTracker, RunDiagnostics}
+import currexx.backtest.optimizer.reporting.{OptimisationReportBuilder, ReportingTracker, RunDiagnostics}
 import currexx.domain.signal.Indicator
 
 import scala.util.Random
@@ -57,7 +57,7 @@ object OptimisationAlgorithm:
   private def ga[F[_]: {Async, Parallel}](
       round: OptimisationRound,
       params: Parameters.GA,
-      progressTracker: Tracker[F, Indicator],
+      progressTracker: ReportingTracker[F],
       evaluatorPoolSize: Int,
       diagnostics: RunDiagnostics[F],
       catalogue: List[StrategyCatalogue.Entry]
@@ -91,7 +91,7 @@ object OptimisationAlgorithm:
   private def scga[F[_]: {Async, Parallel}](
       round: OptimisationRound,
       params: Parameters.SCGA,
-      progressTracker: Tracker[F, Indicator],
+      progressTracker: ReportingTracker[F],
       evaluatorPoolSize: Int,
       diagnostics: RunDiagnostics[F],
       catalogue: List[StrategyCatalogue.Entry]
@@ -142,7 +142,7 @@ object OptimisationAlgorithm:
       space: IndicatorSearchSpace,
       objective: IndicatorObjective.Operators[F],
       algorithm: OptimisationAlgorithm[F, A, P, Indicator],
-      progressTracker: Tracker[F, Indicator],
+      progressTracker: ReportingTracker[F],
       diagnostics: RunDiagnostics[F],
       catalogue: List[StrategyCatalogue.Entry]
   ): IndicatorOptimisation[F] = new IndicatorOptimisation[F]:
@@ -155,19 +155,8 @@ object OptimisationAlgorithm:
         builder = new OptimisationReportBuilder(round, space, objective.inspect, diagnostics, catalogue)
         _ <- builder
           .build(finalists, snapshot, finished - started)
-          .flatMap(report =>
-            OptimisationReportRenderer.sections(report).traverse_ { case (title, lines) =>
-              progressTracker.displayNote(title, lines)
-            }
-          )
-          .handleErrorWith { error =>
-            progressTracker
-              .displayNote(
-                s"Incomplete diagnostics: ${round.name}",
-                List("Optimisation results above are complete; diagnostic reporting failed.", error.toString)
-              )
-              .attempt *> Async[F].raiseError(error)
-          }
+          .flatMap(progressTracker.displayReport)
+          .handleErrorWith(error => progressTracker.displayReportFailure(round.name, error).attempt.void)
       yield finalists
     override val searchSpace: IndicatorSearchSpace                   = space
     override val tracker: Tracker[F, Indicator]                      = progressTracker

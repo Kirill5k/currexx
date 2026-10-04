@@ -36,7 +36,8 @@ final case class BaselineReport(
 enum DuplicateKind:
   case Exact, FixedInputsRestored
 
-final case class CatalogueMatch(name: String, kind: DuplicateKind)
+/** Matching parameters identify the same strategy only when the trading rules also match. */
+final case class CatalogueMatch(name: String, kind: DuplicateKind, sameRules: Boolean = true)
 
 final case class OptimisationReport(
     roundName: String,

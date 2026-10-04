@@ -1,6 +1,9 @@
 package currexx.backtest
 
-/** Named strategy definitions, including lineage entries omitted from batch evaluation. */
+/** Named strategy definitions, including lineage entries omitted from batch evaluation.
+  *
+  * Keep batch membership and ordering explicit. StrategyCatalogueSpec checks completeness against every public TestStrategy definition.
+  */
 object StrategyCatalogue {
   final case class Entry(name: String, strategy: TestStrategy, includeInBatch: Boolean)
 

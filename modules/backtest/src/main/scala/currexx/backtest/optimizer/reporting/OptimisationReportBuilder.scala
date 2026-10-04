@@ -9,7 +9,7 @@ import currexx.domain.signal.Indicator
 
 import scala.concurrent.duration.FiniteDuration
 
-/** Replays only the baselines and two leaders after selection has finished. */
+/** Replays distinct baselines, final leaders, and the best searched candidate after selection has finished. */
 final class OptimisationReportBuilder[F[_]: Async](
     round: OptimisationRound,
     space: IndicatorSearchSpace,
@@ -35,7 +35,7 @@ final class OptimisationReportBuilder[F[_]: Async](
         BaselineReport(original.name, seed.effective, Some(seed.disposition), seed.effective.exists(_ != original.indicator))
       }
       leaders = canonical.headOption.map(_._1).toList ++ canonical.sortBy(c => -c._2.value).headOption.map(_._1).toList
-      replay  = (baselines.flatMap(_.effective) ++ leaders).distinct
+      replay  = (baselines.flatMap(_.effective) ++ leaders ++ frozenSnapshot.bestSeen.map(_.indicator)).distinct
       measurements <- replay.traverse(indicator => inspect(indicator).map(indicator -> _))
       after        <- diagnostics.snapshot
       matches = (replay ++ canonical.map(_._1)).distinct.map(indicator => indicator -> catalogueMatches(indicator)).toMap
@@ -58,10 +58,10 @@ final class OptimisationReportBuilder[F[_]: Async](
 
   private def catalogueMatches(indicator: Indicator): List[CatalogueMatch] =
     catalogue.flatMap { entry =>
-      if (entry.strategy.rules != round.strategy.rules) Nil
-      else if (entry.strategy.indicator == indicator) List(CatalogueMatch(entry.name, DuplicateKind.Exact))
+      val sameRules = entry.strategy.rules == round.strategy.rules
+      if (entry.strategy.indicator == indicator) List(CatalogueMatch(entry.name, DuplicateKind.Exact, sameRules))
       else if (space.canonicalise(entry.strategy.indicator).contains(indicator))
-        List(CatalogueMatch(entry.name, DuplicateKind.FixedInputsRestored))
+        List(CatalogueMatch(entry.name, DuplicateKind.FixedInputsRestored, sameRules))
       else Nil
     }
 
