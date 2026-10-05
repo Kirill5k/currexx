@@ -1,6 +1,6 @@
 package currexx.backtest.services
 
-import cats.effect.{Ref, Temporal}
+import cats.effect.Temporal
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
@@ -12,7 +12,7 @@ import currexx.core.market.MarketService
 import currexx.core.signal.{SignalDetector, SignalService}
 import currexx.core.trade.{TradeOrderPlacement, TradeService}
 import currexx.domain.market.MarketTimeSeriesData
-import fs2.{Pipe, Stream}
+import fs2.Pipe
 
 final class TestServices[F[_]] private (
     private val signalService: SignalService[F],
@@ -33,33 +33,28 @@ final class TestServices[F[_]] private (
     yield ()
 
   def processMarketData(signalDetector: SignalDetector): Pipe[F, MarketTimeSeriesData, Unit] =
-    input =>
-      Stream.eval(Ref.of[F, Option[MarketTimeSeriesData]](None)).flatMap { previousData =>
-        input.evalMap { currentData =>
-          previousData.getAndSet(Some(currentData)).flatMap {
-            case None =>
-              // The first window only primes the simulator; there is no next-bar fill for it yet.
-              F.unit
+    _.zipWithPrevious.evalMap {
+      case (None, _) =>
+        // The first window only primes the simulator; there is no next-bar fill for it yet.
+        F.unit
 
-            case Some(signalData) =>
-              for
-                _      <- appState.prepareExecution(currentData)
-                userId <- appState.userIdRef.get
-                _      <- marketService.updateTimeState(userId, signalData)
-                _      <- signalService.processMarketData(userId, signalData, signalDetector)
-                _      <- collectPendingActions { case Action.ProcessSignals(uid, cp, signals) =>
-                  marketService.processSignals(uid, cp, signals)
-                }
-                _ <- collectPendingActions { case Action.ProcessMarketStateUpdate(uid, cp) =>
-                  marketService.getState(uid, cp).flatMap(tradeService.processMarketStateUpdate)
-                }
-                _ <- collectPendingActions { case Action.ProcessTradeOrderPlacement(top) =>
-                  marketService.processTradeOrderPlacement(top)
-                }
-              yield ()
+      case (Some(signalData), currentData) =>
+        for
+          _      <- appState.prepareExecution(currentData)
+          userId <- appState.userIdRef.get
+          _      <- marketService.updateTimeState(userId, signalData)
+          _      <- signalService.processMarketData(userId, signalData, signalDetector)
+          _      <- collectPendingActions { case Action.ProcessSignals(uid, cp, signals) =>
+            marketService.processSignals(uid, cp, signals)
           }
-        }
-      }
+          _ <- collectPendingActions { case Action.ProcessMarketStateUpdate(uid, cp) =>
+            marketService.getState(uid, cp).flatMap(tradeService.processMarketStateUpdate)
+          }
+          _ <- collectPendingActions { case Action.ProcessTradeOrderPlacement(top) =>
+            marketService.processTradeOrderPlacement(top)
+          }
+        yield ()
+    }
 
   def getOrderStats(riskSettings: RiskSettings = RiskSettings()): F[OrderStats] =
     for

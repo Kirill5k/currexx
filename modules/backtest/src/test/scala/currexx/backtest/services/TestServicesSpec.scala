@@ -41,6 +41,50 @@ class TestServicesSpec extends IOWordSpec {
 
   "TestServices equity accounting" should {
 
+    "preserve output cardinality for empty and priming-only input without recording accounting data" in {
+      val result = for
+        services      <- TestServices.make[IO](settings)
+        emptyOutput   <- Stream.empty.covary[IO].through(services.processMarketData(noSignals)).compile.toList
+        primingOutput <- Stream.emit(bar("2026-01-01T00:00:00Z")).covary[IO].through(services.processMarketData(noSignals)).compile.toList
+        stats         <- services.getOrderStats(risk)
+      yield (emptyOutput, primingOutput, stats)
+
+      result.asserting { case (emptyOutput, primingOutput, stats) =>
+        emptyOutput mustBe Nil
+        primingOutput mustBe List(())
+        stats.dataWindow mustBe None
+        stats.equityCurve mustBe empty
+        stats.total mustBe 0
+      }
+    }
+
+    "account only for execution bars consumed before a downstream take stops the stream" in {
+      val prime  = bar("2026-01-31T23:58:00Z")
+      val first  = bar("2026-01-31T23:59:00Z", close = 0.8)
+      val future = bar("2026-02-01T00:00:00Z", close = 1.2)
+
+      val result = for
+        services <- TestServices.make[IO](settings)
+        outputs  <- Stream
+          .emits(List(prime, first, future))
+          .covary[IO]
+          .through(services.processMarketData(noSignals))
+          .take(2)
+          .compile
+          .toList
+        stats <- services.getOrderStats(risk)
+      yield (outputs, stats)
+
+      result.asserting { case (outputs, stats) =>
+        outputs mustBe List((), ())
+        stats.dataWindow mustBe Some(DataWindow(first.latestTime, closeTime(first)))
+        stats.profitByMonth mustBe Map("2026-01" -> BigDecimal(0))
+        stats.equityCurve.map(_.time) must contain(closeTime(first))
+        stats.equityCurve.exists(_.time.isAfter(closeTime(first))) mustBe false
+        stats.total mustBe 0
+      }
+    }
+
     "value open positions at real closes even when subsequent bars emit no signals" in {
       val prime    = bar("2026-01-15T10:00:00Z", interval = Interval.H1)
       val losing   = bar("2026-01-15T11:00:00Z", close = 0.9, interval = Interval.H1)

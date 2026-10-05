@@ -80,9 +80,10 @@ final private class PureSignalDetector extends SignalDetector {
     // This is the primary input for the indicator.
     val priceLine = transformer.extractFrom(data, indicator.source)
     // 2. Calculate the middle band (e.g., EMA of the priceLine).
-    val middleBand = transformer.transformTo(priceLine, data, indicator.middleBand)
+    // bandCrossing reads only the latest two points.
+    val middleBand = transformer.transformTo(priceLine, data, indicator.middleBand).take(2)
     // 3. Calculate ATR using the required High, Low, and Close data directly.
-    val atrLine = Volatility.averageTrueRange(data.closings, data.highs, data.lows, indicator.atrLength)
+    val atrLine = Volatility.averageTrueRange(data.closings, data.highs, data.lows, indicator.atrLength).take(2)
     // 4. Calculate the upper and lower bands based on the middle band and ATR.
     val upperBand = middleBand.lazyZip(atrLine).map((mid, atr) => mid + (atr * indicator.atrMultiplier)).toList
     val lowerBand = middleBand.lazyZip(atrLine).map((mid, atr) => mid - (atr * indicator.atrMultiplier)).toList
@@ -157,8 +158,8 @@ final private class PureSignalDetector extends SignalDetector {
       indicator: Indicator.BollingerBands
   ): Option[Signal] =
     val priceLine      = transformer.extractFrom(data, indicator.source)
-    val middleBandLine = transformer.transformTo(priceLine, data, indicator.middleBand)
-    val stdDevLine     = Statistics.standardDeviation(priceLine, indicator.stdDevLength)
+    val middleBandLine = transformer.transformTo(priceLine, data, indicator.middleBand).take(2)
+    val stdDevLine     = Statistics.standardDeviation(priceLine, indicator.stdDevLength).take(2)
     val upperBand      = middleBandLine.lazyZip(stdDevLine).map((mid, stdev) => mid + (stdev * indicator.stdDevMultiplier))
     val lowerBand      = middleBandLine.lazyZip(stdDevLine).map((mid, stdev) => mid - (stdev * indicator.stdDevMultiplier))
     Condition
