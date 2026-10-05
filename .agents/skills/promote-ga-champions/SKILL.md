@@ -1,119 +1,137 @@
 ---
 name: promote-ga-champions
-description: Promote the selected champion of every GA optimisation run in optimisation-results into TestStrategy.scala and BatchBacktester.scala, measure it on the searched and holdout corpora, then keep or discard it on the holdout result. Use when asked to "add the optimisation results", "promote the champions", "pull in the latest GA runs", or after an Optimiser run finishes.
+description: Read GA and SCGA optimisation reports, add candidates to TestStrategy and StrategyCatalogue, and compare their diagnostics and continuous batch results. Use when asked to promote champions or add completed optimisation results to the strategy catalogue.
 ---
 
 # Promote GA Champions
 
-Turns each markdown report in `optimisation-results/` into a compiling
-`TestStrategy` val plus a `BatchBacktester` entry, measures it, and then decides whether it
-earns a place in the catalogue.
-
-Promotion is not the end of the job. A champion is a candidate until `BatchBacktester` has
-scored it on the holdout corpus; the last steps keep the winners, delete the rest, and leave
-the catalogue's own documentation true.
-
-Paths
+Turn optimisation reports into named, measured strategy candidates. Preserve the run's
+selection and distinguish selected champions from candidates retained only for reference.
+Use the diagnostics to explain what the search achieved; use `BatchBacktester` to measure
+continuous performance before deciding what to retain within the requested promotion scope.
 
 | Role | Path |
 |---|---|
 | Reports | `optimisation-results/*.md` |
-| Strategy catalogue | `modules/backtest/src/main/scala/currexx/backtest/TestStrategy.scala` |
-| Batch runner | `modules/backtest/src/main/scala/currexx/backtest/BatchBacktester.scala` |
-| Round definitions | `modules/backtest/src/main/scala/currexx/backtest/Optimiser.scala` |
+| Strategy definitions and lineage | `modules/backtest/src/main/scala/currexx/backtest/TestStrategy.scala` |
+| Named registry and batch membership | `modules/backtest/src/main/scala/currexx/backtest/StrategyCatalogue.scala` |
+| Batch runner and corpus labels | `modules/backtest/src/main/scala/currexx/backtest/BatchBacktester.scala` |
+| Round definitions and named seeds | `modules/backtest/src/main/scala/currexx/backtest/Optimiser.scala` |
 | Corpora / folds | `modules/backtest/src/main/scala/currexx/backtest/MarketDataProvider.scala` |
-| Type definitions | `modules/domain/src/main/scala/currexx/domain/signal/Indicator.scala` |
+| Indicator types | `modules/domain/src/main/scala/currexx/domain/signal/Indicator.scala` |
+| Report semantics | `modules/backtest/README.md` |
 
 ## Step 1 — Collect the reports
 
 ```bash
-ls optimisation-results/*.md
+rg --files optimisation-results -g '*.md'
 ```
 
-Reports are never deleted, so work out which are new — by timestamp in the filename, by `git
-status`, or by which report filenames the existing `TestStrategy` comments already cite.
+Reports are retained. Identify new ones by filename timestamp, Git status, and filenames
+already cited in strategy comments. Include both GA and SCGA reports.
 
-Read the whole of `TestStrategy.scala` (including its object-level scaladoc, which is the
-catalogue's own account of itself), `BatchBacktester.scala` and `Optimiser.scala`'s `rounds`
-before editing anything.
+Read `TestStrategy.scala`, including its object-level documentation, `StrategyCatalogue.scala`,
+`BatchBacktester.scala`, and the relevant rounds before editing. The round configuration may
+have changed since a historical report; use its recorded target and cited lineage to cross-check.
 
-## Step 2 — Read the champion selection block
+## Step 2 — Identify the selected candidate, then read its diagnostics
 
-A report has this shape:
+Current reports contain these sections:
 
-```
-# Genetic Algorithm Run: <round name>
-**Started at:** <iso timestamp>
-**Target:** <indicator toString of the strategy that was optimised>
-**Parameters:** GA(<pop>,<maxGen>,<crossover>,<mutation>,<elitism>,<shuffle>,<initialOversampling>)
+```text
+# <algorithm display name> Run: <round name>
+**Target:** <indicator>
+**Parameters:** GA(...) or SCGA(...)
 ## Progress
-### Generation N out of M          **Top Members:** — top 3, ranked on TRAINING only
-## Final Results                   narrative + validation-ranked shortlist table + Stats + Duration
-## Champion selection: <round name>   corpus description, verdict, Indicator
+### Generation N out of M
+## Stable progress: generation N
+## Final Results
+## Champion selection: <round name>
+## Baseline measurements
+## Baseline comparisons
+## Leader fold diagnostics
+## Finalist provenance
+## Search observations and workload
 ```
 
-```bash
-f=optimisation-results/<file>.md
-grep -m1 '^\*\*Target:\*\*' "$f"
-grep -m1 '^\*\*Parameters:\*\*' "$f"
-awk '/^## Final Results/{p=1} p' "$f"
-```
+Older reports may lack the diagnostic sections. Treat absent measurements as unavailable.
+Do not rerun an optimisation just to fill them in.
 
-### Two scores, not one
+**Scope extraction to its section.** Several sections contain `Indicator:` lines: the selected
+candidate, final training leader, and best candidate ever searched can differ. Never choose the
+last `Indicator:` in the file or replace the champion with the largest score found elsewhere.
 
-Every candidate carries a **training** score from the search folds and a **validation** score
-from a fold the search never touched. The `## Final Results` shortlist is ranked on
-*validation*, and `## Champion selection` reports the top of that ranking — so nothing here
-chooses anything, and the shortlist's `#1` and the champion are the same individual.
+The `Final Results` columns are `rank train# training validation retained individual`.
+Training is rescored on all search folds. The table preserves the validator's order: positive
+validation gates eligibility; candidates within the reported tie band of the best validation
+score are ordered by training, then the remaining survivors by validation. The current default
+band is 5%; do not re-sort the shortlist by validation alone. `train#` ranks finalists by
+training; it is not a rank among every candidate the run ever evaluated.
 
-The shortlist table's columns are `rank train# training validation retained individual`;
-`train#` is where that individual placed on training, so a champion with `train# 13` means the
-training-ranked winner was not the one that survived validation.
+Use this precedence:
 
-### The verdict decides whether there is anything to promote
+- **`SELECTED (from N after validation, ties inside ... broken on training): ...`** identifies
+  the selected champion. Older `SELECTED (best of N on validation): ...` wording is also valid
+  for its report. Read the indicator from that champion block and cross-check final rank 1.
+  Copy any `BREACHES` lines: a breach can discount fitness without disqualifying the candidate.
+- **`NOTHING SELECTED: ...`** means no champion cleared the configured gate, or validation was
+  unavailable. The leading finalist can still be added for reference under the existing
+  workflow, but label it **diagnostic only**, not selected or validation-approved. If the user
+  requested selected champions only, omit reference entries.
+- **Complete `Final Results` with missing or incomplete diagnostics** records the completed
+  search and finalist ordering. An `Incomplete diagnostics: ...` note means replay or output
+  failed afterward. Use the champion block if present; otherwise label final rank 1 a
+  **completed-finalist candidate**, with selection and constraint verdicts unavailable.
+  Record the incomplete diagnostics and preserve available scores; do not invent a verdict.
+  Later rounds may have completed normally. A missing champion block alone does not establish
+  that a run was interrupted.
+- **No complete `Final Results`**: the last `Top Members` rank 1 can be retained as an
+  **unvalidated reference**, following the existing fallback workflow. Its rotating-fold score
+  is not full-search fitness. Cite the generation and write `Progress leader from ...` rather
+  than `Champion from ...`. If there is no candidate, there is nothing to add.
 
-`## Champion selection` ends in one of two ways.
+A completed but empty shortlist supplies no candidate; do not substitute an earlier progress
+leader. With zero training fitness, retention is unavailable. Preserve the absolute scores
+without inventing a percentage or treating validation alone as proof of general improvement.
 
-**`SELECTED (best of N on validation): training X -> validation Y, retaining Z%`** — a
-candidate. Followed by either `Satisfies every constraint on validation data.` or `BREACHES n
-constraint(s) on validation data:` with one line per breach. A breach discounted the fitness
-rather than disqualifying it, so still promote — but reproduce every breach line in the val's
-comment so the next reader sees it without reopening the report.
+Read the diagnostics with these meanings:
 
-**`NOTHING SELECTED: no finalist scored above zero on data it was never searched against.`** — 
-promote top candidate for reference. Make sure it is reflected in val's comment.
+| Section | What to extract and how to interpret it |
+|---|---|
+| Baseline measurements | Target and named seed training/validation scores, accepted or incompatible status, and aliases after fixed inputs are restored. Seed parameters are evaluated under this round's rules, not the seed strategy's original rules. |
+| Baseline comparisons | Per-fold net, trade, forced-closure, cost, drawdown, and breach differences against the target; fitness differences against the target and strongest seed for each metric. Report training and validation disagreements separately. A zero baseline has no percentage improvement. |
+| Leader fold diagnostics | Measurements for the leading finalist, distinct final training leader, and distinct best-seen candidate. Each fold resets state and liquidates remaining positions at its end; these are segment results, not continuous multi-year net. |
+| Finalist provenance | First successful search evaluation, including generation 0, plus baseline and catalogue matches. Validation, rescoring, and reporting replays do not establish a discovery generation. |
+| Search observations and workload | Best all-fold fitness ever searched, whether it survived into the shortlist, requests, cache computations/reuse, actual simulations, and separate optimisation/reporting durations. Search + rescore requests include cache hits and in-flight waiters; requests are not independent candidates or simulations. |
 
-### Two readings that need flagging, not skipping
+`Stable progress` uses all-fold fitness and can be compared across generations. Ordinary
+`Top Members` scores use rotating folds and cannot. The best-seen candidate may have been
+lost from the population; its later diagnostic replay does not select it. Do not add it as an
+extra champion just because the report now exposes it.
 
-- **`training 0.000000`** (and therefore `retaining n/a`): the search folds scored the champion
-  at zero and the single validation fold ranked it alone. Promote it, and say so in the comment
-  — a validation figure from such a round filters out the hopeless, it does not rank the rest.
-- **No `## Champion selection` block at all** (interrupted run): fall back to `#1` of the last
-  `**Top Members:**` block, which is *training*-ranked and never validated. Say so in the
-  comment — write `Best Top-25 member from …` instead of `Champion from …` — and expect it to
-  measure badly.
+## Step 3 — Find the base strategy, detect duplicates, and pick a name
 
-## Step 3 — Find the base strategy and pick a name
+Candidates inherit the optimised base's **rules**, with the effective indicator parameters
+printed in the report. Resolve the base from the round configuration and recorded target;
+matching target indicators alone cannot distinguish strategies with different rules. A
+`_shuffle` suffix is a round label, not a strategy name. Read the recorded GA/SCGA parameters
+for shuffle status rather than inferring it from the name. Decode positional fields using
+`Parameters` in `modules/algorithms/src/main/scala/currexx/algorithms/Algorithm.scala` when needed.
 
-The champion is the same *rules* as the strategy that was optimised, with different *indicator*
-params. Identify that base by matching the report's `**Target:**` against the `indicator` of
-each `TestStrategy` val; `Optimiser.scala`'s `rounds` list is the cross-check (`name` →
-`strategy`). A round name ending in `_shuffle` is the shuffled GA run of the same base val — a
-round label, never a val name.
+**Skip actual strategy duplicates:** both stored indicators and trading rules must match.
+Cross-check report matches against the current source, which may have changed since the run.
 
-**Suffixes carry no meaning.** They neither rank a family nor run contiguously within one
-(`s5_optimized_v2` has no `s5_optimized` above it; `s2_optimized_v3` out-scores `s2_optimized`),
-because Step 9 renames winners into their base's name and deletes what they beat. A suffix
-records only that a val once needed distinguishing from something. So:
+- `catalogue strategies=... (exact)` identifies matching rules and parameters at report time.
+- `after restoring fixed inputs` identifies equivalence within that round. Check the actual
+  stored indicator before skipping: its original fixed values may differ from the candidate.
+- `parameter-only catalogue matches (different rules)` is not a duplicate strategy.
+- Target/seed aliases show repeated effective parameters under the round's rules. They can
+  explain a lack of search novelty without establishing equality with a stored seed strategy.
 
-- pick any name not already in `TestStrategy.scala`, following the `<base>_optimized` /
-  `<base>_vN` shape of the file
-- when several champions share one base (typically a run and its `_shuffle` twin), order them by
-  **descending validation** score and allocate consecutive versions
-- do not renumber or reorder anything existing to make the new name fit
-
-**Skip duplicates.** If the champion's indicator is param-for-param identical to an existing
-val's, the run found nothing new — no val, and note the skip in the final report.
+Suffixes do not rank candidates or necessarily run contiguously. Pick an unused name following
+this family's existing convention, keep related definitions adjacent, and preserve existing
+names/order. When several runs share a base, use their reported validation results to allocate
+new names consistently; this naming step does not change selection within any report.
 
 ## Step 4 — Translate the indicator string into Scala
 
@@ -154,120 +172,111 @@ Enums: `HLC3`/`Close`/`Open`/`HL2` → `ValueSource.X`; `Momentum`/`Volatility`/
 
 ## Step 5 — Add the val to TestStrategy.scala
 
-Copy the base val's **entire `rules = TradeStrategy(...)` block verbatim**, inline comments
-included — only the indicator params change. Insert the new val directly after the base val's
-block (or after the last val already derived from that base) so related strategies stay adjacent.
+Copy the resolved base's entire `rules = TradeStrategy(...)` block, including comments.
+Translate only the effective indicator parameters. Insert the new definition after its base
+or the last related definition.
 
-Comment header, following the format already in the file:
+Use the report filename as provenance and retain the distinction between a selected champion,
+a completed-finalist candidate with missing diagnostics, a diagnostic-only finalist, and an
+unvalidated progress reference. For the missing-diagnostics case, write `Completed finalist
+from ... (diagnostics incomplete; selection and constraint verdicts unavailable)`. For a
+selected champion, for example:
 
 ```scala
   // GA-optimized indicator params for <base> (rules unchanged). Champion from
-  // <report-file-name> (training X.XXXXXX -> validation Y.YYYYYY, retaining Z.Z%, shuffled GA).
+  // <report-file-name> (training X.XXXXXX -> validation Y.YYYYYY, retaining Z.Z%).
   // Satisfies every constraint on validation data.
-  // searched 2023-07..2025-07: <metrics from Step 8>
-  // holdout 2025-12..2026-06:  <metrics from Step 8>
+  // searched <actual period>: <continuous batch metrics from Step 8>
+  // historical <actual period>: <continuous batch metrics from Step 8; record prior reuse>
   val <new_name> = TestStrategy(
 ```
 
-- `, shuffled GA` only when the sixth field of `**Parameters:**` is `true`. Reports written before 2026-09-01 have no seventh field, so
-  that line ends in the boolean instead.
-- `retaining Z.Z%` is copied from the verdict; omit it when the report says `n/a`, and add a
-  sentence saying the training score was zero.
-- Replace the `Satisfies` line with the breach block when the verdict breaches:
+Use `SCGA-optimized` and the actual shuffle status where applicable. Replace the constraint
+line with the reported breach lines, or mark the constraint diagnostics unavailable. Do not
+infer that constraints passed from a positive score. For zero training fitness, retain `n/a`
+and explain why. If the base was later deleted, say so in the provenance comment.
+
+Summarise relevant baseline deltas and whether the candidate was already a target/seed, while
+keeping those fold measurements clearly labelled. Continuous `net`/`closed`/`win`/`PF` metrics
+in the batch-period comments come from Step 8, not sums of report folds. Older pre-cost-model
+measurements are not comparable to current accounting.
+
+## Step 6 — Register in StrategyCatalogue.scala
+
+Append new candidates to `StrategyCatalogue.entries`, preserving the existing relative order:
 
 ```scala
-  // BREACHES 2 constraint(s) on validation data:
-  //   - <breach text copied verbatim from the report>
+Entry("<new_name>", TestStrategy.<new_name>, includeInBatch = true)
 ```
 
-- When the base named in the first line was itself deleted by a later prune, the file's phrasing
-  is `for <base>, which is no longer in this catalogue (rules unchanged)`.
-- Free prose between the verdict and the metrics lines is where the interesting reading goes —
-  how it compares to its base, whether its shuffled twin found anything, whether holdout beat
-  in-sample. Write it after Step 8, when there are numbers to write about.
-- Do not invent metrics. `net`/`closed`/`win`/`PF` figures come from `BatchBacktester` and
-  nowhere else; older vals carry pre-cost-model numbers, explicitly marked as not comparable.
+The key must equal the val name. Every public `TestStrategy` definition belongs in the registry;
+lineage-only entries use `includeInBatch = false`. New candidates being measured use `true`.
+`BatchBacktester.strategies` already delegates to `StrategyCatalogue.batch`; do not recreate a
+second registration list in the runner.
 
-## Step 6 — Register in BatchBacktester.scala
+Update the explicit batch-order expectations in `StrategyCatalogueSpec` for deliberate
+membership changes. Its completeness check discovers public strategy definitions and catches
+forgotten registrations. If the task later renames, deletes, or moves a candidate to lineage,
+keep the registry, tests, round/seed references, and strategy documentation consistent.
 
-Add each new strategy to the `strategies` list as a new group at the end, below the existing
-entries, keeping the blank-line grouping of the existing entries untouched:
-
-```scala
-  val strategies: List[(String, TestStrategy)] = List(
-    "s1_v2_optimized" -> TestStrategy.s1_v2_optimized,
-    …
-
-    "<new_name>" -> TestStrategy.<new_name>
-  )
-```
-
-The string key must equal the val name — it is the label in the results table. Not every val in
-`TestStrategy.scala` is here: vals kept only for lineage are marked `Not in BatchBacktester.` in
-their comment and stay out. New champions always go in; that is what Step 8 measures.
-
-## Step 7 — Format
+## Step 7 — Format and verify registration
 
 ```bash
-sbt -batch "backtest/scalafmt"
+sbt --batch ';backtest/scalafmt;backtest/testOnly *StrategyCatalogueSpec;backtest/compile'
 ```
 
-This realigns the `->` arrows in `BatchBacktester.scala` and the named args in
-`TestStrategy.scala` to the repo's `defaultWithAlign` style, `maxColumn = 140`.
+Use the repository formatter and a real compile check before the expensive batch. The
+catalogue test checks registration and ordering; it does not measure trading performance.
 
 ## Step 8 — Measure, then backfill the metrics comments
 
-Running the batch is also the compile check — `backtest/Test/compile` in this repo can report
-success while producing nothing, so do not rely on it.
-
 ```bash
-sbt -batch "backtest/runMain currexx.backtest.BatchBacktester"
+sbt --batch 'backtest/runMain currexx.backtest.BatchBacktester'
 ```
 
-Expect a long run (three corpora × every strategy); run it in the background and let the
-completion notification come back. Fix any compile error and rerun before reading results.
+Run the configured batch to completion and inspect its actual output. It currently contains
+four sections, with one line per included strategy:
 
-The output is three sections, each with one line per strategy:
-
-```
---- majors 1h 2024-07..2025-07 (12 months, original sample) ---
+```text
+--- searched 2023-07..2024-06 (12 months, in sample) ---
+--- searched 2024-07..2025-07 (12 months, in sample) ---
 --- searched 2023-07..2025-07 (24 months, in sample) ---
---- holdout 2025-12..2026-06 (7 months, never selected) ---
-<name>  net=6285.64646  closed= 1259  forced=10  win= 45.75%  exp= 4.992571  PF=  1.259  DD=  1.79%  Sharpe=  1.597  gross=…  costs=…
+--- historical 2025-12..2026-06 (7 months, reused for s10_v2 development) ---
+<name> net=... closed=... forced=... win=... exp=... PF=... DD=... Sharpe=... gross=... costs=...
 ```
 
-Record **two** of the three per val — `searched` and `holdout` — dropping the name, `gross` and
-`costs` columns:
+Use the configured dates and labels if they change. Backfill continuous combined-search and
+later-period `net`, `closed`, `forced`, `win`, `exp`, `PF`, `DD`, and `Sharpe` into each new val's
+comments. Use the separate searched-year results to explain regime differences in the final
+comparison. Preserve cost information when it affects the conclusion.
 
-```scala
-  // searched 2023-07..2025-07: net=6285.64646, closed=1259, forced=10, win=45.75%, exp=4.992571, PF=1.259, DD=1.79%, Sharpe=1.597
-  // holdout 2025-12..2026-06:  net=1535.84151, closed=382, forced=6, win=45.55%, exp=4.020528, PF=1.242, DD=0.85%, Sharpe=1.548
-```
+The currently named `majors1hHoldout` is labelled **historical** by the runner: it has been reused
+for development and promotion. Do not call it untouched, never selected, or independent
+confirmation. Validation is also used to choose finalists. Report improvements on each period
+separately and compare candidates with their base under the same batch settings; unequal
+period lengths do not justify comparing raw net totals as forecasts or equal-duration returns.
 
-The first section is a subset of `searched` and is deliberately not recorded per val. Note the
-double space after `holdout …:` that aligns the two lines.
+These continuous runs remain necessary even when report fold net deltas are available. Record
+missing or failed measurements as such, never as zero. Format again after updating comments.
 
-**The holdout line is the one that means anything.** `searched` is the two years the GA folds
-cover, so for anything `_optimized` it reports fit to the data that chose it. Holdout net
-figures cover seven months against the searched column's twenty-four, so they rank strategies
-against each other and are not a forecast.
+## Step 9 — Report the result
 
-Then re-run `sbt -batch "backtest/scalafmt"` if any comment pushed a line past 140 columns.
+For each source report, state:
 
-## Step 9 — Report
+- Candidate name and base, GA/SCGA and shuffle status, selected/reference status, training and
+  validation scores, and known breaches or incomplete diagnostics.
+- Whether the candidate improved on the target and strongest seed on training and validation;
+  use fold net/activity differences to qualify fitness gains rather than declaring a universal
+  winner from fitness alone.
+- Discovery generation, target/seed/catalogue matches, and whether the best-seen candidate was
+  lost from the shortlist, where these explain the run's result.
+- Actual search/rescore work and additional reporting work/time when available. Do not count
+  reporting replays as optimisation evaluations or independent evidence.
+- Continuous batch results against the base on each relevant period, including disagreements
+  between searched years, validation, and the later reused historical period.
+- What was added, retained for reference, skipped as an actual duplicate, renamed, or removed
+  within the requested scope, with the source report filename for each decision.
 
-Tell the user, per report file:
-
-- new val name, its base, `training -> validation` with the retention percentage, whether the
-  run was shuffled, and the constraint verdict
-- the measured holdout `net` / `closed` / `win` / `PF` / `DD` / `Sharpe`, and how that compares
-  to the base's holdout line in the same batch run — plus the in-sample line where the two
-  disagree
-- what Step 9 did: kept, promoted into a base's name, or deleted
-- anything skipped — `NOTHING SELECTED`, duplicate params, an interrupted report
-
-State plainly when a champion measured *worse* than the base it was optimised from, and when a
-high validation fitness produced weak holdout metrics. That gap is the signal worth surfacing,
-not something to smooth over: the GA's own ranking has repeatedly disagreed with the holdout,
-and the catalogue's best performers have come out of rounds with mediocre fitness and breached
-constraints.
+State plainly when a candidate is worse than its base on a measured period or when improved
+fitness did not improve net results. Diagnostic visibility does not establish fresh
+out-of-sample performance.
