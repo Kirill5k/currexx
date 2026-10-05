@@ -9,6 +9,13 @@ class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
 
   "A MomentumOscillators" when {
     "jurikRelativeStrengthIndex" should {
+      "start neutral and follow a sustained rise after warming up" in {
+        MomentumOscillators.jurikRelativeStrengthIndex(Array(8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0), 1).toList mustBe
+          List(100.0, 100.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0)
+        MomentumOscillators.jurikRelativeStrengthIndex(Array.fill(100)(2.0), 14).toList mustBe List.fill(100)(50.0)
+        MomentumOscillators.jurikRelativeStrengthIndex(Array(Double.NaN, 3.0, 2.0, 1.0), 1).toList mustBe List.fill(4)(50.0)
+      }
+
       "calculate Relative Strength Index" in {
         val rsx = MomentumOscillators.jurikRelativeStrengthIndex(values.map(_._4), 14)
 
@@ -64,6 +71,26 @@ class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
     }
 
     "stochastic" should {
+      "include the current bar and pad only incomplete windows" in {
+        val close = Array(3.0, 2.0, 1.0)
+        val high  = Array(4.0, 3.0, 2.0)
+        val low   = Array(2.0, 1.0, 0.0)
+        MomentumOscillators.stochastic(close, high, low, 1).toList mustBe List(50.0, 50.0, 50.0)
+        MomentumOscillators.stochastic(close, high, low, 2).toList mustBe List(66.66666666666666, 66.66666666666666, 0.0)
+        MomentumOscillators.stochastic(close, high, low, 3).toList mustBe List(75.0, 0.0, 0.0)
+        MomentumOscillators.stochastic(close, high, low, 4).toList mustBe List(0.0, 0.0, 0.0)
+        MomentumOscillators.stochastic(close, close, close, 1).toList mustBe List(100.0, 100.0, 100.0)
+      }
+
+      "order NaN above finite prices in range extrema" in {
+        val close = Array(3.0, 2.0, 1.0)
+        val high  = Array(4.0, 3.0, 2.0)
+        val low   = Array(Double.NaN, 1.0, 0.0)
+        MomentumOscillators.stochastic(close, high, low, 2).toList mustBe List(66.66666666666666, 66.66666666666666, 0.0)
+        high(0) = Double.NaN
+        MomentumOscillators.stochastic(close, high, low, 2).head.isNaN mustBe true
+      }
+
       "calculate stochastic oscillator values (smooth k and smooth d)" in {
         val stoch = MomentumOscillators.stochastic(
           closings = values.map(_._4),
@@ -76,6 +103,15 @@ class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
       }
     }
     "averageDirectionalIndex" should {
+      "seed directional smoothing before reporting sustained trend strength" in {
+        val rising = Array(6.0, 5.0, 4.0, 3.0, 2.0, 1.0)
+        MomentumOscillators.averageDirectionalIndex(rising, rising, rising, 2).toList mustBe List(100.0, 100.0, 100.0, 0.0, 0.0, 0.0)
+        MomentumOscillators.averageDirectionalIndex(rising.reverse, rising.reverse, rising.reverse, 2).toList mustBe
+          List(100.0, 100.0, 100.0, 0.0, 0.0, 0.0)
+        MomentumOscillators.averageDirectionalIndex(Array.fill(6)(1.0), Array.fill(6)(1.0), Array.fill(6)(1.0), 2).toList mustBe
+          List.fill(6)(0.0)
+      }
+
       "calculate ADX values" in {
         val adx = MomentumOscillators.averageDirectionalIndex(
           closings = values.map(_._4),
@@ -100,6 +136,16 @@ class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
     }
 
     "williamsR" should {
+      "use negative percent range with neutral warm-up and flat ranges" in {
+        val close = Array(3.0, 2.0, 1.0)
+        val high  = Array(4.0, 3.0, 2.0)
+        val low   = Array(2.0, 1.0, 0.0)
+        MomentumOscillators.williamsR(close, high, low, 2).toList mustBe List(-33.33333333333333, -33.33333333333333, -50.0)
+        MomentumOscillators.williamsR(close, close, close, 1).toList mustBe List(-50.0, -50.0, -50.0)
+        java.lang.Double.doubleToLongBits(MomentumOscillators.williamsR(high, high, low, 1).head) mustBe
+          java.lang.Double.doubleToLongBits(-0.0)
+      }
+
       "calculate Williams %R values" in {
         val wr = MomentumOscillators.williamsR(
           closings = values.map(_._4),
@@ -116,6 +162,17 @@ class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
     }
 
     "commodityChannelIndex" should {
+      "normalize each complete window by its mean absolute deviation" in {
+        val rising = Array(4.0, 3.0, 2.0, 1.0)
+        MomentumOscillators.commodityChannelIndex(rising, rising, rising, 2).toList mustBe
+          List(66.66666666666667, 66.66666666666667, 66.66666666666667, 0.0)
+        val threeBarCci = 1.0 / (0.015 * (2.0 / 3.0))
+        MomentumOscillators.commodityChannelIndex(rising, rising, rising, 3).toList mustBe List(threeBarCci, threeBarCci, 0.0, 0.0)
+        MomentumOscillators.commodityChannelIndex(rising, rising, rising, 1).toList mustBe List.fill(4)(0.0)
+        rising(0) = Double.PositiveInfinity
+        MomentumOscillators.commodityChannelIndex(rising, rising, rising, 2).head.isNaN mustBe true
+      }
+
       "calculate CCI values" in {
         val cci = MomentumOscillators.commodityChannelIndex(
           closings = values.map(_._4),
@@ -131,6 +188,13 @@ class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
     }
 
     "ichimokuKijunSen" should {
+      "use the bar midpoint until a complete window exists" in {
+        val high = Array(4.0, 3.0, 2.0, 1.0)
+        val low  = Array(2.0, 1.0, 0.0, -1.0)
+        MomentumOscillators.ichimokuKijunSen(high, low, 2).toList mustBe List(2.5, 1.5, 0.5, 0.0)
+        MomentumOscillators.ichimokuKijunSen(high, low, 5).toList mustBe List(3.0, 2.0, 1.0, 0.0)
+      }
+
       "calculate Kijun-Sen (base line) values" in {
         val kijun = MomentumOscillators.ichimokuKijunSen(
           highs = values.map(_._2),
@@ -145,6 +209,14 @@ class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
     }
 
     "parabolicSAR" should {
+      "clamp to the preceding two bars and reset to the extreme on reversal" in {
+        val high = Array(3.0, 5.0, 4.0, 3.0, 2.0)
+        val low  = Array(1.0, 3.0, 2.0, 1.0, 0.0)
+        MomentumOscillators.parabolicSAR(high, low, 0.5, 0.5, 0.0).toList mustBe List(5.0, 1.0, 0.0, 0.0, 0.0)
+        MomentumOscillators.parabolicSAR(Array(2.0, 3.0, 4.0, 5.0), Array(0.0, 1.0, 2.0, 3.0), 0.5, 0.5, 0.0).toList mustBe
+          List(4.0, 5.0, 5.0, 5.0)
+      }
+
       "calculate Parabolic SAR values" in {
         val sar = MomentumOscillators.parabolicSAR(
           highs = values.map(_._2),
@@ -170,6 +242,17 @@ class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
     }
 
     "chaikinMoneyFlow" should {
+      "weight positive and negative money flow by volume" in {
+        val close  = Array(4.0, 0.0, 2.0)
+        val high   = Array.fill(3)(4.0)
+        val low    = Array.fill(3)(0.0)
+        val volume = Array(3.0, 1.0, 2.0)
+        MomentumOscillators.chaikinMoneyFlow(close, high, low, volume, 2).toList mustBe List(0.5, -0.3333333333333333, 0.0)
+        MomentumOscillators.chaikinMoneyFlow(close, close, close, volume, 1).toList mustBe List.fill(3)(0.0)
+        volume(0) = Double.PositiveInfinity
+        MomentumOscillators.chaikinMoneyFlow(close, high, low, volume, 2).head.isNaN mustBe true
+      }
+
       "calculate CMF values" in {
         val volumes = List.fill(values.size)(1000.0) // uniform volume for predictable results
         val cmf     = MomentumOscillators.chaikinMoneyFlow(
@@ -194,6 +277,86 @@ class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
           length = 20
         )
         cmf.head mustBe 0.0
+      }
+    }
+  }
+
+  "Array oscillator inputs" should {
+    "handle empty, short and 100-bar histories across period boundaries" in {
+      for {
+        size   <- List(0, 1, 4, 100)
+        period <- List(1, 2, 14, 100, 101)
+      } {
+        val close     = Array.fill(size)(1.0)
+        val high      = Array.fill(size)(2.0)
+        val low       = Array.fill(size)(0.0)
+        val volume    = Array.fill(size)(1.0)
+        val completed = math.max(size - period + 1, 0)
+        MomentumOscillators.stochastic(close, high, low, period).toList mustBe
+          List.fill(completed)(50.0) ++ List.fill(size - completed)(0.0)
+        MomentumOscillators.williamsR(close, high, low, period).toList mustBe List.fill(size)(-50.0)
+        MomentumOscillators.averageDirectionalIndex(close, high, low, period).toList mustBe List.fill(size)(0.0)
+        MomentumOscillators.commodityChannelIndex(close, high, low, period).toList mustBe List.fill(size)(0.0)
+        MomentumOscillators.ichimokuKijunSen(high, low, period).toList mustBe List.fill(size)(1.0)
+        MomentumOscillators.chaikinMoneyFlow(close, high, low, volume, period).toList mustBe List.fill(size)(0.0)
+        MomentumOscillators.jurikRelativeStrengthIndex(close, period).toList mustBe List.fill(size)(50.0)
+      }
+    }
+
+    "leave inputs untouched and allocate independent results" in {
+      val close        = Array(4.0, 3.0, 2.0, 1.0)
+      val high         = Array(5.0, 4.0, 3.0, 2.0)
+      val low          = Array(3.0, 2.0, 1.0, 0.0)
+      val volume       = Array(4.0, 3.0, 2.0, 1.0)
+      val calculations = List[() => Array[Double]](
+        () => MomentumOscillators.jurikRelativeStrengthIndex(close, 2),
+        () => MomentumOscillators.stochastic(close, high, low, 2),
+        () => MomentumOscillators.averageDirectionalIndex(close, high, low, 2),
+        () => MomentumOscillators.williamsR(close, high, low, 2),
+        () => MomentumOscillators.commodityChannelIndex(close, high, low, 2),
+        () => MomentumOscillators.ichimokuKijunSen(high, low, 2),
+        () => MomentumOscillators.parabolicSAR(high, low, 0.02, 0.2, 0.02),
+        () => MomentumOscillators.chaikinMoneyFlow(close, high, low, volume, 2)
+      )
+      calculations.foreach { calculate =>
+        val first    = calculate()
+        val second   = calculate()
+        val expected = second.toList
+        first(0) = -999.0
+        second.toList mustBe expected
+        close.toList mustBe List(4.0, 3.0, 2.0, 1.0)
+        high.toList mustBe List(5.0, 4.0, 3.0, 2.0)
+        low.toList mustBe List(3.0, 2.0, 1.0, 0.0)
+        volume.toList mustBe List(4.0, 3.0, 2.0, 1.0)
+      }
+    }
+
+    "align unequal inputs at their newest shared history" in {
+      val close  = Array(3.0, 2.0, 1.0)
+      val high   = Array(4.0, 3.0)
+      val low    = Array(2.0)
+      val volume = Array(1.0, 1.0, 1.0)
+      MomentumOscillators.stochastic(close, high, low, 1).toList mustBe List(50.0)
+      MomentumOscillators.williamsR(close, high, low, 1).toList mustBe List(-50.0)
+      MomentumOscillators.commodityChannelIndex(close, high, low, 1).toList mustBe List(0.0)
+      MomentumOscillators.averageDirectionalIndex(close, high, low, 1).toList mustBe List(0.0)
+      MomentumOscillators.ichimokuKijunSen(high, low, 1).toList mustBe List(3.0)
+      MomentumOscillators.parabolicSAR(high, low, 0.02, 0.2, 0.02).toList mustBe List(0.0)
+      MomentumOscillators.chaikinMoneyFlow(close, high, low, volume, 1).toList mustBe List(0.0)
+      MomentumOscillators.averageDirectionalIndex(close, high, Array.emptyDoubleArray, 1).toList mustBe Nil
+      MomentumOscillators.parabolicSAR(high, Array.emptyDoubleArray, 0.02, 0.2, 0.02).toList mustBe Nil
+    }
+
+    "require positive lookback periods" in {
+      val values = Array(1.0)
+      for (period <- List(0, -1)) {
+        intercept[IllegalArgumentException](MomentumOscillators.jurikRelativeStrengthIndex(values, period))
+        intercept[IllegalArgumentException](MomentumOscillators.stochastic(values, values, values, period))
+        intercept[IllegalArgumentException](MomentumOscillators.averageDirectionalIndex(values, values, values, period))
+        intercept[IllegalArgumentException](MomentumOscillators.williamsR(values, values, values, period))
+        intercept[IllegalArgumentException](MomentumOscillators.commodityChannelIndex(values, values, values, period))
+        intercept[IllegalArgumentException](MomentumOscillators.ichimokuKijunSen(values, values, period))
+        intercept[IllegalArgumentException](MomentumOscillators.chaikinMoneyFlow(values, values, values, values, period))
       }
     }
   }

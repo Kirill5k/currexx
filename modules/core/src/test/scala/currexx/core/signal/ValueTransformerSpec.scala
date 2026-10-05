@@ -3,7 +3,7 @@ package currexx.core.signal
 import cats.data.NonEmptyList
 import currexx.core.fixtures.Markets
 import currexx.domain.market.PriceRange
-import currexx.domain.signal.{ValueSource, ValueTransformation as VT}
+import currexx.domain.signal.{MovingAverage, ValueSource, ValueTransformation as VT}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -43,11 +43,13 @@ class ValueTransformerSpec extends AnyWordSpec with Matchers {
       val window = new NumericalWindow(data)
       val source = transformer.extractFrom(window, ValueSource.Close)
       val cases  = List(
-        VT.SMA(2)               -> List(9.0, 3.0, 0.0),
-        VT.EMA(3)               -> List(7.5, 3.0, 0.0),
-        VT.WMA(2)               -> List(10.0, 4.0, 0.0),
-        VT.StandardDeviation(2) -> List(math.sqrt(18.0), math.sqrt(18.0), 0.0),
-        VT.ATR(2)               -> List(7.5, 7.0, 0.0)
+        VT.SMA(2)                               -> List(9.0, 3.0, 0.0),
+        VT.EMA(3)                               -> List(7.5, 3.0, 0.0),
+        VT.WMA(2)                               -> List(10.0, 4.0, 0.0),
+        VT.NMA(2, 2, 1.0, MovingAverage.Simple) -> List(12.0, 4.5, 0.0),
+        VT.JRSX(2)                              -> List(50.0, 50.0, 50.0),
+        VT.StandardDeviation(2)                 -> List(math.sqrt(18.0), math.sqrt(18.0), 0.0),
+        VT.ATR(2)                               -> List(7.5, 7.0, 0.0)
       )
       (cases ++ cases.reverse).foreach { (transformation, expected) =>
         withClue(s"$transformation: ") {
@@ -59,7 +61,7 @@ class ValueTransformerSpec extends AnyWordSpec with Matchers {
       }
     }
 
-    "feed each sequence stage the preceding result across native and List-based kernels" in {
+    "feed each sequence stage the preceding result" in {
       val window = new NumericalWindow(data)
       val source = window.closings
       val native = VT.Sequenced(List(VT.EMA(3), VT.SMA(2)))
@@ -72,12 +74,14 @@ class ValueTransformerSpec extends AnyWordSpec with Matchers {
       source.toList mustBe List(12.0, 6.0, 0.0)
     }
 
-    "use preceding transformed closes with original highs and lows for ATR" in {
+    "use preceding transformed closes with original highs and lows for ATR and stochastic" in {
       val window = new NumericalWindow(data)
       // EMA(3) closes are [7.5, 3, 0]: the newest true range is 14 - 3 = 11, after a seed ATR of 7.
       transformer.transformTo(window.closings, window, VT.Sequenced(List(VT.EMA(3), VT.ATR(2)))).toList mustBe
         List(9.0, 7.0, 0.0)
       transformer.averageTrueRange(Array(7.5, 3.0, 0.0), window, 2).toList mustBe List(9.0, 7.0, 0.0)
+      transformer.transformTo(window.closings, window, VT.Sequenced(List(VT.EMA(3), VT.STOCH(2)))).toList mustBe
+        List(5.5 / 12.0 * 100.0, 7.0 / 12.0 * 100.0, 0.0)
       window.closings.toList mustBe List(12.0, 6.0, 0.0)
     }
 

@@ -1,7 +1,5 @@
 package currexx.calculations
 
-import scala.collection.mutable.{ListBuffer, Queue as MQueue}
-
 object MomentumOscillators {
 
   /** Calculates the Relative Strength Index (RSI).
@@ -87,40 +85,23 @@ object MomentumOscillators {
     * @return
     *   A list of %K values (0-100), sorted from latest to earliest, same size as input. Returns 0.0 during warm-up.
     */
-  def stochastic(
-      closings: List[Double],
-      highs: List[Double],
-      lows: List[Double],
-      length: Int
-  ): List[Double] = {
-    // Combine inputs into a chronological stream of tuples for easier processing.
-    val data = closings.lazyZip(highs).lazyZip(lows).toList
+  def stochastic(closings: List[Double], highs: List[Double], lows: List[Double], length: Int): List[Double] =
+    stochastic(closings.toArray, highs.toArray, lows.toArray, length).toList
 
-    val highWindow   = MQueue.empty[Double]
-    val lowWindow    = MQueue.empty[Double]
-    val resultBuffer = new ListBuffer[Double]
-
-    val it = data.reverseIterator
-    while (it.hasNext) {
-      val (close, high, low) = it.next()
-      highWindow.enqueue(high)
-      lowWindow.enqueue(low)
-
-      if (highWindow.size > length) {
-        val _ = highWindow.dequeue()
-        val _ = lowWindow.dequeue()
-      }
-
-      var stoch = 0.0 // Default to 0 during warm-up
-      if (highWindow.size == length) {
-        val highestHigh = highWindow.max
-        val lowestLow   = lowWindow.min
-        val range       = highestHigh - lowestLow
-        stoch = if (range == 0.0) 100.0 else ((close - lowestLow) / range) * 100.0
-      }
-      resultBuffer += stoch
+  /** Returns newest-first %K values over the shared OHLC history without mutating the inputs. */
+  def stochastic(closings: Array[Double], highs: Array[Double], lows: Array[Double], length: Int): Array[Double] = {
+    require(length > 0, "Stochastic period must be positive")
+    val size   = math.min(closings.length, math.min(highs.length, lows.length))
+    val result = new Array[Double](size)
+    var index  = size - length
+    while (index >= 0) {
+      val highestHigh = highest(highs, index, index + length - 1)
+      val lowestLow   = lowest(lows, index, index + length - 1)
+      val range       = highestHigh - lowestLow
+      result(index) = if (range == 0.0) 100.0 else ((closings(index) - lowestLow) / range) * 100.0
+      index -= 1
     }
-    resultBuffer.toList.reverse
+    result
   }
 
   /** Calculates the Average Directional Index (ADX).
@@ -152,39 +133,32 @@ object MomentumOscillators {
     *   A list of ADX values (0-100), sorted from latest to earliest, same size as input. Returns 0.0 during the warm-up period (first
     *   2*length bars).
     */
-  def averageDirectionalIndex(
-      closings: List[Double],
-      highs: List[Double],
-      lows: List[Double],
-      length: Int
-  ): List[Double] =
-    if (closings.size < 2) List.fill(closings.size)(0.0)
-    else {
-      val data         = closings.lazyZip(highs).lazyZip(lows).toList.reverse // chronological
-      val resultBuffer = new ListBuffer[Double]
+  def averageDirectionalIndex(closings: List[Double], highs: List[Double], lows: List[Double], length: Int): List[Double] =
+    averageDirectionalIndex(closings.toArray, highs.toArray, lows.toArray, length).toList
 
-      var prevHigh  = data.head._2
-      var prevLow   = data.head._3
-      var prevClose = data.head._1
-
+  /** Returns newest-first ADX values over the shared OHLC history without mutating the inputs. */
+  def averageDirectionalIndex(closings: Array[Double], highs: Array[Double], lows: Array[Double], length: Int): Array[Double] = {
+    require(length > 0, "ADX period must be positive")
+    val size   = math.min(closings.length, math.min(highs.length, lows.length))
+    val result = new Array[Double](size)
+    if (size >= 2) {
+      var prevHigh        = highs(size - 1)
+      var prevLow         = lows(size - 1)
+      var prevClose       = closings(size - 1)
       var smoothedPlusDM  = 0.0
       var smoothedMinusDM = 0.0
       var smoothedTR      = 0.0
       var smoothedADX     = 0.0
       var count           = 0
-
-      resultBuffer += 0.0 // first element has no DM
-
-      val it = data.iterator
-      val _  = it.next() // skip first
-      while (it.hasNext) {
-        val (close, high, low) = it.next()
+      var index           = size - 2
+      while (index >= 0) {
+        val close = closings(index)
+        val high  = highs(index)
+        val low   = lows(index)
         count += 1
-
         val tr      = math.max(high - low, math.max(math.abs(high - prevClose), math.abs(low - prevClose)))
         val plusDM  = if (high - prevHigh > prevLow - low && high - prevHigh > 0) high - prevHigh else 0.0
         val minusDM = if (prevLow - low > high - prevHigh && prevLow - low > 0) prevLow - low else 0.0
-
         if (count <= length) {
           smoothedPlusDM += plusDM
           smoothedMinusDM += minusDM
@@ -194,31 +168,26 @@ object MomentumOscillators {
             smoothedMinusDM /= length
             smoothedTR /= length
           }
-          resultBuffer += 0.0
         } else {
           smoothedPlusDM = (smoothedPlusDM * (length - 1) + plusDM) / length
           smoothedMinusDM = (smoothedMinusDM * (length - 1) + minusDM) / length
           smoothedTR = (smoothedTR * (length - 1) + tr) / length
-
           val plusDI  = if (smoothedTR == 0.0) 0.0 else 100.0 * smoothedPlusDM / smoothedTR
           val minusDI = if (smoothedTR == 0.0) 0.0 else 100.0 * smoothedMinusDM / smoothedTR
           val diSum   = plusDI + minusDI
           val dx      = if (diSum == 0.0) 0.0 else 100.0 * math.abs(plusDI - minusDI) / diSum
-
-          if (count == length + 1) {
-            smoothedADX = dx
-          } else {
-            smoothedADX = (smoothedADX * (length - 1) + dx) / length
-          }
-          resultBuffer += smoothedADX
+          if (count == length + 1) smoothedADX = dx
+          else smoothedADX = (smoothedADX * (length - 1) + dx) / length
+          result(index) = smoothedADX
         }
-
         prevHigh = high
         prevLow = low
         prevClose = close
+        index -= 1
       }
-      resultBuffer.toList.reverse
     }
+    result
+  }
 
   /** Calculates Williams %R (Williams Percent Range).
     *
@@ -242,37 +211,24 @@ object MomentumOscillators {
     * @return
     *   A list of Williams %R values (-100 to 0), sorted from latest to earliest, same size as input. Returns -50.0 during warm-up.
     */
-  def williamsR(
-      closings: List[Double],
-      highs: List[Double],
-      lows: List[Double],
-      length: Int
-  ): List[Double] = {
-    val data         = closings.lazyZip(highs).lazyZip(lows).toList
-    val highWindow   = MQueue.empty[Double]
-    val lowWindow    = MQueue.empty[Double]
-    val resultBuffer = new ListBuffer[Double]
+  def williamsR(closings: List[Double], highs: List[Double], lows: List[Double], length: Int): List[Double] =
+    williamsR(closings.toArray, highs.toArray, lows.toArray, length).toList
 
-    val it = data.reverseIterator
-    while (it.hasNext) {
-      val (close, high, low) = it.next()
-      highWindow.enqueue(high)
-      lowWindow.enqueue(low)
-      if (highWindow.size > length) {
-        val _ = highWindow.dequeue()
-        val _ = lowWindow.dequeue()
-      }
-
-      var wr = -50.0
-      if (highWindow.size == length) {
-        val hh    = highWindow.max
-        val ll    = lowWindow.min
-        val range = hh - ll
-        wr = if (range == 0.0) -50.0 else ((hh - close) / range) * -100.0
-      }
-      resultBuffer += wr
+  /** Returns newest-first Williams %R values over the shared OHLC history without mutating the inputs. */
+  def williamsR(closings: Array[Double], highs: Array[Double], lows: Array[Double], length: Int): Array[Double] = {
+    require(length > 0, "Williams %R period must be positive")
+    val size   = math.min(closings.length, math.min(highs.length, lows.length))
+    val result = new Array[Double](size)
+    java.util.Arrays.fill(result, -50.0)
+    var index = size - length
+    while (index >= 0) {
+      val hh    = highest(highs, index, index + length - 1)
+      val ll    = lowest(lows, index, index + length - 1)
+      val range = hh - ll
+      result(index) = if (range == 0.0) -50.0 else ((hh - closings(index)) / range) * -100.0
+      index -= 1
     }
-    resultBuffer.toList.reverse
+    result
   }
 
   /** Calculates the Commodity Channel Index (CCI).
@@ -301,35 +257,39 @@ object MomentumOscillators {
     * @return
     *   A list of CCI values (unbounded, typically ±300), sorted from latest to earliest, same size as input. Returns 0.0 during warm-up.
     */
-  def commodityChannelIndex(
-      closings: List[Double],
-      highs: List[Double],
-      lows: List[Double],
-      length: Int
-  ): List[Double] = {
-    val typicalPrices = closings.lazyZip(highs).lazyZip(lows).map((c, h, l) => (h + l + c) / 3.0).toList
-    val window        = MQueue.empty[Double]
-    val resultBuffer  = new ListBuffer[Double]
+  def commodityChannelIndex(closings: List[Double], highs: List[Double], lows: List[Double], length: Int): List[Double] =
+    commodityChannelIndex(closings.toArray, highs.toArray, lows.toArray, length).toList
 
-    val it = typicalPrices.reverseIterator
-    while (it.hasNext) {
-      val tp = it.next()
-      window.enqueue(tp)
-      if (window.size > length) {
-        val _ = window.dequeue()
-      }
-
-      var cci = 0.0
-      if (window.size == length) {
-        val mean   = window.sum / length
+  /** Returns newest-first CCI values over the shared OHLC history without mutating the inputs. */
+  def commodityChannelIndex(closings: Array[Double], highs: Array[Double], lows: Array[Double], length: Int): Array[Double] = {
+    require(length > 0, "CCI period must be positive")
+    val size          = math.min(closings.length, math.min(highs.length, lows.length))
+    val typicalPrices = new Array[Double](size)
+    val result        = new Array[Double](size)
+    var index         = size - 1
+    while (index >= 0) {
+      typicalPrices(index) = (highs(index) + lows(index) + closings(index)) / 3.0
+      if (size - index >= length) {
+        var cursor = index + length - 1
+        var sum    = typicalPrices(cursor)
+        cursor -= 1
+        while (cursor >= index) {
+          sum += typicalPrices(cursor)
+          cursor -= 1
+        }
+        val mean   = sum / length
         var madSum = 0.0
-        window.foreach(v => madSum += math.abs(v - mean))
+        cursor = index + length - 1
+        while (cursor >= index) {
+          madSum += math.abs(typicalPrices(cursor) - mean)
+          cursor -= 1
+        }
         val meanDeviation = madSum / length
-        cci = if (meanDeviation == 0.0) 0.0 else (tp - mean) / (0.015 * meanDeviation)
+        result(index) = if (meanDeviation == 0.0) 0.0 else (typicalPrices(index) - mean) / (0.015 * meanDeviation)
       }
-      resultBuffer += cci
+      index -= 1
     }
-    resultBuffer.toList.reverse
+    result
   }
 
   /** Calculates the Ichimoku Kijun-Sen (Base Line).
@@ -358,33 +318,24 @@ object MomentumOscillators {
     * @return
     *   A list of Kijun-Sen values, sorted from latest to earliest, same size as input. Uses (high + low) / 2 as fallback during warm-up.
     */
-  def ichimokuKijunSen(
-      highs: List[Double],
-      lows: List[Double],
-      length: Int
-  ): List[Double] = {
-    val highWindow   = MQueue.empty[Double]
-    val lowWindow    = MQueue.empty[Double]
-    val resultBuffer = new ListBuffer[Double]
+  def ichimokuKijunSen(highs: List[Double], lows: List[Double], length: Int): List[Double] =
+    ichimokuKijunSen(highs.toArray, lows.toArray, length).toList
 
-    val it = highs.lazyZip(lows).toList.reverseIterator
-    while (it.hasNext) {
-      val (high, low) = it.next()
-      highWindow.enqueue(high)
-      lowWindow.enqueue(low)
-      if (highWindow.size > length) {
-        val _ = highWindow.dequeue()
-        val _ = lowWindow.dequeue()
-      }
-
-      val kijun = if (highWindow.size == length) {
-        (highWindow.max + lowWindow.min) / 2.0
+  /** Returns newest-first Kijun-Sen values over the shared high/low history without mutating the inputs. */
+  def ichimokuKijunSen(highs: Array[Double], lows: Array[Double], length: Int): Array[Double] = {
+    require(length > 0, "Kijun-Sen period must be positive")
+    val size   = math.min(highs.length, lows.length)
+    val result = new Array[Double](size)
+    var index  = size - 1
+    while (index >= 0) {
+      result(index) = if (size - index >= length) {
+        (highest(highs, index, index + length - 1) + lowest(lows, index, index + length - 1)) / 2.0
       } else {
-        (high + low) / 2.0
+        (highs(index) + lows(index)) / 2.0
       }
-      resultBuffer += kijun
+      index -= 1
     }
-    resultBuffer.toList.reverse
+    result
   }
 
   /** Calculates the Parabolic SAR (Stop and Reverse).
@@ -417,67 +368,54 @@ object MomentumOscillators {
     * @return
     *   A list of SAR values (price-level), sorted from latest to earliest, same size as input.
     */
-  def parabolicSAR(
-      highs: List[Double],
-      lows: List[Double],
-      afStart: Double,
-      afMax: Double,
-      afStep: Double
-  ): List[Double] =
-    if (highs.size < 2) List.fill(highs.size)(0.0)
-    else {
-      val hArr   = highs.reverse.toArray
-      val lArr   = lows.reverse.toArray
-      val n      = hArr.length
-      val result = new Array[Double](n)
+  def parabolicSAR(highs: List[Double], lows: List[Double], afStart: Double, afMax: Double, afStep: Double): List[Double] =
+    parabolicSAR(highs.toArray, lows.toArray, afStart, afMax, afStep).toList
 
-      var isLong = hArr(1) > hArr(0) || lArr(1) > lArr(0)
+  /** Returns newest-first SAR values over the shared high/low history without mutating the inputs. */
+  def parabolicSAR(highs: Array[Double], lows: Array[Double], afStart: Double, afMax: Double, afStep: Double): Array[Double] = {
+    val size   = math.min(highs.length, lows.length)
+    val result = new Array[Double](size)
+    if (size >= 2) {
+      var isLong = highs(size - 2) > highs(size - 1) || lows(size - 2) > lows(size - 1)
       var af     = afStart
-      var ep     = if (isLong) hArr(0) else lArr(0)
-      var sar    = if (isLong) lArr(0) else hArr(0)
-      result(0) = sar
-
-      var i = 1
-      while (i < n) {
+      var ep     = if (isLong) highs(size - 1) else lows(size - 1)
+      var sar    = if (isLong) lows(size - 1) else highs(size - 1)
+      result(size - 1) = sar
+      var index = size - 2
+      while (index >= 0) {
         val prevSar = sar
         sar = prevSar + af * (ep - prevSar)
-
         if (isLong) {
-          sar = math.min(sar, lArr(i - 1))
-          if (i >= 2) sar = math.min(sar, lArr(i - 2))
-
-          if (lArr(i) < sar) {
+          sar = math.min(sar, lows(index + 1))
+          if (index + 2 < size) sar = math.min(sar, lows(index + 2))
+          if (lows(index) < sar) {
             isLong = false
             sar = ep
-            ep = lArr(i)
+            ep = lows(index)
             af = afStart
-          } else {
-            if (hArr(i) > ep) {
-              ep = hArr(i)
-              af = math.min(af + afStep, afMax)
-            }
+          } else if (highs(index) > ep) {
+            ep = highs(index)
+            af = math.min(af + afStep, afMax)
           }
         } else {
-          sar = math.max(sar, hArr(i - 1))
-          if (i >= 2) sar = math.max(sar, hArr(i - 2))
-
-          if (hArr(i) > sar) {
+          sar = math.max(sar, highs(index + 1))
+          if (index + 2 < size) sar = math.max(sar, highs(index + 2))
+          if (highs(index) > sar) {
             isLong = true
             sar = ep
-            ep = hArr(i)
+            ep = highs(index)
             af = afStart
-          } else {
-            if (lArr(i) < ep) {
-              ep = lArr(i)
-              af = math.min(af + afStep, afMax)
-            }
+          } else if (lows(index) < ep) {
+            ep = lows(index)
+            af = math.min(af + afStep, afMax)
           }
         }
-        result(i) = sar
-        i += 1
+        result(index) = sar
+        index -= 1
       }
-      result.toList.reverse
     }
+    result
+  }
 
   /** Calculates the Chaikin Money Flow (CMF).
     *
@@ -520,37 +458,65 @@ object MomentumOscillators {
       lows: List[Double],
       volumes: List[Double],
       length: Int
-  ): List[Double] = {
-    val mfvWindow    = MQueue.empty[Double]
-    val volWindow    = MQueue.empty[Double]
-    val resultBuffer = new ListBuffer[Double]
+  ): List[Double] =
+    chaikinMoneyFlow(closings.toArray, highs.toArray, lows.toArray, volumes.toArray, length).toList
 
-    val data = closings.lazyZip(highs).lazyZip(lows).toList.lazyZip(volumes).toList
-    val it   = data.reverseIterator
-    while (it.hasNext) {
-      val ((close, high, low), volume) = it.next()
-      val range                        = high - low
-      val mfMultiplier                 = if (range == 0.0) 0.0 else ((close - low) - (high - close)) / range
-      val mfVolume                     = mfMultiplier * volume
-
-      mfvWindow.enqueue(mfVolume)
-      volWindow.enqueue(volume)
-      if (mfvWindow.size > length) {
-        val _ = mfvWindow.dequeue()
-        val _ = volWindow.dequeue()
+  /** Returns newest-first CMF values over the shared OHLCV history without mutating the inputs. */
+  def chaikinMoneyFlow(
+      closings: Array[Double],
+      highs: Array[Double],
+      lows: Array[Double],
+      volumes: Array[Double],
+      length: Int
+  ): Array[Double] = {
+    require(length > 0, "CMF period must be positive")
+    val size             = math.min(math.min(closings.length, highs.length), math.min(lows.length, volumes.length))
+    val moneyFlowVolumes = new Array[Double](size)
+    val result           = new Array[Double](size)
+    var index            = size - 1
+    while (index >= 0) {
+      val range        = highs(index) - lows(index)
+      val mfMultiplier = if (range == 0.0) 0.0 else ((closings(index) - lows(index)) - (highs(index) - closings(index))) / range
+      moneyFlowVolumes(index) = mfMultiplier * volumes(index)
+      if (size - index >= length) {
+        var cursor = index + length - 1
+        var volSum = volumes(cursor)
+        var mfvSum = moneyFlowVolumes(cursor)
+        cursor -= 1
+        while (cursor >= index) {
+          volSum += volumes(cursor)
+          mfvSum += moneyFlowVolumes(cursor)
+          cursor -= 1
+        }
+        result(index) = if (volSum == 0.0) 0.0 else mfvSum / volSum
       }
-
-      var cmf = 0.0
-      if (mfvWindow.size == length) {
-        val volSum = volWindow.sum
-        cmf = if (volSum == 0.0) 0.0 else mfvWindow.sum / volSum
-      }
-      resultBuffer += cmf
+      index -= 1
     }
-    resultBuffer.toList.reverse
+    result
   }
 
-  // A mutable class is better for a while loop to avoid creating many case class instances.
+  // Total ordering keeps NaN above finite values and distinguishes signed zero.
+  private def highest(values: Array[Double], newest: Int, oldest: Int): Double = {
+    var result = values(oldest)
+    var index  = oldest - 1
+    while (index >= newest) {
+      if (java.lang.Double.compare(values(index), result) > 0) result = values(index)
+      index -= 1
+    }
+    result
+  }
+
+  private def lowest(values: Array[Double], newest: Int, oldest: Int): Double = {
+    var result = values(oldest)
+    var index  = oldest - 1
+    while (index >= newest) {
+      if (java.lang.Double.compare(values(index), result) < 0) result = values(index)
+      index -= 1
+    }
+    result
+  }
+
+  // Per-call Jurik smoothing state.
   final private class JrsiState {
     var f8_price: Double            = 0.0
     var f28_v8_smoothed: Double     = 0.0
@@ -585,23 +551,26 @@ object MomentumOscillators {
     *   A list of RSX values (0-100), sorted from latest to earliest, same size as input. Returns neutral 50.0 during warm-up.
     */
   def jurikRelativeStrengthIndex(values: List[Double], length: Int): List[Double] =
-    if (values.isEmpty) Nil
-    else {
+    jurikRelativeStrengthIndex(values.toArray, length).toList
+
+  /** Returns newest-first RSX values without mutating the input. */
+  def jurikRelativeStrengthIndex(values: Array[Double], length: Int): Array[Double] = {
+    require(length > 0, "Jurik RSI period must be positive")
+    val result = new Array[Double](values.length)
+    if (values.nonEmpty) {
       val f18 = 3.0 / (length + 2)
       val f20 = 1.0 - f18
 
-      val chronologicalValues = values.reverse
-      val it                  = chronologicalValues.iterator
-      val resultBuffer        = new ListBuffer[Double]
-      val state               = new JrsiState()
+      val state = new JrsiState()
 
       // Seed the initial state
-      val firstPrice = it.next()
+      val firstPrice = values(values.length - 1)
       state.f8_price = 100 * firstPrice
-      resultBuffer += 50.0 // Start with neutral 50
+      result(values.length - 1) = 50.0
 
-      while (it.hasNext) {
-        val price    = it.next()
+      var index = values.length - 2
+      while (index >= 0) {
+        val price    = values(index)
         val prev_f8  = state.f8_price
         val prev_f90 = state.f90_counter
 
@@ -643,7 +612,7 @@ object MomentumOscillators {
           50.0
         }
 
-        resultBuffer += rsx
+        result(index) = rsx
 
         // Update state for the next iteration
         state.f8_price = f8; state.f28_v8_smoothed = f28; state.f30_f28_smoothed = f30
@@ -651,7 +620,9 @@ object MomentumOscillators {
         state.f50_f48_smoothed = f50; state.f58_abs_v8_smoothed = f58; state.f60_f58_smoothed = f60
         state.f68_v18_smoothed = f68; state.f70_f68_smoothed = f70; state.f78_v1c_smoothed = f78
         state.f80_f78_smoothed = f80; state.f88_jurik_period = f88; state.f90_counter = f90
+        index -= 1
       }
-      resultBuffer.toList.reverse
     }
+    result
+  }
 }

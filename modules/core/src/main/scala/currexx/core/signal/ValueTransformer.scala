@@ -14,31 +14,30 @@ private[signal] object ValueTransformer {
     vt match {
       case VT.Sequenced(transformations) =>
         transformations.foldLeft(values)((current, transformation) => transformTo(current, window, transformation))
-      case VT.StandardDeviation(length) => Statistics.standardDeviation(values, length)
-      case VT.ATR(length)               => averageTrueRange(values, window, length)
-      case VT.RSX(length)               => MomentumOscillators.relativeStrengthIndex(values, length)
-      case VT.WMA(length)               => MovingAverages.weighted(values, length)
-      case VT.SMA(length)               => MovingAverages.simple(values, length)
-      case VT.EMA(length)               => MovingAverages.exponential(values, length)
-      case VT.HMA(length)               => MovingAverages.hull(values, length)
-      case VT.JMA(length, phase, power) => MovingAverages.jurikSimplified(values, length, phase, power)
-      // List-based kernels use the original data for their OHLC inputs.
-      case VT.Kalman(gain, measurementNoise)         => Filters.kalman(values.toList, gain, measurementNoise).toArray
-      case VT.KalmanVelocity(gain, measurementNoise) => Filters.kalmanVelocity(values.toList, gain, measurementNoise).toArray
-      case VT.JRSX(length)                           => MomentumOscillators.jurikRelativeStrengthIndex(values.toList, length).toArray
-      case VT.STOCH(length) => MomentumOscillators.stochastic(values.toList, window.data.highs, window.data.lows, length).toArray
-      case VT.ADX(length)   =>
-        MomentumOscillators.averageDirectionalIndex(window.data.closings, window.data.highs, window.data.lows, length).toArray
-      case VT.WilliamsR(length) => MomentumOscillators.williamsR(window.data.closings, window.data.highs, window.data.lows, length).toArray
+      case VT.StandardDeviation(length)              => Statistics.standardDeviation(values, length)
+      case VT.ATR(length)                            => averageTrueRange(values, window, length)
+      case VT.RSX(length)                            => MomentumOscillators.relativeStrengthIndex(values, length)
+      case VT.WMA(length)                            => MovingAverages.weighted(values, length)
+      case VT.SMA(length)                            => MovingAverages.simple(values, length)
+      case VT.EMA(length)                            => MovingAverages.exponential(values, length)
+      case VT.HMA(length)                            => MovingAverages.hull(values, length)
+      case VT.JMA(length, phase, power)              => MovingAverages.jurikSimplified(values, length, phase, power)
+      case VT.Kalman(gain, measurementNoise)         => Filters.kalman(values, gain, measurementNoise)
+      case VT.KalmanVelocity(gain, measurementNoise) => Filters.kalmanVelocity(values, gain, measurementNoise)
+      case VT.JRSX(length)                           => MomentumOscillators.jurikRelativeStrengthIndex(values, length)
+      case VT.STOCH(length)                          => MomentumOscillators.stochastic(values, window.highs, window.lows, length)
+      case VT.ADX(length)                            =>
+        MomentumOscillators.averageDirectionalIndex(window.closings, window.highs, window.lows, length)
+      case VT.WilliamsR(length) => MomentumOscillators.williamsR(window.closings, window.highs, window.lows, length)
       case VT.CCI(length)       =>
-        MomentumOscillators.commodityChannelIndex(window.data.closings, window.data.highs, window.data.lows, length).toArray
-      case VT.IchimokuKijunSen(length) => MomentumOscillators.ichimokuKijunSen(window.data.highs, window.data.lows, length).toArray
+        MomentumOscillators.commodityChannelIndex(window.closings, window.highs, window.lows, length)
+      case VT.IchimokuKijunSen(length)             => MomentumOscillators.ichimokuKijunSen(window.highs, window.lows, length)
       case VT.ParabolicSAR(afStart, afMax, afStep) =>
-        MomentumOscillators.parabolicSAR(window.data.highs, window.data.lows, afStart, afMax, afStep).toArray
+        MomentumOscillators.parabolicSAR(window.highs, window.lows, afStart, afMax, afStep)
       case VT.CMF(length) =>
-        MomentumOscillators.chaikinMoneyFlow(window.data.closings, window.data.highs, window.data.lows, window.data.volumes, length).toArray
+        MomentumOscillators.chaikinMoneyFlow(window.closings, window.highs, window.lows, window.volumes, length)
       case VT.NMA(length, signalLength, lambda, ma) =>
-        MovingAverages.nyquist(values.toList, length, signalLength, lambda, ma.calculation).toArray
+        MovingAverages.nyquist(values, length, signalLength, lambda, ma.calculation)
     }
 
   extension (ma: MovingAverage)

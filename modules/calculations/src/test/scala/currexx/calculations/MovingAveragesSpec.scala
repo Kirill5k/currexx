@@ -62,6 +62,41 @@ class MovingAveragesSpec extends AnyWordSpec with Matchers {
       nma.take(6).map(rounded(4)) mustBe List(1.1313, 1.1289, 1.1272, 1.1297, 1.1328, 1.1394)
     }
 
+    "combine Nyquist stages in newest-first order with their warm-up prices" in {
+      MovingAverages.nyquist(Array.emptyDoubleArray, 3, 2, 1.0, MovingAverages.weighted).toList mustBe Nil
+      MovingAverages.nyquist(Array(3.0), 3, 2, 1.0, MovingAverages.weighted).toList mustBe List(3.0)
+      MovingAverages.nyquist(Array(7.0, 4.0, 1.0), 3, 2, 1.0, MovingAverages.weighted).toList mustBe
+        List(10.0 - 14.0 / 3.0, 5.0, 1.0)
+      MovingAverages.nyquist(Array(7.0, 4.0, 1.0), 3, 3, 1.0, MovingAverages.simple).toList mustBe List(5.0, 4.0, 1.0)
+      MovingAverages.nyquist(Array(5.0, 3.0, 1.0), 3, 3, 1.0, MovingAverages.exponential).toList mustBe
+        List(4.5, 2.5, 1.0)
+    }
+
+    "handle Nyquist periods below, at and above a full window" in {
+      for (period <- List(1, 2, 100, 101))
+        MovingAverages.nyquist(Array.fill(100)(1.0), period, period, 0.0, MovingAverages.weighted).toList mustBe
+          List.fill(100)(1.0)
+      MovingAverages.nyquist(Array(5.0, 3.0, 1.0), 4, 4, 0.0, MovingAverages.weighted).toList mustBe List(5.0, 3.0, 1.0)
+    }
+
+    "keep Nyquist measurements and outputs independent" in {
+      val input  = Array(7.0, 4.0, 1.0)
+      val first  = MovingAverages.nyquist(input, 3, 2, 1.0, MovingAverages.weighted)
+      val second = MovingAverages.nyquist(input, 3, 2, 1.0, MovingAverages.weighted)
+      first(0) = -1.0
+      input.toList mustBe List(7.0, 4.0, 1.0)
+      second.toList mustBe List(10.0 - 14.0 / 3.0, 5.0, 1.0)
+    }
+
+    "propagate nonfinite prices through Nyquist stages" in {
+      for (price <- List(Double.NaN, Double.PositiveInfinity, Double.NegativeInfinity)) {
+        val result = MovingAverages.nyquist(Array(price, 2.0, 1.0), 3, 2, 1.0, MovingAverages.weighted)
+        result.head.isNaN mustBe true
+        result.last mustBe 1.0
+      }
+      succeed
+    }
+
     "calculate Jurik Moving Average (simplified)" in {
       val jma = MovingAverages.jurikSimplified(values, 9, 50, 2)
 

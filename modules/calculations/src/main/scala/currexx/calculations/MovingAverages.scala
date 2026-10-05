@@ -211,18 +211,25 @@ object MovingAverages {
       n2: Int,
       lambda: Double,
       maCalc: (Array[Double], Int) => Array[Double] = weighted
-  ): List[Double] = {
+  ): List[Double] = nyquist(values.toArray, n1, n2, lambda, maCalc).toList
+
+  def nyquist(
+      values: Array[Double],
+      n1: Int,
+      n2: Int,
+      lambda: Double,
+      maCalc: (Array[Double], Int) => Array[Double]
+  ): Array[Double] = {
     val alpha  = lambda * (n1 - 1) / (n1 - lambda)
-    val arr    = values.toArray
-    val nwma1  = maCalc(arr, n1)
+    val nwma1  = maCalc(values, n1)
     val nwma2  = maCalc(nwma1, n2)
-    val result = new Array[Double](arr.length)
+    val result = new Array[Double](values.length)
     var i      = 0
-    while (i < arr.length) {
+    while (i < values.length) {
       result(i) = (1 + alpha) * nwma1(i) - alpha * nwma2(i)
       i += 1
     }
-    result.toList
+    result
   }
 
   /** Calculates a simplified Jurik Moving Average (JMA).

@@ -12,33 +12,36 @@ object Filters {
     *   A list of smoothed prices, sorted from latest to earliest.
     */
   def kalman(values: List[Double], gain: Double, measurementNoise: Double = 1.0): List[Double] =
-    runKalman(values, gain, measurementNoise)((x0, _) => x0)
+    kalman(values.toArray, gain, measurementNoise).toList
 
   def kalmanVelocity(values: List[Double], gain: Double, measurementNoise: Double = 1.0): List[Double] =
-    runKalman(values, gain, measurementNoise)((_, x1) => x1)
+    kalmanVelocity(values.toArray, gain, measurementNoise).toList
 
-  private def runKalman(values: List[Double], processNoise: Double, measurementNoise: Double)(
-      extract: (Double, Double) => Double
-  ): List[Double] =
-    if (values.isEmpty) Nil
+  def kalman(values: Array[Double], gain: Double, measurementNoise: Double): Array[Double] =
+    runKalman(values, gain, measurementNoise, velocity = false)
+
+  def kalmanVelocity(values: Array[Double], gain: Double, measurementNoise: Double): Array[Double] =
+    runKalman(values, gain, measurementNoise, velocity = true)
+
+  private def runKalman(values: Array[Double], processNoise: Double, measurementNoise: Double, velocity: Boolean): Array[Double] =
+    if (values.isEmpty) Array.emptyDoubleArray
     else {
       val q00    = processNoise * 0.25
       val q01    = processNoise * 0.5
-      val arr    = values.toArray
-      val result = new Array[Double](arr.length)
-      val last   = arr.length - 1
+      val result = new Array[Double](values.length)
+      val last   = values.length - 1
 
-      var x0  = arr(last)
+      var x0  = values(last)
       var x1  = 0.0
       var p00 = 500.0
       var p01 = 0.0
       var p11 = 500.0
 
-      result(last) = extract(x0, x1)
+      result(last) = if (velocity) x1 else x0
       var i = last - 1
 
       while (i >= 0) {
-        val z = arr(i)
+        val z = values(i)
 
         // Predict (dt = 1.0)
         val x0p  = x0 + x1
@@ -58,11 +61,11 @@ object Filters {
         p01 = (1.0 - k0) * p01p
         p11 = p11p - k1 * p01p
 
-        result(i) = extract(x0, x1)
+        result(i) = if (velocity) x1 else x0
         i -= 1
       }
 
-      result.toList
+      result
     }
 
 }
