@@ -22,6 +22,45 @@ class MomentumOscillatorsSpec extends AnyWordSpec with Matchers {
 
         rsi.take(5).map(rounded(4)) mustBe List(49.206, 51.0793, 51.3351, 54.7208, 52.5356)
       }
+
+      "preserve array warm-up and zero-loss values across valid periods" in {
+        val zeroLossRsi = 99.00990099009901
+        MomentumOscillators.relativeStrengthIndex(Array.emptyDoubleArray, 14).toList mustBe Nil
+        MomentumOscillators.relativeStrengthIndex(Array(3.0), 1).toList mustBe List(50.0)
+        MomentumOscillators.relativeStrengthIndex(Array(3.0, 2.0), 3).toList mustBe List(50.0, 50.0)
+        for (period <- List(1, 14, 99, 100, 101)) {
+          val expected = List.fill(math.max(100 - period, 0))(zeroLossRsi) ++ List.fill(math.min(period, 100))(50.0)
+          MomentumOscillators.relativeStrengthIndex(Array.fill(100)(1.0), period).toList mustBe expected
+        }
+        MomentumOscillators.relativeStrengthIndex(Array(1.0, 2.0, 3.0, 4.0, 5.0), 2).toList mustBe
+          List(0.0, 0.0, 0.0, 50.0, 50.0)
+        MomentumOscillators.relativeStrengthIndex(Array(-0.0, 0.0, -0.0, 0.0), 2).toList mustBe
+          List(zeroLossRsi, zeroLossRsi, 50.0, 50.0)
+      }
+
+      "keep array inputs and results independent" in {
+        val input  = Array(1.0, 2.0, 1.0, 2.0, 1.0)
+        val first  = MomentumOscillators.relativeStrengthIndex(input, 2)
+        val second = MomentumOscillators.relativeStrengthIndex(input, 2)
+        first.toList mustBe List(37.5, 75.0, 50.0, 50.0, 50.0)
+        first(0) = -1.0
+        input.toList mustBe List(1.0, 2.0, 1.0, 2.0, 1.0)
+        second.toList mustBe List(37.5, 75.0, 50.0, 50.0, 50.0)
+      }
+
+      "retain IEEE arithmetic for nonfinite prices" in {
+        val nanResult = MomentumOscillators.relativeStrengthIndex(Array(Double.NaN, 3.0, 2.0, 1.0), 1)
+        nanResult.head.isNaN mustBe true
+        nanResult.last mustBe 50.0
+        MomentumOscillators.relativeStrengthIndex(Array(Double.PositiveInfinity, 3.0, 2.0, 1.0), 1).head mustBe 99.00990099009901
+        MomentumOscillators.relativeStrengthIndex(Array(Double.NegativeInfinity, 3.0, 2.0, 1.0), 1).head mustBe 0.0
+      }
+
+      "require a positive RSI period" in {
+        for (period <- List(0, -1))
+          intercept[IllegalArgumentException](MomentumOscillators.relativeStrengthIndex(Array(1.0), period))
+        succeed
+      }
     }
 
     "stochastic" should {

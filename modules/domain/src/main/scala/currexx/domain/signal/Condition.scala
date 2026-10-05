@@ -71,120 +71,94 @@ object Condition {
     * @return
     *   `Some(Condition.LinesCrossing)` containing the direction of the cross if one occurred. `None` otherwise.
     */
-  def linesCrossing(line1: List[Double], line2: List[Double]): Option[Condition] =
-    crossingDirection(line1, line2)
-      .map(Condition.LinesCrossing(_))
+  def linesCrossing(line1: Array[Double], line2: Array[Double]): Option[Condition] =
+    crossingDirection(line1, line2).map(Condition.LinesCrossing(_))
 
-  def bandCrossing(line: List[Double], upperBarrier: List[Double], lowerBarrier: List[Double]): Option[Condition] =
+  def bandCrossing(line: Array[Double], upperBarrier: Array[Double], lowerBarrier: Array[Double]): Option[Condition] =
     crossingDirection(line, upperBarrier)
       .map(Condition.UpperBandCrossing(_))
       .orElse(crossingDirection(line, lowerBarrier).map(Condition.LowerBandCrossing(_)))
 
-  private def crossingDirection(line1: List[Double], line2: List[Double]): Option[Direction] =
-    (line1, line2) match
-      case (l1c :: l1p :: _, l2c :: l2p :: _) if l1c >= l2c && l1p < l2p => Some(Direction.Upward)
-      case (l1c :: l1p :: _, l2c :: l2p :: _) if l1c <= l2c && l1p > l2p => Some(Direction.Downward)
-      case _                                                             => None
+  private def crossingDirection(line1: Array[Double], line2: Array[Double]): Option[Direction] =
+    if (line1.length < 2 || line2.length < 2) None
+    else if (line1(0) >= line2(0) && line1(1) < line2(1)) Some(Direction.Upward)
+    else if (line1(0) <= line2(0) && line1(1) > line2(1)) Some(Direction.Downward)
+    else None
 
-  def priceCrossedLine(
-      priceLine: List[Double],
-      otherLine: List[Double],
-      lineRole: ValueRole
-  ): Option[Condition] =
-    crossingDirection(priceLine, otherLine)
-      .map(PriceCrossedLine(lineRole, _))
+  def priceCrossedLine(priceLine: Array[Double], otherLine: Array[Double], lineRole: ValueRole): Option[Condition] =
+    crossingDirection(priceLine, otherLine).map(Condition.PriceCrossedLine(lineRole, _))
 
   /** Detects a significant turn (peak or trough) in a time-series line. This method is more reliable than a simple slope change but has a
     * lag of `lookback` periods.
     *
     * @param line
-    *   A list of values sorted from latest to earliest.
+    *   Values sorted from latest to earliest.
     * @param lookback
     *   The number of periods to look before and after the turn point for confirmation. A higher value means more reliability but more lag.
     *   A common value is 2 or 3.
     * @return
     *   An Option[Condition.TrendDirectionChange] if a significant turn was confirmed `lookback` periods ago, otherwise None.
     */
-  def trendDirectionChange(line: List[Double], lookback: Int = 1): Option[Condition] = {
-    def getDirection(current: Double, previous: Double): Direction =
-      if (current > previous) Direction.Upward
-      else if (current < previous) Direction.Downward
-      else Direction.Still
-
-    def calculateTrendLength(history: List[Double], trendDirection: Direction): Int =
-      val historicalSegments   = history.sliding(2)
-      val historicalDirections = historicalSegments.collect { case curr :: prev :: _ => getDirection(curr, prev) }
-      val trendSegmentCount    = historicalDirections.takeWhile(_ == trendDirection).size
-      trendSegmentCount + 1
-
-    // The total window size needed to confirm a turn at the center.
-    val windowSize = 2 * lookback + 1
-    if (line.length >= windowSize) {
-      val window = line.take(windowSize)
-      // The point we are testing is the one in the middle of our window.
-      // Since the list is latest-to-earliest, this point is `lookback` periods in the past.
-      val candidateTurnPoint = window(lookback)
-      val beforeTurn         = window.take(lookback)
-      val afterTurn          = window.drop(lookback + 1)
-
-      if (beforeTurn.forall(_ < candidateTurnPoint) && afterTurn.forall(_ < candidateTurnPoint)) {
-        Some(
-          Condition.TrendDirectionChange(
-            Direction.Upward,
-            Direction.Downward,
-            Some(calculateTrendLength(line.drop(lookback), Direction.Upward))
-          )
-        )
-      } else if (beforeTurn.forall(_ > candidateTurnPoint) && afterTurn.forall(_ > candidateTurnPoint)) {
-        Some(
-          Condition.TrendDirectionChange(
-            Direction.Downward,
-            Direction.Upward,
-            Some(calculateTrendLength(line.drop(lookback), Direction.Downward))
-          )
-        )
-      } else None
-    } else None
+  def trendDirectionChange(line: Array[Double], lookback: Int = 1): Option[Condition] = {
+    require(lookback > 0, "lookback must be positive")
+    val windowSize = 2L * lookback + 1
+    if (line.length < windowSize) None
+    else {
+      val candidate = line(lookback)
+      var isPeak    = true
+      var isTrough  = true
+      var i         = 0
+      while (i < windowSize && (isPeak || isTrough)) {
+        if (i != lookback) {
+          isPeak = isPeak && line(i) < candidate
+          isTrough = isTrough && line(i) > candidate
+        }
+        i += 1
+      }
+      if (isPeak)
+        Some(Condition.TrendDirectionChange(Direction.Upward, Direction.Downward, Some(trendLength(line, lookback, Direction.Upward))))
+      else if (isTrough)
+        Some(Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(trendLength(line, lookback, Direction.Downward))))
+      else None
+    }
   }
 
-  def thresholdCrossing(line: List[Double], lowerBoundary: Double, upperBoundary: Double): Option[Condition] =
-    line match
-      case current :: previous :: _ =>
-        (current, previous) match {
-          // Prioritize entry into the destination zone when one move crosses both boundaries.
-          case (c, p) if c >= upperBoundary && p < upperBoundary =>
-            Some(Condition.ThresholdCrossing(BigDecimal.valueOf(upperBoundary), BigDecimal.valueOf(c), Direction.Upward, Boundary.Upper))
-          case (c, p) if c <= lowerBoundary && p > lowerBoundary =>
-            Some(Condition.ThresholdCrossing(BigDecimal.valueOf(lowerBoundary), BigDecimal.valueOf(c), Direction.Downward, Boundary.Lower))
-          case (c, p) if c < upperBoundary && p >= upperBoundary =>
-            Some(Condition.ThresholdCrossing(BigDecimal.valueOf(upperBoundary), BigDecimal.valueOf(c), Direction.Downward, Boundary.Upper))
-          case (c, p) if c > lowerBoundary && p <= lowerBoundary =>
-            Some(Condition.ThresholdCrossing(BigDecimal.valueOf(lowerBoundary), BigDecimal.valueOf(c), Direction.Upward, Boundary.Lower))
-          case _ => None
-        }
-      case _ => None
+  private def trendLength(line: Array[Double], start: Int, direction: Direction): Int = {
+    var i = start
+    while (i + 1 < line.length && (if (direction == Direction.Upward) line(i) > line(i + 1) else line(i) < line(i + 1))) i += 1
+    i - start + 1
+  }
 
-  def volatilityRegimeChange(primaryLine: List[Double], smoothedLine: List[Double]): Option[Condition] =
-    // Safely pattern match to get the current and previous values from both lines.
-    (primaryLine, smoothedLine) match {
-      case (currentPrimary :: previousPrimary :: restPrimary, currentSmoothed :: previousSmoothed :: restSmoothed) =>
+  def thresholdCrossing(line: Array[Double], lowerBoundary: Double, upperBoundary: Double): Option[Condition] =
+    if (line.length < 2) None
+    else {
+      val current  = line(0)
+      val previous = line(1)
+      // Prioritize entry into the destination zone when one move crosses both boundaries.
+      if (current >= upperBoundary && previous < upperBoundary)
+        Some(Condition.ThresholdCrossing(BigDecimal.valueOf(upperBoundary), BigDecimal.valueOf(current), Direction.Upward, Boundary.Upper))
+      else if (current <= lowerBoundary && previous > lowerBoundary)
+        Some(
+          Condition.ThresholdCrossing(BigDecimal.valueOf(lowerBoundary), BigDecimal.valueOf(current), Direction.Downward, Boundary.Lower)
+        )
+      else if (current < upperBoundary && previous >= upperBoundary)
+        Some(
+          Condition.ThresholdCrossing(BigDecimal.valueOf(upperBoundary), BigDecimal.valueOf(current), Direction.Downward, Boundary.Upper)
+        )
+      else if (current > lowerBoundary && previous <= lowerBoundary)
+        Some(Condition.ThresholdCrossing(BigDecimal.valueOf(lowerBoundary), BigDecimal.valueOf(current), Direction.Upward, Boundary.Lower))
+      else None
+    }
 
-        val currentRegime = if (currentPrimary > currentSmoothed) VolatilityRegime.High else VolatilityRegime.Low
-
-        // Now, determine the previous regime.
-        // We check if there is enough data to have a valid previous state.
-        // If `restPrimary` is empty, it means we only have 2 data points, so there is no "from".
-        val previousRegimeOpt = Option.when(restPrimary.nonEmpty && restSmoothed.nonEmpty) {
-          if (previousPrimary > previousSmoothed) VolatilityRegime.High else VolatilityRegime.Low
-        }
-        // A signal is generated if:
-        // 1. The regime has changed from the previous one.
-        // OR
-        // 2. There was no previous regime (it's the first ever calculation).
-        Option.when(!previousRegimeOpt.contains(currentRegime)) {
-          Condition.VolatilityRegimeChange(from = previousRegimeOpt, to = currentRegime)
-        }
-      // Not enough data to even determine the current regime.
-      case _ => None
+  def volatilityRegimeChange(primaryLine: Array[Double], smoothedLine: Array[Double]): Option[Condition] =
+    if (primaryLine.length < 2 || smoothedLine.length < 2) None
+    else {
+      val currentRegime  = if (primaryLine(0) > smoothedLine(0)) VolatilityRegime.High else VolatilityRegime.Low
+      val previousRegime = Option.when(primaryLine.length > 2 && smoothedLine.length > 2) {
+        if (primaryLine(1) > smoothedLine(1)) VolatilityRegime.High else VolatilityRegime.Low
+      }
+      Option.when(!previousRegime.contains(currentRegime)) {
+        Condition.VolatilityRegimeChange(previousRegime, currentRegime)
+      }
     }
 }

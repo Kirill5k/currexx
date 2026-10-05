@@ -121,5 +121,42 @@ class StatisticsSpec extends AnyWordSpec with Matchers {
 
       result must be(empty)
     }
+
+    "calculate exact array sample deviations over 100 bars" in {
+      val input = Array.tabulate(100)(_.toDouble)
+      Statistics.standardDeviation(input, 3).toList mustBe List.fill(98)(1.0) ++ List(0.0, 0.0)
+      Statistics.standardDeviation(input, 1).toList mustBe List.fill(100)(0.0)
+      Statistics.standardDeviation(input, 100).toList mustBe math.sqrt(100.0 * 101.0 / 12.0) :: List.fill(99)(0.0)
+      Statistics.standardDeviation(input, 101).toList mustBe List.fill(100)(0.0)
+      Statistics.standardDeviation(Array.emptyDoubleArray, 3).toList mustBe Nil
+      Statistics.standardDeviation(Array(2.0), 1).toList mustBe List(0.0)
+    }
+
+    "keep deviation input arrays and outputs independent" in {
+      val input  = Array(5.0, 3.0, 1.0)
+      val first  = Statistics.standardDeviation(input, 3)
+      val second = Statistics.standardDeviation(input, 3)
+      first.toList mustBe List(2.0, 0.0, 0.0)
+      first(0) = -1.0
+      input.toList mustBe List(5.0, 3.0, 1.0)
+      second.toList mustBe List(2.0, 0.0, 0.0)
+    }
+
+    "retain nonfinite and signed-zero arithmetic in array windows" in {
+      for (value <- List(Double.NaN, Double.PositiveInfinity, Double.NegativeInfinity)) {
+        val result = Statistics.standardDeviation(Array(value, 3.0, 2.0, 1.0), 2)
+        result.head.isNaN mustBe true
+        result.tail.toList mustBe List(math.sqrt(0.5), math.sqrt(0.5), 0.0)
+        Statistics.standardDeviation(Array(value), 1).toList mustBe List(0.0)
+      }
+      val zeroResult = Statistics.standardDeviation(Array(-0.0, 0.0, -0.0, 0.0), 2)
+      zeroResult.map(java.lang.Double.doubleToRawLongBits).toList mustBe List.fill(4)(0L)
+    }
+
+    "require a positive standard-deviation period" in {
+      for (period <- List(0, -1))
+        intercept[IllegalArgumentException](Statistics.standardDeviation(Array(1.0), period))
+      succeed
+    }
   }
 }

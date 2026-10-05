@@ -2,7 +2,8 @@ package currexx.core.market
 
 import cats.data.NonEmptyList
 import currexx.core.fixtures.{Markets, Signals, Users}
-import currexx.core.signal.{SignalDetector, ValueTransformer}
+import currexx.calculations.MomentumOscillators
+import currexx.core.signal.SignalDetector
 import currexx.core.trade.{Rule, TradeAction}
 import currexx.domain.market.{PriceRange, TradeOrder}
 import currexx.domain.signal.{Boundary, Condition, Direction, Indicator, ValueRole, ValueSource, ValueTransformation}
@@ -43,7 +44,7 @@ class MarketStateSpec extends AnyWordSpec with Matchers with OptionValues {
         PriceRange(open, open.max(close), open.min(close), close, 1000.0, candleTime.minusSeconds((closes.size - 1 - index) * 3600L))
       }.reverse
       val data        = Markets.timeSeriesData.copy(prices = NonEmptyList.fromListUnsafe(prices))
-      val transformed = ValueTransformer.pure.transformTo(data.closings, data, indicator.transformation)
+      val transformed = MomentumOscillators.relativeStrengthIndex(data.closings, 14)
 
       transformed(1) must be >= indicator.upperBoundary
       transformed.head must be <= indicator.lowerBoundary

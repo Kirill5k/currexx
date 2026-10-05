@@ -17,6 +17,62 @@ class VolatilitySpec extends AnyWordSpec with Matchers {
       result.take(5) mustBe List(0.010395405950770225, 0.010738898716214088, 0.010274198617461325, 0.010324521588035275,
         0.010603330940961062)
     }
+
+    "preserve ATR warm-up across positive periods and short or 100-bar arrays" in {
+      for {
+        size   <- List(0, 1, 2, 7, 100)
+        period <- List(1, 2, 14, 100, 101)
+      } {
+        val padding  = math.min(size, math.max(period - 1, 1))
+        val expected = List.fill(size - padding)(2.0) ++ List.fill(padding)(0.0)
+        Volatility.averageTrueRange(Array.fill(size)(1.0), Array.fill(size)(2.0), Array.fill(size)(0.0), period).toList mustBe expected
+      }
+      succeed
+    }
+
+    "seed after zero ranges and then apply Wilder smoothing" in {
+      val input = Array(6.0, 4.0, 2.0, 2.0, 2.0)
+      Volatility.averageTrueRange(input, input, input, 2).toList mustBe List(1.5, 1.0, 0.0, 0.0, 0.0)
+      val zeros = Array(-0.0, 0.0, -0.0, 0.0)
+      Volatility.averageTrueRange(zeros, zeros, zeros, 2).toList mustBe List.fill(4)(0.0)
+    }
+
+    "keep OHLC arrays and ATR outputs independent" in {
+      val closes = Array(3.0, 2.0, 1.0)
+      val highs  = Array(3.5, 2.5, 1.5)
+      val lows   = Array(2.5, 1.5, 0.5)
+      val first  = Volatility.averageTrueRange(closes, highs, lows, 2)
+      val second = Volatility.averageTrueRange(closes, highs, lows, 2)
+      first.toList mustBe List(1.375, 1.25, 0.0)
+      first(0) = -1.0
+      closes.toList mustBe List(3.0, 2.0, 1.0)
+      highs.toList mustBe List(3.5, 2.5, 1.5)
+      lows.toList mustBe List(2.5, 1.5, 0.5)
+      second.toList mustBe List(1.375, 1.25, 0.0)
+    }
+
+    "truncate ATR inputs to the shortest OHLC series" in {
+      Volatility.averageTrueRange(Array(3.0, 2.0, 1.0), Array(4.0, 3.0), Array(2.0, 1.0), 2).toList mustBe List(2.0, 0.0)
+      Volatility.averageTrueRange(Array(3.0, 2.0), Array.emptyDoubleArray, Array(2.0, 1.0), 2).toList mustBe Nil
+      Volatility.averageTrueRange(Array(3.0), Array(4.0), Array(2.0), 1).toList mustBe List(0.0)
+    }
+
+    "propagate nonfinite previous closing prices through true ranges" in {
+      val highs     = Array.fill(3)(2.0)
+      val lows      = Array.fill(3)(0.0)
+      val nanResult = Volatility.averageTrueRange(Array(1.0, Double.NaN, 1.0), highs, lows, 2)
+      nanResult.head.isNaN mustBe true
+      nanResult.tail.toList mustBe List(2.0, 0.0)
+      for (price <- List(Double.PositiveInfinity, Double.NegativeInfinity))
+        Volatility.averageTrueRange(Array(1.0, price, 1.0), highs, lows, 2).toList mustBe List(Double.PositiveInfinity, 2.0, 0.0)
+      succeed
+    }
+
+    "require a positive ATR period" in {
+      for (period <- List(0, -1))
+        intercept[IllegalArgumentException](Volatility.averageTrueRange(Array(1.0), Array(2.0), Array(0.0), period))
+      succeed
+    }
   }
 
   // AUDUSD - 06/12/2022 - Open/High/Low/Close

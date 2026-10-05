@@ -236,25 +236,32 @@ object MovingAverages {
       length: Int,
       phase: Int,
       power: Int
-  ): List[Double] =
-    if (values.isEmpty) Nil
+  ): List[Double] = jurikSimplified(values.toArray, length, phase, power).toList
+
+  /** Returns newest-first JMA values without mutating the input. */
+  def jurikSimplified(
+      values: Array[Double],
+      length: Int,
+      phase: Int,
+      power: Int
+  ): Array[Double] =
+    if (values.isEmpty) Array.emptyDoubleArray
     else {
       val beta   = 0.45 * (length - 1) / (0.45 * (length - 1) + 2)
       val pr     = if (phase < -100) 0.5 else if (phase > 100) 2.5 else phase / 100.0 + 1.5
       val alpha  = math.pow(beta, power)
-      val arr    = values.toArray
-      val result = new Array[Double](arr.length)
-      val last   = arr.length - 1
+      val result = new Array[Double](values.length)
+      val last   = values.length - 1
 
-      var ma1  = arr(last)
+      var ma1  = values(last)
       var det0 = 0.0
       var det1 = 0.0
-      var jma  = arr(last)
+      var jma  = values(last)
       result(last) = jma
       var i = last - 1
 
       while (i >= 0) {
-        val price   = arr(i)
+        val price   = values(i)
         val prevJma = jma
         ma1 = (1 - alpha) * price + alpha * ma1
         det0 = (price - ma1) * (1 - beta) + beta * det0
@@ -264,6 +271,6 @@ object MovingAverages {
         result(i) = jma
         i -= 1
       }
-      result.toList
+      result
     }
 }

@@ -1,7 +1,5 @@
 package currexx.calculations
 
-import scala.collection.mutable.{ListBuffer, Queue as MQueue}
-
 object Statistics {
 
   /** Calculates the rolling standard deviation for a given list of values.
@@ -13,32 +11,34 @@ object Statistics {
     * @return
     *   A list of standard deviation values, sorted from latest to earliest.
     */
-  def standardDeviation(values: List[Double], n: Int): List[Double] = {
-    val chronologicalValues = values.reverse
-    val window              = MQueue.empty[Double]
-    val resultBuffer        = new ListBuffer[Double]
+  def standardDeviation(values: List[Double], n: Int): List[Double] = standardDeviation(values.toArray, n).toList
 
-    chronologicalValues.foreach { value =>
-      window.enqueue(value)
-      if (window.size > n) {
-        val _ = window.dequeue()
-      }
-
-      var stdDev = 0.0 // Default to 0 during warm-up
-      if (window.size == n) {
-        val mean = window.sum / n
-        // Use sample standard deviation (Bessel's correction: divide by n-1)
-        // Calculate variance without creating intermediate collections
-        var sumSquaredDiff = 0.0
-        window.foreach { x =>
-          val diff = x - mean
-          sumSquaredDiff += diff * diff
+  /** Returns newest-first sample standard deviations without mutating the input. The period must be positive. */
+  def standardDeviation(values: Array[Double], n: Int): Array[Double] = {
+    require(n > 0, "Standard-deviation period must be positive")
+    val result = new Array[Double](values.length)
+    if (n > 1 && n <= values.length) {
+      var i = values.length - n
+      while (i >= 0) {
+        val oldest = i + n - 1
+        var sum    = values(oldest)
+        var j      = oldest - 1
+        while (j >= i) {
+          sum += values(j)
+          j -= 1
         }
-        val variance = if (n > 1) sumSquaredDiff / (n - 1) else 0.0
-        stdDev = math.sqrt(variance)
+        val mean           = sum / n
+        var sumSquaredDiff = 0.0
+        j = oldest
+        while (j >= i) {
+          val diff = values(j) - mean
+          sumSquaredDiff += diff * diff
+          j -= 1
+        }
+        result(i) = math.sqrt(sumSquaredDiff / (n - 1))
+        i -= 1
       }
-      resultBuffer += stdDev
     }
-    resultBuffer.toList.reverse
+    result
   }
 }

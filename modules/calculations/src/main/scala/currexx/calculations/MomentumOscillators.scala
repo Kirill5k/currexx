@@ -20,62 +20,53 @@ object MomentumOscillators {
     *   A list of RSI values (0-100), sorted from latest to earliest, same size as input. Returns neutral 50.0 during warm-up.
     */
   def relativeStrengthIndex(values: List[Double], length: Int): List[Double] =
-    // RSI requires at least `length` periods of price changes, so `length + 1` prices.
-    if (values.size <= length) List.fill(values.size)(50.0) // Not enough data, return neutral RSI
-    else {
-      val chronologicalValues = values.reverse
-      val it                  = chronologicalValues.iterator
-      val resultBuffer        = new ListBuffer[Double]
+    relativeStrengthIndex(values.toArray, length).toList
 
-      // --- Step 1: Prime the initial average gain/loss using a Simple Moving Average ---
+  /** Returns newest-first RSI values without mutating the input. The period must be positive. */
+  def relativeStrengthIndex(values: Array[Double], length: Int): Array[Double] = {
+    require(length > 0, "RSI period must be positive")
+    val result = new Array[Double](values.length)
+    if (values.length <= length) {
+      java.util.Arrays.fill(result, 50.0)
+    } else {
+      var index     = values.length - 1
+      var prevValue = values(index)
       var gainSum   = 0.0
       var lossSum   = 0.0
-      var prevValue = it.next()
+      var count     = 1
 
-      // Pad the result buffer for the initial `length` periods where RSI is not yet available.
-      resultBuffer ++= List.fill(length)(50.0)
-
-      var i = 1
-      while (i <= length) {
-        val currentVal = it.next()
-        val diff       = currentVal - prevValue
+      while (count <= length) {
+        result(index) = 50.0
+        index -= 1
+        val currentValue = values(index)
+        val diff         = currentValue - prevValue
         gainSum += diff.max(0.0)
         lossSum += diff.min(0.0).abs
-        prevValue = currentVal
-        i += 1
+        prevValue = currentValue
+        count += 1
       }
 
       var avgGain = gainSum / length
       var avgLoss = lossSum / length
+      val firstRs = if (avgLoss == 0.0) 100.0 else avgGain / avgLoss
+      result(index) = 100.0 - (100.0 / (1.0 + firstRs))
+      index -= 1
 
-      // Calculate the very first RSI value and add it to the buffer.
-      val firstRs  = if (avgLoss == 0.0) 100.0 else avgGain / avgLoss
-      val firstRsi = 100.0 - (100.0 / (1.0 + firstRs))
-      resultBuffer += firstRsi
-
-      // --- Step 2: Calculate the rest of the RSI using Wilder's smoothing ---
-      while (it.hasNext) {
-        val currentVal  = it.next()
-        val diff        = currentVal - prevValue
-        val currentGain = diff.max(0.0)
-        val currentLoss = diff.min(0.0).abs
-
-        // Apply Wilder's smoothing using the previous average
+      while (index >= 0) {
+        val currentValue = values(index)
+        val diff         = currentValue - prevValue
+        val currentGain  = diff.max(0.0)
+        val currentLoss  = diff.min(0.0).abs
         avgGain = (avgGain * (length - 1) + currentGain) / length
         avgLoss = (avgLoss * (length - 1) + currentLoss) / length
-
-        val rs  = if (avgLoss == 0.0) 100.0 else avgGain / avgLoss
-        val rsi = 100.0 - (100.0 / (1.0 + rs))
-
-        resultBuffer += rsi
-        prevValue = currentVal
+        val rs = if (avgLoss == 0.0) 100.0 else avgGain / avgLoss
+        result(index) = 100.0 - (100.0 / (1.0 + rs))
+        prevValue = currentValue
+        index -= 1
       }
-
-      // The buffer is currently oldest-to-latest: [pad, pad, ..., rsi1, rsi2, ...].
-      // The total size is greater than the input size because of the padding.
-      // We need to take the last `values.size` elements to get the correctly aligned output.
-      resultBuffer.toList.takeRight(values.size).reverse
     }
+    result
+  }
 
   /** Calculates the Stochastic Oscillator (%K).
     *

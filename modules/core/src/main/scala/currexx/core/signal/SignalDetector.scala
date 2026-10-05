@@ -2,7 +2,7 @@ package currexx.core.signal
 
 import cats.data.NonEmptyList
 import com.github.benmanes.caffeine.cache.{Cache, Caffeine}
-import currexx.calculations.{Statistics, Volatility}
+import currexx.calculations.Statistics
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData}
 import currexx.domain.signal.{CombinationLogic, Condition, Indicator}
 
@@ -13,9 +13,8 @@ trait SignalDetector:
   def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal]
 
 final private class PureSignalDetector extends SignalDetector {
-  private val transformer: ValueTransformer = ValueTransformer.pure
-
-  private def makeSignal(uid: UserId, data: MarketTimeSeriesData, indicator: Indicator)(cond: Condition): Signal =
+  private def makeSignal(uid: UserId, window: NumericalWindow, indicator: Indicator)(cond: Condition): Signal =
+    val data = window.data
     Signal(
       userId = uid,
       currencyPair = data.currencyPair,
@@ -26,145 +25,141 @@ final private class PureSignalDetector extends SignalDetector {
     )
 
   override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal] =
+    detect(uid, new NumericalWindow(data))(indicator)
+
+  private def detect(uid: UserId, window: NumericalWindow)(indicator: Indicator): Option[Signal] =
     indicator match
-      case vt: Indicator.ValueTracking              => detectValue(uid, data, vt)
-      case tcd: Indicator.TrendChangeDetection      => detectTrendChange(uid, data, tcd)
-      case tc: Indicator.ThresholdCrossing          => detectThresholdCrossing(uid, data, tc)
-      case lc: Indicator.LinesCrossing              => detectLinesCrossing(uid, data, lc)
-      case kc: Indicator.KeltnerChannel             => detectBarrierCrossing(uid, data, kc)
-      case vrd: Indicator.VolatilityRegimeDetection => detectVolatilityRegimeChange(uid, data, vrd)
-      case c: Indicator.Composite                   => detectComposite(uid, data, c)
-      case plc: Indicator.PriceLineCrossing         => detectPriceLineCrossing(uid, data, plc)
-      case bb: Indicator.BollingerBands             => detectBollingerBandsCrossing(uid, data, bb)
+      case vt: Indicator.ValueTracking              => detectValue(uid, window, vt)
+      case tcd: Indicator.TrendChangeDetection      => detectTrendChange(uid, window, tcd)
+      case tc: Indicator.ThresholdCrossing          => detectThresholdCrossing(uid, window, tc)
+      case lc: Indicator.LinesCrossing              => detectLinesCrossing(uid, window, lc)
+      case kc: Indicator.KeltnerChannel             => detectBarrierCrossing(uid, window, kc)
+      case vrd: Indicator.VolatilityRegimeDetection => detectVolatilityRegimeChange(uid, window, vrd)
+      case c: Indicator.Composite                   => detectComposite(uid, window, c)
+      case plc: Indicator.PriceLineCrossing         => detectPriceLineCrossing(uid, window, plc)
+      case bb: Indicator.BollingerBands             => detectBollingerBandsCrossing(uid, window, bb)
 
   private def detectThresholdCrossing(
       uid: UserId,
-      data: MarketTimeSeriesData,
+      window: NumericalWindow,
       indicator: Indicator.ThresholdCrossing
   ): Option[Signal] =
-    val source      = transformer.extractFrom(data, indicator.source)
-    val transformed = transformer.transformTo(source, data, indicator.transformation)
+    val source      = ValueTransformer.extractFrom(window, indicator.source)
+    val transformed = ValueTransformer.transformTo(source, window, indicator.transformation)
     Condition
       .thresholdCrossing(transformed, indicator.lowerBoundary, indicator.upperBoundary)
-      .map(makeSignal(uid, data, indicator))
+      .map(makeSignal(uid, window, indicator))
 
   private def detectTrendChange(
       uid: UserId,
-      data: MarketTimeSeriesData,
+      window: NumericalWindow,
       indicator: Indicator.TrendChangeDetection
   ): Option[Signal] =
-    val source      = transformer.extractFrom(data, indicator.source)
-    val transformed = transformer.transformTo(source, data, indicator.transformation)
+    val source      = ValueTransformer.extractFrom(window, indicator.source)
+    val transformed = ValueTransformer.transformTo(source, window, indicator.transformation)
     Condition
       .trendDirectionChange(transformed)
-      .map(makeSignal(uid, data, indicator))
+      .map(makeSignal(uid, window, indicator))
 
   private def detectLinesCrossing(
       uid: UserId,
-      data: MarketTimeSeriesData,
+      window: NumericalWindow,
       indicator: Indicator.LinesCrossing
   ): Option[Signal] =
-    val source = transformer.extractFrom(data, indicator.source)
-    val line1  = transformer.transformTo(source, data, indicator.line1Transformation)
-    val line2  = transformer.transformTo(source, data, indicator.line2Transformation)
+    val source = ValueTransformer.extractFrom(window, indicator.source)
+    val line1  = ValueTransformer.transformTo(source, window, indicator.line1Transformation)
+    val line2  = ValueTransformer.transformTo(source, window, indicator.line2Transformation)
     Condition
       .linesCrossing(line1, line2)
-      .map(makeSignal(uid, data, indicator))
+      .map(makeSignal(uid, window, indicator))
 
   private def detectBarrierCrossing(
       uid: UserId,
-      data: MarketTimeSeriesData,
+      window: NumericalWindow,
       indicator: Indicator.KeltnerChannel
   ): Option[Signal] =
-    // 1. Get the raw price line that we will check against the bands.
-    // This is the primary input for the indicator.
-    val priceLine = transformer.extractFrom(data, indicator.source)
-    // 2. Calculate the middle band (e.g., EMA of the priceLine).
-    // bandCrossing reads only the latest two points.
-    val middleBand = transformer.transformTo(priceLine, data, indicator.middleBand).take(2)
-    // 3. Calculate ATR using the required High, Low, and Close data directly.
-    val atrLine = Volatility.averageTrueRange(data.closings, data.highs, data.lows, indicator.atrLength).take(2)
-    // 4. Calculate the upper and lower bands based on the middle band and ATR.
-    val upperBand = middleBand.lazyZip(atrLine).map((mid, atr) => mid + (atr * indicator.atrMultiplier)).toList
-    val lowerBand = middleBand.lazyZip(atrLine).map((mid, atr) => mid - (atr * indicator.atrMultiplier)).toList
-    // 5. CORRECT: Check if the `priceLine` crosses the calculated bands.
+    val priceLine              = ValueTransformer.extractFrom(window, indicator.source)
+    val middleBand             = ValueTransformer.transformTo(priceLine, window, indicator.middleBand)
+    val atrLine                = ValueTransformer.averageTrueRange(window.closings, window, indicator.atrLength)
+    val (upperBand, lowerBand) = bands(middleBand, atrLine, indicator.atrMultiplier)
     Condition
       .bandCrossing(priceLine, upperBand, lowerBand)
-      .map(makeSignal(uid, data, indicator))
+      .map(makeSignal(uid, window, indicator))
 
   private def detectVolatilityRegimeChange(
       uid: UserId,
-      data: MarketTimeSeriesData,
+      window: NumericalWindow,
       indicator: Indicator.VolatilityRegimeDetection
   ): Option[Signal] =
-    val atrLine   = transformer.averageTrueRange(data.closings, data, indicator.atrLength)
-    val atrMaLine = transformer.transformTo(atrLine, data, indicator.smoothingType)
+    val atrLine   = ValueTransformer.averageTrueRange(window.closings, window, indicator.atrLength)
+    val atrMaLine = ValueTransformer.transformTo(atrLine, window, indicator.smoothingType)
     Condition
       .volatilityRegimeChange(atrLine, atrMaLine)
-      .map(makeSignal(uid, data, indicator))
+      .map(makeSignal(uid, window, indicator))
 
   private def detectValue(
       uid: UserId,
-      data: MarketTimeSeriesData,
+      window: NumericalWindow,
       indicator: Indicator.ValueTracking
   ): Option[Signal] = {
-    val source      = transformer.extractFrom(data, indicator.source)
-    val transformed = transformer.transformTo(source, data, indicator.transformation)
+    val source      = ValueTransformer.extractFrom(window, indicator.source)
+    val transformed = ValueTransformer.transformTo(source, window, indicator.transformation)
     transformed.headOption.map { latestValue =>
-      Signal(
-        userId = uid,
-        currencyPair = data.currencyPair,
-        interval = data.interval,
-        condition = Condition.ValueUpdated(indicator.role, BigDecimal.valueOf(latestValue)),
-        triggeredBy = indicator,
-        time = data.latestTime
-      )
+      makeSignal(uid, window, indicator)(Condition.ValueUpdated(indicator.role, BigDecimal.valueOf(latestValue)))
     }
   }
 
   private def detectComposite(
       uid: UserId,
-      data: MarketTimeSeriesData,
+      window: NumericalWindow,
       composite: Indicator.Composite
   ): Option[Signal] =
-    val childSignals   = composite.indicators.toList.flatMap(detect(uid, data))
+    val childSignals   = composite.indicators.toList.flatMap(detect(uid, window))
     val isConditionMet = composite.combinator match
       case CombinationLogic.All => childSignals.size == composite.indicators.size
       case CombinationLogic.Any => childSignals.nonEmpty
     Option
       .when(isConditionMet) {
-        Signal(
-          userId = uid,
-          currencyPair = data.currencyPair,
-          interval = data.interval,
-          condition = Condition.Composite(NonEmptyList.fromListUnsafe(childSignals.map(_.condition))),
-          triggeredBy = composite,
-          time = data.latestTime
-        )
+        makeSignal(uid, window, composite)(Condition.Composite(NonEmptyList.fromListUnsafe(childSignals.map(_.condition))))
       }
 
   private def detectPriceLineCrossing(
       uid: UserId,
-      data: MarketTimeSeriesData,
+      window: NumericalWindow,
       plc: Indicator.PriceLineCrossing
   ): Option[Signal] =
-    val priceLine = transformer.extractFrom(data, plc.source)
-    val otherLine = transformer.transformTo(priceLine, data, plc.transformation)
-    Condition.priceCrossedLine(priceLine, otherLine, plc.role).map(makeSignal(uid, data, plc))
+    val priceLine = ValueTransformer.extractFrom(window, plc.source)
+    val otherLine = ValueTransformer.transformTo(priceLine, window, plc.transformation)
+    Condition.priceCrossedLine(priceLine, otherLine, plc.role).map(makeSignal(uid, window, plc))
 
   private def detectBollingerBandsCrossing(
       uid: UserId,
-      data: MarketTimeSeriesData,
+      window: NumericalWindow,
       indicator: Indicator.BollingerBands
   ): Option[Signal] =
-    val priceLine      = transformer.extractFrom(data, indicator.source)
-    val middleBandLine = transformer.transformTo(priceLine, data, indicator.middleBand).take(2)
-    val stdDevLine     = Statistics.standardDeviation(priceLine, indicator.stdDevLength).take(2)
-    val upperBand      = middleBandLine.lazyZip(stdDevLine).map((mid, stdev) => mid + (stdev * indicator.stdDevMultiplier))
-    val lowerBand      = middleBandLine.lazyZip(stdDevLine).map((mid, stdev) => mid - (stdev * indicator.stdDevMultiplier))
+    val priceLine              = ValueTransformer.extractFrom(window, indicator.source)
+    val middleBandLine         = ValueTransformer.transformTo(priceLine, window, indicator.middleBand)
+    val stdDevLine             = Statistics.standardDeviation(priceLine, indicator.stdDevLength)
+    val (upperBand, lowerBand) = bands(middleBandLine, stdDevLine, indicator.stdDevMultiplier)
     Condition
       .bandCrossing(priceLine, upperBand, lowerBand)
-      .map(makeSignal(uid, data, indicator))
+      .map(makeSignal(uid, window, indicator))
+
+  // bandCrossing reads only the latest two points.
+  private def bands(middle: Array[Double], width: Array[Double], multiplier: Double): (Array[Double], Array[Double]) = {
+    val size  = math.min(2, math.min(middle.length, width.length))
+    val upper = new Array[Double](size)
+    val lower = new Array[Double](size)
+    var i     = 0
+    while (i < size) {
+      val offset = width(i) * multiplier
+      upper(i) = middle(i) + offset
+      lower(i) = middle(i) - offset
+      i += 1
+    }
+    (upper, lower)
+  }
+
 }
 
 final private case class CacheKey(

@@ -2,6 +2,7 @@ package currexx.core.signal
 
 import cats.data.NonEmptyList
 import currexx.core.fixtures.{Markets, Users}
+import currexx.domain.market.{MarketTimeSeriesData, PriceRange}
 import currexx.domain.signal.{
   Boundary,
   Condition,
@@ -14,6 +15,8 @@ import currexx.domain.signal.{
 }
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+
+import java.time.Instant
 
 class SignalDetectorSpec extends AnyWordSpec with Matchers {
 
@@ -269,6 +272,119 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
       signal mustBe None
     }
   }
+
+  "band boundaries" should {
+    "include equality at the current band and prefer the upper band when both bands cross" in {
+      val cases = List(
+        (List(1.5, 1.0, 2.0), 0.0, Direction.Upward),
+        (List(1.5, 2.0, 1.0), 0.0, Direction.Downward),
+        (List(3.0, 1.0, 2.0), 0.1, Direction.Upward),
+        (List(0.0, 2.0, 1.0), 0.1, Direction.Downward)
+      )
+      cases.foreach { (closes, multiplier, direction) =>
+        val data = dataFor(closes)
+        // EMA(3) of the first two cases is [1.5, 1.5, oldest]: the current price is exactly on both zero-width bands.
+        bandIndicators(multiplier).foreach { indicator =>
+          withClue(s"$indicator on $closes: ") {
+            SignalDetector.pure.detect(Users.uid, data)(indicator) mustBe
+              Some(expectedSignal(data, indicator, Condition.UpperBandCrossing(direction)))
+          }
+        }
+      }
+    }
+
+    "use older prices to calculate the current middle band" in {
+      val data = dataFor(List(4.0, 2.0, 10.0, 0.0))
+      // The full EMA(3) is [3.75, 3.5, 5, 0], so price crosses upward from 2 < 3.5 to 4 > 3.75.
+      bandIndicators(0.0).foreach { indicator =>
+        SignalDetector.pure.detect(Users.uid, data)(indicator) mustBe
+          Some(expectedSignal(data, indicator, Condition.UpperBandCrossing(Direction.Upward)))
+        SignalDetector.pure.detect(Users.uid, dataFor(List(4.0, 2.0)))(indicator) mustBe None
+      }
+    }
+
+    "produce no crossing from a single price or from equality at the preceding band" in {
+      for {
+        closes    <- List(List(2.0), List(2.0, 1.0))
+        indicator <- bandIndicators(0.0)
+      } SignalDetector.pure.detect(Users.uid, dataFor(closes))(indicator) mustBe None
+    }
+  }
+
+  "crossing boundaries" should {
+    "include equality at the latest line and keep the price-line role" in
+      List((List(1.5, 1.0, 2.0), Direction.Upward), (List(1.5, 2.0, 1.0), Direction.Downward)).foreach { (closes, direction) =>
+        val data  = dataFor(closes)
+        val lines = Indicator.LinesCrossing(ValueSource.Close, VT.SMA(1), VT.EMA(3))
+        val price = Indicator.PriceLineCrossing(ValueSource.Close, ValueRole.ChannelMiddleBand, VT.EMA(3))
+        SignalDetector.pure.detect(Users.uid, data)(lines) mustBe
+          Some(expectedSignal(data, lines, Condition.LinesCrossing(direction)))
+        SignalDetector.pure.detect(Users.uid, data)(price) mustBe
+          Some(expectedSignal(data, price, Condition.PriceCrossedLine(ValueRole.ChannelMiddleBand, direction)))
+      }
+  }
+
+  "trend duration" should {
+    "count the preceding trend through the oldest observation and stop at a plateau" in {
+      val indicator = Indicator.TrendChangeDetection(ValueSource.Close, VT.SMA(1))
+      val cases     = List(
+        (List(4.0, 5.0, 3.0, 2.0, 1.0), Direction.Upward, Direction.Downward, 4),
+        (List(4.0, 5.0, 3.0, 3.0, 1.0), Direction.Upward, Direction.Downward, 2),
+        (List(2.0, 1.0, 3.0, 4.0, 5.0), Direction.Downward, Direction.Upward, 4)
+      )
+      cases.foreach { (closes, from, to, duration) =>
+        val data = dataFor(closes)
+        SignalDetector.pure.detect(Users.uid, data)(indicator) mustBe
+          Some(expectedSignal(data, indicator, Condition.TrendDirectionChange(from, to, Some(duration))))
+      }
+      List(List(4.0, 3.0), List(4.0, 4.0, 3.0)).foreach { closes =>
+        SignalDetector.pure.detect(Users.uid, dataFor(closes))(indicator) mustBe None
+      }
+    }
+  }
+
+  "nested composites" should {
+    "retain child order and nesting while omitting children without a signal" in {
+      val data      = dataFor(List(4.0, 2.0, 10.0, 0.0))
+      val indicator = Indicator.compositeAnyOf(
+        Indicator.ThresholdCrossing(ValueSource.Close, VT.SMA(1), 20.0, -20.0),
+        Indicator.ValueTracking(ValueRole.Price, ValueSource.Close, VT.SMA(1)),
+        Indicator.compositeAllOf(
+          Indicator.ValueTracking(ValueRole.Momentum, ValueSource.Close, VT.SMA(2)),
+          Indicator.ThresholdCrossing(ValueSource.Close, VT.SMA(1), 3.0, 1.0)
+        ),
+        Indicator.ValueTracking(ValueRole.Velocity, ValueSource.Close, VT.EMA(3))
+      )
+      val condition = Condition.Composite(
+        NonEmptyList.of(
+          Condition.ValueUpdated(ValueRole.Price, BigDecimal(4)),
+          Condition.Composite(
+            NonEmptyList.of(
+              Condition.ValueUpdated(ValueRole.Momentum, BigDecimal(3)),
+              Condition.ThresholdCrossing(BigDecimal(3), BigDecimal(4), Direction.Upward, Boundary.Upper)
+            )
+          ),
+          Condition.ValueUpdated(ValueRole.Velocity, BigDecimal(3.75))
+        )
+      )
+      SignalDetector.pure.detect(Users.uid, data)(indicator) mustBe Some(expectedSignal(data, indicator, condition))
+    }
+  }
+
+  private def bandIndicators(multiplier: Double): List[Indicator] = List(
+    Indicator.KeltnerChannel(ValueSource.Close, VT.EMA(3), 2, multiplier),
+    Indicator.BollingerBands(ValueSource.Close, VT.EMA(3), 3, multiplier)
+  )
+
+  private def dataFor(closes: List[Double]): MarketTimeSeriesData = {
+    val prices = closes.zipWithIndex.map { (close, index) =>
+      PriceRange(close - 0.002, close + 0.004, close - 0.003, close, 1000.0, Instant.EPOCH.minusSeconds(index.toLong * 3600))
+    }
+    Markets.timeSeriesData.copy(prices = NonEmptyList.fromListUnsafe(prices))
+  }
+
+  private def expectedSignal(data: MarketTimeSeriesData, indicator: Indicator, condition: Condition): Signal =
+    Signal(Users.uid, data.currencyPair, data.interval, condition, indicator, data.latestTime)
 
   extension [A](nel: NonEmptyList[A])
     def drop(n: Int): NonEmptyList[A] =

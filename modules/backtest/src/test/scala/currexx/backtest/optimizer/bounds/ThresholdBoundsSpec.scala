@@ -22,7 +22,7 @@ class ThresholdBoundsSpec extends IOWordSpec {
 
   private def firesSomewhereOn(line: List[Double], ub: Double, lb: Double): Boolean =
     line.sliding(2).exists {
-      case previous :: current :: Nil => Condition.thresholdCrossing(List(current, previous), lb, ub).isDefined
+      case previous :: current :: Nil => Condition.thresholdCrossing(Array(current, previous), lb, ub).isDefined
       case _                          => false
     }
 

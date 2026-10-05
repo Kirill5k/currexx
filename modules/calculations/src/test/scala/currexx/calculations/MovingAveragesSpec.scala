@@ -68,7 +68,36 @@ class MovingAveragesSpec extends AnyWordSpec with Matchers {
       jma.take(6).map(rounded(4)) mustBe List(1.1263, 1.1194, 1.1156, 1.1184, 1.1247, 1.1351)
     }
 
-    // 1.2999, 1.1214, 1.1155, 1.1169, 1,1223, 1.1341
+    "preserve array JMA initialization and constant series across periods" in {
+      MovingAverages.jurikSimplified(Array.emptyDoubleArray, 14, 0, 2).toList mustBe Nil
+      MovingAverages.jurikSimplified(Array(3.0), 14, 0, 2).toList mustBe List(3.0)
+      for {
+        period <- List(1, 14, 100, 101)
+        phase  <- List(-150, 0, 150)
+      }
+        MovingAverages.jurikSimplified(Array.fill(100)(1.0), period, phase, 2).toList mustBe List.fill(100)(1.0)
+      val signedZero = MovingAverages.jurikSimplified(Array(-0.0), 14, 0, 2).head
+      java.lang.Double.doubleToRawLongBits(signedZero) mustBe java.lang.Double.doubleToRawLongBits(-0.0)
+    }
+
+    "keep JMA input arrays and outputs independent" in {
+      val input  = Array(5.0, 4.0, 3.0, 2.0, 1.0)
+      val first  = MovingAverages.jurikSimplified(input, 1, 0, 2)
+      val second = MovingAverages.jurikSimplified(input, 1, 0, 2)
+      first.toList mustBe List(5.0, 4.0, 3.0, 2.0, 1.0)
+      first(0) = -1.0
+      input.toList mustBe List(5.0, 4.0, 3.0, 2.0, 1.0)
+      second.toList mustBe List(5.0, 4.0, 3.0, 2.0, 1.0)
+    }
+
+    "propagate nonfinite JMA prices after initialization" in {
+      for (price <- List(Double.NaN, Double.PositiveInfinity, Double.NegativeInfinity)) {
+        val result = MovingAverages.jurikSimplified(Array(price, 2.0, 1.0), 3, 0, 2)
+        result.head.isNaN mustBe true
+        result.last mustBe 1.0
+      }
+      succeed
+    }
   }
 
   def rounded(scale: Int)(num: Double): Double =
