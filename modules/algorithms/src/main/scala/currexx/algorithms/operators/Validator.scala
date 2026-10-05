@@ -24,6 +24,9 @@ trait Validator[F[_], I]:
 
 object Validator:
 
+  /** A candidate clears the validation gate only when its validation fitness is strictly positive. */
+  def passesGate(fitness: Fitness): Boolean = fitness.value > 0.0
+
   /** Re-scores the best `shortlistSize` distinct individuals of a finished population and reorders it by what they scored — see
     * `consensusOrder` for what "reorders" means, which is not simply the best validation figure first.
     *
@@ -60,6 +63,9 @@ object Validator:
   /** Reserves a representative of each final species before filling the same bounded validation shortlist by training fitness. The caller
     * supplies canonical candidates already rescored on the complete training evidence. Distinctness uses candidate equality, not distance:
     * two different candidates may have zero distance in a caller's search space.
+    *
+    * This generic helper has no protected-baseline policy. A caller that reserves baselines separately should assemble its shortlist first
+    * and pass it to `shortlisted`.
     */
   def speciesShortlisted[F[_]: MonadThrow, I](
       shortlistSize: Int,
@@ -127,7 +133,7 @@ object Validator:
     * training-ranked best and reports itself as having selected nothing.
     */
   private def consensusOrder[I](validated: ValidatedPopulation[I], tieBand: TieBand): ValidatedPopulation[I] =
-    val (survived, failed) = validated.partition(_._3.value > 0.0)
+    val (survived, failed) = validated.partition { case (_, _, validation) => passesGate(validation) }
     if (survived.isEmpty) failed
     else
       val best               = survived.map(_._3.value).max

@@ -151,16 +151,18 @@ class OptimisationReportSpec extends IOWordSpec {
       val text = OptimisationReportRenderer.sections(report).flatMap { case (heading, lines) => heading :: lines }.mkString("\n")
       text must include("Champion selection: report-test")
       text must include("SELECTED (from 2 after validation")
+      text must include("Selection source: searched candidate selected.")
       text must include("strongest seed on training (training seed): -0.500000")
       text must include("strongest seed on validation (validation seed): -0.400000")
-      text must include("Final training leader vs strongest seed on training (training seed): +1.000000")
-      text must include("Final training leader vs strongest seed on validation (validation seed): -0.500000")
+      text must include("Shortlist training leader vs strongest seed on training (training seed): +1.000000")
+      text must include("Shortlist training leader vs strongest seed on validation (validation seed): -0.500000")
       text must include("n/a (baseline is zero)")
       text must include("#1: first seen=7")
       text must include("retained (exact)")
       text must include("closed=20; forced=1; costs=3")
       text must include("portfolio drawdown=0.50%")
       text must include("Search + rescore: candidate requests=")
+      text must include("Final rescore requests: 2 (includes missing baseline evaluations).")
       text must include("Search cache reuses: 9 (includes waiting on an in-flight computation).")
       text must include("reporting duration: 20 ms")
     }
@@ -248,6 +250,49 @@ class OptimisationReportSpec extends IOWordSpec {
       text must include("strongest seed on training (literal): +0.000000")
       text must include("restored (fixed inputs restored): duplicate of target")
       text must include("baselines=target, literal, restored (fixed inputs restored)")
+      text must include("Selection source: target retained.")
+      (text must not).include("Selection source: supplied seed parameters selected")
+    }
+
+    "identify selected seed parameters and their aliases without claiming they are the original seed strategy" in {
+      val target    = indicator(10)
+      val candidate = indicator(20)
+      val report    = OptimisationReport(
+        round.name,
+        round.corpus,
+        Vector((candidate, Fitness(0.5), Fitness(0.2))),
+        List(
+          BaselineReport("target", Some(target), None),
+          BaselineReport("seed", Some(candidate), Some(IndicatorSearchSpace.SeedDisposition.Accepted)),
+          BaselineReport(
+            "alias",
+            Some(candidate),
+            Some(IndicatorSearchSpace.SeedDisposition.SeedDuplicate(0)),
+            fixedInputsRestored = true
+          )
+        ),
+        Map(target -> measured(target), candidate -> measured(candidate)),
+        Map.empty,
+        RunDiagnostics.Snapshot(),
+        RunDiagnostics.Workload(),
+        1.second,
+        10.millis
+      )
+      val text = OptimisationReportRenderer.sections(report).flatMap(_._2).mkString("\n")
+      text must include(
+        "Selection source: supplied seed parameters selected (seed, alias (fixed inputs restored)); " +
+          "evaluated under this round's rules."
+      )
+      text must include("#1: first seen=not observed")
+      (text must not).include("no improvement")
+
+      List(0.0, -0.1, Double.NaN).foreach { validation =>
+        val rejected     = report.copy(finalists = Vector((candidate, Fitness(0.5), Fitness(validation))))
+        val rejectedText = OptimisationReportRenderer.sections(rejected).flatMap(_._2).mkString("\n")
+        rejectedText must include("NOTHING SELECTED:")
+        (rejectedText must not).include("Selection source:")
+      }
+      succeed
     }
 
     "report missing validation without claiming that constraints passed" in {
@@ -268,6 +313,7 @@ class OptimisationReportSpec extends IOWordSpec {
       text must include("NOTHING SELECTED: validation measurements are unavailable.")
       text must include("Validation: unavailable.")
       (text must not).include("Satisfies every constraint")
+      (text must not).include("Selection source:")
     }
 
     "handle an empty final population" in {

@@ -6,7 +6,6 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
-import currexx.algorithms.operators.Evaluator
 import currexx.algorithms.Fitness
 import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.optimizer.reporting.{CandidateDiagnostics, FoldDiagnostics, RunDiagnostics}
@@ -78,7 +77,7 @@ object IndicatorObjective {
   }
 
   final case class Operators[F[_]](
-      evaluator: Evaluator[F, Indicator],
+      evaluator: FoldRotatingEvaluator[F],
       validationObjective: Indicator => F[Fitness],
       backtest: Indicator => F[List[List[OrderStats]]],
       validate: Indicator => F[List[OrderStats]],

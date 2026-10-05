@@ -29,10 +29,29 @@ final class FoldRotatingEvaluator[F[_]: MonadThrow](
 ) extends Evaluator[F, Indicator]:
 
   override def evaluateIndividual(indicator: Indicator, phase: EvaluationPhase): F[(Indicator, Fitness)] =
+    evaluate(indicator, phase, (_, _) => MonadThrow[F].unit)
+
+  /** A run-local view observes successful searches while sharing the existing fold-score cache and diagnostics. */
+  def observingSearch(callback: (Indicator, Fitness) => F[Unit]): Evaluator[F, Indicator] =
+    val onSearch = (candidate: Indicator, scores: List[Double]) =>
+      callback(candidate, Fitness(IndicatorObjective.FoldAggregation.combine(scores)))
+    new Evaluator[F, Indicator] {
+      override def evaluateIndividual(indicator: Indicator, phase: EvaluationPhase): F[(Indicator, Fitness)] =
+        phase match
+          case EvaluationPhase.Search(_) => evaluate(indicator, phase, onSearch)
+          case EvaluationPhase.Rescore   => FoldRotatingEvaluator.this.evaluateIndividual(indicator, phase)
+    }
+
+  private def evaluate(
+      indicator: Indicator,
+      phase: EvaluationPhase,
+      onEvaluated: (Indicator, List[Double]) => F[Unit]
+  ): F[(Indicator, Fitness)] =
     MonadThrow[F].fromEither(canonicalise(indicator)).flatMap { candidate =>
       observer.traverse_(_.requested(phase)).flatMap { _ =>
         foldScores(candidate)
           .flatTap(scores => observer.traverse_(_.observed(candidate, phase, scores)))
+          .flatTap(scores => onEvaluated(candidate, scores))
           .map(scores => candidate -> Fitness(IndicatorObjective.FoldAggregation.combineExcluding(scores, withheldFold(phase))))
       }
     }

@@ -26,6 +26,22 @@ class IndicatorObjectiveSpec extends IOWordSpec {
     validationFold = List(MarketDataProvider.majors1hCorpus.validationFold.head)
   )
 
+  private def assembledValidator(
+      space: IndicatorSearchSpace,
+      objective: IndicatorObjective.Operators[IO],
+      validator: Validator[IO, Indicator],
+      size: Int
+  ): IO[Validator[IO, Indicator]] =
+    for {
+      baselines <- IO.fromEither(FinalistAssembler.protectedBaselines(space, Nil, size))
+      archive   <- SearchArchive.make[IO](size)
+      assembler = FinalistAssembler.ga(
+        space,
+        baselines,
+        objective.evaluator.evaluateIndividual(_, EvaluationPhase.Rescore)
+      )
+    } yield OptimisationAlgorithm.assemblingValidator(archive, assembler, validator)
+
   "IndicatorObjective.make" should {
 
     "hand back a backtest that reproduces the run its fitness came from" in {
@@ -137,7 +153,7 @@ class IndicatorObjectiveSpec extends IOWordSpec {
           searchSpace = Some(space)
         )
         validator <- Validator.shortlisted[IO, Indicator](2, objective.validationObjective)
-        scoped = OptimisationAlgorithm.canonicalValidator(space, validator)
+        scoped    <- assembledValidator(space, objective, validator, 2)
         finalists <- scoped.validate(
           Vector(alias -> Fitness(3.0), target.indicator -> Fitness(2.0), alternative -> Fitness(1.0))
         )
@@ -156,7 +172,7 @@ class IndicatorObjectiveSpec extends IOWordSpec {
       }
     }
 
-    "canonicalise a configured validator's inputs before its custom selection reads validation evidence" in {
+    "assemble canonical distinct candidates before a configured validator reads validation evidence" in {
       val target = TestStrategy.s5_optimized_v2
       val alias  = target.indicator match
         case Indicator.Composite(children, combinator) =>
@@ -209,7 +225,7 @@ class IndicatorObjectiveSpec extends IOWordSpec {
               }
               .map(_.toVector)
         }
-        scoped = OptimisationAlgorithm.canonicalValidator(space, validator)
+        scoped           <- assembledValidator(space, objective, validator, 2)
         _                <- objective.evaluator.evaluateIndividual(alias, EvaluationPhase.Rescore)
         beforeValidation <- (received.get, callbackCalls.get).tupled
         finalists        <- scoped.validate(
@@ -222,7 +238,7 @@ class IndicatorObjectiveSpec extends IOWordSpec {
       result.asserting { case (beforeValidation, finalists, replayed, afterValidation) =>
         beforeValidation mustBe ((Vector.empty, 0))
         afterValidation mustBe ((
-          Vector(Vector(target.indicator -> Fitness(3.0), target.indicator -> Fitness(2.0), alternative -> Fitness(1.0))),
+          Vector(Vector(target.indicator -> Fitness(3.0), alternative -> Fitness(1.0))),
           1
         ))
         replayed must not be empty
@@ -254,7 +270,7 @@ class IndicatorObjectiveSpec extends IOWordSpec {
           diagnostics = Some(diagnostics)
         )
         validator <- Validator.shortlisted[IO, Indicator](1, objective.validationObjective)
-        scoped = OptimisationAlgorithm.canonicalValidator(space, validator)
+        scoped    <- assembledValidator(space, objective, validator, 1)
         // Construction must succeed; only running each returned effect may fail with the schema error.
         effects <- IO {
           List(

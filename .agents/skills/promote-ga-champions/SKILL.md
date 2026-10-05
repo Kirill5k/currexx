@@ -58,7 +58,8 @@ Older reports may lack the diagnostic sections. Treat absent measurements as una
 Do not rerun an optimisation just to fill them in.
 
 **Scope extraction to its section.** Several sections contain `Indicator:` lines: the selected
-candidate, final training leader, and best candidate ever searched can differ. Never choose the
+candidate, shortlist training leader, and best candidate ever searched can differ. Older
+reports call the shortlist training leader `Final training leader`. Never choose the
 last `Indicator:` in the file or replace the champion with the largest score found elsewhere.
 
 The `Final Results` columns are `rank train# training validation retained individual`.
@@ -68,12 +69,23 @@ score are ordered by training, then the remaining survivors by validation. The c
 band is 5%; do not re-sort the shortlist by validation alone. `train#` ranks finalists by
 training; it is not a rank among every candidate the run ever evaluated.
 
+Current runs reserve shortlist places for the target and distinct compatible effective
+seeds, then consider the final population and a bounded all-fold search archive. GA fills
+remaining places by training fitness; SCGA also preserves unrepresented species where
+capacity permits. The archive has the same capacity as the shortlist and does not feed
+candidates back into evolution. A shortlisted candidate need not have survived in the final
+population. These selection changes do not apply retroactively to older reports.
+
 Use this precedence:
 
 - **`SELECTED (from N after validation, ties inside ... broken on training): ...`** identifies
   the selected champion. Older `SELECTED (best of N on validation): ...` wording is also valid
   for its report. Read the indicator from that champion block and cross-check final rank 1.
   Copy any `BREACHES` lines: a breach can discount fitness without disqualifying the candidate.
+  The optional `Selection source:` line distinguishes a retained target, supplied seed
+  parameters, and a searched candidate. A selected seed may improve on the target, but its
+  parameters are evaluated under the current round's rules; check duplicates before adding
+  anything. Target retention does not establish a newly discovered strategy.
 - **`NOTHING SELECTED: ...`** means no champion cleared the configured gate, or validation was
   unavailable. The leading finalist can still be added for reference under the existing
   workflow, but label it **diagnostic only**, not selected or validation-approved. If the user
@@ -100,14 +112,15 @@ Read the diagnostics with these meanings:
 |---|---|
 | Baseline measurements | Target and named seed training/validation scores, accepted or incompatible status, and aliases after fixed inputs are restored. Seed parameters are evaluated under this round's rules, not the seed strategy's original rules. |
 | Baseline comparisons | Per-fold net, trade, forced-closure, cost, drawdown, and breach differences against the target; fitness differences against the target and strongest seed for each metric. Report training and validation disagreements separately. A zero baseline has no percentage improvement. |
-| Leader fold diagnostics | Measurements for the leading finalist, distinct final training leader, and distinct best-seen candidate. Each fold resets state and liquidates remaining positions at its end; these are segment results, not continuous multi-year net. |
-| Finalist provenance | First successful search evaluation, including generation 0, plus baseline and catalogue matches. Validation, rescoring, and reporting replays do not establish a discovery generation. |
-| Search observations and workload | Best all-fold fitness ever searched, whether it survived into the shortlist, requests, cache computations/reuse, actual simulations, and separate optimisation/reporting durations. Search + rescore requests include cache hits and in-flight waiters; requests are not independent candidates or simulations. |
+| Leader fold diagnostics | Measurements for the leading finalist, distinct shortlist training leader (called `Final training leader` in older reports), and distinct best-seen candidate. The training leader may originate from the archive or protected baselines. Each fold resets state and liquidates remaining positions at its end; these are segment results, not continuous multi-year net. |
+| Finalist provenance | First successful search evaluation, including generation 0, plus baseline and catalogue matches. Validation, rescoring, and reporting replays do not establish a discovery generation. A baseline first evaluated during final assembly has `first seen=not observed`. |
+| Search observations and workload | Best all-fold fitness ever searched, whether it reached the shortlist, requests, cache computations/reuse, actual simulations, and separate optimisation/reporting durations. Final rescore requests include missing baseline evaluations. Search + rescore requests include cache hits and in-flight waiters; requests are not independent candidates or simulations. |
 
 `Stable progress` uses all-fold fitness and can be compared across generations. Ordinary
 `Top Members` scores use rotating folds and cannot. The best-seen candidate may have been
-lost from the population; its later diagnostic replay does not select it. Do not add it as an
-extra champion just because the report now exposes it.
+lost from the population and considered through the archive, but archive membership alone
+does not guarantee shortlisting or selection. Its later diagnostic replay does not select
+it. Do not add it as an extra champion just because the report now exposes it.
 
 ## Step 3 — Find the base strategy, detect duplicates, and pick a name
 

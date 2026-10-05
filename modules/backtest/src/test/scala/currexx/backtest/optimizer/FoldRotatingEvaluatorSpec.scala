@@ -2,7 +2,7 @@ package currexx.backtest.optimizer
 
 import cats.effect.{Deferred, IO, Ref}
 import cats.syntax.all.*
-import currexx.algorithms.EvaluationPhase
+import currexx.algorithms.{EvaluationPhase, Fitness}
 import currexx.backtest.{OrderStats, TestStrategy}
 import currexx.backtest.optimizer.reporting.RunDiagnostics
 import currexx.domain.signal.{Indicator, ValueRole, ValueSource, ValueTransformation}
@@ -270,6 +270,102 @@ class FoldRotatingEvaluatorSpec extends IOWordSpec {
         snapshot.bestSeen mustBe Some(RunDiagnostics.Discovery(indicator, IndicatorObjective.FoldAggregation.combine(steady), 0))
         snapshot.firstSeen mustBe Map(indicator -> 0, other -> 0)
         snapshot.computationAttempts mustBe 2L
+      }
+    }
+  }
+
+  "FoldRotatingEvaluator.observingSearch" should {
+
+    "observe all-fold fitness from generation zero without changing rotating scores or workload" in {
+      val backtests = scores.map(score => (_: Indicator) => IO.pure(stats(score)))
+      val phases    = List(EvaluationPhase.Search(0), EvaluationPhase.Search(2), EvaluationPhase.Rescore)
+      val result    = for
+        reference    <- FoldRotatingEvaluator.cached[IO](backtests, scoring())
+        expected     <- phases.traverse(reference.evaluateIndividual(indicator, _))
+        diagnostics  <- RunDiagnostics.make[IO]
+        evaluator    <- FoldRotatingEvaluator.cached[IO](backtests, scoring(), observer = Some(diagnostics.evaluatorObserver))
+        observations <- Ref.of[IO, Vector[(Indicator, Fitness)]](Vector.empty)
+        view = evaluator.observingSearch((candidate, fitness) => observations.update(_ :+ (candidate -> fitness)))
+        evaluated <- phases.traverse(view.evaluateIndividual(indicator, _))
+        observed  <- observations.get
+        snapshot  <- diagnostics.snapshot
+      yield (expected, evaluated, observed, snapshot)
+
+      result.asserting { case (expected, evaluated, observed, snapshot) =>
+        evaluated mustBe expected
+        observed mustBe Vector.fill(2)(indicator -> Fitness(IndicatorObjective.FoldAggregation.combine(scores)))
+        snapshot.searchRequests mustBe 2L
+        snapshot.rescoreRequests mustBe 1L
+        snapshot.computationAttempts mustBe 1L
+        snapshot.cacheReuses mustBe 2L
+        snapshot.workloads(RunDiagnostics.Stage.Search).foldAttempts mustBe scores.size.toLong
+        snapshot.firstSeen mustBe Map(indicator -> 0)
+      }
+    }
+
+    "observe only successful searches after a failed attempt and ignore unobserved evaluations" in {
+      val failure = new RuntimeException("temporary failure")
+      val result  = for
+        calls <- Ref.of[IO, Int](0)
+        backtest = (_: Indicator) =>
+          calls.getAndUpdate(_ + 1).flatMap {
+            case 0 => IO.raiseError[List[OrderStats]](failure)
+            case _ => IO.pure(stats(0.5))
+          }
+        evaluator <- FoldRotatingEvaluator.cached[IO](List(backtest), scoring())
+        archive   <- SearchArchive.make[IO](2)
+        view = evaluator.observingSearch(archive.record)
+        failed       <- view.evaluateIndividual(indicator, EvaluationPhase.Search(0)).attempt
+        afterFailed  <- archive.candidates
+        _            <- view.evaluateIndividual(indicator, EvaluationPhase.Rescore)
+        _            <- evaluator.evaluateIndividual(other, EvaluationPhase.Search(0))
+        afterRescore <- archive.candidates
+        _            <- view.evaluateIndividual(indicator, EvaluationPhase.Search(1))
+        observed     <- archive.candidates
+        count        <- calls.get
+      yield (failed, afterFailed, afterRescore, observed, count)
+
+      result.asserting { case (failed, afterFailed, afterRescore, observed, count) =>
+        failed mustBe Left(failure)
+        afterFailed mustBe Vector.empty
+        afterRescore mustBe Vector.empty
+        observed mustBe Vector(indicator -> Fitness(0.5))
+        count mustBe 3
+      }
+    }
+
+    "share in-flight canonical fold scores between independent observer views" in {
+      val alias  = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SMA(11))
+      val result = for
+        started <- Deferred[IO, Unit]
+        release <- Deferred[IO, Unit]
+        calls   <- Ref.of[IO, Int](0)
+        backtest = (_: Indicator) => calls.update(_ + 1) >> started.complete(()) >> release.get.as(stats(0.5))
+        evaluator <- FoldRotatingEvaluator
+          .cached[IO](List(backtest), scoring(), candidate => Right(if (candidate == alias) indicator else candidate))
+        firstArchive  <- SearchArchive.make[IO](2)
+        secondArchive <- SearchArchive.make[IO](2)
+        firstView  = evaluator.observingSearch(firstArchive.record)
+        secondView = evaluator.observingSearch(secondArchive.record)
+        first            <- firstView.evaluateIndividual(alias, EvaluationPhase.Search(0)).start
+        _                <- started.get
+        second           <- secondView.evaluateIndividual(indicator, EvaluationPhase.Search(2)).start
+        _                <- IO.cede
+        _                <- release.complete(())
+        a                <- first.joinWithNever
+        b                <- second.joinWithNever
+        _                <- firstView.evaluateIndividual(other, EvaluationPhase.Rescore)
+        firstCandidates  <- firstArchive.candidates
+        secondCandidates <- secondArchive.candidates
+        count            <- calls.get
+      yield (a, b, firstCandidates, secondCandidates, count)
+
+      result.asserting { case (a, b, firstCandidates, secondCandidates, count) =>
+        a mustBe (indicator -> Fitness(0.5))
+        b mustBe a
+        firstCandidates mustBe Vector(a)
+        secondCandidates mustBe Vector(a)
+        count mustBe 2
       }
     }
   }

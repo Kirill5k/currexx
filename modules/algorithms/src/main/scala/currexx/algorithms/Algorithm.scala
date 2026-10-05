@@ -101,7 +101,8 @@ object Algorithm {
     *
     * Species are rebuilt each generation; conservation protects each current representative for one transition, not a permanent species
     * identity. Selection allocates one champion and at least one child per species before distributing the remaining budget by rank. The
-    * injected validator controls the final shortlist; use Validator.speciesShortlisted to retain diversity at validation too.
+    * injected validator controls the final shortlist. Validator.speciesShortlisted provides generic representative preservation; callers
+    * with protected baselines can assemble their own species-aware shortlist before invoking Validator.shortlisted.
     */
   case object SCGA extends Algorithm[Alg.SCGA, Parameters.SCGA] {
     override def optimise[I](target: I, params: Parameters.SCGA): Free[Op[*, I], ValidatedPopulation[I]] =

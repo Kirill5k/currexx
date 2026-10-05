@@ -76,6 +76,85 @@ class OptimisationAlgorithmSpec extends IOWordSpec {
   }
 
   "The round-configured optimisation dispatcher" should {
+    "reject invalid baseline budgets before loading the corpus or creating a report" in {
+      given random: Random = Random(91)
+      val params           = Parameters.GA(1, 0, 0.0, 0.0, 0.0, shuffle = false)
+      val missingCorpus    = Corpus(List(List(Dataset("missing-baseline-budget-test.csv"))), Nil)
+      val cases            = List(0, -1, 1).map(size => (s"baseline-budget-$size-${UUID.randomUUID()}", size))
+
+      cases
+        .traverse { case (label, size) =>
+          for
+            result <- OptimisationAlgorithm
+              .indicator[IO](round(label, params).copy(shortlistSize = size, corpus = missingCorpus), 1)
+              .attempt
+            reports <- readReports(label)
+          yield (result, reports)
+        }
+        .asserting { results =>
+          results.foreach { case (result, reports) =>
+            result match
+              case Left(error: IllegalArgumentException) => error.getMessage.toLowerCase must include("shortlist")
+              case other                                 => fail(s"Expected baseline budget failure, got $other")
+            reports mustBe empty
+          }
+          random.nextLong() mustBe Random(91).nextLong()
+        }
+    }
+
+    "reserve a seed omitted from initialisation without inventing a search discovery" in {
+      given Random = Random(91)
+      val params   = Parameters.GA(1, 0, 0.0, 0.0, 0.0, shuffle = false)
+      val label    = s"unsearched-baseline-${UUID.randomUUID()}"
+
+      val result = for
+        algorithm <- OptimisationAlgorithm.indicator[IO](round(label, params), 1)
+        finalists <- algorithm.optimise
+        reports   <- readReports(label)
+      yield (finalists, reports)
+
+      result.asserting { case (finalists, reports) =>
+        finalists.map(_._1) mustBe Vector(strategy.indicator, indicator(70))
+        val content = reports.head._2
+        content must include("Selection source: target retained.")
+        content must include("#2: first seen=not observed; baselines=alternative (fixed inputs restored)")
+        content must include("Search evaluation requests: 1; successful: 1; distinct successfully searched candidates: 1.")
+        content must include("Final rescore requests: 2")
+        content must include("Validation: candidate requests=2; folds=2/2 completed/attempted")
+        reports must have size 1
+      }
+    }
+
+    "start a fresh archive for each invocation of the same configured optimiser" in {
+      // Each zero-generation run has the target and one distinct jitter. The earlier jitter wins lexical ties,
+      // so retaining the previous archive would incorrectly select it again on the second invocation.
+      class ControlledJitterRandom extends Random(91) {
+        var jitter: Double                  = 1.0
+        override def nextGaussian(): Double = jitter
+      }
+      val random   = new ControlledJitterRandom
+      given Random = random
+      val params   = Parameters.GA(2, 0, 0.0, 0.0, 0.0, shuffle = false)
+      val label    = s"fresh-run-archive-${UUID.randomUUID()}"
+
+      val result = for
+        algorithm <- OptimisationAlgorithm.indicator[IO](round(label, params).copy(extraSeeds = Nil), 1)
+        first     <- algorithm.optimise
+        _         <- IO { random.jitter = 2.0 }
+        second    <- algorithm.optimise
+        _         <- readReports(label)
+      yield (first, second)
+
+      result.asserting { case (first, second) =>
+        first.map(_._1).head mustBe strategy.indicator
+        second.map(_._1).head mustBe strategy.indicator
+        first must have size 2
+        second must have size 2
+        first.last._1.toString must be < second.last._1.toString
+        second.map(_._1) must not contain first.last._1
+      }
+    }
+
     "wire GA seeds, fixed inputs, corpus, scorer, shortlist and final progress with reproducible validation" in {
       given Random = Random(91)
       val params   = Parameters.GA(2, 0, 0.0, 0.0, 0.0, shuffle = false)
@@ -225,6 +304,31 @@ class OptimisationAlgorithmSpec extends IOWordSpec {
 
       val result = for
         algorithm <- OptimisationAlgorithm.indicator[IO](round(label, params).copy(scoringFunction = failingSearch), 1)
+        outcome   <- algorithm.optimise.attempt
+        reports   <- readReports(label)
+      yield (outcome, reports)
+
+      result.asserting { case (outcome, reports) =>
+        outcome mustBe Left(failure)
+        reports must have size 1
+        (reports.head._2 must not).include("## Final Results")
+        (reports.head._2 must not).include("## Incomplete diagnostics")
+      }
+    }
+
+    "propagate final validation failures instead of treating them as optional diagnostics" in {
+      given Random          = Random(17)
+      val params            = Parameters.GA(1, 0, 0.0, 0.0, 0.0, shuffle = false)
+      val label             = s"validation-failure-test-${UUID.randomUUID()}"
+      val failure           = new IllegalStateException("Deliberate validation failure")
+      val failingValidation = new ScoringFunction {
+        override def score(stats: List[OrderStats]): Double =
+          if (scoring.score(stats) == 10.0) throw failure else scoring.score(stats)
+        override def violations(stats: List[OrderStats]): List[ScoringFunction.Violation] = Nil
+      }
+
+      val result = for
+        algorithm <- OptimisationAlgorithm.indicator[IO](round(label, params).copy(scoringFunction = failingValidation), 1)
         outcome   <- algorithm.optimise.attempt
         reports   <- readReports(label)
       yield (outcome, reports)

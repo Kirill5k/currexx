@@ -2,17 +2,58 @@
 
 GA and SCGA runs retain their existing Markdown reports in `optimisation-results/`
 and console output. Additional diagnostics measure what changed relative to the
-round's starting parameters. They do not alter scoring, selection, the search
-budget, or random-number generation.
+round's starting parameters. Diagnostics observe completed selection; they do not
+supply candidate state or feed measurements back into search.
+
+## Finalist selection
+
+Each run reserves places for the canonical target and every distinct compatible
+effective seed within its configured shortlist size (normally 25). Fixed-input
+aliases share one place; incompatible seeds are excluded. A nonpositive shortlist
+size or more distinct baselines than places fails before search. Baselines can
+occupy the entire shortlist.
+
+A separate bounded search archive retains the strongest distinct candidates by
+all-fold fitness, including candidates later lost from the population. Its capacity
+equals the shortlist size. Successful search evaluations, including generation 0,
+update the archive using existing fold scores, without additional simulations.
+The archive is fresh for each optimisation invocation and is never reinserted into
+the evolving population. Archive fitness ties use canonical indicator text,
+independently of the discovery-generation tie break used by diagnostics.
+
+After evolution, GA fills unreserved places from the archive and final population
+by all-fold fitness. SCGA first reserves representatives of species not already
+covered by a protected baseline within the representative's configured radius,
+where capacity permits, then fills remaining places by all-fold fitness. Forced
+assignment to a species at the species cap does not establish that proximity.
+Archive membership does not guarantee validation.
+Baselines missing an all-fold score are rescored through the existing search cache.
+Each shortlisted candidate is validated once after evolution finishes.
+
+The positive-validation gate, validation-first ordering, and 5% tie band remain
+unchanged. Before validation, training-fitness ties favour the target, then seeds in
+configured order, then discoveries by canonical indicator text. The champion block
+identifies whether the target was retained, supplied seed parameters were selected
+under the round's rules, or a searched candidate was selected. A seed win can
+improve upon the target; it is not automatically a new strategy or a lack of
+improvement. Previously promoted seeds may already have been selected on the same
+validation period, so these comparisons do not supply independent evidence of
+out-of-sample performance.
+
+Scoring formulas, evolution operators, initial seed injection, and random-number
+consumption are unchanged. Search archive and finalist assembly failures propagate
+as selection failures rather than incomplete diagnostics.
 
 ## Fitness and candidate identity
 
 Generation progress uses rotating search folds: one fold is excluded from each
 generation's selection score. Compare the separately labelled **all-fold fitness**
-across generations. Its best-seen candidate may have been lost from the final
-population; reporting it does not reinsert it into the shortlist.
+across generations. Candidates lost from the final population can remain eligible
+through the bounded archive. Equal-score ties can retain a different candidate
+from the one identified as best-seen by diagnostics. Reporting a candidate does
+not select it or guarantee a shortlist place.
 
-The final shortlist and champion verdict retain the existing selection policy.
+The champion verdict retains the existing validation policy.
 When every finalist fails validation, the first finalist is recorded for
 diagnostics only. A higher training score does not establish better validation
 performance, and neither establishes fresh out-of-sample performance.
@@ -26,15 +67,18 @@ matches, not strategy duplicates.
 
 First appearance means the first successful search evaluation of a canonical
 candidate. Generation 0 includes oversampled initial candidates. Rescoring,
-validation, and report-only backtests cannot create a first appearance.
+validation, and report-only backtests cannot create a first appearance. A baseline
+first evaluated during final assembly is reported as `not observed` in search.
 
 ## Measurement and overhead
 
 After selection finishes, reporting replays only distinct effective candidates
-from the target, compatible seeds, leading finalist, final training leader, and
+from the target, compatible seeds, leading finalist, shortlist training leader, and
 best all-fold candidate seen during search, including one lost from the final
 population. Baseline comparisons show fitness and per-fold net differences;
 training and validation comparisons remain separate.
+The shortlist training leader may come from the final population, archive, or
+protected baselines; it need not be the final population's training leader.
 Each fold is reduced immediately to fitness, net profit, trade and forced-closure
 counts, costs, drawdown, and constraint breaches. Full trade and equity histories
 are not retained in the search cache.
@@ -48,7 +92,8 @@ Workload is split into search plus rescoring, validation, reporting, and direct
 backtests. Both validation for selection and explicit validation replays belong
 to validation; raw `backtest` calls belong to direct backtests. Only diagnostic
 inspection belongs to reporting. Evaluation requests include reused candidates;
-computation attempts count actual cache fills, including retries. Cache reuse
+final rescore requests include any missing baseline evaluations. Computation
+attempts count actual cache fills, including retries. Cache reuse
 includes callers waiting on an in-flight
 computation. Fold and pair simulation counts are measured at execution, rather
 than estimated from population size. Started and completed counts can differ
@@ -68,7 +113,10 @@ still propagate; recovery applies only to reporting after selection finishes.
   for duplicate detection. A completeness test checks the catalogue against every
   public `TestStrategy` definition, including newly added ones.
 - Supply extra seeds as `NamedIndicator(name, indicator)` values. Seed resolution
-  belongs to `IndicatorSearchSpace`, shared by search and reporting.
+  belongs to `IndicatorSearchSpace`, shared by search, finalist assembly, and reporting.
+- Keep bounded candidate retention in `SearchArchive` and baseline reservation,
+  merging, and species-aware shortlisting in `FinalistAssembler`. Neither depends
+  on reporting state. `Validator.shortlisted` owns validation and consensus ordering.
 - Keep observation and counters in `RunDiagnostics`, pooled simulation execution
   in `IndicatorBacktest`, evaluation and diagnostic inspection in
   `IndicatorObjective`, report assembly in `OptimisationReportBuilder`, and text

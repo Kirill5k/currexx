@@ -39,7 +39,7 @@ object OptimisationReportRenderer:
         report.finalists,
         breaches,
         validationAvailable
-      )),
+      ) ::: selectionSource(report)),
       "Baseline measurements"            -> baselineLines(report),
       "Baseline comparisons"             -> comparisonLines(report),
       "Leader fold diagnostics"          -> leaderLines(report),
@@ -66,7 +66,7 @@ object OptimisationReportRenderer:
           if (!validationAvailable) List("Validation diagnostics unavailable: no validation measurements.")
           else if (breaches.isEmpty) List("Satisfies every constraint on validation data.")
           else s"BREACHES ${breaches.size} constraint(s) on validation data:" :: breaches.map(breach => s"  - $breach")
-        if (validation.value <= 0.0)
+        if (!Validator.passesGate(validation))
           List(
             if (validationAvailable) "NOTHING SELECTED: no finalist scored above zero on data it was never searched against."
             else "NOTHING SELECTED: validation measurements are unavailable.",
@@ -95,6 +95,16 @@ object OptimisationReportRenderer:
       }
       val matches = baseline.effective.toList.flatMap(indicator => report.catalogueMatches.getOrElse(indicator, Nil))
       List(s"${baselineLabel(baseline)}: $disposition; $measurement", s"  ${catalogueText(matches)}")
+    }
+
+  private def selectionSource(report: OptimisationReport): List[String] =
+    report.finalists.headOption.filter { case (_, _, validation) => Validator.passesGate(validation) }.toList.map { case (champion, _, _) =>
+      val matches = report.baselines.filter(_.effective.contains(champion))
+      if (matches.exists(_.disposition.isEmpty)) "Selection source: target retained."
+      else if (matches.nonEmpty)
+        s"Selection source: supplied seed parameters selected (${matches.map(baselineLabel).mkString(", ")}); " +
+          "evaluated under this round's rules."
+      else "Selection source: searched candidate selected."
     }
 
   private def comparisonLines(report: OptimisationReport): List[String] =
@@ -164,7 +174,7 @@ object OptimisationReportRenderer:
     val training = report.finalists.sortBy(c => -c._2.value).headOption.map(_._1).filterNot(first.contains)
     val best     =
       report.diagnostics.bestSeen.map(_.indicator).filterNot(indicator => first.contains(indicator) || training.contains(indicator))
-    val roles = first.toList.map("Leading finalist" -> _) ++ training.toList.map("Final training leader" -> _) ++ best.toList.map {
+    val roles = first.toList.map("Leading finalist" -> _) ++ training.toList.map("Shortlist training leader" -> _) ++ best.toList.map {
       indicator =>
         val label =
           if (report.finalists.exists(_._1 == indicator)) "Best all-fold search candidate"
@@ -220,7 +230,7 @@ object OptimisationReportRenderer:
     best ::: List(
       s"Search evaluation requests: ${snapshot.searchRequests}; successful: ${snapshot.successfulSearchRequests}; " +
         s"distinct successfully searched candidates: ${snapshot.distinctSearchCandidates}.",
-      s"Final rescore requests: ${snapshot.rescoreRequests}.",
+      s"Final rescore requests: ${snapshot.rescoreRequests} (includes missing baseline evaluations).",
       s"Search cache computations: ${snapshot.computationAttempts} attempted, ${snapshot.completedComputations} completed; " +
         s"unique computed candidates: ${snapshot.uniqueComputedCandidates}.",
       s"Search cache reuses: ${snapshot.cacheReuses} (includes waiting on an in-flight computation)."
