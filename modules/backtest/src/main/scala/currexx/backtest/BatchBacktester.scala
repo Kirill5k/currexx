@@ -12,15 +12,6 @@ object BatchBacktester extends IOApp.Simple {
 
   /** The vals worth the runtime, including research candidates, with selection history recorded on each val.
     *
-    * `TestStrategy` also keeps older lineage vals outside this measured set. Deleted candidates and their results remain documented in
-    * their promotion report. A val is dropped from here once a descendant dominates it on the holdout or its family has been answered; it
-    * otherwise adds a line nothing reads. Unmeasured lineage vals carry a `Not in BatchBacktester` line saying which val replaced them. The
-    * sole survivor of the 2026-09-14 report candidates is s10_optimized_v7, promoted into s10. User review of the 2026-09-21 batch promoted
-    * s1_v2_optimized_v7 into s1_v2_optimized, s6_optimized_v3 into s6_optimized, and s4_optimized_v6 into s4_optimized_v2. The retained
-    * s10_optimized_v2 was subsequently renamed s10_optimized; the other 30 new candidates were deleted. See
-    * docs/ga-promotions-2026-09-21.md for all measurements and the final selection. The 2026-09-28 batch retains s1_v2_optimized_v4 and
-    * s13_optimized, and promotes s13_optimized_v5 into s13 after user review. The other 26 additions were deleted. See
-    * docs/ga-promotions-2026-09-28.md for all measurements and final decisions.
     */
   val strategies: List[(String, TestStrategy)] = StrategyCatalogue.batch
 
