@@ -11,7 +11,6 @@ object BatchBacktester extends IOApp.Simple {
   inline given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
   /** The vals worth the runtime, including research candidates, with selection history recorded on each val.
-    *
     */
   val strategies: List[(String, TestStrategy)] = StrategyCatalogue.batch
 
