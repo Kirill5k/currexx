@@ -1,14 +1,15 @@
 package currexx.backtest
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import currexx.backtest.MarketDataProvider.Dataset
+import currexx.backtest.MarketDataProvider.{Dataset, DateRange}
 import currexx.domain.market.{CurrencyPair, Interval, PriceRange}
 import kirill5k.common.cats.test.IOWordSpec
 
 import java.time.temporal.ChronoUnit
-import java.time.{Instant, ZoneOffset}
+import java.time.{Instant, YearMonth, ZoneOffset}
 
 class MarketDataProviderSpec extends IOWordSpec {
 
@@ -36,6 +37,19 @@ class MarketDataProviderSpec extends IOWordSpec {
     Export("eur-usd-1h-1year.csv", Instant.parse("2024-07-01T00:00:00Z"), 1.07456, 6113),
     Export("eur-usd-1h-1year-2025-07-2026-06.csv", Instant.parse("2025-07-01T00:00:00Z"), 1.17973, 6226)
   )
+
+  private val fullFixture   = "eur-usd-1h-walk-forward-full.csv"
+  private val firstFixture  = "eur-usd-1h-walk-forward-first.csv"
+  private val secondFixture = "eur-usd-1h-walk-forward-second.csv"
+  private val splitFixture  = Dataset(NonEmptyList.of(firstFixture, secondFixture))
+
+  private def range(from: String, until: String): Option[DateRange] = Some(DateRange(YearMonth.parse(from), YearMonth.parse(until)))
+
+  private def failsReading(dataset: Dataset, message: String): IO[org.scalatest.Assertion] =
+    MarketDataProvider.read[IO](dataset).compile.toList.attempt.map {
+      case Left(error: IllegalArgumentException) => error.getMessage must include(message)
+      case other                                 => fail(s"Expected an invalid dataset, got $other")
+    }
 
   "MarketDataProvider.read" should {
 
@@ -72,6 +86,174 @@ class MarketDataProviderSpec extends IOWordSpec {
           }
           succeed
         }
+  }
+
+  "MarketDataProvider combined history" should {
+
+    "produce identical windows when the same raw bars are split between files" in
+      (for
+        single <- MarketDataProvider.read[IO](Dataset(fullFixture)).compile.toList
+        split  <- MarketDataProvider.read[IO](splitFixture).compile.toList
+      yield {
+        split mustBe single
+        split must have size 121
+        split.map(_.latestTime).distinct must have size 121
+      }).asserting(identity)
+
+    "warm the opening bar from the preceding file without consuming the requested period" in {
+      val period = range("2024-02", "2024-03")
+      (for
+        single <- MarketDataProvider.read[IO](Dataset(fullFixture, period)).compile.toList
+        split  <- MarketDataProvider.read[IO](splitFixture.copy(range = period)).compile.toList
+      yield {
+        split mustBe single
+        split must have size 120
+        split.head.latestTime mustBe Instant.parse("2024-02-01T00:00:00Z")
+        split.head.prices.size mustBe 100
+        split.head.prices.tail.forall(_.time.isBefore(split.head.latestTime)) mustBe true
+        split.head.prices.last.time mustBe Instant.parse("2024-01-27T21:00:00Z")
+      }).asserting(identity)
+    }
+
+    "stop before the exclusive cutoff without opening a subsequent file" in {
+      val bounded = Dataset(NonEmptyList.of(fullFixture, "eur-usd-1h-file-that-does-not-exist.csv"), range("2024-01", "2024-02"))
+      MarketDataProvider.read[IO](bounded).compile.toList.asserting { windows =>
+        windows.map(_.latestTime) mustBe List(Instant.parse("2024-01-31T23:00:00Z"))
+        windows.flatMap(_.prices.toList).forall(_.time.isBefore(Instant.parse("2024-02-01T00:00:00Z"))) mustBe true
+      }
+    }
+
+    "avoid creating a short warm-up window when the date cutoff precedes the hundredth bar" in
+      MarketDataProvider
+        .read[IO](Dataset("eur-usd-1h-walk-forward-short-before-cutoff.csv", range("2024-01", "2024-02")))
+        .compile
+        .toList
+        .asserting(_ mustBe empty)
+
+    "preserve one partial window when a short export ends naturally" in
+      MarketDataProvider.read[IO](Dataset("eur-usd-1h-walk-forward-missing-month.csv")).compile.toList.asserting { windows =>
+        windows must have size 1
+        windows.head.prices.toList.map(_.time) mustBe List(
+          Instant.parse("2024-03-01T00:00:00Z"),
+          Instant.parse("2024-01-01T00:00:00Z")
+        )
+        windows.head.prices.toList.forall(_.volume > 0) mustBe true
+      }
+
+    "emit no windows when an export contains only zero-volume rows" in
+      MarketDataProvider.read[IO](Dataset("eur-usd-1h-walk-forward-empty-history.csv")).compile.toList.asserting(_ mustBe Nil)
+
+    "reject files from different pairs or intervals before loading them" in
+      List(
+        Dataset(NonEmptyList.of(firstFixture, "aud-usd-1h-missing.csv"))   -> "mixes currency pairs",
+        Dataset(NonEmptyList.of(firstFixture, "eur-usd-1day-missing.csv")) -> "mixes intervals"
+      ).traverse { case (dataset, message) => failsReading(dataset, message) }.asserting(_ => succeed)
+
+    "reject reversed bars and overlapping exports rather than silently sorting or deduplicating" in
+      List(
+        Dataset("eur-usd-1h-walk-forward-unordered.csv"),
+        Dataset("eur-usd-1h-walk-forward-duplicate.csv"),
+        Dataset(NonEmptyList.of("eur-usd-1h-walk-forward-empty-history.csv", "eur-usd-1h-walk-forward-empty-history.csv")),
+        Dataset(NonEmptyList.of(firstFixture, fullFixture)),
+        Dataset(NonEmptyList.of(secondFixture, firstFixture))
+      ).traverse(failsReading(_, "strictly increasing")).asserting(_ => succeed)
+
+    "reject a requested month containing only zero-volume bars" in {
+      val dataset = Dataset("eur-usd-1h-walk-forward-missing-month.csv", range("2024-01", "2024-04"))
+      failsReading(dataset, "no trading bars in requested month(s) 2024-02").asserting(identity)
+    }
+
+    "reject missing leading and trailing requested months" in
+      List(
+        Dataset(fullFixture, range("2023-12", "2024-03")) -> "2023-12",
+        Dataset(fullFixture, range("2024-01", "2024-04")) -> "2024-03"
+      ).traverse { case (dataset, month) => failsReading(dataset, s"no trading bars in requested month(s) $month") }.asserting(_ => succeed)
+
+    "reject empty or reversed calendar ranges" in
+      List(range("2024-02", "2024-02"), range("2024-03", "2024-02"))
+        .traverse(period => failsReading(Dataset(fullFixture, period), "range must be nonempty and increasing"))
+        .asserting(_ => succeed)
+
+    "group all three annual exports per pair and retain history over the June boundary" in {
+      val histories = MarketDataProvider.majors1hHistory
+      val eur       = histories.find(_.currencyPair == CurrencyPair.fromUnsafe("EURUSD")).get
+      MarketDataProvider.read[IO](eur.copy(range = range("2024-07", "2024-08"))).head.compile.lastOrError.asserting { first =>
+        histories must have size 6
+        histories.map(_.currencyPair).distinct must have size 6
+        histories.foreach(_.filePaths.size mustBe 3)
+        first.latestTime mustBe Instant.parse("2024-07-01T00:00:00Z")
+        first.prices.size mustBe 100
+        first.prices.last.time.isBefore(Instant.parse("2024-07-01T00:00:00Z")) mustBe true
+      }
+    }
+  }
+
+  "MarketDataProvider.fingerprint" should {
+
+    "hash the original resource bytes with SHA-256" in
+      MarketDataProvider.fingerprint[IO](fullFixture).asserting {
+        _ mustBe "98d777fa99500280cee870b259f98fdfa0120109539f1d65c398d2b95189bf8c"
+      }
+  }
+
+  "MarketDataProvider.inspectHistory" should {
+
+    "count every raw trading bar identically across one or several exports" in
+      (for
+        single <- MarketDataProvider.inspectHistory[IO](Dataset(fullFixture))
+        split  <- MarketDataProvider.inspectHistory[IO](splitFixture)
+      yield (single, split)).asserting { case (single, split) =>
+        split mustBe single
+        split.currencyPair mustBe CurrencyPair.fromUnsafe("EURUSD")
+        split.interval mustBe Interval.H1
+        split.firstBar mustBe Instant.parse("2024-01-27T20:00:00Z")
+        split.lastBar mustBe Instant.parse("2024-02-05T23:00:00Z")
+        split.perMonth mustBe Map(YearMonth.of(2024, 1) -> 100L, YearMonth.of(2024, 2) -> 120L)
+        split.countBefore(YearMonth.of(2024, 2)) mustBe 100L
+        split.countIn(DateRange(YearMonth.of(2024, 1), YearMonth.of(2024, 3))) mustBe 220L
+      }
+
+    "expose unsupported older and future months without inventing coverage or warm-up" in
+      MarketDataProvider.inspectHistory[IO](Dataset(fullFixture)).asserting { coverage =>
+        coverage.perMonth.contains(YearMonth.of(2023, 12)) mustBe false
+        coverage.perMonth.contains(YearMonth.of(2024, 3)) mustBe false
+        coverage.countBefore(YearMonth.of(2023, 12)) mustBe 0L
+        coverage.countBefore(YearMonth.of(2024, 1)) mustBe 0L
+        coverage.countIn(DateRange(YearMonth.of(2023, 12), YearMonth.of(2024, 1))) mustBe 0L
+        coverage.countIn(DateRange(YearMonth.of(2024, 3), YearMonth.of(2024, 4))) mustBe 0L
+      }
+
+    "exclude zero-volume rows from monthly coverage and warm-up availability" in
+      MarketDataProvider.inspectHistory[IO](Dataset("eur-usd-1h-walk-forward-missing-month.csv")).asserting { coverage =>
+        coverage.perMonth mustBe Map(YearMonth.of(2024, 1) -> 1L, YearMonth.of(2024, 3) -> 1L)
+        coverage.countBefore(YearMonth.of(2024, 3)) mustBe 1L
+        coverage.countIn(DateRange(YearMonth.of(2024, 2), YearMonth.of(2024, 3))) mustBe 0L
+      }
+
+    "validate all declared exports for strict ordering, duplicates and consistent metadata" in
+      List(
+        Dataset("eur-usd-1h-walk-forward-unordered.csv") -> "strictly increasing",
+        Dataset("eur-usd-1h-walk-forward-duplicate.csv") -> "strictly increasing",
+        Dataset(
+          NonEmptyList.of("eur-usd-1h-walk-forward-empty-history.csv", "eur-usd-1h-walk-forward-empty-history.csv")
+        )                                                                  -> "strictly increasing",
+        Dataset(NonEmptyList.of(firstFixture, fullFixture))                -> "strictly increasing",
+        Dataset(NonEmptyList.of(secondFixture, firstFixture))              -> "strictly increasing",
+        Dataset(NonEmptyList.of(firstFixture, "aud-usd-1h-missing.csv"))   -> "mixes currency pairs",
+        Dataset(NonEmptyList.of(firstFixture, "eur-usd-1day-missing.csv")) -> "mixes intervals"
+      ).traverse { case (dataset, message) =>
+        MarketDataProvider.inspectHistory[IO](dataset).attempt.map {
+          case Left(error: IllegalArgumentException) => error.getMessage must include(message)
+          case other                                 => fail(s"Expected invalid history, got $other")
+        }
+      }.asserting(_ => succeed)
+
+    "reject histories without any trading bars" in
+      MarketDataProvider.inspectHistory[IO](Dataset("eur-usd-1h-walk-forward-empty-history.csv")).attempt.asserting {
+        case Left(error: IllegalArgumentException) => error.getMessage must include("contains no trading bars")
+        case other                                 => fail(s"Expected unavailable history, got $other")
+      }
+
   }
 
   "MarketDataProvider search folds" should {

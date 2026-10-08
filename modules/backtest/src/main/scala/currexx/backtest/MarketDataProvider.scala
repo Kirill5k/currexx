@@ -1,14 +1,21 @@
 package currexx.backtest
 
-import cats.effect.Async
+import cats.data.NonEmptyList
+import cats.effect.{Async, Ref}
+import cats.syntax.flatMap.*
+import cats.syntax.functor.*
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import fs2.io.readClassResource
-import fs2.{Stream, text}
+import fs2.{Pipe, Stream, text}
 
 import java.time.format.DateTimeFormatter
 import java.time.{Instant, OffsetDateTime, YearMonth, ZoneOffset, ZonedDateTime}
+import java.security.MessageDigest
+import java.util.HexFormat
 
 object MarketDataProvider:
+
+  val priceWindowSize: Int = 100
 
   /** A half-open span of calendar months, `[from, until)`, used to carve one export into disjoint segments.
     *
@@ -23,18 +30,41 @@ object MarketDataProvider:
     override def toString: String        = s"$from..${until.minusMonths(1)}"
   }
 
-  /** One export, optionally narrowed to a segment of it.
+  /** One pair's chronological exports, optionally narrowed to a segment of their combined history.
     *
     * The segment travels with the path rather than being applied by the caller: a bare `List[String]` cannot express which part of a file a
     * run is entitled to, so nothing would stop a search seeing the data its champion is judged on.
     */
-  final case class Dataset(filePath: String, range: Option[DateRange] = None) {
-    def currencyPair: CurrencyPair = {
-      val cpStr = filePath.slice(0, 7).replaceAll("-", "").toUpperCase()
-      CurrencyPair.from(cpStr).toOption.getOrElse(throw new IllegalArgumentException(s"Invalid currency pair in file path: $filePath"))
+  final case class Dataset(filePaths: NonEmptyList[String], range: Option[DateRange]) {
+    def currencyPair: CurrencyPair = currencyPairOf(filePaths.head)
+    def interval: Interval         = intervalOf(filePaths.head)
+    override def toString: String  = {
+      val paths = filePaths.toList.mkString(" + ")
+      range.fold(paths)(r => s"$paths[$r]")
     }
-    def interval: Interval        = if (filePath.contains("1h")) Interval.H1 else Interval.D1
-    override def toString: String = range.fold(filePath)(r => s"$filePath[$r]")
+  }
+
+  object Dataset {
+    def apply(filePath: String, range: Option[DateRange] = None): Dataset =
+      new Dataset(NonEmptyList.one(filePath), range)
+
+    def apply(filePaths: NonEmptyList[String]): Dataset = new Dataset(filePaths, None)
+  }
+
+  /** Raw trading-bar availability; this metadata contains no prices, strategy results or sliding windows. */
+  final case class HistoryCoverage(
+      currencyPair: CurrencyPair,
+      interval: Interval,
+      firstBar: Instant,
+      lastBar: Instant,
+      perMonth: Map[YearMonth, Long]
+  ) {
+    def countBefore(month: YearMonth): Long = perMonth.iterator.collect { case (observed, count) if observed.isBefore(month) => count }.sum
+
+    def countIn(range: DateRange): Long =
+      perMonth.iterator.collect {
+        case (month, count) if !month.isBefore(range.from) && month.isBefore(range.until) => count
+      }.sum
   }
 
   /** The data one search is entitled to: the segments it may score against, and the one segment its finalists are ranked on.
@@ -86,12 +116,12 @@ object MarketDataProvider:
   /** The whole of the oldest export, 2023-07 to 2024-06. Searched, like `majors1h`. */
   val majors1h_202307_202406: List[Dataset] = majorFiles1h_202307_202406.map(Dataset(_))
 
-  /** The whole of the middle export, 2024-07 to 2025-07. Fine for measuring a strategy that already exists; not for choosing one, since a
+  /** The whole of the middle export, 2024-07 to 2025-06. Fine for measuring a strategy that already exists; not for choosing one, since a
     * search that scores against this has nothing left to be checked against.
     */
   val majors1h: List[Dataset] = majorFiles1h.map(Dataset(_))
 
-  /** Everything the search folds cover, as whole files rather than segments: both older exports, 2023-07 to 2025-07.
+  /** Everything the search folds cover, as whole files rather than segments: both older exports, 2023-07 to 2025-06.
     *
     * What "in sample" means once the folds span two exports. Measuring over either export alone would report half the data a champion was
     * chosen on and label it as all of it, which is the mislabelling this exists to prevent.
@@ -105,6 +135,13 @@ object MarketDataProvider:
     * out-of-sample. `majors1hHoldout` isolates the originally reserved evaluation period; s10_v2 has now reused it for manual development.
     */
   val majors1h_202507_202606: List[Dataset] = majorFiles1h_202507_202606.map(Dataset(_))
+
+  /** One uninterrupted series per pair, July 2023 through June 2026. Requested ranges also retain preceding price history for warm-up. */
+  val majors1hHistory: List[Dataset] =
+    majorFiles1h_202307_202406
+      .zip(majorFiles1h)
+      .zip(majorFiles1h_202507_202606)
+      .map { case ((oldest, middle), newest) => Dataset(NonEmptyList.of(oldest, middle, newest)) }
 
   /** How many calendar months one scored segment holds.
     *
@@ -195,12 +232,113 @@ object MarketDataProvider:
   // rather than the other way round keeps a backtest over the old files reporting exactly the numbers it always has.
   private val utcVolumeToLegacyScale = 1_000_000.0
 
+  final private case class ReadProgress(months: Set[YearMonth] = Set.empty, reachedCutoff: Boolean = false) {
+    def observe(price: PriceRange): ReadProgress = copy(months = months + monthOf(price.time))
+  }
+
   def read[F[_]: Async](dataset: Dataset): Stream[F, MarketTimeSeriesData] =
-    readClassResource[F, MarketDataProvider.type](s"/${dataset.filePath}")
+    Stream.eval(Ref.of[F, ReadProgress](ReadProgress())).flatMap { progress =>
+      val prices = rawPrices[F](dataset)
+        .through(beforePeriodEnd(dataset, progress))
+        .through(orderedTradingPrices(dataset))
+        .evalTap(price => progress.update(_.observe(price)))
+      val checkCoverage = Stream.eval(progress.get).map(state => validateCoverage(dataset, state.months)).rethrow.drain
+
+      (prices ++ checkCoverage).through(priceWindows(dataset, progress))
+    }
+
+  private def rawPrices[F[_]: Async](dataset: Dataset): Stream[F, PriceRange] =
+    Stream
+      .eval(Async[F].delay(validateDataset(dataset)))
+      .rethrow
+      .flatMap(_ => Stream.emits(dataset.filePaths.toList).flatMap(readPrices[F]))
+
+  private def beforePeriodEnd[F[_]: Async](dataset: Dataset, progress: Ref[F, ReadProgress]): Pipe[F, PriceRange, PriceRange] =
+    val end = dataset.range.map(_.until.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant)
+    _.evalMap { price =>
+      if (end.forall(price.time.isBefore)) Async[F].pure(Option(price))
+      else progress.update(_.copy(reachedCutoff = true)).as(Option.empty[PriceRange])
+    }.unNoneTerminate
+
+  private def orderedTradingPrices[F[_]: Async](dataset: Dataset): Pipe[F, PriceRange, PriceRange] =
+    _.zipWithPrevious
+      .map { case (previous, price) =>
+          Either.cond(
+            previous.forall(_.time.isBefore(price.time)),
+            price,
+            new IllegalArgumentException(s"Dataset timestamps must be strictly increasing: $dataset at ${price.time}")
+        )
+      }
+      .rethrow
+      .filter(_.volume > 0)
+
+  private def priceWindows[F[_]: Async](dataset: Dataset, progress: Ref[F, ReadProgress]): Pipe[F, PriceRange, MarketTimeSeriesData] =
+    _.sliding(priceWindowSize)
+      // Preserve short exports, but do not invent a partial window when a date cutoff interrupts warm-up.
+      .evalFilter(prices => if (prices.size == priceWindowSize) Async[F].pure(true) else progress.get.map(!_.reachedCutoff))
+      .map(_.toNel.map(prices => MarketTimeSeriesData(dataset.currencyPair, dataset.interval, prices.reverse, "csv")))
+      .unNone
+      .filter(data => dataset.range.forall(_.contains(data.latestTime)))
+
+  /** SHA-256 of the unmodified CSV bytes, independent of parsing and selected date ranges. */
+  def fingerprint[F[_]: Async](filePath: String): F[String] =
+    Async[F].delay(MessageDigest.getInstance("SHA-256")).flatMap { digest =>
+      readClassResource[F, MarketDataProvider.type](s"/$filePath").chunks
+        .evalMap(chunk => Async[F].delay(digest.update(chunk.toArray)))
+        .compile
+        .drain
+        .flatMap(_ => Async[F].delay(HexFormat.of().formatHex(digest.digest())))
+    }
+
+  /** Inspect the unranged history supplied by preflight. Only timestamps and positive-volume bar counts are retained. */
+  def inspectHistory[F[_]: Async](dataset: Dataset): F[HistoryCoverage] =
+    rawPrices[F](dataset)
+      .through(orderedTradingPrices(dataset))
+      .compile
+      .fold(Option.empty[HistoryCoverage])((coverage, price) => Some(recordCoverage(dataset, coverage, price.time)))
+      .flatMap(coverage => Async[F].fromOption(coverage, new IllegalArgumentException(s"History contains no trading bars: $dataset")))
+
+  private def recordCoverage(dataset: Dataset, coverage: Option[HistoryCoverage], time: Instant): HistoryCoverage =
+    val month = monthOf(time)
+    coverage match
+      case None           => HistoryCoverage(dataset.currencyPair, dataset.interval, time, time, Map(month -> 1L))
+      case Some(previous) =>
+        previous.copy(lastBar = time, perMonth = previous.perMonth.updated(month, previous.perMonth.getOrElse(month, 0L) + 1L))
+
+  private def monthOf(time: Instant): YearMonth = YearMonth.from(time.atOffset(ZoneOffset.UTC))
+
+  private def currencyPairOf(filePath: String): CurrencyPair = {
+    val cpStr = filePath.slice(0, 7).replaceAll("-", "").toUpperCase()
+    CurrencyPair.from(cpStr).toOption.getOrElse(throw new IllegalArgumentException(s"Invalid currency pair in file path: $filePath"))
+  }
+
+  private def intervalOf(filePath: String): Interval = if (filePath.contains("1h")) Interval.H1 else Interval.D1
+
+  private def validateDataset(dataset: Dataset): Either[IllegalArgumentException, Unit] =
+    if (dataset.filePaths.exists(path => currencyPairOf(path) != dataset.currencyPair))
+      Left(new IllegalArgumentException(s"Dataset mixes currency pairs: $dataset"))
+    else if (dataset.filePaths.exists(path => intervalOf(path) != dataset.interval))
+      Left(new IllegalArgumentException(s"Dataset mixes intervals: $dataset"))
+    else if (dataset.range.exists(range => !range.from.isBefore(range.until)))
+      Left(new IllegalArgumentException(s"Dataset range must be nonempty and increasing: $dataset"))
+    else Right(())
+
+  private def validateCoverage(dataset: Dataset, observedMonths: Set[YearMonth]): Either[IllegalArgumentException, Unit] =
+    val missing = dataset.range.toList.flatMap { range =>
+      Iterator.iterate(range.from)(_.plusMonths(1)).takeWhile(_.isBefore(range.until)).filterNot(observedMonths).toList
+    }
+    Either.cond(
+      missing.isEmpty,
+      (),
+      new IllegalArgumentException(s"Dataset has no trading bars in requested month(s) ${missing.mkString(", ")}: $dataset")
+    )
+
+  private def readPrices[F[_]: Async](filePath: String): Stream[F, PriceRange] =
+    readClassResource[F, MarketDataProvider.type](s"/$filePath")
       .through(text.utf8.decode)
       .through(text.lines)
       .drop(1)
-      .filter(l => l.split(",")(5).toDouble > 0)
+      .filter(_.nonEmpty)
       .map { line =>
         val vals   = line.split(",")
         val format = csvFormatOf(vals(0))
@@ -213,10 +351,6 @@ object MarketDataProvider:
           parseDateTime(vals(0), format)
         )
       }
-      .sliding(100)
-      .map(_.toNel.map(prices => MarketTimeSeriesData(dataset.currencyPair, dataset.interval, prices.reverse, "csv")))
-      .unNone
-      .filter(data => dataset.range.forall(_.contains(data.latestTime)))
 
   private def parseDateTime(dateTimeStr: String, format: CsvFormat): Instant =
     format match

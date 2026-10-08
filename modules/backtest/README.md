@@ -128,3 +128,10 @@ still propagate; recovery applies only to reporting after selection finishes.
 - Reporting must never consume randomness, consult historical holdout data, or
   feed measurements back into selection. Seeded replay configuration and JSON
   export are outside this feature.
+
+## Chronological walk-forward evaluation
+
+Edit the settings at the top of `WalkForwardEvaluator`, then run the object from
+the IDE with no program arguments. See [the walk-forward guide](WALK_FORWARD.md)
+for the configuration defaults, chronological schedule, reports, and small
+real-data verification run.

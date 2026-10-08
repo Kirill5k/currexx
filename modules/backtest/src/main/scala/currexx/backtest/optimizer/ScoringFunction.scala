@@ -14,6 +14,9 @@ import java.time.{Instant, YearMonth, ZoneOffset}
   * object, so a champion cannot be re-checked against numbers it was never scored against.
   */
 trait ScoringFunction:
+  /** Stable report label. Custom scorers with configuration should override this to include their settings. */
+  def description: String = getClass.getName
+
   def score(stats: List[OrderStats]): Double
 
   /** Re-checks a result against the thresholds it was scored against, as pass or fail.
@@ -24,6 +27,9 @@ trait ScoringFunction:
   def violations(stats: List[OrderStats]): List[ScoringFunction.Violation]
 
 object ScoringFunction {
+  private def describe(name: String, config: Product): String =
+    config.productElementNames.zip(config.productIterator).map { case (key, value) => s"$key=$value" }.mkString(s"$name(", ", ", ")")
+
   final case class Violation(constraint: String, actual: String, required: String):
     override def toString: String = s"$constraint is $actual, required $required"
 
@@ -70,6 +76,8 @@ object ScoringFunction {
       */
     def apply(config: Config = Config()): ScoringFunction =
       new ScoringFunction {
+        override val description: String = describe("Robust", config)
+
         override def score(stats: List[OrderStats]): Double =
           if (stats.isEmpty) 0.0
           else {
@@ -316,6 +324,8 @@ object ScoringFunction {
       */
     def apply(config: Config = Config()): ScoringFunction =
       new ScoringFunction {
+        override val description: String = describe("Consistent", config)
+
         override def score(stats: List[OrderStats]): Double =
           if (stats.isEmpty) 0.0
           else {

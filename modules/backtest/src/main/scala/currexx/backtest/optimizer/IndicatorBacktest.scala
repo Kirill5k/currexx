@@ -9,13 +9,12 @@ import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.optimizer.reporting.RunDiagnostics
-import currexx.backtest.services.TestServicesPool
+import currexx.backtest.services.{PeriodSimulation, TestServicesPool}
 import currexx.backtest.{MarketDataProvider, OrderStats, TestSettings}
 import currexx.core.signal.SignalDetector
 import currexx.core.trade.TradeStrategy
 import currexx.domain.market.MarketTimeSeriesData
 import currexx.domain.signal.Indicator
-import fs2.Stream
 
 /** Loads a corpus once and executes its pair simulations through a bounded, reusable services pool. */
 final private[optimizer] class IndicatorBacktest[F[_]: {Async, Parallel}] private (
@@ -41,8 +40,7 @@ final private[optimizer] class IndicatorBacktest[F[_]: {Async, Parallel}] privat
       pool.use(TestSettings.make(testData.head.currencyPair, strategy, indicator :: otherIndicators)) { services =>
         for
           _     <- diagnostics.traverse_(_.pairStarted(stage))
-          _     <- Stream.emits(testData).through(services.processMarketData(signalDetector)).compile.drain
-          stats <- services.getOrderStats()
+          stats <- PeriodSimulation.run(services, testData, signalDetector)
           _     <- diagnostics.traverse_(_.pairCompleted(stage))
         yield stats
       }

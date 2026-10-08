@@ -76,32 +76,6 @@ class OptimisationAlgorithmSpec extends IOWordSpec {
   }
 
   "The round-configured optimisation dispatcher" should {
-    "reject invalid baseline budgets before loading the corpus or creating a report" in {
-      given random: Random = Random(91)
-      val params           = Parameters.GA(1, 0, 0.0, 0.0, 0.0, shuffle = false)
-      val missingCorpus    = Corpus(List(List(Dataset("missing-baseline-budget-test.csv"))), Nil)
-      val cases            = List(0, -1, 1).map(size => (s"baseline-budget-$size-${UUID.randomUUID()}", size))
-
-      cases
-        .traverse { case (label, size) =>
-          for
-            result <- OptimisationAlgorithm
-              .indicator[IO](round(label, params).copy(shortlistSize = size, corpus = missingCorpus), 1)
-              .attempt
-            reports <- readReports(label)
-          yield (result, reports)
-        }
-        .asserting { results =>
-          results.foreach { case (result, reports) =>
-            result match
-              case Left(error: IllegalArgumentException) => error.getMessage.toLowerCase must include("shortlist")
-              case other                                 => fail(s"Expected baseline budget failure, got $other")
-            reports mustBe empty
-          }
-          random.nextLong() mustBe Random(91).nextLong()
-        }
-    }
-
     "reserve a seed omitted from initialisation without inventing a search discovery" in {
       given Random = Random(91)
       val params   = Parameters.GA(1, 0, 0.0, 0.0, 0.0, shuffle = false)

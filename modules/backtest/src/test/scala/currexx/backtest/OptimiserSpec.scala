@@ -19,6 +19,14 @@ class OptimiserSpec extends AnyWordSpec with Matchers {
     OptimisationReportRenderer.verdict(reportRound, Vector((reportRound.strategy.indicator, Fitness(1.0), Fitness(validation))), breaches)
 
   "Optimiser rounds" should {
+    "resolve a named preset and return an error for an unknown name" in {
+      OptimisationRounds.findByName("s13_ga_refine").map(_.strategy) mustBe Right(TestStrategy.s13)
+      OptimisationRounds.roundsByName("s13_ga_refine").parameters mustBe Optimiser.gaParameters
+      val missing = OptimisationRounds.findByName("unknown-round").swap.toOption.get
+      missing.getMessage must include("Unknown round 'unknown-round'")
+      missing.getMessage must include("s13_ga_refine")
+    }
+
     "give every family two GA rounds and add SCGA only for enabled families" in {
       val rounds                  = Optimiser.rounds
       val byStrategy              = rounds.groupBy(_.strategy)
