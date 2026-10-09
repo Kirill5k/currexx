@@ -20,7 +20,7 @@ final private class LiveLogEventProcessor[F[_]: Async](
     logger: Logger[F]
 ) extends LogEventProcessor[F] {
 
-  private val acceptedEvents = Set(LogLevel.Trace, LogLevel.Debug, LogLevel.Warn, LogLevel.Error)
+  private val acceptedEvents = Set(LogLevel.Warn, LogLevel.Error)
   // Delivery failures must not enter the event queue and trigger more notifications.
   private val deliveryLogger = Slf4jLogger.getLogger[F]
 
