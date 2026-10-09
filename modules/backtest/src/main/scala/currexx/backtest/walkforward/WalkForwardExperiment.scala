@@ -24,5 +24,6 @@ object WalkForwardExperiment:
       history: List[Dataset],
       plan: WalkForwardPlan
   ): WalkForwardExperiment =
-    val id = s"${timestamp.format(Instant.now())}-${round.name}"
+    val objective = round.searchObjective.productPrefix.toLowerCase
+    val id        = s"${timestamp.format(Instant.now())}-${round.name}-$objective-seed-$masterSeed"
     WalkForwardExperiment(id, round, masterSeed, history, plan)

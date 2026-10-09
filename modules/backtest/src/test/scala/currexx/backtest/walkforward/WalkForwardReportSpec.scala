@@ -4,7 +4,7 @@ import cats.effect.{IO, Resource}
 import currexx.algorithms.Parameters
 import currexx.backtest.{MarketDataProvider, OptimisationRound, TestStrategy}
 import currexx.backtest.MarketDataProvider.Dataset
-import currexx.backtest.optimizer.ScoringFunction
+import currexx.backtest.optimizer.{ScoringFunction, SearchObjectiveConfig, UpgradeDecision, UpgradeFailure, UpgradeRejection}
 import currexx.core.trade.TradeStrategy
 import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation}
 import fs2.io.file.Path
@@ -30,14 +30,17 @@ class WalkForwardReportSpec extends IOWordSpec {
   private val readiness  = List(
     WindowReadiness(window, List(PeriodReadiness("training fold 1", window.trainingFolds.head, "EUR/USD", 120, 0, 99)))
   )
-  private val selection = FrozenSelection(strategy, SelectionOutcome.BaseSelected, Some(0.5), Some(0.2))
-  private val base      = ForwardMetrics(100, 4, 10, 1, Some(BigDecimal(2)), 3, 10000)
-  private val coverage  = PeriodCoverage("EUR/USD", Instant.EPOCH, Instant.EPOCH.plusSeconds(3600), Instant.EPOCH.plusSeconds(7200), 0)
-  private def result(index: Int, difference: Int, outcome: SelectionOutcome = SelectionOutcome.CandidateSelected): WindowResult =
+  private val selection =
+    FrozenSelection(strategy, Some(0.5), Some(0.2), UpgradeDecision.RetainBase(Nil), UpgradeFixtures.evidence(strategy.indicator))
+  private val base     = ForwardMetrics(100, 4, 10, 1, Some(BigDecimal(2)), 3, 10000)
+  private val coverage = PeriodCoverage("EUR/USD", Instant.EPOCH, Instant.EPOCH.plusSeconds(3600), Instant.EPOCH.plusSeconds(7200), 0)
+  private def result(index: Int, difference: Int, outcome: SelectionOutcome = SelectionOutcome.UpgradeApproved): WindowResult =
     WindowResult(
       experiment.plan.windows(index - 1),
       experiment.plan.windows(index - 1).seed(experiment.masterSeed),
-      selection.copy(outcome = outcome),
+      selection.copy(decision = outcome match
+        case SelectionOutcome.UpgradeApproved => UpgradeFixtures.approved(strategy.indicator, strategy.indicator)
+        case SelectionOutcome.BaseRetained    => UpgradeDecision.RetainBase(Nil)),
       ForwardResult(base.copy(netProfit = base.netProfit + difference), base, List(coverage))
     )
 
@@ -57,6 +60,9 @@ class WalkForwardReportSpec extends IOWordSpec {
   "WalkForwardReportRenderer" should {
     "record full strategies, explicit configuration and chronology in the manifest" in {
       val manifest = WalkForwardReportRenderer.manifest(experiment, List(source -> "a" * 64)).hcursor
+      manifest.get[Int]("formatVersion") mustBe Right(2)
+      manifest.downField("search").downField("objective").get[String]("mode") mustBe Right("Current")
+      manifest.downField("search").downField("upgradePolicy").get[Int]("minMonths") mustBe Right(3)
       manifest.get[String]("evidence") mustBe Right("retrospective development evidence")
       manifest.get[String]("seedDerivation") mustBe Right(WalkForwardWindow.seedVersion)
       manifest.downField("baseStrategy").focus mustBe Some(strategy.asJson)
@@ -66,8 +72,11 @@ class WalkForwardReportSpec extends IOWordSpec {
       manifest.downField("simulation").get[BigDecimal]("spreadPips") mustBe Right(BigDecimal("0.8"))
       manifest.downField("schedule").focus.flatMap(_.asArray).get must have size 5
       manifest.downField("sourceFiles").downArray.get[String]("sha256") mustBe Right("a" * 64)
-      WalkForwardReportRenderer.frozen(window, 42L, selection).hcursor.downField("selection").downField("strategy").focus mustBe
-        Some(strategy.asJson)
+      val frozen = WalkForwardReportRenderer.frozen(window, 42L, selection).hcursor
+      frozen.get[Int]("formatVersion") mustBe Right(2)
+      frozen.downField("selection").downField("strategy").focus mustBe Some(strategy.asJson)
+      frozen.downField("selection").downField("upgradeDecision").get[String]("outcome") mustBe Right("BASE RETAINED")
+      frozen.downField("selection").downField("baseEvidence").get[Int]("monthsCovered") mustBe Right(4)
     }
 
     "include every SCGA setting and effective species cap" in {
@@ -85,9 +94,44 @@ class WalkForwardReportSpec extends IOWordSpec {
       cursor.get[Int]("initialOversampling") mustBe Right(2)
     }
 
+    "persist rejected comparisons and their exact policy reasons before forward evidence exists" in {
+      val approval  = UpgradeFixtures.approved(strategy.indicator, strategy.indicator)
+      val rejection = UpgradeRejection(
+        strategy.indicator,
+        approval.comparison,
+        List(UpgradeFailure("net_improvement", "19.999", ">= 20"))
+      )
+      val rejected = selection.copy(decision = UpgradeDecision.RetainBase(List(rejection)))
+      val frozen   = WalkForwardReportRenderer.frozen(window, 42L, rejected).hcursor
+      val decision = frozen.downField("selection").downField("upgradeDecision")
+      decision.downField("rejections").downArray.downField("failures").downArray.get[String]("code") mustBe Right("net_improvement")
+      decision.downField("rejections").downArray.downField("failures").downArray.get[String]("actual") mustBe Right("19.999")
+      decision.downField("rejections").downArray.downField("comparison").get[BigDecimal]("stressedNetImprovement") mustBe Right(
+        BigDecimal(100)
+      )
+      frozen.downField("forward").focus mustBe None
+    }
+
+    "compare modes and seeds with honest source labels and separate forward summaries" in {
+      val current  = WalkForwardComparison.Run(experiment, WalkForwardSummary.from(List(result(1, 20))))
+      val relative = WalkForwardComparison.Run(
+        experiment
+          .copy(id = "relative-test", round = round.copy(searchObjective = SearchObjectiveConfig.BaselineRelative()), masterSeed = 43L),
+        WalkForwardSummary.from(List(result(1, -10), result(2, 0, SelectionOutcome.BaseRetained)))
+      )
+      val report = WalkForwardComparison.markdown(List(current, relative))
+      report must include("retrospective development evidence")
+      report must include("BaselineRelative")
+      report must include("| 43 | -10 | -5 | -10 | 0/2 | 1 |")
+      report must include("| 42 | 20 | 20 | 20 | 1/1 | 1 |")
+      val json = WalkForwardComparison.json(List(current, relative)).hcursor
+      json.get[Int]("formatVersion") mustBe Right(2)
+      json.downField("runs").downArray.right.downField("objective").get[Double]("weight") mustBe Right(0.5)
+    }
+
     "summarise paired differences without pooling drawdowns across independent windows" in {
       val results =
-        List(result(1, 20), result(2, -10), result(3, 0, SelectionOutcome.BaseSelected), result(4, 0, SelectionOutcome.NoCandidatePassed))
+        List(result(1, 20), result(2, -10), result(3, 0, SelectionOutcome.BaseRetained), result(4, 0, SelectionOutcome.BaseRetained))
       val totals = WalkForwardSummary.from(results)
       totals.completedWindows mustBe 4
       totals.totalNetDifference mustBe BigDecimal(10)
@@ -96,9 +140,7 @@ class WalkForwardReportSpec extends IOWordSpec {
       totals.positiveWindows mustBe 1
       totals.tiedWindows mustBe 2
       totals.negativeWindows mustBe 1
-      totals.candidateSelectedWindows mustBe 2
-      totals.baseSelectedWindows mustBe 1
-      totals.noCandidatePassedWindows mustBe 1
+      totals.upgradeApprovedWindows mustBe 2
       totals.baseRetainedWindows mustBe 2
       val summary = WalkForwardReportRenderer.summary(totals).hcursor
       summary.get[BigDecimal]("totalNetDifference") mustBe Right(BigDecimal(10))
@@ -108,14 +150,13 @@ class WalkForwardReportSpec extends IOWordSpec {
       summary.get[Int]("tiedWindows") mustBe Right(2)
       summary.get[Int]("negativeWindows") mustBe Right(1)
       summary.get[Int]("baseRetainedWindows") mustBe Right(2)
-      summary.get[Int]("baseSelectedWindows") mustBe Right(1)
-      summary.get[Int]("noCandidatePassedWindows") mustBe Right(1)
+      summary.get[Int]("upgradeApprovedWindows") mustBe Right(2)
       summary.downField("maxDrawdownPercent").focus mustBe None
       val markdown = WalkForwardReportRenderer.markdown(experiment, results, totals, None)
       markdown must include("not pooled into a continuous account")
       markdown must include("initial warm-up loss 0 bars")
-      markdown must include("Base selected by ranking")
-      markdown must include("Base retained: no candidate passed")
+      markdown must include("UPGRADE APPROVED")
+      markdown must include("BASE RETAINED")
     }
 
     "keep profit factors as separate measurements without subtracting ratios" in {
@@ -138,7 +179,7 @@ class WalkForwardReportSpec extends IOWordSpec {
       val totals = WalkForwardSummary.from(List(result(1, -1), result(2, 12)))
       totals.medianNetDifference mustBe Some(BigDecimal("5.5"))
       totals.totalNetDifference mustBe BigDecimal(11)
-      val zero = WalkForwardSummary.from(List(result(1, 0, SelectionOutcome.NoCandidatePassed)))
+      val zero = WalkForwardSummary.from(List(result(1, 0, SelectionOutcome.BaseRetained)))
       zero.medianNetDifference mustBe Some(BigDecimal(0))
       zero.worstNetDifference mustBe Some(BigDecimal(0))
       zero.tiedWindows mustBe 1
@@ -149,7 +190,7 @@ class WalkForwardReportSpec extends IOWordSpec {
 
     "leave unmeasured summary statistics empty until a window completes" in {
       val totals = WalkForwardSummary.from(Nil)
-      totals mustBe WalkForwardSummary(0, BigDecimal(0), None, None, 0, 0, 0, 0, 0, 0)
+      totals mustBe WalkForwardSummary(0, BigDecimal(0), None, None, 0, 0, 0, 0, 0)
       totals.baseRetainedWindows mustBe 0
       val summary = WalkForwardReportRenderer.summary(totals).hcursor
       summary.get[BigDecimal]("totalNetDifference") mustBe Right(BigDecimal(0))
@@ -173,7 +214,7 @@ class WalkForwardReportSpec extends IOWordSpec {
             _             <- store.events.frozen(window, window.seed(42L), selection)
             frozen        <- readJson(store.directory / "window-1-frozen.json")
             hasResult     <- IO.blocking(Files.exists((store.directory / "window-1-result.json").toNioPath))
-            _             <- store.events.completed(result(1, 0, SelectionOutcome.BaseSelected))
+            _             <- store.events.completed(result(1, 0, SelectionOutcome.BaseRetained))
             beforeFailure <- readJson(store.directory / "window-1-result.json")
             _             <- store.events.failed(
               experiment.plan.windows(1),
@@ -211,7 +252,7 @@ class WalkForwardReportSpec extends IOWordSpec {
           for
             store     <- WalkForwardReportStore.make[IO](single, root)
             _         <- store.events.frozen(window, window.seed(42L), selection)
-            _         <- store.events.completed(result(1, 0, SelectionOutcome.BaseSelected))
+            _         <- store.events.completed(result(1, 0, SelectionOutcome.BaseRetained))
             summary   <- readJson(store.directory / "summary.json")
             collision <- WalkForwardReportStore.make[IO](single, root).attempt
             retained  <- readJson(store.directory / "summary.json")

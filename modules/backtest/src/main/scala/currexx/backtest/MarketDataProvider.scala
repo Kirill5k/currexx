@@ -263,10 +263,10 @@ object MarketDataProvider:
   private def orderedTradingPrices[F[_]: Async](dataset: Dataset): Pipe[F, PriceRange, PriceRange] =
     _.zipWithPrevious
       .map { case (previous, price) =>
-          Either.cond(
-            previous.forall(_.time.isBefore(price.time)),
-            price,
-            new IllegalArgumentException(s"Dataset timestamps must be strictly increasing: $dataset at ${price.time}")
+        Either.cond(
+          previous.forall(_.time.isBefore(price.time)),
+          price,
+          new IllegalArgumentException(s"Dataset timestamps must be strictly increasing: $dataset at ${price.time}")
         )
       }
       .rethrow

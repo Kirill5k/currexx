@@ -83,18 +83,18 @@ class OptimisationAlgorithmSpec extends IOWordSpec {
 
       val result = for
         algorithm <- OptimisationAlgorithm.indicator[IO](round(label, params), 1)
-        finalists <- algorithm.optimise
+        finalists <- algorithm.optimise.map(_.finalists)
         reports   <- readReports(label)
       yield (finalists, reports)
 
       result.asserting { case (finalists, reports) =>
         finalists.map(_._1) mustBe Vector(strategy.indicator, indicator(70))
         val content = reports.head._2
-        content must include("Selection source: target retained.")
+        content must include("BASE RETAINED")
         content must include("#2: first seen=not observed; baselines=alternative (fixed inputs restored)")
         content must include("Search evaluation requests: 1; successful: 1; distinct successfully searched candidates: 1.")
         content must include("Final rescore requests: 2")
-        content must include("Validation: candidate requests=2; folds=2/2 completed/attempted")
+        content must include("folds=2/2 completed/attempted")
         reports must have size 1
       }
     }
@@ -113,9 +113,9 @@ class OptimisationAlgorithmSpec extends IOWordSpec {
 
       val result = for
         algorithm <- OptimisationAlgorithm.indicator[IO](round(label, params).copy(extraSeeds = Nil), 1)
-        first     <- algorithm.optimise
+        first     <- algorithm.optimise.map(_.finalists)
         _         <- IO { random.jitter = 2.0 }
-        second    <- algorithm.optimise
+        second    <- algorithm.optimise.map(_.finalists)
         _         <- readReports(label)
       yield (first, second)
 
@@ -136,7 +136,7 @@ class OptimisationAlgorithmSpec extends IOWordSpec {
 
       val result = for
         algorithm   <- OptimisationAlgorithm.indicator[IO](round(label, params), evaluatorPoolSize = 1)
-        finalists   <- algorithm.optimise
+        finalists   <- algorithm.optimise.map(_.finalists)
         replayed    <- finalists.map(_._1).traverse(algorithm.validate)
         aliasReplay <- algorithm.validate(seedAlias)
         _ <- algorithm.tracker.displayNote("Validation replay", List("Replayed both finalists through the configured validation corpus."))
@@ -168,7 +168,7 @@ class OptimisationAlgorithmSpec extends IOWordSpec {
         content must include("## Final Results")
         content must include("**Top 2 members:**")
         content must include("2 finalist(s) validated")
-        content must include(s"## Champion selection: $label")
+        content must include(s"## Search ranking: $label")
         content must include("alternative")
         content must include("first successful search")
         finalists.foreach { case (individual, _, _) => content must include(individual.toString) }
@@ -194,7 +194,7 @@ class OptimisationAlgorithmSpec extends IOWordSpec {
 
       val result = for
         algorithm <- OptimisationAlgorithm.indicator[IO](round(label, params), evaluatorPoolSize = 1)
-        finalists <- algorithm.optimise
+        finalists <- algorithm.optimise.map(_.finalists)
         replayed  <- finalists.map(_._1).traverse(algorithm.validate)
         _         <- algorithm.tracker.displayNote("Validation replay", List("SCGA validation replay completed."))
         reports   <- readReports(label)
@@ -218,7 +218,7 @@ class OptimisationAlgorithmSpec extends IOWordSpec {
         content must include("## Final Results")
         content must include("**Top 2 members:**")
         content must include("2 finalist(s) validated")
-        content must include(s"## Champion selection: $label")
+        content must include(s"## Search ranking: $label")
         finalists.foreach { case (individual, _, _) => content must include(individual.toString) }
         content must include("SCGA validation replay completed.")
         content.indexOf("## Validation replay") must be > content.indexOf("## Final Results")
@@ -234,18 +234,21 @@ class OptimisationAlgorithmSpec extends IOWordSpec {
       val failure            = new IllegalStateException("Deliberate diagnostics failure")
       val failingDiagnostics = new ScoringFunction {
         override def score(stats: List[OrderStats]): Double                               = scoring.score(stats)
-        override def violations(stats: List[OrderStats]): List[ScoringFunction.Violation] = throw failure
+        override def violations(stats: List[OrderStats]): List[ScoringFunction.Violation] =
+          if (scoring.score(stats) == 10.0) Nil else throw failure
       }
 
       val result = for
-        finalists <- List(round(label, params).copy(scoringFunction = failingDiagnostics), round(nextLabel, params)).traverse { config =>
+        completed <- List(round(label, params).copy(scoringFunction = failingDiagnostics), round(nextLabel, params)).traverse { config =>
           OptimisationAlgorithm.indicator[IO](config, 1).flatMap(_.optimise)
         }
         reports     <- readReports(label)
         nextReports <- readReports(nextLabel)
-      yield (finalists, reports, nextReports)
+      yield (completed, reports, nextReports)
 
-      result.asserting { case (finalists, reports, nextReports) =>
+      result.asserting { case (completed, reports, nextReports) =>
+        completed.head.decision mustBe completed.last.decision
+        val finalists = completed.map(_.finalists)
         finalists must have size 2
         finalists.head mustBe finalists.last
         finalists.head.map(_._1).toSet mustBe Set(strategy.indicator, indicator(70))
@@ -262,7 +265,7 @@ class OptimisationAlgorithmSpec extends IOWordSpec {
         content must include("Remaining rounds can continue.")
         content.indexOf("## Incomplete diagnostics") must be > content.indexOf("## Final Results")
         nextReports must have size 1
-        nextReports.head._2 must include(s"## Champion selection: $nextLabel")
+        nextReports.head._2 must include(s"## Search ranking: $nextLabel")
       }
     }
 

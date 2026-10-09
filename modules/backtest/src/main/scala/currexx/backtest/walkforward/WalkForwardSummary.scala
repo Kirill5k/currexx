@@ -9,11 +9,9 @@ final case class WalkForwardSummary(
     positiveWindows: Int,
     tiedWindows: Int,
     negativeWindows: Int,
-    candidateSelectedWindows: Int,
-    baseSelectedWindows: Int,
-    noCandidatePassedWindows: Int
-):
-  def baseRetainedWindows: Int = baseSelectedWindows + noCandidatePassedWindows
+    upgradeApprovedWindows: Int,
+    baseRetainedWindows: Int
+)
 
 object WalkForwardSummary:
   def from(results: List[WindowResult]): WalkForwardSummary =
@@ -30,7 +28,6 @@ object WalkForwardSummary:
       positiveWindows = differences.count(_ > 0),
       tiedWindows = differences.count(_ == 0),
       negativeWindows = differences.count(_ < 0),
-      candidateSelectedWindows = results.count(_.selection.outcome == SelectionOutcome.CandidateSelected),
-      baseSelectedWindows = results.count(_.selection.outcome == SelectionOutcome.BaseSelected),
-      noCandidatePassedWindows = results.count(_.selection.outcome == SelectionOutcome.NoCandidatePassed)
+      upgradeApprovedWindows = results.count(_.selection.outcome == SelectionOutcome.UpgradeApproved),
+      baseRetainedWindows = results.count(_.selection.outcome == SelectionOutcome.BaseRetained)
     )

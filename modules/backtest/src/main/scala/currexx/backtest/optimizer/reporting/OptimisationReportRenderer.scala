@@ -3,14 +3,14 @@ package currexx.backtest.optimizer.reporting
 import currexx.algorithms.ValidatedPopulation
 import currexx.algorithms.operators.Validator
 import currexx.backtest.OptimisationRound
-import currexx.backtest.optimizer.{IndicatorSearchSpace, ScoringFunction}
+import currexx.backtest.optimizer.{IndicatorSearchSpace, ScoringFunction, SearchObjectiveConfig, UpgradeDecision}
 import currexx.domain.signal.Indicator
 
 /** Text is derived from completed measurements; rendering never evaluates a candidate. */
 object OptimisationReportRenderer:
   def incompleteDiagnostics(roundName: String, error: Throwable): (String, List[String]) =
     s"Incomplete diagnostics: $roundName" -> List(
-      "Optimisation results above are complete; diagnostic reporting failed. Remaining rounds can continue.",
+      "Optimisation and upgrade decision are complete; reporting failed. Remaining rounds can continue.",
       error.toString
     )
 
@@ -35,11 +35,13 @@ object OptimisationReportRenderer:
       report.finalists.headOption.toList.flatMap(c => report.candidates.get(c._1).toList.flatMap(_.validation.toList.flatMap(_.violations)))
     val validationAvailable = report.finalists.headOption.exists(c => report.candidates.get(c._1).exists(_.validation.nonEmpty))
     List(
-      s"Champion selection: ${report.roundName}" -> (report.corpus.describe ::: List("") ::: outcome(
+      s"Search ranking: ${report.roundName}" -> (report.corpus.describe ::: List("") ::: outcome(
         report.finalists,
         breaches,
-        validationAvailable
+        validationAvailable,
+        report.searchObjective
       ) ::: selectionSource(report)),
+      "Upgrade decision"                 -> upgradeLines(report),
       "Baseline measurements"            -> baselineLines(report),
       "Baseline comparisons"             -> comparisonLines(report),
       "Leader fold diagnostics"          -> leaderLines(report),
@@ -51,33 +53,50 @@ object OptimisationReportRenderer:
       round: OptimisationRound,
       population: ValidatedPopulation[Indicator],
       championBreaches: List[ScoringFunction.Violation]
-  ): List[String] = round.corpus.describe ::: List("") ::: outcome(population, championBreaches, round.corpus.validationFold.nonEmpty)
+  ): List[String] = round.corpus.describe ::: List("") ::: outcome(
+    population,
+    championBreaches,
+    round.corpus.validationFold.nonEmpty,
+    round.searchObjective
+  )
 
   private def outcome(
       population: ValidatedPopulation[Indicator],
       breaches: List[ScoringFunction.Violation],
-      validationAvailable: Boolean
+      validationAvailable: Boolean,
+      objective: SearchObjectiveConfig
   ): List[String] =
     population.headOption match
       case None                                   => List("No candidates were evaluated.")
       case Some((champion, training, validation)) =>
-        val retained    = if (training.value > 0.0) f"${validation.value / training.value * 100}%.1f%%" else "n/a"
+        val searchLeader = population.maxBy(_._2.value)
+        val retained     =
+          if (objective == SearchObjectiveConfig.Current && training.value > 0.0)
+            List(f"Validation/training fitness ratio: ${validation.value / training.value * 100}%.1f%% (diagnostic only).")
+          else Nil
         val breachLines =
           if (!validationAvailable) List("Validation diagnostics unavailable: no validation measurements.")
           else if (breaches.isEmpty) List("Satisfies every constraint on validation data.")
           else s"BREACHES ${breaches.size} constraint(s) on validation data:" :: breaches.map(breach => s"  - $breach")
-        if (!Validator.passesGate(validation))
-          List(
-            if (validationAvailable) "NOTHING SELECTED: no finalist scored above zero on data it was never searched against."
-            else "NOTHING SELECTED: validation measurements are unavailable.",
-            "No finalist cleared the configured validation fitness gate."
-          ) ::: breachLines ::: List(s"Leading finalist, recorded for diagnostics only: $champion")
-        else
-          List(
-            f"SELECTED (from ${population.size} after validation, ties inside ${Validator.defaultTieBand.describe}%s broken on training): " +
-              f"training ${training.value}%.6f -> validation ${validation.value}%.6f, retaining $retained%s"
-          ) :::
-            breachLines ::: List(s"Indicator: $champion")
+        List(
+          f"SEARCH LEADER: search fitness=${searchLeader._2.value}%.6f; indicator=${searchLeader._1}",
+          f"Leading finalist: search fitness=${training.value}%.6f; absolute validation fitness=${validation.value}%.6f",
+          s"Indicator: $champion",
+          "Ranking is diagnostic. Only the separate upgrade decision authorises a candidate for further evaluation."
+        ) ::: retained ::: breachLines
+
+  private def upgradeLines(report: OptimisationReport): List[String] =
+    List(
+      "Format version: 2",
+      s"Absolute scoring: ${report.scoringDescription}",
+      s"Search objective: ${UpgradeDecisionRenderer.objective(report.searchObjective).noSpaces}",
+      s"Upgrade policy: ${UpgradeDecisionRenderer.policy(report.upgradePolicy).noSpaces}"
+    ) ::: report.upgrade.fold(List("Upgrade decision unavailable; ranking does not establish an upgrade.")) { result =>
+      UpgradeDecisionRenderer.markdown(result.decision) ::: List(
+        s"Selection baseline: ${UpgradeDecisionRenderer.evidence(result.base).noSpaces}",
+        s"Recorded decision: ${UpgradeDecisionRenderer.decision(result.decision).noSpaces}"
+      )
+    }
 
   private def baselineLines(report: OptimisationReport): List[String] =
     List("Every seed is measured under this round's rules and fixed inputs.") ::: report.baselines.flatMap { baseline =>
@@ -100,11 +119,11 @@ object OptimisationReportRenderer:
   private def selectionSource(report: OptimisationReport): List[String] =
     report.finalists.headOption.filter { case (_, _, validation) => Validator.passesGate(validation) }.toList.map { case (champion, _, _) =>
       val matches = report.baselines.filter(_.effective.contains(champion))
-      if (matches.exists(_.disposition.isEmpty)) "Selection source: target retained."
+      if (matches.exists(_.disposition.isEmpty)) "Leading finalist source: target parameters."
       else if (matches.nonEmpty)
-        s"Selection source: supplied seed parameters selected (${matches.map(baselineLabel).mkString(", ")}); " +
+        s"Leading finalist source: supplied seed parameters (${matches.map(baselineLabel).mkString(", ")}); " +
           "evaluated under this round's rules."
-      else "Selection source: searched candidate selected."
+      else "Leading finalist source: searched candidate."
     }
 
   private def comparisonLines(report: OptimisationReport): List[String] =
@@ -174,6 +193,9 @@ object OptimisationReportRenderer:
     val training = report.finalists.sortBy(c => -c._2.value).headOption.map(_._1).filterNot(first.contains)
     val best     =
       report.diagnostics.bestSeen.map(_.indicator).filterNot(indicator => first.contains(indicator) || training.contains(indicator))
+    val approved = report.upgrade.toList.flatMap(_.decision match
+      case UpgradeDecision.Approved(candidate, _, _) => List("Approved upgrade" -> candidate)
+      case UpgradeDecision.RetainBase(_)             => Nil)
     val roles = first.toList.map("Leading finalist" -> _) ++ training.toList.map("Shortlist training leader" -> _) ++ best.toList.map {
       indicator =>
         val label =
@@ -181,7 +203,7 @@ object OptimisationReportRenderer:
           else "Best all-fold search candidate (diagnostic only; absent from final shortlist)"
         label -> indicator
     }
-    roles.flatMap { case (label, indicator) => report.candidates.get(indicator).map(label -> _) }
+    (roles ++ approved).distinctBy(_._2).flatMap { case (label, indicator) => report.candidates.get(indicator).map(label -> _) }
 
   private def foldLines(label: String, fold: FoldDiagnostics): List[String] =
     List(

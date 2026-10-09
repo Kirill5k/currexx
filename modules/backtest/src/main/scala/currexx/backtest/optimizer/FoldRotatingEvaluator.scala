@@ -85,16 +85,29 @@ object FoldRotatingEvaluator:
       canonicalise: Indicator => Either[Throwable, Indicator] = indicator => Right(indicator),
       observer: Option[Observer[F]] = None
   ): F[FoldRotatingEvaluator[F]] =
+    cachedScores(backtests.map(run => indicator => run(indicator).map(scoringFunction.score)), canonicalise, observer)
+
+  /** Accept already reduced fold computations so an objective can use compact baseline measurements without retaining candidate histories.
+    * Initial scores are measurements prepared before search, with their actual work recorded by the caller.
+    */
+  private[optimizer] def cachedScores[F[_]: Concurrent](
+      computations: List[Indicator => F[Double]],
+      canonicalise: Indicator => Either[Throwable, Indicator],
+      observer: Option[Observer[F]],
+      initialScores: Map[Indicator, List[Double]] = Map.empty
+  ): F[FoldRotatingEvaluator[F]] =
     memoize[F, Indicator, List[Double]] { indicator =>
       observer.traverse_(_.computationStarted(indicator)).flatMap { _ =>
-        backtests
-          .traverse { backtest =>
+        computations
+          .traverse { compute =>
             observer.traverse_(_.foldStarted).flatMap { _ =>
-              backtest(indicator)
+              compute(indicator)
                 .flatTap(_ => observer.traverse_(_.foldCompleted))
-                .map(scoringFunction.score)
             }
           }
           .flatTap(_ => observer.traverse_(_.computationCompleted))
       }
-    }.map(scores => FoldRotatingEvaluator(scores, backtests.size, canonicalise, observer))
+    }.map { scores =>
+      val cached = (indicator: Indicator) => initialScores.get(indicator).fold(scores(indicator))(Concurrent[F].pure)
+      FoldRotatingEvaluator(cached, computations.size, canonicalise, observer)
+    }

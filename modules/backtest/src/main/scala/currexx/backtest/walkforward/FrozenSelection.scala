@@ -1,26 +1,34 @@
 package currexx.backtest.walkforward
 
-import currexx.algorithms.ValidatedPopulation
-import currexx.algorithms.operators.Validator
 import currexx.backtest.TestStrategy
-import currexx.domain.signal.Indicator
+import currexx.backtest.optimizer.{OptimisationResult, SelectionEvidence, UpgradeDecision}
 
 enum SelectionOutcome:
-  case CandidateSelected, BaseSelected, NoCandidatePassed
+  case UpgradeApproved, BaseRetained
 
 /** The complete strategy is fixed before the forward evaluator can see its test period. */
 final case class FrozenSelection(
     strategy: TestStrategy,
-    outcome: SelectionOutcome,
     trainingFitness: Option[Double],
-    selectionFitness: Option[Double]
-)
+    selectionFitness: Option[Double],
+    decision: UpgradeDecision,
+    baseEvidence: SelectionEvidence
+):
+  def outcome: SelectionOutcome = decision match
+    case _: UpgradeDecision.Approved   => SelectionOutcome.UpgradeApproved
+    case _: UpgradeDecision.RetainBase => SelectionOutcome.BaseRetained
 
 object FrozenSelection:
-  def choose(base: TestStrategy, finalists: ValidatedPopulation[Indicator]): FrozenSelection =
-    finalists.find(candidate => Validator.passesGate(candidate._3)) match
-      case Some((indicator, training, selection)) =>
-        val strategy = base.copy(indicator = indicator)
-        val outcome  = if (strategy == base) SelectionOutcome.BaseSelected else SelectionOutcome.CandidateSelected
-        FrozenSelection(strategy, outcome, Some(training.value), Some(selection.value))
-      case None => FrozenSelection(base, SelectionOutcome.NoCandidatePassed, None, None)
+  /** Converts an already completed decision. Forward evaluation cannot apply another acceptance rule. */
+  def fromResult(base: TestStrategy, result: OptimisationResult): FrozenSelection =
+    val indicator = result.decision match
+      case UpgradeDecision.Approved(candidate, _, _) => candidate
+      case UpgradeDecision.RetainBase(_)             => base.indicator
+    val fitness = result.finalists.find(_._1 == indicator)
+    FrozenSelection(
+      base.copy(indicator = indicator),
+      fitness.map(_._2.value),
+      fitness.map(_._3.value),
+      result.decision,
+      result.base
+    )

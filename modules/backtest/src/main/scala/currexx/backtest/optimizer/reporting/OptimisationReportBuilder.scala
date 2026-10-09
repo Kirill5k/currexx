@@ -2,9 +2,8 @@ package currexx.backtest.optimizer.reporting
 
 import cats.effect.Async
 import cats.syntax.all.*
-import currexx.algorithms.ValidatedPopulation
 import currexx.backtest.{OptimisationRound, StrategyCatalogue}
-import currexx.backtest.optimizer.IndicatorSearchSpace
+import currexx.backtest.optimizer.{IndicatorSearchSpace, OptimisationResult, UpgradeDecision}
 import currexx.domain.signal.Indicator
 
 import scala.concurrent.duration.FiniteDuration
@@ -18,14 +17,14 @@ final class OptimisationReportBuilder[F[_]: Async](
     catalogue: List[StrategyCatalogue.Entry]
 ):
   def build(
-      finalists: ValidatedPopulation[Indicator],
+      result: OptimisationResult,
       frozenSnapshot: RunDiagnostics.Snapshot,
       optimisationDuration: FiniteDuration
   ): F[OptimisationReport] =
     for
       started   <- Async[F].monotonic
       before    <- diagnostics.snapshot
-      canonical <- Async[F].fromEither(finalists.map { case (indicator, training, validation) =>
+      canonical <- Async[F].fromEither(result.finalists.map { case (indicator, training, validation) =>
         space.canonicalise(indicator).map(canonical => (canonical, training, validation))
       }.sequence)
       target   <- Async[F].fromEither(space.canonicalise(round.strategy.indicator))
@@ -34,8 +33,11 @@ final class OptimisationReportBuilder[F[_]: Async](
         val original = round.extraSeeds(seed.index)
         BaselineReport(original.name, seed.effective, Some(seed.disposition), seed.effective.exists(_ != original.indicator))
       }
-      leaders = canonical.headOption.map(_._1).toList ++ canonical.sortBy(c => -c._2.value).headOption.map(_._1).toList
-      replay  = (baselines.flatMap(_.effective) ++ leaders ++ frozenSnapshot.bestSeen.map(_.indicator)).distinct
+      leaders  = canonical.headOption.map(_._1).toList ++ canonical.sortBy(c => -c._2.value).headOption.map(_._1).toList
+      approved = result.decision match
+        case UpgradeDecision.Approved(candidate, _, _) => List(candidate)
+        case UpgradeDecision.RetainBase(_)             => Nil
+      replay = (baselines.flatMap(_.effective) ++ leaders ++ approved ++ frozenSnapshot.bestSeen.map(_.indicator)).distinct
       measurements <- replay.traverse(indicator => inspect(indicator).map(indicator -> _))
       after        <- diagnostics.snapshot
       matches = (replay ++ canonical.map(_._1)).distinct.map(indicator => indicator -> catalogueMatches(indicator)).toMap
@@ -49,11 +51,15 @@ final class OptimisationReportBuilder[F[_]: Async](
       matches,
       frozenSnapshot,
       difference(
-        after.workloads.getOrElse(RunDiagnostics.Stage.Reporting, RunDiagnostics.Workload()),
-        before.workloads.getOrElse(RunDiagnostics.Stage.Reporting, RunDiagnostics.Workload())
+        reportWork(after),
+        reportWork(before)
       ),
       optimisationDuration,
-      ended - started
+      ended - started,
+      Some(result),
+      round.searchObjective,
+      round.upgradePolicy,
+      round.scoringFunction.description
     )
 
   private def catalogueMatches(indicator: Indicator): List[CatalogueMatch] =
@@ -73,3 +79,18 @@ final class OptimisationReportBuilder[F[_]: Async](
       after.pairAttempts - before.pairAttempts,
       after.pairCompleted - before.pairCompleted
     )
+
+  // A diagnostic leader outside the shortlist can miss the shared selection cache. Include that post-decision work in this report,
+  // while keeping the frozen validation snapshot unchanged and preserving the canonical cache shared by validation and reporting.
+  private def reportWork(snapshot: RunDiagnostics.Snapshot): RunDiagnostics.Workload =
+    List(RunDiagnostics.Stage.Reporting, RunDiagnostics.Stage.Validation)
+      .map(stage => snapshot.workloads.getOrElse(stage, RunDiagnostics.Workload()))
+      .foldLeft(RunDiagnostics.Workload()) { (total, work) =>
+        RunDiagnostics.Workload(
+          total.candidateRequests + work.candidateRequests,
+          total.foldAttempts + work.foldAttempts,
+          total.foldCompleted + work.foldCompleted,
+          total.pairAttempts + work.pairAttempts,
+          total.pairCompleted + work.pairCompleted
+        )
+      }

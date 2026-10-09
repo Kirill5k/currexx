@@ -60,8 +60,8 @@ final class WalkForwardRunner[F[_]](
     val round  = experiment.round.copy(name = s"${experiment.id}-window-${window.index}", corpus = corpus)
     val seed   = window.seed(experiment.masterSeed)
     val run    = for
-      finalists <- stage(window, "search and selection")(search.search(round, seed))
-      decision = FrozenSelection.choose(experiment.round.strategy, finalists)
+      optimisation <- stage(window, "search and selection")(search.search(round, seed))
+      decision = FrozenSelection.fromResult(experiment.round.strategy, optimisation)
       _          <- stage(window, "persist selection")(events.frozen(window, seed, decision))
       evaluation <- stage(window, "forward evaluation")(
         forward.evaluate(decision.strategy, experiment.round.strategy, datasets(window.test))

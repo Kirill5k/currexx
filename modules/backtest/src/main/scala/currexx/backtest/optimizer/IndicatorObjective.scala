@@ -6,12 +6,13 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
-import currexx.algorithms.Fitness
+import currexx.algorithms.{EvaluationPhase, Fitness, memoize}
 import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.optimizer.reporting.{CandidateDiagnostics, FoldDiagnostics, RunDiagnostics}
 import currexx.backtest.OrderStats
 import currexx.core.signal.SignalDetector
 import currexx.core.trade.TradeStrategy
+import currexx.domain.market.CurrencyPair
 import currexx.domain.signal.Indicator
 
 object IndicatorObjective {
@@ -81,7 +82,8 @@ object IndicatorObjective {
       validationObjective: Indicator => F[Fitness],
       backtest: Indicator => F[List[List[OrderStats]]],
       validate: Indicator => F[List[OrderStats]],
-      inspect: Indicator => F[CandidateDiagnostics]
+      inspect: Indicator => F[CandidateDiagnostics],
+      selectionEvidence: Indicator => F[SelectionEvidence]
   )
 
   def make[F[_]: {Async, Parallel}](
@@ -92,18 +94,81 @@ object IndicatorObjective {
       signalDetector: SignalDetector = SignalDetector.pure,
       scoringFunction: ScoringFunction = ScoringFunction.Robust(),
       searchSpace: Option[IndicatorSearchSpace] = None,
-      diagnostics: Option[RunDiagnostics[F]] = None
+      diagnostics: Option[RunDiagnostics[F]] = None,
+      searchObjective: SearchObjectiveConfig = SearchObjectiveConfig.Current,
+      upgradePolicy: UpgradePolicyConfig = UpgradePolicyConfig(),
+      baseIndicator: Option[Indicator] = None
   ): F[Operators[F]] =
     for
       backtests <- IndicatorBacktest.make(corpus, strategy, poolSize, otherIndicators, signalDetector, diagnostics)
-      objective = new IndicatorObjective(backtests, scoringFunction, searchSpace, diagnostics)
-      evaluator <- FoldRotatingEvaluator.cached[F](
-        backtests.searchFolds(RunDiagnostics.Stage.Search),
+      canonicalise = (indicator: Indicator) => searchSpace.fold[Either[Throwable, Indicator]](Right(indicator))(_.canonicalise(indicator))
+      baseline  <- prepareBaseline(backtests, scoringFunction, searchObjective, baseIndicator, canonicalise, diagnostics)
+      selection <- memoize[F, Indicator, SelectionEvidence] { candidate =>
+        for
+          _        <- diagnostics.traverse_(_.foldStarted(RunDiagnostics.Stage.Validation))
+          stats    <- backtests.validationWithPairs(candidate, RunDiagnostics.Stage.Validation)
+          evidence <- Async[F].fromEither(SelectionEvidence.fromStats(candidate, stats, scoringFunction))
+          _        <- diagnostics.traverse_(_.foldCompleted(RunDiagnostics.Stage.Validation))
+        yield evidence
+      }
+      objective = new IndicatorObjective(
+        backtests,
         scoringFunction,
-        objective.canonicalise,
-        diagnostics.map(_.evaluatorObserver)
+        searchSpace,
+        diagnostics,
+        selection,
+        searchObjective,
+        upgradePolicy,
+        baseline
       )
-    yield Operators(evaluator, objective.validationFitness, objective.backtest, objective.validate, objective.inspect)
+      initialScores = baseline.headOption.fold(Map.empty[Indicator, List[Double]]) { case (_, evidence) =>
+        Map(evidence.candidate -> baseline.toList.sortBy(_._1).map(_._2.score.value))
+      }
+      evaluator <- FoldRotatingEvaluator.cachedScores[F](
+        backtests.searchFoldsWithPairs(RunDiagnostics.Stage.Search).zipWithIndex.map { case (run, fold) =>
+          candidate => run(candidate).flatMap(stats => Async[F].fromEither(objective.searchScore(candidate, stats, fold)))
+        },
+        objective.canonicalise,
+        diagnostics.map(_.evaluatorObserver),
+        initialScores
+      )
+    yield Operators(
+      evaluator,
+      objective.validationFitness,
+      objective.backtest,
+      objective.validate,
+      objective.inspect,
+      objective.selectionEvidence
+    )
+
+  private def prepareBaseline[F[_]: Async](
+      backtests: IndicatorBacktest[F],
+      scoring: ScoringFunction,
+      objective: SearchObjectiveConfig,
+      baseIndicator: Option[Indicator],
+      canonicalise: Indicator => Either[Throwable, Indicator],
+      diagnostics: Option[RunDiagnostics[F]]
+  ): F[Map[Int, SelectionEvidence]] = objective match
+    case SearchObjectiveConfig.Current             => Async[F].pure(Map.empty)
+    case SearchObjectiveConfig.BaselineRelative(_) =>
+      val observer = diagnostics.map(_.evaluatorObserver)
+      for
+        base <- Async[F].fromEither(
+          baseIndicator.toRight(new IllegalArgumentException("Baseline-relative search requires a base indicator"))
+        )
+        canonical <- Async[F].fromEither(canonicalise(base))
+        _         <- observer.traverse_(_.requested(EvaluationPhase.Rescore))
+        _         <- observer.traverse_(_.computationStarted(canonical))
+        evidence  <- backtests.searchFoldsWithPairs(RunDiagnostics.Stage.Search).zipWithIndex.traverse { case (run, fold) =>
+          for
+            _        <- observer.traverse_(_.foldStarted)
+            stats    <- run(canonical)
+            measured <- Async[F].fromEither(SelectionEvidence.fromStats(canonical, stats, scoring))
+            _        <- observer.traverse_(_.foldCompleted)
+          yield fold -> measured
+        }
+        _ <- observer.traverse_(_.computationCompleted)
+      yield evidence.toMap
 }
 
 /** Candidate-level operations share canonicalisation, scoring and explicit workload ownership. */
@@ -111,7 +176,11 @@ final class IndicatorObjective[F[_]: Async] private (
     backtests: IndicatorBacktest[F],
     scoringFunction: ScoringFunction,
     searchSpace: Option[IndicatorSearchSpace],
-    diagnostics: Option[RunDiagnostics[F]]
+    diagnostics: Option[RunDiagnostics[F]],
+    cachedSelection: Indicator => F[SelectionEvidence],
+    searchObjective: SearchObjectiveConfig,
+    upgradePolicy: UpgradePolicyConfig,
+    baselines: Map[Int, SelectionEvidence]
 ) {
   import RunDiagnostics.Stage
 
@@ -130,14 +199,22 @@ final class IndicatorObjective[F[_]: Async] private (
     withCandidate(indicator, Stage.Validation)(validationResults(_, Stage.Validation))
 
   def validationFitness(indicator: Indicator): F[Fitness] =
-    validate(indicator).map(stats => Fitness(scoringFunction.score(stats)))
+    if (backtests.hasValidation) selectionEvidence(indicator).map(evidence => Fitness(evidence.score.value))
+    else validate(indicator).map(stats => Fitness(scoringFunction.score(stats)))
+
+  def selectionEvidence(indicator: Indicator): F[SelectionEvidence] =
+    withCandidate(indicator, Stage.Validation)(cachedSelection)
 
   def inspect(indicator: Indicator): F[CandidateDiagnostics] =
     withCandidate(indicator, Stage.Reporting) { candidate =>
       for
-        search     <- searchResults(candidate, Stage.Reporting)(summarise)
+        search <- backtests.searchFoldsWithPairs(Stage.Reporting).zipWithIndex.traverse { case (run, fold) =>
+          observedFold(Stage.Reporting)(run(candidate)).flatMap { stats =>
+            Async[F].fromEither(searchScore(candidate, stats, fold)).map(score => summarise(stats.map(_._2), score))
+          }
+        }
         validation <-
-          if (backtests.hasValidation) validationResults(candidate, Stage.Reporting).map(stats => Some(summarise(stats)))
+          if (backtests.hasValidation) cachedSelection(candidate).map(evidence => Some(summarise(evidence)))
           else Async[F].pure(Option.empty[FoldDiagnostics])
       yield CandidateDiagnostics(candidate, search, validation)
     }
@@ -153,10 +230,35 @@ final class IndicatorObjective[F[_]: Async] private (
   private def observedFold[A](stage: Stage)(run: F[A]): F[A] =
     diagnostics.traverse_(_.foldStarted(stage)).flatMap(_ => run.flatTap(_ => diagnostics.traverse_(_.foldCompleted(stage))))
 
-  private def summarise(stats: List[OrderStats]): FoldDiagnostics = {
+  private def searchScore(candidate: Indicator, stats: List[(CurrencyPair, OrderStats)], fold: Int): Either[Throwable, Double] =
+    searchObjective match
+      case SearchObjectiveConfig.Current             => Right(scoringFunction.score(stats.map(_._2)))
+      case SearchObjectiveConfig.BaselineRelative(_) =>
+        for
+          base     <- baselines.get(fold).toRight(new IllegalArgumentException(s"Missing baseline evidence for search fold $fold"))
+          evidence <- SelectionEvidence.fromStats(candidate, stats, scoringFunction)
+          _        <- Either.cond(
+            evidence.coverage == base.coverage,
+            (),
+            new IllegalArgumentException(s"Mismatched search coverage for fold $fold")
+          )
+        yield searchObjective.adjust(evidence.score.value, evidence.netProfit, base, upgradePolicy)
+
+  private def summarise(evidence: SelectionEvidence): FoldDiagnostics =
+    FoldDiagnostics(
+      score = evidence.score.value,
+      netProfit = evidence.netProfit,
+      closedTrades = evidence.closedTrades.value,
+      forcedClosures = evidence.forcedClosures.value,
+      costs = evidence.costs.value,
+      maxDrawdownPercent = evidence.maxDrawdownPercent.value,
+      violations = evidence.violations
+    )
+
+  private def summarise(stats: List[OrderStats], score: Double): FoldDiagnostics = {
     val portfolio = OrderStats.combine(stats)
     FoldDiagnostics(
-      score = scoringFunction.score(stats),
+      score = score,
       netProfit = portfolio.totalProfit,
       closedTrades = portfolio.total,
       forcedClosures = portfolio.forcedClosureCount,

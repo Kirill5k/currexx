@@ -17,7 +17,7 @@ trait Fs2HttpClient[F[_]] {
   protected val name: String
   protected val backend: WebSocketStreamBackend[F, Fs2Streams[F]]
 
-  protected val delayBetweenConnectionFailures: FiniteDuration = 10.seconds
+  protected val delayBetweenConnectionFailures: FiniteDuration  = 10.seconds
   protected val additionalRetryableStatusCodes: Set[StatusCode] = Set.empty
 
   protected def calculateBackoffDelay(

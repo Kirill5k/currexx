@@ -2,7 +2,14 @@ package currexx.backtest.optimizer.reporting
 
 import currexx.algorithms.ValidatedPopulation
 import currexx.backtest.MarketDataProvider.Corpus
-import currexx.backtest.optimizer.{IndicatorObjective, IndicatorSearchSpace, ScoringFunction}
+import currexx.backtest.optimizer.{
+  IndicatorObjective,
+  IndicatorSearchSpace,
+  OptimisationResult,
+  ScoringFunction,
+  SearchObjectiveConfig,
+  UpgradePolicyConfig
+}
 import currexx.domain.signal.Indicator
 
 import scala.concurrent.duration.FiniteDuration
@@ -49,5 +56,9 @@ final case class OptimisationReport(
     diagnostics: RunDiagnostics.Snapshot,
     reportingWorkload: RunDiagnostics.Workload,
     optimisationDuration: FiniteDuration,
-    reportingDuration: FiniteDuration
+    reportingDuration: FiniteDuration,
+    upgrade: Option[OptimisationResult] = None,
+    searchObjective: SearchObjectiveConfig = SearchObjectiveConfig.Current,
+    upgradePolicy: UpgradePolicyConfig = UpgradePolicyConfig(),
+    scoringDescription: String = "unspecified"
 )

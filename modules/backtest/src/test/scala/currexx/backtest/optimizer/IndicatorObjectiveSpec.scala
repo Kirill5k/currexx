@@ -278,6 +278,7 @@ class IndicatorObjectiveSpec extends IOWordSpec {
             objective.backtest(invalid).void,
             objective.validate(invalid).void,
             objective.validationObjective(invalid).void,
+            objective.selectionEvidence(invalid).void,
             objective.inspect(invalid).void,
             scoped
               .validate(Vector(target.indicator -> Fitness(2.0), invalid -> Fitness(1.0)))
@@ -343,7 +344,7 @@ class IndicatorObjectiveSpec extends IOWordSpec {
         before.workloads(RunDiagnostics.Stage.Reporting) mustBe RunDiagnostics.Workload()
         after.workloads(RunDiagnostics.Stage.Search) mustBe before.workloads(RunDiagnostics.Stage.Search)
         after.workloads(RunDiagnostics.Stage.Validation) mustBe before.workloads(RunDiagnostics.Stage.Validation)
-        after.workloads(RunDiagnostics.Stage.Reporting) mustBe RunDiagnostics.Workload(1, 3, 3, 3, 3)
+        after.workloads(RunDiagnostics.Stage.Reporting) mustBe RunDiagnostics.Workload(1, 2, 2, 2, 2)
         after.firstSeen mustBe before.firstSeen
         after.bestSeen mustBe before.bestSeen
         after.computationAttempts mustBe 1L
@@ -355,6 +356,112 @@ class IndicatorObjectiveSpec extends IOWordSpec {
         afterDirect.searchRequests mustBe after.searchRequests
         afterDirect.rescoreRequests mustBe after.rescoreRequests
         afterDirect.firstSeen mustBe after.firstSeen
+      }
+    }
+
+    "share compact selection evidence across canonical aliases, validation, and reporting" in {
+      val target = TestStrategy.s5_optimized_v2
+      val alias  = target.indicator match
+        case Indicator.Composite(children, combinator) =>
+          Indicator.Composite(
+            children.map {
+              case Indicator.ValueTracking(ValueRole.Momentum, source, _) =>
+                Indicator.ValueTracking(ValueRole.Momentum, source, ValueTransformation.RSX(40))
+              case child => child
+            },
+            combinator
+          )
+        case _ => fail("Expected s5 to be a composite")
+      val result = for
+        space       <- IO.fromEither(IndicatorSearchSpace.forStrategy(target))
+        diagnostics <- RunDiagnostics.make[IO]
+        objective   <- IndicatorObjective.make[IO](
+          corpus = corpus.copy(searchFolds = corpus.searchFolds.take(1)),
+          strategy = target.rules,
+          poolSize = 1,
+          searchSpace = Some(space),
+          diagnostics = Some(diagnostics)
+        )
+        shared    <- (objective.selectionEvidence(alias), objective.selectionEvidence(target.indicator)).parTupled
+        score     <- objective.validationObjective(alias)
+        before    <- diagnostics.snapshot
+        inspected <- objective.inspect(alias)
+        after     <- diagnostics.snapshot
+      yield (shared, score, before, inspected, after)
+
+      result.asserting { case ((first, second), score, before, inspected, after) =>
+        first mustBe second
+        first.candidate mustBe target.indicator
+        first.coverage.value.keySet mustBe Set(corpus.validationFold.head.currencyPair)
+        first.score.value mustBe score.value
+        before.workloads(RunDiagnostics.Stage.Validation) mustBe RunDiagnostics.Workload(3, 1, 1, 1, 1)
+        after.workloads(RunDiagnostics.Stage.Validation) mustBe before.workloads(RunDiagnostics.Stage.Validation)
+        inspected.validation.map(_.score) mustBe Some(first.score.value)
+        inspected.validation.map(_.netProfit) mustBe Some(first.netProfit)
+        after.workloads(RunDiagnostics.Stage.Reporting) mustBe RunDiagnostics.Workload(1, 1, 1, 1, 1)
+      }
+    }
+
+    "prepare each baseline fold once and report the actual relative score while keeping validation absolute" in {
+      val challenger = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SMA(20))
+      val mode       = SearchObjectiveConfig.BaselineRelative()
+      val quality    = new ScoringFunction {
+        override def score(stats: List[OrderStats]): Double                               = 1.0
+        override def violations(stats: List[OrderStats]): List[ScoringFunction.Violation] = Nil
+      }
+      val result = for
+        diagnostics <- RunDiagnostics.make[IO]
+        objective   <- IndicatorObjective.make[IO](
+          corpus = corpus.copy(searchFolds = corpus.searchFolds.take(2)),
+          strategy = strategy.rules,
+          poolSize = 1,
+          scoringFunction = quality,
+          diagnostics = Some(diagnostics),
+          searchObjective = mode,
+          baseIndicator = Some(strategy.indicator)
+        )
+        prepared   <- diagnostics.snapshot
+        baseline   <- objective.evaluator.evaluateIndividual(strategy.indicator, EvaluationPhase.Rescore)
+        reused     <- diagnostics.snapshot
+        rescored   <- objective.evaluator.evaluateIndividual(challenger, EvaluationPhase.Rescore)
+        searched   <- objective.evaluator.evaluateIndividual(challenger, EvaluationPhase.Search(0))
+        validation <- objective.validationObjective(challenger)
+        inspected  <- objective.inspect(challenger)
+        baseStats  <- objective.backtest(strategy.indicator)
+        expected   <- baseStats.zip(inspected.searchFolds).traverse { case (stats, report) =>
+          IO.fromEither(SelectionEvidence.fromStats(strategy.indicator, stats.map(corpus.searchFolds.head.head.currencyPair -> _), quality))
+            .map(base => mode.adjust(1.0, report.netProfit, base, UpgradePolicyConfig()))
+        }
+      yield (prepared, baseline, reused, rescored, searched, validation, inspected, expected)
+
+      result.asserting { case (prepared, baseline, reused, rescored, searched, validation, inspected, expected) =>
+        prepared.workloads(RunDiagnostics.Stage.Search).foldCompleted mustBe 2L
+        prepared.workloads(RunDiagnostics.Stage.Search).pairCompleted mustBe 2L
+        reused.workloads(RunDiagnostics.Stage.Search).foldCompleted mustBe 2L
+        reused.workloads(RunDiagnostics.Stage.Search).pairCompleted mustBe 2L
+        reused.computationAttempts mustBe 1L
+        baseline._2.value mustBe 1.0
+        validation.value mustBe 1.0
+        inspected.validation.map(_.score) mustBe Some(1.0)
+        inspected.searchFolds.map(_.score) mustBe expected
+        rescored._2.value mustBe IndicatorObjective.FoldAggregation.combine(expected)
+        searched._2.value mustBe IndicatorObjective.FoldAggregation.combineExcluding(expected, Some(0))
+      }
+    }
+
+    "fail selection evidence when the corpus has no selection data" in {
+      val result = for
+        objective <- IndicatorObjective.make[IO](
+          corpus = Corpus(corpus.searchFolds.take(1)),
+          strategy = strategy.rules,
+          poolSize = 1
+        )
+        evidence <- objective.selectionEvidence(strategy.indicator).attempt
+      yield evidence
+
+      result.asserting {
+        case Left(error: IllegalArgumentException) => error.getMessage mustBe "Selection data is required"
+        case other                                 => fail(s"Expected missing selection data to fail, got $other")
       }
     }
 

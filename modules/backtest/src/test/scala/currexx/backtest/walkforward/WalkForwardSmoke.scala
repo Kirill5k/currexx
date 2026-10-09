@@ -19,5 +19,8 @@ object WalkForwardSmoke extends IOApp.Simple:
       _           <- IO.raiseUnless(results.size == 2 && results.forall(_.forward.coverage.size == 1))(
         new IllegalStateException("Smoke experiment did not complete both paired tests")
       )
+      _ <- IO.raiseUnless(results.forall { result =>
+        result.selection.outcome != SelectionOutcome.BaseRetained || result.forward.netDifference == 0
+      })(new IllegalStateException("A retained base produced a different paired result"))
       _ <- IO.println(s"Smoke experiment completed: ${store.directory / "report.md"}")
     yield ()

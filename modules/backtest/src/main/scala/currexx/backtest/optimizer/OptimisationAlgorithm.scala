@@ -18,7 +18,7 @@ trait OptimisationAlgorithm[F[_], A <: Alg, P <: Parameters[A], T]:
 
 /** A configured indicator search that appends diagnostics after selection, retaining explicit replay access for callers. */
 trait IndicatorOptimisation[F[_]]:
-  def optimise(using Random): F[ValidatedPopulation[Indicator]]
+  def optimise(using Random): F[OptimisationResult]
   def searchSpace: IndicatorSearchSpace
   def tracker: Tracker[F, Indicator]
   def validate(indicator: Indicator): F[List[OrderStats]]
@@ -30,6 +30,9 @@ object OptimisationAlgorithm:
       catalogue: List[StrategyCatalogue.Entry] = StrategyCatalogue.entries
   )(using Random): F[IndicatorOptimisation[F]] =
     for
+      _ <- Async[F].raiseWhen(round.corpus.validationFold.isEmpty)(
+        new IllegalArgumentException("Strategy upgrade decisions require a nonempty selection period")
+      )
       space     <- Async[F].fromEither(IndicatorSearchSpace.forStrategy(round.strategy, round.fixedIndicators))
       baselines <- Async[F].fromEither(
         FinalistAssembler.protectedBaselines(space, round.extraSeeds.map(_.indicator), round.shortlistSize)
@@ -52,7 +55,12 @@ object OptimisationAlgorithm:
         showStats = false,
         finalTopN = baselines.shortlistSize
       )
-      progressTracker = new ReportingTracker(Tracker.composite(markdown, logging), diagnostics, round.corpus.foldCount)
+      progressTracker = new ReportingTracker(
+        Tracker.composite(markdown, logging),
+        diagnostics,
+        round.corpus.foldCount,
+        searchObjective = round.searchObjective
+      )
       algorithm <- round.parameters match
         case params: Parameters.GA   => ga[F](round, params, space, baselines, progressTracker, evaluatorPoolSize, diagnostics, catalogue)
         case params: Parameters.SCGA => scga[F](round, params, space, baselines, progressTracker, evaluatorPoolSize, diagnostics, catalogue)
@@ -78,7 +86,10 @@ object OptimisationAlgorithm:
         poolSize = evaluatorPoolSize,
         scoringFunction = round.scoringFunction,
         searchSpace = Some(space),
-        diagnostics = Some(diagnostics)
+        diagnostics = Some(diagnostics),
+        searchObjective = round.searchObjective,
+        upgradePolicy = round.upgradePolicy,
+        baseIndicator = Some(round.strategy.indicator)
       )
       assembler = FinalistAssembler.ga(
         space,
@@ -118,7 +129,10 @@ object OptimisationAlgorithm:
         poolSize = evaluatorPoolSize,
         scoringFunction = round.scoringFunction,
         searchSpace = Some(space),
-        diagnostics = Some(diagnostics)
+        diagnostics = Some(diagnostics),
+        searchObjective = round.searchObjective,
+        upgradePolicy = round.upgradePolicy,
+        baseIndicator = Some(round.strategy.indicator)
       )
       assembler = FinalistAssembler.scga(
         space,
@@ -162,21 +176,24 @@ object OptimisationAlgorithm:
       diagnostics: RunDiagnostics[F],
       catalogue: List[StrategyCatalogue.Entry]
   ): IndicatorOptimisation[F] = new IndicatorOptimisation[F]:
-    override def optimise(using Random): F[ValidatedPopulation[Indicator]] =
+    override def optimise(using Random): F[OptimisationResult] =
       for
         started   <- Async[F].monotonic
         archive   <- SearchArchive.make[F](assembler.shortlistSize)
         validator <- Validator.shortlisted[F, Indicator](assembler.shortlistSize, objective.validationObjective)
         algorithm = buildAlgorithm(objective.evaluator.observingSearch(archive.record), assemblingValidator(archive, assembler, validator))
         finalists <- algorithm.optimise(round.strategy.indicator, params)
-        finished  <- Async[F].monotonic
-        snapshot  <- diagnostics.snapshot
+        base      <- objective.selectionEvidence(space.template)
+        evidence  <- finalists.toList.traverse(candidate => objective.selectionEvidence(candidate._1))
+        decision  <- Async[F].fromEither(UpgradePolicy.decide(base, evidence, round.upgradePolicy))
+        result = OptimisationResult(finalists, decision, base)
+        finished <- Async[F].monotonic
+        snapshot <- diagnostics.snapshot
         builder = new OptimisationReportBuilder(round, space, objective.inspect, diagnostics, catalogue)
-        _ <- builder
-          .build(finalists, snapshot, finished - started)
-          .flatMap(progressTracker.displayReport)
+        _ <- (progressTracker.displayCompletedRankings(finalists) >>
+          builder.build(result, snapshot, finished - started).flatMap(progressTracker.displayReport))
           .handleErrorWith(error => progressTracker.displayReportFailure(round.name, error).attempt.void)
-      yield finalists
+      yield result
     override val searchSpace: IndicatorSearchSpace                   = space
     override val tracker: Tracker[F, Indicator]                      = progressTracker
     override def validate(indicator: Indicator): F[List[OrderStats]] = objective.validate(indicator)

@@ -4,6 +4,7 @@ import cats.effect.{IO, Ref}
 import currexx.algorithms.{EvaluationPhase, Fitness, Parameters, ValidatedPopulation}
 import currexx.algorithms.progress.{Progress, Tracker}
 import currexx.backtest.MarketDataProvider.Corpus
+import currexx.backtest.optimizer.SearchObjectiveConfig
 import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation as VT}
 import kirill5k.common.cats.test.IOWordSpec
 
@@ -24,14 +25,67 @@ class ReportingTrackerSpec extends IOWordSpec {
     20.millis
   )
 
-  private def noteTracker(write: (String, List[String]) => IO[Unit]): Tracker[IO, Indicator] = new Tracker[IO, Indicator] {
-    def displayInitial(target: Indicator, params: Parameters[?]): IO[Unit] = IO.unit
-    def displayProgress(progress: Progress[Indicator]): IO[Unit]           = IO.unit
-    def displayFinal(population: ValidatedPopulation[Indicator]): IO[Unit] = IO.unit
-    def displayNote(title: String, lines: List[String]): IO[Unit]          = write(title, lines)
-  }
+  private def noteTracker(write: (String, List[String]) => IO[Unit], finalCall: IO[Unit] = IO.unit): Tracker[IO, Indicator] =
+    new Tracker[IO, Indicator] {
+      def displayInitial(target: Indicator, params: Parameters[?]): IO[Unit] = IO.unit
+      def displayProgress(progress: Progress[Indicator]): IO[Unit]           = IO.unit
+      def displayFinal(population: ValidatedPopulation[Indicator]): IO[Unit] = finalCall
+      def displayNote(title: String, lines: List[String]): IO[Unit]          = write(title, lines)
+    }
 
   "ReportingTracker" should {
+    "omit the generic retention table when search and validation use different objectives" in {
+      val result = for {
+        diagnostics <- RunDiagnostics.make[IO]
+        notes       <- Ref.of[IO, List[(String, List[String])]](Nil)
+        delegate = noteTracker(
+          (title, lines) => notes.update(_ :+ (title -> lines)),
+          IO.raiseError(new IllegalStateException("Generic retention table must not be rendered"))
+        )
+        tracker   = new ReportingTracker(delegate, diagnostics, 1, searchObjective = SearchObjectiveConfig.BaselineRelative())
+        finalists = Vector((indicator, Fitness(2.0), Fitness(1.0)))
+        _       <- tracker.displayFinal(finalists)
+        before  <- notes.get
+        _       <- tracker.displayCompletedRankings(finalists)
+        written <- notes.get
+      } yield (before, written)
+      result.asserting { case (before, written) =>
+        before mustBe Nil
+        written.map(_._1) mustBe List("Final rankings (separate objectives)")
+        val text = written.head._2.mkString("\n")
+        text must include("search=2.000000; absolute validation=1.000000")
+        (text must not).include("retained")
+        (text must not).include("50.0%")
+      }
+    }
+
+    "delay a failing final sink until completed rankings are displayed after the decision" in {
+      val failure = new RuntimeException("final sink unavailable")
+      val result  = for {
+        diagnostics <- RunDiagnostics.make[IO]
+        calls       <- Ref.of[IO, Int](0)
+        notes       <- Ref.of[IO, List[String]](Nil)
+        delegate = noteTracker(
+          (title, _) => notes.update(_ :+ title),
+          calls.update(_ + 1) >> IO.raiseError(failure)
+        )
+        tracker = new ReportingTracker(delegate, diagnostics, foldCount = 1)
+        beforeDecision <- tracker.displayFinal(report.finalists).attempt
+        callsBefore    <- calls.get
+        afterDecision  <- tracker.displayCompletedRankings(report.finalists).attempt
+        callsAfter     <- calls.get
+        written        <- notes.get
+      } yield (beforeDecision, callsBefore, afterDecision, callsAfter, written)
+
+      result.asserting { case (beforeDecision, callsBefore, afterDecision, callsAfter, written) =>
+        beforeDecision mustBe Right(())
+        callsBefore mustBe 0
+        afterDecision mustBe Left(failure)
+        callsAfter mustBe 1
+        written mustBe Nil
+      }
+    }
+
     "forward completed report sections in order" in {
       val result = for {
         diagnostics <- RunDiagnostics.make[IO]
@@ -58,7 +112,7 @@ class ReportingTrackerSpec extends IOWordSpec {
 
       result.asserting { written =>
         written.map(_._1) mustBe List("Incomplete diagnostics: report-test")
-        written.head._2 must contain("Optimisation results above are complete; diagnostic reporting failed. Remaining rounds can continue.")
+        written.head._2 must contain("Optimisation and upgrade decision are complete; reporting failed. Remaining rounds can continue.")
         written.head._2 must contain(failure.toString)
       }
     }

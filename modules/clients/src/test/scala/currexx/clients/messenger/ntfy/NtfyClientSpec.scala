@@ -1,6 +1,6 @@
 package currexx.clients.messenger.ntfy
 
-import cats.effect.{IO}
+import cats.effect.IO
 import currexx.domain.errors.AppError
 import kirill5k.common.sttp.test.Sttp4WordSpec
 import org.typelevel.log4cats.Logger
@@ -32,7 +32,7 @@ class NtfyClientSpec extends Sttp4WordSpec {
 
       NtfyClient.make[IO](config, testingBackend).flatMap(_.send("Currexx Warn", message)).assertVoid
     }
-    
+
     "report an unsuccessful response without retrying" in {
       val requests       = AtomicInteger(0)
       val testingBackend = fs2BackendStub.whenAnyRequest.thenRespond {

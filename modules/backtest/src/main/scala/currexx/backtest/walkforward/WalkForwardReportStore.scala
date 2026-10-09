@@ -21,6 +21,23 @@ final case class WalkForwardReportStore[F[_]](
 object WalkForwardReportStore:
   val outputDirectory: Path = Path("walk-forward-results")
 
+  def writeComparison[F[_]](runs: List[WalkForwardComparison.Run], root: Path = outputDirectory)(using F: Async[F]): F[Path] =
+    F.fromOption(runs.headOption, new IllegalArgumentException("A comparison needs at least one completed experiment"))
+      .flatMap { first =>
+        val directory = root / s"${first.experiment.id}-comparison"
+        F.blocking {
+          Files.createDirectories(root.toNioPath)
+          Files.createDirectory(directory.toNioPath)
+          Files.writeString(
+            (directory / "comparison.json").toNioPath,
+            WalkForwardComparison.json(runs).spaces2 + "\n",
+            StandardCharsets.UTF_8
+          )
+          Files.writeString((directory / "report.md").toNioPath, WalkForwardComparison.markdown(runs), StandardCharsets.UTF_8)
+          directory
+        }
+      }
+
   def make[F[_]](experiment: WalkForwardExperiment, root: Path = outputDirectory)(using F: Async[F]): F[WalkForwardReportStore[F]] =
     val directory = root / experiment.id
 

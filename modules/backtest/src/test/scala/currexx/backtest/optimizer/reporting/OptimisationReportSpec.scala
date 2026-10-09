@@ -2,14 +2,26 @@ package currexx.backtest.optimizer.reporting
 
 import cats.effect.{IO, Ref}
 import cats.syntax.foldable.*
-import currexx.algorithms.{EvaluationPhase, Fitness, Parameters}
-import currexx.backtest.{NamedIndicator, OptimisationRound, StrategyCatalogue, TestStrategy}
-import currexx.backtest.optimizer.{IndicatorSearchSpace, ScoringFunction}
+import currexx.algorithms.{EvaluationPhase, Fitness, Parameters, ValidatedPopulation}
+import currexx.backtest.{DataWindow, NamedIndicator, OptimisationRound, StrategyCatalogue, TestStrategy}
+import currexx.backtest.optimizer.{
+  IndicatorSearchSpace,
+  OptimisationResult,
+  ScoringFunction,
+  SearchObjectiveConfig,
+  SelectionCoverage,
+  SelectionEvidence,
+  UpgradeDecision,
+  UpgradePolicy
+}
 import currexx.core.trade.{Rule, TradeAction, TradeStrategy}
+import currexx.domain.market.CurrencyPair
 import currexx.domain.signal.{Indicator, ValueRole, ValueSource, ValueTransformation as VT}
+import eu.timepit.refined.types.numeric.PosBigDecimal
 import kirill5k.common.cats.test.IOWordSpec
 
 import scala.concurrent.duration.*
+import java.time.{Instant, YearMonth}
 
 class OptimisationReportSpec extends IOWordSpec {
   private def indicator(length: Int, tracker: Int = 8): Indicator = Indicator.compositeAnyOf(
@@ -26,6 +38,35 @@ class OptimisationReportSpec extends IOWordSpec {
   private def fold(score: Double): FoldDiagnostics = FoldDiagnostics(score, BigDecimal(100), 20, 1, BigDecimal(3), BigDecimal("0.5"), Nil)
   private def measured(ind: Indicator, training: Double = 0.5, validation: Option[Double] = Some(0.2)): CandidateDiagnostics =
     CandidateDiagnostics(ind, List(fold(training)), validation.map(fold))
+
+  private def evidence(candidate: Indicator, netProfit: BigDecimal = 100): SelectionEvidence =
+    SelectionEvidence
+      .from(
+        candidate,
+        Map(
+          CurrencyPair.fromUnsafe("EUR/USD") -> SelectionCoverage(
+            DataWindow(Instant.parse("2025-01-01T00:00:00Z"), Instant.parse("2025-04-30T23:59:59Z")),
+            PosBigDecimal.unsafeFrom(BigDecimal(10000))
+          )
+        ),
+        BigDecimal(10000),
+        netProfit,
+        BigDecimal(3),
+        BigDecimal("0.5"),
+        (1 to 4).map(month => YearMonth.of(2025, month) -> (netProfit / 4)).toMap,
+        0.5,
+        Nil,
+        20,
+        1
+      )
+      .toOption
+      .get
+
+  private def completed(finalists: ValidatedPopulation[Indicator]): OptimisationResult = OptimisationResult(
+    finalists,
+    UpgradeDecision.RetainBase(Nil),
+    evidence(round.strategy.indicator)
+  )
 
   "OptimisationReportBuilder" should {
     "replay canonical baselines, both leaders, and a lost best candidate once, but discover catalogue aliases for every finalist" in {
@@ -61,7 +102,7 @@ class OptimisationReportSpec extends IOWordSpec {
         calls       <- Ref.of[IO, List[Indicator]](Nil)
         inspect = (ind: Indicator) => calls.update(_ :+ ind).as(measured(ind))
         report <- new OptimisationReportBuilder(configured, space, inspect, diagnostics, catalogue)
-          .build(finalists, frozen, 2.seconds)
+          .build(completed(finalists), frozen, 2.seconds)
         called <- calls.get
       } yield (report, called)
       result.asserting { case (report, called) =>
@@ -105,7 +146,7 @@ class OptimisationReportSpec extends IOWordSpec {
           diagnostics.foldCompleted(stage)
         _ <- replayWork
         inspect = (ind: Indicator) => replayWork.as(measured(ind))
-        report <- new OptimisationReportBuilder(configured, space, inspect, diagnostics, Nil).build(finalists, frozen, 1.second)
+        report <- new OptimisationReportBuilder(configured, space, inspect, diagnostics, Nil).build(completed(finalists), frozen, 1.second)
         latest <- diagnostics.snapshot
       } yield (report, frozen, latest)
       result.asserting { case (report, frozen, latest) =>
@@ -119,7 +160,70 @@ class OptimisationReportSpec extends IOWordSpec {
     }
   }
 
+  "Diagnostic selection cache misses" should {
+    "count report-time selection simulations without changing frozen validation counts" in {
+      val target = round.strategy.indicator
+      val lost   = indicator(99)
+      val stage  = RunDiagnostics.Stage.Validation
+      val run    = for {
+        space       <- IO.fromEither(IndicatorSearchSpace.forStrategy(round.strategy))
+        diagnostics <- RunDiagnostics.make[IO]
+        frozen      <- diagnostics.snapshot
+        inspect = (candidate: Indicator) => {
+          val validation =
+            if (candidate == lost)
+              diagnostics.foldStarted(stage) >> diagnostics.pairStarted(stage) >>
+                diagnostics.pairCompleted(stage) >> diagnostics.foldCompleted(stage)
+            else IO.unit
+          validation.as(measured(candidate))
+        }
+        report <- new OptimisationReportBuilder(round, space, inspect, diagnostics, Nil).build(
+          completed(Vector((target, Fitness(1), Fitness(1)))),
+          frozen.copy(bestSeen = Some(RunDiagnostics.Discovery(lost, 2.0, 1))),
+          1.second
+        )
+      } yield report
+      run.asserting { report =>
+        report.reportingWorkload mustBe RunDiagnostics.Workload(0, 1, 1, 1, 1)
+        report.diagnostics.workloads.getOrElse(stage, RunDiagnostics.Workload()) mustBe RunDiagnostics.Workload()
+      }
+    }
+  }
+
   "OptimisationReportRenderer" should {
+    "record the completed upgrade decision and omit ratios across different objectives" in {
+      val candidate  = indicator(20)
+      val base       = completed(Vector.empty).base
+      val challenger = evidence(candidate, 200)
+      val decision   = UpgradePolicy.decide(base, List(challenger)).toOption.get
+      val finalists  = Vector((base.candidate, Fitness(2), Fitness(1)), (candidate, Fitness(1), Fitness(0.5)))
+      val result     = OptimisationResult(finalists, decision, base)
+      val report     = OptimisationReport(
+        round.name,
+        round.corpus,
+        finalists,
+        List(BaselineReport("target", Some(base.candidate), None)),
+        Map(base.candidate -> measured(base.candidate), candidate -> measured(candidate)),
+        Map.empty,
+        RunDiagnostics.Snapshot(),
+        RunDiagnostics.Workload(),
+        1.second,
+        1.second,
+        upgrade = Some(result),
+        searchObjective = SearchObjectiveConfig.BaselineRelative()
+      )
+      val text = OptimisationReportRenderer.sections(report).flatMap(_._2).mkString("\n")
+      text must include("UPGRADE APPROVED")
+      text must include("Format version: 2")
+      text must include("BaselineRelative")
+      text must include("trial-v1")
+      text must include("minimumNetImprovement")
+      (text must not).include("Validation/training fitness ratio")
+      // The completed decision, not the first finalist's identity, determines approval.
+      text must include(candidate.toString)
+      text must include("Approved upgrade vs target")
+    }
+
     "compare each fitness against its own strongest seed and show provenance without inventing percentage gain from zero" in {
       val target         = indicator(10)
       val firstSeed      = indicator(20)
@@ -149,9 +253,9 @@ class OptimisationReportSpec extends IOWordSpec {
         20.millis
       )
       val text = OptimisationReportRenderer.sections(report).flatMap { case (heading, lines) => heading :: lines }.mkString("\n")
-      text must include("Champion selection: report-test")
-      text must include("SELECTED (from 2 after validation")
-      text must include("Selection source: searched candidate selected.")
+      text must include("Search ranking: report-test")
+      text must include("SEARCH LEADER:")
+      text must include("Leading finalist source: searched candidate.")
       text must include("strongest seed on training (training seed): -0.500000")
       text must include("strongest seed on validation (validation seed): -0.400000")
       text must include("Shortlist training leader vs strongest seed on training (training seed): +1.000000")
@@ -250,8 +354,8 @@ class OptimisationReportSpec extends IOWordSpec {
       text must include("strongest seed on training (literal): +0.000000")
       text must include("restored (fixed inputs restored): duplicate of target")
       text must include("baselines=target, literal, restored (fixed inputs restored)")
-      text must include("Selection source: target retained.")
-      (text must not).include("Selection source: supplied seed parameters selected")
+      text must include("Leading finalist source: target parameters.")
+      (text must not).include("Leading finalist source: supplied seed parameters")
     }
 
     "identify selected seed parameters and their aliases without claiming they are the original seed strategy" in {
@@ -280,7 +384,7 @@ class OptimisationReportSpec extends IOWordSpec {
       )
       val text = OptimisationReportRenderer.sections(report).flatMap(_._2).mkString("\n")
       text must include(
-        "Selection source: supplied seed parameters selected (seed, alias (fixed inputs restored)); " +
+        "Leading finalist source: supplied seed parameters (seed, alias (fixed inputs restored)); " +
           "evaluated under this round's rules."
       )
       text must include("#1: first seen=not observed")
@@ -289,8 +393,8 @@ class OptimisationReportSpec extends IOWordSpec {
       List(0.0, -0.1, Double.NaN).foreach { validation =>
         val rejected     = report.copy(finalists = Vector((candidate, Fitness(0.5), Fitness(validation))))
         val rejectedText = OptimisationReportRenderer.sections(rejected).flatMap(_._2).mkString("\n")
-        rejectedText must include("NOTHING SELECTED:")
-        (rejectedText must not).include("Selection source:")
+        rejectedText must include("Upgrade decision unavailable")
+        (rejectedText must not).include("Leading finalist source:")
       }
       succeed
     }
@@ -310,10 +414,10 @@ class OptimisationReportSpec extends IOWordSpec {
         10.millis
       )
       val text = OptimisationReportRenderer.sections(report).flatMap(_._2).mkString("\n")
-      text must include("NOTHING SELECTED: validation measurements are unavailable.")
+      text must include("Validation diagnostics unavailable: no validation measurements.")
       text must include("Validation: unavailable.")
       (text must not).include("Satisfies every constraint")
-      (text must not).include("Selection source:")
+      (text must not).include("Leading finalist source:")
     }
 
     "handle an empty final population" in {

@@ -13,7 +13,7 @@ import currexx.backtest.services.{PeriodSimulation, TestServicesPool}
 import currexx.backtest.{MarketDataProvider, OrderStats, TestSettings}
 import currexx.core.signal.SignalDetector
 import currexx.core.trade.TradeStrategy
-import currexx.domain.market.MarketTimeSeriesData
+import currexx.domain.market.{CurrencyPair, MarketTimeSeriesData}
 import currexx.domain.signal.Indicator
 
 /** Loads a corpus once and executes its pair simulations through a bounded, reusable services pool. */
@@ -30,19 +30,29 @@ final private[optimizer] class IndicatorBacktest[F[_]: {Async, Parallel}] privat
 
   // Callers sequence folds and reduce their results; parallelism remains limited to pairs within a fold.
   def searchFolds(stage: RunDiagnostics.Stage): List[Indicator => F[List[OrderStats]]] =
+    searchFoldsWithPairs(stage).map(run => indicator => run(indicator).map(_.map(_._2)))
+
+  def searchFoldsWithPairs(stage: RunDiagnostics.Stage): List[Indicator => F[List[(CurrencyPair, OrderStats)]]] =
     searchData.map(data => indicator => run(data, indicator, stage))
 
   def validation(indicator: Indicator, stage: RunDiagnostics.Stage): F[List[OrderStats]] =
+    validationWithPairs(indicator, stage).map(_.map(_._2))
+
+  def validationWithPairs(indicator: Indicator, stage: RunDiagnostics.Stage): F[List[(CurrencyPair, OrderStats)]] =
     run(validationData, indicator, stage)
 
-  private def run(dataSets: List[List[MarketTimeSeriesData]], indicator: Indicator, stage: RunDiagnostics.Stage): F[List[OrderStats]] =
+  private def run(
+      dataSets: List[List[MarketTimeSeriesData]],
+      indicator: Indicator,
+      stage: RunDiagnostics.Stage
+  ): F[List[(CurrencyPair, OrderStats)]] =
     dataSets.parTraverse { testData =>
       pool.use(TestSettings.make(testData.head.currencyPair, strategy, indicator :: otherIndicators)) { services =>
         for
           _     <- diagnostics.traverse_(_.pairStarted(stage))
           stats <- PeriodSimulation.run(services, testData, signalDetector)
           _     <- diagnostics.traverse_(_.pairCompleted(stage))
-        yield stats
+        yield testData.head.currencyPair -> stats
       }
     }
 }

@@ -95,10 +95,10 @@ class OptimiserSpec extends AnyWordSpec with Matchers {
       )
       val lines = verdict(0.0, breaches)
 
-      lines.exists(_.startsWith("NOTHING SELECTED:")) mustBe true
+      lines.exists(_.startsWith("SEARCH LEADER:")) mustBe true
       lines must contain("BREACHES 2 constraint(s) on validation data:")
       breaches.foreach(breach => lines must contain(s"  - $breach"))
-      lines.mkString("\n") must include("Leading finalist, recorded for diagnostics only:")
+      lines.mkString("\n") must include("Ranking is diagnostic.")
       (lines.mkString("\n") must not).include("did not find an edge")
     }
 
@@ -106,7 +106,7 @@ class OptimiserSpec extends AnyWordSpec with Matchers {
       val breach = ScoringFunction.Violation("closed trades", "60", ">= 120")
       val lines  = verdict(0.5, List(breach))
 
-      lines.exists(_.startsWith("SELECTED (")) mustBe true
+      lines.exists(_.startsWith("SEARCH LEADER:")) mustBe true
       lines must contain("BREACHES 1 constraint(s) on validation data:")
       lines must contain(s"  - $breach")
     }

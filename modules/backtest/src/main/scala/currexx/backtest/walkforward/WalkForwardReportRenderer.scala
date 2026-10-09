@@ -4,6 +4,7 @@ import currexx.algorithms.Parameters
 import currexx.algorithms.operators.Validator
 import currexx.backtest.{RiskSettings, TestSettings}
 import currexx.backtest.MarketDataProvider.DateRange
+import currexx.backtest.optimizer.reporting.UpgradeDecisionRenderer
 import io.circe.Json
 import io.circe.syntax.*
 
@@ -17,6 +18,7 @@ object WalkForwardReportRenderer:
     val round = experiment.round
     val risk  = RiskSettings()
     Json.obj(
+      "formatVersion"  -> UpgradeDecisionRenderer.formatVersion.asJson,
       "experimentId"   -> experiment.id.asJson,
       "evidence"       -> evidenceLabel.asJson,
       "roundName"      -> round.name.asJson,
@@ -26,12 +28,14 @@ object WalkForwardReportRenderer:
       "search"         -> Json.obj(
         "parameters"    -> parameters(round.parameters),
         "scoring"       -> round.scoringFunction.description.asJson,
+        "objective"     -> UpgradeDecisionRenderer.objective(round.searchObjective),
+        "upgradePolicy" -> UpgradeDecisionRenderer.policy(round.upgradePolicy),
         "shortlistSize" -> round.shortlistSize.asJson,
         "extraSeeds"    -> round.extraSeeds.map(seed => Json.obj("name" -> seed.name.asJson, "indicator" -> seed.indicator.asJson)).asJson,
         "fixedIndicators"          -> round.fixedIndicators.toList.sortBy(_.toString).asJson,
-        "selectionGate"            -> "selection fitness > 0".asJson,
+        "selectionGate"            -> "explicit baseline-relative upgrade requirements after validation".asJson,
         "selectionTieBandRelative" -> Validator.defaultTieBand.relative.asJson,
-        "selectionOrdering" -> "Existing Validator consensus ordering; take the first passing finalist, otherwise retain the original base".asJson
+        "selectionOrdering" -> "Existing Validator consensus ordering; skip base, then approve the first challenger meeting every upgrade requirement".asJson
       ),
       "simulation" -> Json.obj(
         "initialBalancePerPair" -> risk.initialBalance.value.asJson,
@@ -77,33 +81,38 @@ object WalkForwardReportRenderer:
   }.asJson
 
   def frozen(window: WalkForwardWindow, seed: Long, selection: FrozenSelection): Json =
-    Json.obj("evidence" -> evidenceLabel.asJson, "window" -> windowJson(window, seed), "selection" -> selectionJson(selection))
+    Json.obj(
+      "formatVersion" -> UpgradeDecisionRenderer.formatVersion.asJson,
+      "evidence"      -> evidenceLabel.asJson,
+      "window"        -> windowJson(window, seed),
+      "selection"     -> selectionJson(selection)
+    )
 
   def completed(result: WindowResult): Json =
     frozen(result.window, result.seed, result.selection).deepMerge(Json.obj("forward" -> forwardJson(result.forward)))
 
   def failed(failure: Failure): Json = Json.obj(
-    "windowIndex" -> failure.window.index.asJson,
-    "testPeriod"  -> rangeJson(failure.window.test),
-    "errorType"   -> failure.errorType.asJson,
-    "message"     -> failure.message.asJson
+    "formatVersion" -> UpgradeDecisionRenderer.formatVersion.asJson,
+    "windowIndex"   -> failure.window.index.asJson,
+    "testPeriod"    -> rangeJson(failure.window.test),
+    "errorType"     -> failure.errorType.asJson,
+    "message"       -> failure.message.asJson
   )
 
   def summary(value: WalkForwardSummary): Json = Json.obj(
-    "completedWindows"         -> value.completedWindows.asJson,
-    "totalNetDifference"       -> value.totalNetDifference.asJson,
-    "medianNetDifference"      -> value.medianNetDifference.asJson,
-    "worstNetDifference"       -> value.worstNetDifference.asJson,
-    "positiveWindows"          -> value.positiveWindows.asJson,
-    "tiedWindows"              -> value.tiedWindows.asJson,
-    "negativeWindows"          -> value.negativeWindows.asJson,
-    "candidateSelectedWindows" -> value.candidateSelectedWindows.asJson,
-    "baseSelectedWindows"      -> value.baseSelectedWindows.asJson,
-    "noCandidatePassedWindows" -> value.noCandidatePassedWindows.asJson,
-    "baseRetainedWindows"      -> value.baseRetainedWindows.asJson
+    "completedWindows"       -> value.completedWindows.asJson,
+    "totalNetDifference"     -> value.totalNetDifference.asJson,
+    "medianNetDifference"    -> value.medianNetDifference.asJson,
+    "worstNetDifference"     -> value.worstNetDifference.asJson,
+    "positiveWindows"        -> value.positiveWindows.asJson,
+    "tiedWindows"            -> value.tiedWindows.asJson,
+    "negativeWindows"        -> value.negativeWindows.asJson,
+    "upgradeApprovedWindows" -> value.upgradeApprovedWindows.asJson,
+    "baseRetainedWindows"    -> value.baseRetainedWindows.asJson
   )
 
   def progress(experiment: WalkForwardExperiment, totals: WalkForwardSummary, failure: Option[Failure]): Json = Json.obj(
+    "formatVersion"  -> UpgradeDecisionRenderer.formatVersion.asJson,
     "experimentId"   -> experiment.id.asJson,
     "evidence"       -> evidenceLabel.asJson,
     "status"         -> status(experiment, totals.completedWindows, failure).asJson,
@@ -132,9 +141,10 @@ object WalkForwardReportRenderer:
         s"## Window ${result.window.index}",
         "",
         s"Training: ${result.window.training}; selection: ${result.window.selection}; test: ${result.window.test}; seed: ${result.seed}.",
-        s"Decision: ${outcomeLabel(result.selection.outcome)}. Training fitness: ${result.selection.trainingFitness.fold("n/a")(_.toString)}; " +
-          s"selection fitness: ${result.selection.selectionFitness.fold("n/a")(_.toString)}.",
-        "",
+        s"Search score (${experiment.round.searchObjective}): ${result.selection.trainingFitness.fold("n/a")(_.toString)}; " +
+          s"absolute selection score: ${result.selection.selectionFitness.fold("n/a")(_.toString)}.",
+        ""
+      ) ++ UpgradeDecisionRenderer.markdown(result.selection.decision) ++ List(
         "| Measurement | Frozen strategy | Original base | Difference |",
         "|---|---:|---:|---:|",
         s"| Net profit | ${candidate.netProfit} | ${base.netProfit} | ${result.forward.netDifference} |",
@@ -164,6 +174,8 @@ object WalkForwardReportRenderer:
         "",
         s"Experiment: `${experiment.id}`; master seed: ${experiment.masterSeed}; status: ${status(experiment, totals.completedWindows, failure)}.",
         s"Completed ${results.size} of ${experiment.plan.windows.size} windows. Full settings and source hashes: [manifest.json](manifest.json).",
+        s"Search objective: `${UpgradeDecisionRenderer.objective(experiment.round.searchObjective).noSpaces}`.",
+        s"Upgrade policy: `${UpgradeDecisionRenderer.policy(experiment.round.upgradePolicy).noSpaces}`.",
         "",
         executionConventions,
         "Independent periods are summarised by paired net differences; their drawdowns and risk ratios are not pooled into a continuous account.",
@@ -171,8 +183,7 @@ object WalkForwardReportRenderer:
         s"Total net difference: ${totals.totalNetDifference}; median: ${display(totals.medianNetDifference)}; " +
           s"worst: ${display(totals.worstNetDifference)}.",
         s"Positive/tied/negative windows: ${totals.positiveWindows}/${totals.tiedWindows}/${totals.negativeWindows}.",
-        s"Base retained: ${totals.baseRetainedWindows} (${totals.baseSelectedWindows} selected by ranking; " +
-          s"${totals.noCandidatePassedWindows} because no candidate passed).",
+        s"Upgrades approved: ${totals.upgradeApprovedWindows}. Base retained: ${totals.baseRetainedWindows}.",
         ""
       ) ++ failureLines ++ List(
         "| Window | Test | Decision | Frozen net | Base net | Net difference | Drawdown % (frozen / base) |",
@@ -253,7 +264,9 @@ object WalkForwardReportRenderer:
     "outcome"          -> selection.outcome.toString.asJson,
     "strategy"         -> selection.strategy.asJson,
     "trainingFitness"  -> selection.trainingFitness.asJson,
-    "selectionFitness" -> selection.selectionFitness.asJson
+    "selectionFitness" -> selection.selectionFitness.asJson,
+    "baseEvidence"     -> UpgradeDecisionRenderer.evidence(selection.baseEvidence),
+    "upgradeDecision"  -> UpgradeDecisionRenderer.decision(selection.decision)
   )
 
   private def metrics(value: ForwardMetrics): Json = Json.obj(
@@ -291,9 +304,8 @@ object WalkForwardReportRenderer:
     if (failure.nonEmpty) "failed" else if (completedWindows == experiment.plan.windows.size) "completed" else "running"
 
   private def outcomeLabel(value: SelectionOutcome): String = value match
-    case SelectionOutcome.CandidateSelected => "Candidate selected"
-    case SelectionOutcome.BaseSelected      => "Base selected by ranking"
-    case SelectionOutcome.NoCandidatePassed => "Base retained: no candidate passed"
+    case SelectionOutcome.UpgradeApproved => "UPGRADE APPROVED"
+    case SelectionOutcome.BaseRetained    => "BASE RETAINED"
 
   private def display(value: Option[BigDecimal]): String = value.fold("n/a")(_.toString)
   private def escape(value: String): String              = value.replace("\n", " ").replace("\r", " ").replace("|", "\\|")

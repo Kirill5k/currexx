@@ -2,7 +2,7 @@ package currexx.backtest
 
 import currexx.algorithms.Parameters
 import currexx.backtest.MarketDataProvider.Corpus
-import currexx.backtest.optimizer.ScoringFunction
+import currexx.backtest.optimizer.{ScoringFunction, SearchObjectiveConfig, UpgradePolicyConfig}
 import currexx.domain.signal.Indicator
 
 final case class OptimisationRound(
@@ -20,7 +20,9 @@ final case class OptimisationRound(
     /** Additional indicators or composite subtrees to keep at their target values. All identical occurrences are fixed; values absent from
       * the strategy produce a validation error. Raw-close identity inputs and value trackers unused by these rules are fixed automatically.
       */
-    fixedIndicators: Set[Indicator] = Set.empty
+    fixedIndicators: Set[Indicator] = Set.empty,
+    searchObjective: SearchObjectiveConfig = SearchObjectiveConfig.Current,
+    upgradePolicy: UpgradePolicyConfig = UpgradePolicyConfig()
 )
 
 /** Shared search presets, independent of either entry point's execution and random generator. */

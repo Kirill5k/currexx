@@ -69,11 +69,11 @@ class WindowSearchSpec extends IOWordSpec {
         } yield (first, again)).guarantee(deleteReports(label))
 
         result.asserting { case (first, again) =>
-          first must not be empty
-          first.size must be <= 3
-          first.map(_._1) must contain(strategy.indicator)
+          first.finalists must not be empty
+          first.finalists.size must be <= 3
+          first.finalists.map(_._1) must contain(strategy.indicator)
           again mustBe first
-          first.foreach { case (_, training, selection) =>
+          first.finalists.foreach { case (_, training, selection) =>
             training.value must be > 0.0
             selection.value must be > 0.0
           }

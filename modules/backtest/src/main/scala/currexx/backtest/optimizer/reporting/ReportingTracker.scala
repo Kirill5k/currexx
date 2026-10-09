@@ -4,6 +4,7 @@ import cats.Monad
 import cats.syntax.all.*
 import currexx.algorithms.{Parameters, ValidatedPopulation}
 import currexx.algorithms.progress.{Progress, Tracker}
+import currexx.backtest.optimizer.SearchObjectiveConfig
 import currexx.domain.signal.Indicator
 
 /** Renders progress and completed diagnostics through the existing output sinks. */
@@ -11,9 +12,9 @@ final class ReportingTracker[F[_]: Monad](
     delegate: Tracker[F, Indicator],
     diagnostics: RunDiagnostics[F],
     foldCount: Int,
-    logInterval: Int = 10
+    logInterval: Int = 10,
+    searchObjective: SearchObjectiveConfig = SearchObjectiveConfig.Current
 ) extends Tracker[F, Indicator]:
-  require(logInterval > 0, "Reporting interval must be positive")
 
   override def displayInitial(target: Indicator, params: Parameters[?]): F[Unit] =
     delegate.displayInitial(target, params) >>
@@ -29,8 +30,21 @@ final class ReportingTracker[F[_]: Monad](
       }
     }
 
-  override def displayFinal(population: ValidatedPopulation[Indicator]): F[Unit] = delegate.displayFinal(population)
-  override def displayNote(title: String, lines: List[String]): F[Unit]          = delegate.displayNote(title, lines)
+  override def displayFinal(population: ValidatedPopulation[Indicator]): F[Unit] =
+    Monad[F].unit
+
+  // Generic algorithms finish before the upgrade policy runs. Delay final output until the completed decision is available.
+  def displayCompletedRankings(population: ValidatedPopulation[Indicator]): F[Unit] =
+    if (searchObjective == SearchObjectiveConfig.Current) delegate.displayFinal(population)
+    else
+      delegate.displayNote(
+        "Final rankings (separate objectives)",
+        List("Search fitness uses the baseline-relative objective. Absolute validation fitness uses the quality scorer.") :::
+          population.toList.zipWithIndex.map { case ((indicator, training, validation), index) =>
+            f"#${index + 1}: search=${training.value}%.6f; absolute validation=${validation.value}%.6f; indicator=$indicator"
+          }
+      )
+  override def displayNote(title: String, lines: List[String]): F[Unit] = delegate.displayNote(title, lines)
 
   def displayReport(report: OptimisationReport): F[Unit] =
     OptimisationReportRenderer.sections(report).traverse_ { case (title, lines) =>
