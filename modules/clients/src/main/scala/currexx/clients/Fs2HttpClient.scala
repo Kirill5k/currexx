@@ -50,7 +50,7 @@ trait Fs2HttpClient[F[_]] {
       .flatMap { response =>
         if ((response.code.code >= 500 || additionalRetryableStatusCodes.contains(response.code)) && attempt < maxRetries) {
           val message = s"$name-client/http-error-${response.code.code}-attempt-$attempt: ${response.body}"
-          logger.warn(message) *> F.sleep(calculateBackoffDelay(attempt)) *> dispatchWithRetry(request, attempt + 1, maxRetries)
+          logger.debug(message) *> F.sleep(calculateBackoffDelay(attempt)) *> dispatchWithRetry(request, attempt + 1, maxRetries)
         } else F.pure(response)
       }
       .handleErrorWith { error =>
