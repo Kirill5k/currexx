@@ -13,21 +13,31 @@ class LogEventProcessorSpec extends IOWordSpec {
   private val time = Instant.parse("2026-09-30T12:00:00Z")
 
   "A LogEventProcessor" should {
-    "save accepted events before sending their notifications in order" in {
+    "save Warn and Error events before sending their notifications in stream order" in {
       val repository           = mock[LogEventRepository[IO]]
       val messenger            = mock[MessengerClient[IO]]
       given logger: Logger[IO] = mock[Logger[IO]]
-      val events               = LogLevel.values.toList.map(level => LogEvent(level, time, s"$level message"))
+      val first                = LogEvent(LogLevel.Warn, time, "first warning")
+      val second               = LogEvent(LogLevel.Error, time, "error message")
+      val third                = LogEvent(LogLevel.Warn, time, "second warning")
+      val accepted             = List(first, second, third)
+      val events               = List(
+        LogEvent(LogLevel.Trace, time, "trace message"),
+        first,
+        LogEvent(LogLevel.Debug, time, "debug message"),
+        second,
+        LogEvent(LogLevel.Info, time, "info message"),
+        third
+      )
       when(logger.events).thenReturn(Stream.emits(events))
 
-      val accepted = events.filterNot(_.level == LogLevel.Info)
-      val result   = for
+      val result = for
         operations <- Ref.of[IO, List[String]](Nil)
         _          <- IO {
           accepted.foreach { event =>
-            when(repository.save(event)).thenReturn(operations.update(_ :+ s"save:${event.level}"))
+            when(repository.save(event)).thenReturn(operations.update(_ :+ s"save:${event.message}"))
             when(messenger.send(s"Currexx [${event.level.toString.toUpperCase}]", event.message))
-              .thenReturn(operations.update(_ :+ s"send:${event.level}"))
+              .thenReturn(operations.update(_ :+ s"send:${event.message}"))
           }
         }
         _      <- LiveLogEventProcessor[IO](repository, messenger).run.compile.drain
@@ -41,19 +51,21 @@ class LogEventProcessorSpec extends IOWordSpec {
         }
         verify(logger).events
         verifyNoMoreInteractions(repository, messenger, logger)
-        operations mustBe accepted.flatMap(event => List(s"save:${event.level}", s"send:${event.level}"))
+        operations mustBe accepted.flatMap(event => List(s"save:${event.message}", s"send:${event.message}"))
       }
     }
 
-    "ignore Info events" in {
-      val repository           = mock[LogEventRepository[IO]]
-      val messenger            = mock[MessengerClient[IO]]
-      given logger: Logger[IO] = mock[Logger[IO]]
-      when(logger.events).thenReturn(Stream.emit(LogEvent(LogLevel.Info, time, "info message")))
+    List(LogLevel.Trace, LogLevel.Debug, LogLevel.Info).foreach { level =>
+      s"ignore $level events" in {
+        val repository           = mock[LogEventRepository[IO]]
+        val messenger            = mock[MessengerClient[IO]]
+        given logger: Logger[IO] = mock[Logger[IO]]
+        when(logger.events).thenReturn(Stream.emit(LogEvent(level, time, s"$level message")))
 
-      LiveLogEventProcessor[IO](repository, messenger).run.compile.drain.asserting { result =>
-        verifyNoInteractions(repository, messenger)
-        result mustBe ()
+        LiveLogEventProcessor[IO](repository, messenger).run.compile.drain.asserting { result =>
+          verifyNoInteractions(repository, messenger)
+          result mustBe ()
+        }
       }
     }
 
