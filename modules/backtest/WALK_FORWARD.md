@@ -3,16 +3,37 @@
 Open `currexx.backtest.WalkForwardEvaluator` and edit the settings at the top of
 the object, then run it directly from the IDE. No program arguments are needed.
 
-The defaults are `roundName = "s13_ga_refine"`, `masterSeed = 42L`,
-`history = MarketDataProvider.majors1hHistory`, `plan = WalkForwardPlan.default`,
-and `evaluatorPoolSize = Runtime.getRuntime.availableProcessors()`. Choose another
-named preset from `OptimisationRounds.rounds` and set the seed explicitly before
-the run.
-Each preset keeps its existing GA/SCGA parameters, scoring, extra seeds, fixed
-inputs and shortlist policy. A full run executes five independent searches and
-can be expensive.
+The configured experiment compares two search objectives for one fixed strategy:
 
-The same configured object can also be run through sbt:
+| Setting | Value |
+|---|---|
+| Round | `s5_optimized_v2_ga_refine` |
+| Search objectives | `Current`, `BaselineRelative(weight = 0.5)` |
+| Master seeds | `42L`, `43L`, `44L` |
+| History | `MarketDataProvider.majors1hHistory`: six major currency pairs, hourly bars |
+| Schedule | `WalkForwardPlan.default`: five expanding windows |
+| Evaluator pool | `Runtime.getRuntime.availableProcessors()` |
+
+This is **six experiments and 30 independent searches**: two objectives × three
+master seeds × five windows. Runs execute sequentially; each search uses the
+configured evaluator pool. A full matrix can be expensive.
+
+Only the search objective and master seed vary. The existing refinement preset
+keeps a population of 300, 150 generations, crossover probability 0.7, mutation
+probability 0.1, elitism ratio 0.02, `shuffle = false`, and shortlist size 25.
+`ScoringFunction.Consistent()`, extra seeds (`s5_optimized_v3`, `s6`,
+`s6_optimized`), fixed inputs, execution costs, capital, and the `trial-v1` upgrade
+policy stay unchanged. Extra seeds supply compatible indicator parameters under
+the target's rules.
+
+`BaselineRelative(0.5)` adjusts the existing training quality score according to
+net improvement over the same base on the same fold. A zero quality score stays
+zero. Both objectives still use the same absolute selection fitness and upgrade
+requirements; changing the search objective does not relax approval.
+
+Run the [small verification run](#small-verification-run) first; it checks the full
+history coverage before exercising a reduced search matrix. To launch the full
+30-search matrix, run the configured object through sbt:
 
 ```sh
 sbt "backtest/runMain currexx.backtest.WalkForwardEvaluator"
@@ -21,6 +42,15 @@ sbt "backtest/runMain currexx.backtest.WalkForwardEvaluator"
 The default schedule starts with 12 months of training, followed by four months of
 selection and four months of testing. It advances four months at a time, expanding
 training from July 2023. The five test periods cover November 2024–June 2026.
+Ranges in this table include both displayed months:
+
+| Window | Training | Selection | Forward test |
+|---|---|---|---|
+| 1 | Jul 2023–Jun 2024 | Jul–Oct 2024 | Nov 2024–Feb 2025 |
+| 2 | Jul 2023–Oct 2024 | Nov 2024–Feb 2025 | Mar–Jun 2025 |
+| 3 | Jul 2023–Feb 2025 | Mar–Jun 2025 | Jul–Oct 2025 |
+| 4 | Jul 2023–Jun 2025 | Jul–Oct 2025 | Nov 2025–Feb 2026 |
+| 5 | Jul 2023–Oct 2025 | Nov 2025–Feb 2026 | Mar–Jun 2026 |
 
 Each search receives only its training and selection ranges. Its first passing
 finalist is frozen before testing. If no finalist passes, the unchanged original
@@ -45,8 +75,9 @@ forward coverage. Every period also skips one complete window to prime fresh sta
 `WalkForwardReportStore` owns the output location, defaulting to
 `outputDirectory = Path("walk-forward-results")`. Experiments write to
 `walk-forward-results/<experiment-id>/`. Each ID combines a UTC timestamp in
-`yyyyMMdd-HHmmss-SSS` format with the round name, without a UUID. An existing
-experiment directory is preserved and causes the new run to fail.
+`yyyyMMdd-HHmmss-SSS` format with the round name, objective and master seed,
+without a UUID. An existing experiment directory is preserved and causes the
+new run to fail.
 
 The directory contains:
 
@@ -68,6 +99,25 @@ Existing optimiser reports remain in `optimisation-results/`, labelled with the
 experiment and window. Failed experiments retain completed artifacts and stop;
 automatic resume is not supported.
 
+After all six experiments complete, a sibling `<first-experiment-id>-comparison/`
+directory contains `comparison.json` and `report.md`. The comparison reports each
+objective/seed run's total, median and worst forward net difference from the fixed
+base, positive windows, and approved upgrades.
+
+Compare the two objectives **at the same master seed and window**. Their derived
+window seed, base, date ranges and execution settings then match. Start with the
+15 paired forward-net differences between objectives, and check whether the
+direction survives across seeds and windows; do not select an objective from its
+best individual run or compare the objectives' differently scaled search scores.
+Use each experiment's per-window results for drawdown, costs and trade activity.
+
+If every selection retains the base, every paired forward net difference should
+be zero. That means neither search produced an upgrade under the frozen policy.
+Inspect rejection codes and measured/required values in `window-N-frozen.json`
+and the linked optimisation reports to distinguish unprofitable candidates from
+failures of consistency, concentration, drawdown or cost constraints. Keep the
+policy fixed for this comparison rather than loosening it after seeing failures.
+
 Results are **retrospective development evidence**, not independent confirmation:
 this market history has already influenced the strategy catalogue. The report
 summarises paired net differences across separate periods. It does not manufacture
@@ -84,6 +134,26 @@ is:
 sbt "backtest/Test/runMain currexx.backtest.walkforward.WalkForwardSmoke"
 ```
 
-This runs two windows on one real currency pair with a two-member population and
-one generation. Its reports are under `target/walk-forward-smoke/`. It verifies the
-pipeline and persistence; its small search budget is not a strategy-quality test.
+The smoke entry point reads the round, objectives, master seeds, history and plan
+from `WalkForwardEvaluator`, so it verifies the configured experiment rather than
+a separate strategy preset. It performs two stages:
+
+1. **Full data preflight:** inspect all six configured pairs and all five windows
+   without running a search. Success prints
+   `Full history preflight passed: 6 pairs, 5 windows`. Missing data stops the run.
+2. **Reduced search matrix:** run both objectives and all three master seeds on
+   the first two windows and first currency pair. This is six small experiments
+   and 12 searches, each with population 6, one generation, elitism 0.5 and
+   shortlist size 6. The target, three named indicator seeds, scoring, costs and
+   upgrade policy remain configured as above.
+
+Each experiment must complete both paired tests. A retained base must reproduce
+exactly zero forward net difference. The smoke writes experiment artifacts and
+an objective comparison under `target/walk-forward-smoke/`; the full-history
+preflight is reported in the console, while each smoke experiment's
+`preflight.json` describes its reduced two-window, one-pair schedule.
+
+There is no separate preflight-only command. Running this smoke does **not**
+launch the full 30-search matrix or change its budget. It verifies data coverage,
+objective/seed wiring and persistence; its small search budget is not a
+strategy-quality test.
