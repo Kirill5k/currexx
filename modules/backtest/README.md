@@ -5,6 +5,20 @@ and console output. Additional diagnostics measure what changed relative to the
 round's starting parameters. Diagnostics observe completed selection; they do not
 supply candidate state or feed measurements back into search.
 
+## Package layout
+
+- `currexx.backtest` contains CLI entry points, strategy definitions, market data,
+  and shared backtest statistics.
+- `currexx.backtest.optimizer` contains the generic `OptimisationAlgorithm`
+  factories and `ScoringFunction`.
+- `currexx.backtest.optimizer.indicator` contains concrete indicator optimisation:
+  `IndicatorOptimisation`, rounds, named seeds, search operators, evaluation,
+  selection evidence, and policy and objective configuration. Its `bounds` and
+  `reporting` subpackages hold indicator gene constraints and optimisation reports.
+- `currexx.backtest.services` contains simulation services and their pools.
+- `currexx.backtest.walkforward` contains chronological search, frozen selection,
+  forward evaluation, and experiment reporting.
+
 ## Finalist selection
 
 Each run reserves places for the canonical target and every distinct compatible
@@ -123,7 +137,7 @@ still propagate; recovery applies only to reporting after selection finishes.
   formatting, including failure-note wording, in `OptimisationReportRenderer`.
   `ReportingTracker` writes completed reports and explicit failure notes through
   the existing output interface; it neither builds reports nor recovers failures.
-  `OptimisationAlgorithm` owns recovery after selection, so diagnostic failures
+  `IndicatorOptimisation` owns recovery after selection, so diagnostic failures
   leave completed finalists available and let subsequent rounds continue.
 - Reporting must never consume randomness, consult historical holdout data, or
   feed measurements back into selection. Seeded replay configuration and JSON

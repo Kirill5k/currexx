@@ -2,7 +2,8 @@ package currexx.backtest
 
 import currexx.algorithms.{Fitness, Parameters}
 import currexx.backtest.optimizer.ScoringFunction
-import currexx.backtest.optimizer.reporting.OptimisationReportRenderer
+import currexx.backtest.optimizer.indicator.{NamedIndicator, OptimisationRound, OptimisationRounds}
+import currexx.backtest.optimizer.indicator.reporting.OptimisationReportRenderer
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 

@@ -1,6 +1,6 @@
 package currexx.backtest.walkforward
 
-import currexx.backtest.optimizer.reporting.UpgradeDecisionRenderer
+import currexx.backtest.optimizer.indicator.reporting.UpgradeDecisionRenderer
 import io.circe.Json
 import io.circe.syntax.*
 

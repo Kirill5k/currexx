@@ -1,7 +1,7 @@
 package currexx.backtest.walkforward
 
 import currexx.backtest.TestStrategy
-import currexx.backtest.optimizer.{OptimisationResult, SelectionEvidence, UpgradeDecision}
+import currexx.backtest.optimizer.indicator.{OptimisationResult, SelectionEvidence, UpgradeDecision}
 
 enum SelectionOutcome:
   case UpgradeApproved, BaseRetained

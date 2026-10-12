@@ -1,7 +1,7 @@
 package currexx.backtest.walkforward
 
 import currexx.backtest.DataWindow
-import currexx.backtest.optimizer.*
+import currexx.backtest.optimizer.indicator.*
 import currexx.domain.market.CurrencyPair
 import currexx.domain.signal.Indicator
 import eu.timepit.refined.types.numeric.PosBigDecimal

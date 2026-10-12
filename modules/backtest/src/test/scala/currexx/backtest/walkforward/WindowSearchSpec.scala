@@ -2,9 +2,10 @@ package currexx.backtest.walkforward
 
 import cats.effect.IO
 import currexx.algorithms.Parameters
+import currexx.backtest.{OrderStats, TestStrategy}
 import currexx.backtest.MarketDataProvider.{Corpus, Dataset, DateRange}
-import currexx.backtest.{OptimisationRound, OrderStats, TestStrategy}
 import currexx.backtest.optimizer.ScoringFunction
+import currexx.backtest.optimizer.indicator.OptimisationRound
 import currexx.core.trade.{Rule, TradeAction, TradeStrategy}
 import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation as VT}
 import fs2.io.file.{Files, Path}

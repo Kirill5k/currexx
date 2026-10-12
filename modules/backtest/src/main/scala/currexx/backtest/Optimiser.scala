@@ -1,8 +1,8 @@
 package currexx.backtest
 
+import currexx.backtest.optimizer.indicator.{IndicatorOptimisation, OptimisationRounds}
 import cats.effect.{IO, IOApp}
 import cats.syntax.foldable.*
-import currexx.backtest.optimizer.OptimisationAlgorithm
 
 import scala.util.Random
 
@@ -17,7 +17,7 @@ object Optimiser extends IOApp.Simple {
   override def run: IO[Unit] =
     rounds.traverse_ { round =>
       for
-        algorithm <- OptimisationAlgorithm.indicator[IO](round, evaluatorPoolSize, StrategyCatalogue.entries)
+        algorithm <- IndicatorOptimisation.make[IO](round, evaluatorPoolSize, StrategyCatalogue.entries)
         _         <- algorithm.optimise
       yield ()
     }

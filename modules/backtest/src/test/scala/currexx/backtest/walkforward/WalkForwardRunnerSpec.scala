@@ -3,9 +3,10 @@ package currexx.backtest.walkforward
 import cats.effect.{IO, Ref}
 import cats.syntax.apply.*
 import currexx.algorithms.{Fitness, Parameters}
-import currexx.backtest.{MarketDataProvider, OptimisationRound, TestStrategy}
+import currexx.backtest.{MarketDataProvider, TestStrategy}
 import currexx.backtest.MarketDataProvider.Dataset
-import currexx.backtest.optimizer.{OptimisationResult, ScoringFunction, UpgradeDecision}
+import currexx.backtest.optimizer.ScoringFunction
+import currexx.backtest.optimizer.indicator.{OptimisationResult, OptimisationRound, UpgradeDecision}
 import currexx.core.trade.{Rule, TradeAction, TradeStrategy}
 import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation as VT}
 import kirill5k.common.cats.test.IOWordSpec

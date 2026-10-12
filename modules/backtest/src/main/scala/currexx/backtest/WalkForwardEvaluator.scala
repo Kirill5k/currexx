@@ -1,10 +1,10 @@
 package currexx.backtest
 
-import cats.effect.{IO, IOApp}
-import cats.syntax.traverse.*
-import currexx.backtest.optimizer.SearchObjectiveConfig
+import currexx.backtest.optimizer.indicator.{OptimisationRounds, SearchObjectiveConfig}
 import currexx.backtest.types.given
 import currexx.backtest.walkforward.*
+import cats.effect.{IO, IOApp}
+import cats.syntax.traverse.*
 
 /** Compares objective/seed presets on one fixed chronological development schedule. */
 object WalkForwardEvaluator extends IOApp.Simple {

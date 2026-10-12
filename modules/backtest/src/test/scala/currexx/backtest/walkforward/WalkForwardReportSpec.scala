@@ -2,9 +2,10 @@ package currexx.backtest.walkforward
 
 import cats.effect.{IO, Resource}
 import currexx.algorithms.Parameters
-import currexx.backtest.{MarketDataProvider, OptimisationRound, TestStrategy}
+import currexx.backtest.{MarketDataProvider, TestStrategy}
 import currexx.backtest.MarketDataProvider.Dataset
-import currexx.backtest.optimizer.{ScoringFunction, SearchObjectiveConfig, UpgradeDecision, UpgradeFailure, UpgradeRejection}
+import currexx.backtest.optimizer.ScoringFunction
+import currexx.backtest.optimizer.indicator.{OptimisationRound, SearchObjectiveConfig, UpgradeDecision, UpgradeFailure, UpgradeRejection}
 import currexx.core.trade.TradeStrategy
 import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation}
 import fs2.io.file.Path

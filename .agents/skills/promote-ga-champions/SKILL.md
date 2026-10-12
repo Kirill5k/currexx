@@ -17,11 +17,11 @@ continuous performance within the requested promotion scope.
 | Strategy definitions and lineage | `modules/backtest/src/main/scala/currexx/backtest/TestStrategy.scala` |
 | Named registry and batch membership | `modules/backtest/src/main/scala/currexx/backtest/StrategyCatalogue.scala` |
 | Batch runner and corpus labels | `modules/backtest/src/main/scala/currexx/backtest/BatchBacktester.scala` |
-| Round definitions and named seeds | `modules/backtest/src/main/scala/currexx/backtest/OptimisationRounds.scala` |
+| Round definitions and named seeds | `modules/backtest/src/main/scala/currexx/backtest/optimizer/indicator/OptimisationRounds.scala` |
 | Corpora / folds | `modules/backtest/src/main/scala/currexx/backtest/MarketDataProvider.scala` |
 | Indicator types | `modules/domain/src/main/scala/currexx/domain/signal/Indicator.scala` |
 | Upgrade decisions and objective workflow | `docs/strategy-upgrades.md` |
-| Report fields and decision rendering | `modules/backtest/src/main/scala/currexx/backtest/optimizer/reporting/UpgradeDecisionRenderer.scala` |
+| Report fields and decision rendering | `modules/backtest/src/main/scala/currexx/backtest/optimizer/indicator/reporting/UpgradeDecisionRenderer.scala` |
 | Other report semantics | `modules/backtest/README.md` |
 
 ## Step 1 — Collect the reports

@@ -1,7 +1,7 @@
 package currexx.backtest.walkforward
 
 import currexx.backtest.MarketDataProvider.Dataset
-import currexx.backtest.OptimisationRound
+import currexx.backtest.optimizer.indicator.OptimisationRound
 
 import java.time.{Instant, ZoneOffset}
 import java.time.format.DateTimeFormatter
