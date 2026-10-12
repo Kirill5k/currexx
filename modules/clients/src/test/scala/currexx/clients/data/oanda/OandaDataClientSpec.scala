@@ -162,7 +162,7 @@ class OandaDataClientSpec extends Sttp4WordSpec {
       }
     }
 
-    "fail after three unauthorized retries" in {
+    "fail after four unauthorized retries" in {
       given Clock[IO] = Clock.mock[IO](Instant.parse("2026-02-06T22:00:00Z"))
 
       val requests       = AtomicInteger(0)
@@ -179,7 +179,7 @@ class OandaDataClientSpec extends Sttp4WordSpec {
 
       result.asserting { res =>
         res mustBe Left(AppError.AccessDenied("oanda-data authentication has expired or is invalid"))
-        requests.get mustBe 4
+        requests.get mustBe 7
       }
     }
 
