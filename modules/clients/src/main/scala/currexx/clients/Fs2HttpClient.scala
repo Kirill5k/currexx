@@ -40,7 +40,7 @@ trait Fs2HttpClient[F[_]] {
   private def dispatchWithRetry[T](
       request: Request[T],
       attempt: Int = 0,
-      maxRetries: Int = 3
+      maxRetries: Int = 6
   )(using
       F: Temporal[F],
       logger: Logger[F]
