@@ -11,6 +11,8 @@ import kirill5k.common.sttp.test.Sttp4WordSpec
 import kirill5k.common.cats.{Cache, Clock}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import sttp.capabilities.fs2.Fs2Streams
+import sttp.client4.WebSocketStreamBackend
 import sttp.client4.testing.ResponseStub
 import sttp.model.StatusCode
 
@@ -37,10 +39,8 @@ class OandaDataClientSpec extends Sttp4WordSpec {
         backend = fs2BackendStub.whenAnyRequest.thenRespondF {
           calls.update(_ + 1) >> started.complete(()) >> release.get.as(ResponseStub.adjust(response))
         }
-        cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        requestMutex <- KeyedMutex[IO, CacheKey]
-        dataClient = LiveOandaDataClient[IO](backend, config, cache, requestMutex)
-        results <- dataClient
+        dataClient <- makeClient(backend)
+        results    <- dataClient
           .timeSeriesData(pair, Interval.H1)
           .start
           .bracket { first =>
@@ -71,72 +71,47 @@ class OandaDataClientSpec extends Sttp4WordSpec {
       }
     }
 
-    "retrieve the latest 100 completed candles in reverse chronological order" in {
-      given Clock[IO] = Clock.mock[IO](Instant.parse("2026-02-06T22:00:00Z"))
-
-      val requestParams = Map(
-        "granularity"       -> "H1",
-        "count"             -> "150",
-        "alignmentTimezone" -> "UTC"
+    List(
+      (
+        "retrieve the latest 100 completed candles in reverse chronological order",
+        Instant.parse("2026-02-06T22:00:00Z"),
+        PriceRange(1.18222, 1.18241, 1.18134, 1.18168, 1859.0, Instant.parse("2026-02-06T21:00:00Z")),
+        PriceRange(1.18002, 1.18013, 1.17777, 1.17796, 9007.0, Instant.parse("2026-02-02T18:00:00Z"))
+      ),
+      (
+        "exclude the incomplete current candle before keeping the latest 100 candles",
+        Instant.parse("2026-02-06T21:03:00Z"),
+        PriceRange(1.18195, 1.18229, 1.18184, 1.18222, 2336.0, Instant.parse("2026-02-06T20:00:00Z")),
+        PriceRange(1.18066, 1.18125, 1.17949, 1.18000, 10070.0, Instant.parse("2026-02-02T17:00:00Z"))
       )
+    ).foreach { case (description, now, expectedFirst, expectedLast) =>
+      description in {
+        given Clock[IO] = Clock.mock[IO](now)
 
-      val testingBackend = fs2BackendStub
-        .whenRequestMatchesPartial {
-          case r if r.isGet && r.isGoingTo("oanda.com/v3/instruments/EUR_USD/candles") && r.hasParams(requestParams) =>
-            ResponseStub.adjust(readJson("oanda/instruments-rud-usd-success-response.json"))
-          case _ => throw new RuntimeException()
+        val requestParams = Map(
+          "granularity"       -> "H1",
+          "count"             -> "150",
+          "alignmentTimezone" -> "UTC"
+        )
+
+        val testingBackend = fs2BackendStub
+          .whenRequestMatchesPartial {
+            case r if r.isGet && r.isGoingTo("oanda.com/v3/instruments/EUR_USD/candles") && r.hasParams(requestParams) =>
+              ResponseStub.adjust(readJson("oanda/instruments-rud-usd-success-response.json"))
+            case _ => throw new RuntimeException()
+          }
+
+        val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.H1))
+
+        result.asserting { timeSeriesData =>
+          timeSeriesData.currencyPair mustBe pair
+          timeSeriesData.interval mustBe Interval.H1
+          timeSeriesData.prices must have size 100
+          timeSeriesData.prices.head mustBe expectedFirst
+          timeSeriesData.prices.last mustBe expectedLast
+          val times = timeSeriesData.prices.toList.map(_.time)
+          times mustBe times.sortWith(_.isAfter(_))
         }
-
-      val result = for
-        cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        requestMutex <- KeyedMutex[IO, CacheKey]
-        client = LiveOandaDataClient[IO](testingBackend, config, cache, requestMutex)
-        res <- client.timeSeriesData(pair, Interval.H1)
-      yield res
-
-      result.asserting { timeSeriesData =>
-        timeSeriesData.currencyPair mustBe pair
-        timeSeriesData.interval mustBe Interval.H1
-        timeSeriesData.prices must have size 100
-        // Should be reversed: latest (2026-02-06T21:00:00Z) first
-        timeSeriesData.prices.head mustBe PriceRange(1.18222, 1.18241, 1.18134, 1.18168, 1859.0, Instant.parse("2026-02-06T21:00:00Z"))
-        timeSeriesData.prices.last mustBe PriceRange(1.18002, 1.18013, 1.17777, 1.17796, 9007.0, Instant.parse("2026-02-02T18:00:00Z"))
-        val times = timeSeriesData.prices.toList.map(_.time)
-        times mustBe times.sortWith(_.isAfter(_))
-      }
-    }
-
-    "exclude the incomplete current candle before keeping the latest 100 candles" in {
-      given Clock[IO] = Clock.mock[IO](Instant.parse("2026-02-06T21:03:00Z"))
-
-      val requestParams = Map(
-        "granularity"       -> "H1",
-        "count"             -> "150",
-        "alignmentTimezone" -> "UTC"
-      )
-
-      val testingBackend = fs2BackendStub
-        .whenRequestMatchesPartial {
-          case r if r.isGet && r.isGoingTo("oanda.com/v3/instruments/EUR_USD/candles") && r.hasParams(requestParams) =>
-            ResponseStub.adjust(readJson("oanda/instruments-rud-usd-success-response.json"))
-          case _ => throw new RuntimeException()
-        }
-
-      val result = for
-        cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        requestMutex <- KeyedMutex[IO, CacheKey]
-        client = LiveOandaDataClient[IO](testingBackend, config, cache, requestMutex)
-        res <- client.timeSeriesData(pair, Interval.H1)
-      yield res
-
-      result.asserting { timeSeriesData =>
-        timeSeriesData.currencyPair mustBe pair
-        timeSeriesData.interval mustBe Interval.H1
-        timeSeriesData.prices must have size 100
-        timeSeriesData.prices.head mustBe PriceRange(1.18195, 1.18229, 1.18184, 1.18222, 2336.0, Instant.parse("2026-02-06T20:00:00Z"))
-        timeSeriesData.prices.last mustBe PriceRange(1.18066, 1.18125, 1.17949, 1.18000, 10070.0, Instant.parse("2026-02-02T17:00:00Z"))
-        val times = timeSeriesData.prices.toList.map(_.time)
-        times mustBe times.sortWith(_.isAfter(_))
       }
     }
 
@@ -167,12 +142,7 @@ class OandaDataClientSpec extends Sttp4WordSpec {
           case _ => throw new RuntimeException()
         }
 
-      val result = for
-        cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        requestMutex <- KeyedMutex[IO, CacheKey]
-        client = LiveOandaDataClient[IO](testingBackend, customConfig, cache, requestMutex)
-        res <- client.timeSeriesData(pair, Interval.H1)
-      yield res
+      val result = makeClient(testingBackend, customConfig).flatMap(_.timeSeriesData(pair, Interval.H1))
 
       result.asserting { timeSeriesData =>
         timeSeriesData.prices must have size 80
@@ -198,9 +168,7 @@ class OandaDataClientSpec extends Sttp4WordSpec {
       }
 
       val result = for
-        cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        requestMutex <- KeyedMutex[IO, CacheKey]
-        client = LiveOandaDataClient[IO](testingBackend, config, cache, requestMutex)
+        client <- makeClient(testingBackend)
         res    <- client.timeSeriesData(pair, Interval.H1)
         cached <- client.timeSeriesData(pair, Interval.H1)
       yield (res, cached)
@@ -214,7 +182,7 @@ class OandaDataClientSpec extends Sttp4WordSpec {
       }
     }
 
-    "fail after four unauthorized retries" in {
+    "fail after exhausting unauthorized retries" in {
       given Clock[IO] = Clock.mock[IO](Instant.parse("2026-02-06T22:00:00Z"))
 
       val requests       = AtomicInteger(0)
@@ -223,12 +191,7 @@ class OandaDataClientSpec extends Sttp4WordSpec {
         ResponseStub.adjust("Unauthorized", StatusCode.Unauthorized)
       }
 
-      val result = for
-        cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        requestMutex <- KeyedMutex[IO, CacheKey]
-        client = LiveOandaDataClient[IO](testingBackend, config, cache, requestMutex)
-        res <- client.timeSeriesData(pair, Interval.H1).attempt
-      yield res
+      val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.H1).attempt)
 
       result.asserting { res =>
         res mustBe Left(AppError.AccessDenied("oanda-data authentication has expired or is invalid"))
@@ -245,12 +208,7 @@ class OandaDataClientSpec extends Sttp4WordSpec {
         ResponseStub.adjust("Forbidden", StatusCode.Forbidden)
       }
 
-      val result = for
-        cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        requestMutex <- KeyedMutex[IO, CacheKey]
-        client = LiveOandaDataClient[IO](testingBackend, config, cache, requestMutex)
-        res <- client.timeSeriesData(pair, Interval.H1).attempt
-      yield res
+      val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.H1).attempt)
 
       result.asserting { res =>
         res mustBe Left(AppError.AccessDenied("oanda-data authentication has expired or is invalid"))
@@ -268,12 +226,7 @@ class OandaDataClientSpec extends Sttp4WordSpec {
         else ResponseStub.adjust(response)
       }
 
-      val result = for
-        cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        requestMutex <- KeyedMutex[IO, CacheKey]
-        client = LiveOandaDataClient[IO](testingBackend, config, cache, requestMutex)
-        res <- client.latestPrice(pair)
-      yield res
+      val result = makeClient(testingBackend).flatMap(_.latestPrice(pair))
 
       result.asserting { price =>
         price mustBe PriceRange(1.18222, 1.18241, 1.18134, 1.18168, 1859.0, Instant.parse("2026-02-06T21:00:00Z"))
@@ -307,16 +260,21 @@ class OandaDataClientSpec extends Sttp4WordSpec {
           case _ => throw new RuntimeException()
         }
 
-      val result = for
-        cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        requestMutex <- KeyedMutex[IO, CacheKey]
-        client = LiveOandaDataClient[IO](testingBackend, config, cache, requestMutex)
-        res <- client.latestPrice(pair)
-      yield res
+      val result = makeClient(testingBackend).flatMap(_.latestPrice(pair))
 
       result.asserting { price =>
         price mustBe PriceRange(1.18222, 1.18241, 1.18134, 1.18168, 10.0, Instant.parse("2026-02-06T21:00:00Z"))
       }
     }
   }
+
+  private def makeClient(
+      backend: WebSocketStreamBackend[IO, Fs2Streams[IO]],
+      clientConfig: OandaDataConfig = config
+  )(using marketClock: Clock[IO]): IO[OandaDataClient[IO]] =
+    for
+      // Cache expiry uses real time; the scenario clock controls candle completion.
+      cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+      requestMutex <- KeyedMutex[IO, CacheKey]
+    yield LiveOandaDataClient[IO](backend, clientConfig, cache, requestMutex)
 }

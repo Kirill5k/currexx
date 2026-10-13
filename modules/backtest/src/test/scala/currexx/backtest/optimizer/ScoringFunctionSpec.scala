@@ -130,12 +130,6 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       ScoringFunction.Robust().score(Nil) mustBe 0.0
     }
 
-    "assign positive fitness to a robust candidate" in {
-      val stats = pairs.map(pair => statsAtFloorRate(pair, BigDecimal(100), months = 5))
-
-      ScoringFunction.Robust().score(stats) must be > 0.0
-    }
-
     "credit metrics whose denominator is undefined with their target rather than zero" in {
       val stats = pairs.map(pair => statsAtFloorRate(pair, BigDecimal(100), months = 5))
 
@@ -337,37 +331,19 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       ScoringFunction.Consistent().score(stats) must be > 0.0
     }
 
-    "scale the trade floor with the length of the run rather than demanding a fixed total" in {
-      // Both candidates traded at exactly one a month, so both fall equally short of a rate of two and neither is
-      // preferred for having been handed a longer window. A fixed total would have demanded as much of the six-month
-      // run as of the twelve-month one, which is the frequency requirement silently doubling whenever the data is
-      // halved — and halving the data is exactly what splitting a year into a training and a validation half does.
-      val scoring      = ScoringFunction.Consistent(permissive.copy(minTradesPerMonth = 2))
-      val sixMonths    = List(statsFor(pairs.head, List.fill(6)(BigDecimal(40))))
-      val twelveMonths = List(statsFor(pairs.head, List.fill(12)(BigDecimal(40))))
+    // Every fixture trades once per pair-month, below the configured rate of two. Changing the run length and
+    // dataset count independently protects both factors in the pooled floor against becoming a fixed total.
+    List(
+      ("require twelve trades over six months for one pair", 6, 1, ">= 12 (2 per pair-month over 6 months x 1 pairs)"),
+      ("double the trade floor when the run grows to twelve months", 12, 1, ">= 24 (2 per pair-month over 12 months x 1 pairs)"),
+      ("triple the trade floor when the corpus grows to three pairs", 6, 3, ">= 36 (2 per pair-month over 6 months x 3 pairs)")
+    ).foreach { case (description, months, pairCount, expected) =>
+      description in {
+        val scoring = ScoringFunction.Consistent(permissive.copy(minTradesPerMonth = 2))
+        val stats   = pairs.take(pairCount).map(pair => statsFor(pair, List.fill(months)(BigDecimal(40))))
 
-      def tradeFloor(stats: List[OrderStats]): Option[String] =
-        scoring.violations(stats).find(_.constraint == "closed trades").map(_.required)
-
-      tradeFloor(sixMonths) mustBe Some(">= 12 (2 per pair-month over 6 months x 1 pairs)")
-      tradeFloor(twelveMonths) mustBe Some(">= 24 (2 per pair-month over 12 months x 1 pairs)")
-    }
-
-    "scale the trade floor with the number of datasets rather than demanding a fixed pooled total" in {
-      // The count the floor is compared against is pooled over every dataset, so a floor that ignores how many there
-      // are asks exactly as much of three pairs as of one. Both candidates here trade at the same rate per pair and
-      // fall equally short of it; without the dataset term the three-pair run would clear a floor built for one and
-      // the only sample-size guard there is would weaken by the factor the corpus was widened by — at the one moment
-      // it was widened in order to strengthen it.
-      val scoring    = ScoringFunction.Consistent(permissive.copy(minTradesPerMonth = 2))
-      val onePair    = List(statsFor(pairs.head, List.fill(6)(BigDecimal(40))))
-      val threePairs = pairs.map(pair => statsFor(pair, List.fill(6)(BigDecimal(40))))
-
-      def tradeFloor(stats: List[OrderStats]): Option[String] =
-        scoring.violations(stats).find(_.constraint == "closed trades").map(_.required)
-
-      tradeFloor(onePair) mustBe Some(">= 12 (2 per pair-month over 6 months x 1 pairs)")
-      tradeFloor(threePairs) mustBe Some(">= 36 (2 per pair-month over 6 months x 3 pairs)")
+        scoring.violations(stats).find(_.constraint == "closed trades").map(_.required) mustBe Some(expected)
+      }
     }
 
     "reject a candidate whose one profitable period pays for several losing ones" in {

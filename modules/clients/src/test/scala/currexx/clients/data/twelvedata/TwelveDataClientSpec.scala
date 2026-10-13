@@ -7,6 +7,8 @@ import kirill5k.common.sttp.test.Sttp4WordSpec
 import kirill5k.common.cats.{Cache, Clock}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import sttp.capabilities.fs2.Fs2Streams
+import sttp.client4.WebSocketStreamBackend
 import sttp.client4.testing.ResponseStub
 
 import java.time.Instant
@@ -38,11 +40,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
           case _ => throw new RuntimeException()
         }
 
-      val result = for
-        cache  <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        client <- TwelveDataClient.make[IO](config, testingBackend, cache, 100.millis)
-        res    <- client.timeSeriesData(pair, Interval.D1)
-      yield res
+      val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.D1))
 
       result.asserting { timeSeriesData =>
         timeSeriesData.currencyPair mustBe pair
@@ -62,11 +60,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
           ResponseStub.adjust(readJson("twelvedata/eur-usd-daily-prices.response.json"))
         )
 
-      val result = for
-        cache  <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        client <- TwelveDataClient.make[IO](config, testingBackend, cache, 100.millis)
-        res    <- client.timeSeriesData(pair, Interval.D1)
-      yield res
+      val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.D1))
 
       result.asserting { timeSeriesData =>
         timeSeriesData.currencyPair mustBe pair
@@ -77,75 +71,49 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
       }
     }
 
-    "exclude the incomplete current candle before keeping the latest 100 candles" in {
-      given Clock[IO] = Clock.mock[IO](Instant.parse("2026-01-19T12:03:00Z"))
-
-      val requestParams = Map(
-        "symbol"     -> "EUR/USD",
-        "interval"   -> "1h",
-        "apikey"     -> "api-key",
-        "outputsize" -> "150",
-        "timezone"   -> "UTC"
+    List(
+      (
+        "exclude the incomplete current candle before keeping the latest 100 candles",
+        Instant.parse("2026-01-19T12:03:00Z"),
+        PriceRange(1.16246, 1.16294, 1.16209, 1.16285, 0.0, Instant.parse("2026-01-19T11:00:00Z")),
+        PriceRange(1.16296, 1.16355, 1.16266, 1.16316, 0.0, Instant.parse("2026-01-15T08:00:00Z"))
+      ),
+      (
+        "retrieve the latest 100 completed candles in reverse chronological order",
+        Instant.parse("2026-01-19T13:00:00Z"),
+        PriceRange(1.16284, 1.16284, 1.16269, 1.16272, 0.0, Instant.parse("2026-01-19T12:00:00Z")),
+        PriceRange(1.16316, 1.16399, 1.16311, 1.16362, 0.0, Instant.parse("2026-01-15T09:00:00Z"))
       )
+    ).foreach { case (description, now, expectedFirst, expectedLast) =>
+      description in {
+        given Clock[IO] = Clock.mock[IO](now)
 
-      val testingBackend = fs2BackendStub
-        .whenRequestMatchesPartial {
-          case r if r.isGet && r.isGoingTo("twelve-data.com/time_series") && r.hasParams(requestParams) =>
-            ResponseStub.adjust(readJson("twelvedata/eur-usd-hourly-prices.response.json"))
-          case _ => throw new RuntimeException()
+        val requestParams = Map(
+          "symbol"     -> "EUR/USD",
+          "interval"   -> "1h",
+          "apikey"     -> "api-key",
+          "outputsize" -> "150",
+          "timezone"   -> "UTC"
+        )
+
+        val testingBackend = fs2BackendStub
+          .whenRequestMatchesPartial {
+            case r if r.isGet && r.isGoingTo("twelve-data.com/time_series") && r.hasParams(requestParams) =>
+              ResponseStub.adjust(readJson("twelvedata/eur-usd-hourly-prices.response.json"))
+            case _ => throw new RuntimeException()
+          }
+
+        val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.H1))
+
+        result.asserting { timeSeriesData =>
+          timeSeriesData.currencyPair mustBe pair
+          timeSeriesData.interval mustBe Interval.H1
+          timeSeriesData.prices must have size 100
+          timeSeriesData.prices.head mustBe expectedFirst
+          timeSeriesData.prices.last mustBe expectedLast
+          val times = timeSeriesData.prices.toList.map(_.time)
+          times mustBe times.sortWith(_.isAfter(_))
         }
-
-      val result = for
-        cache  <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        client <- TwelveDataClient.make[IO](config, testingBackend, cache, 100.millis)
-        res    <- client.timeSeriesData(pair, Interval.H1)
-      yield res
-
-      result.asserting { timeSeriesData =>
-        timeSeriesData.currencyPair mustBe pair
-        timeSeriesData.interval mustBe Interval.H1
-        timeSeriesData.prices must have size 100
-        // First candle should now be 11:00 (the 12:00 candle was excluded)
-        timeSeriesData.prices.head mustBe PriceRange(1.16246, 1.16294, 1.16209, 1.16285, 0.0, Instant.parse("2026-01-19T11:00:00Z"))
-        timeSeriesData.prices.last mustBe PriceRange(1.16296, 1.16355, 1.16266, 1.16316, 0.0, Instant.parse("2026-01-15T08:00:00Z"))
-        val times = timeSeriesData.prices.toList.map(_.time)
-        times mustBe times.sortWith(_.isAfter(_))
-      }
-    }
-
-    "retrieve the latest 100 completed candles in reverse chronological order" in {
-      given clock: Clock[IO] = Clock.mock[IO](Instant.parse("2026-01-19T13:00:00Z"))
-
-      val requestParams = Map(
-        "symbol"     -> "EUR/USD",
-        "interval"   -> "1h",
-        "apikey"     -> "api-key",
-        "outputsize" -> "150",
-        "timezone"   -> "UTC"
-      )
-
-      val testingBackend = fs2BackendStub
-        .whenRequestMatchesPartial {
-          case r if r.isGet && r.isGoingTo("twelve-data.com/time_series") && r.hasParams(requestParams) =>
-            ResponseStub.adjust(readJson("twelvedata/eur-usd-hourly-prices.response.json"))
-          case _ => throw new RuntimeException()
-        }
-
-      val result = for
-        cache  <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        client <- TwelveDataClient.make[IO](config, testingBackend, cache, 100.millis)
-        res    <- client.timeSeriesData(pair, Interval.H1)
-      yield res
-
-      result.asserting { timeSeriesData =>
-        timeSeriesData.currencyPair mustBe pair
-        timeSeriesData.interval mustBe Interval.H1
-        timeSeriesData.prices must have size 100
-        // First candle should be 12:00
-        timeSeriesData.prices.head mustBe PriceRange(1.16284, 1.16284, 1.16269, 1.16272, 0.0, Instant.parse("2026-01-19T12:00:00Z"))
-        timeSeriesData.prices.last mustBe PriceRange(1.16316, 1.16399, 1.16311, 1.16362, 0.0, Instant.parse("2026-01-15T09:00:00Z"))
-        val times = timeSeriesData.prices.toList.map(_.time)
-        times mustBe times.sortWith(_.isAfter(_))
       }
     }
 
@@ -178,11 +146,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
           case _ => throw new RuntimeException()
         }
 
-      val result = for
-        cache  <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        client <- TwelveDataClient.make[IO](customConfig, testingBackend, cache, 100.millis)
-        res    <- client.timeSeriesData(pair, Interval.H1)
-      yield res
+      val result = makeClient(testingBackend, customConfig).flatMap(_.timeSeriesData(pair, Interval.H1))
 
       result.asserting { timeSeriesData =>
         timeSeriesData.prices must have size 80
@@ -225,15 +189,21 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
           case _ => throw new RuntimeException()
         }
 
-      val result = for
-        cache  <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        client <- TwelveDataClient.make[IO](config, testingBackend, cache, 100.millis)
-        res    <- client.latestPrice(pair)
-      yield res
+      val result = makeClient(testingBackend).flatMap(_.latestPrice(pair))
 
       result.asserting { price =>
         price mustBe PriceRange(1.16284, 1.16284, 1.16269, 1.16272, 0.0, Instant.parse("2026-01-19T12:00:00Z"))
       }
     }
   }
+
+  private def makeClient(
+      backend: WebSocketStreamBackend[IO, Fs2Streams[IO]],
+      clientConfig: TwelveDataConfig = config
+  )(using marketClock: Clock[IO]): IO[TwelveDataClient[IO]] =
+    for
+      // Cache expiry uses real time; the scenario clock controls candle completion.
+      cache  <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+      client <- TwelveDataClient.make[IO](clientConfig, backend, cache, 100.millis)
+    yield client
 }

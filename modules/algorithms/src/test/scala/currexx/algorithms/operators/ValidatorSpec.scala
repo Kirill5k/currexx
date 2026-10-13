@@ -36,16 +36,17 @@ class ValidatorSpec extends IOWordSpec {
 
   "Validator.shortlisted" should {
 
-    "rank individuals by what they scored on held-out evidence rather than by training fitness" in
-      // The training order is deliberately the reverse of the validation order, because a validator that quietly
-      // preserved the order it was given would pass every other assertion here. With two candidates the two ranks
-      // always sum to the same total, so this is the tie-break doing the work: held-out evidence leads.
-      validatorOver(Map("a" -> 0.1, "b" -> 0.9))
-        .flatMap { case (validator, _) => validator.validate(trained("a" -> 0.9, "b" -> 0.1)) }
-        .asserting { validated =>
-          validated.map(_._1) mustBe Vector("b", "a")
-          validated.map(_._3) mustBe Vector(Fitness(0.9), Fitness(0.1))
-        }
+    // Reversing training order must not outweigh a clear held-out lead. Keep both the mirrored scores and the
+    // larger training gap: a rank-sum or training-first ordering would discard the stronger held-out evidence.
+    List(
+      ("rank individuals by what they scored on held-out evidence rather than by training fitness", 0.9, 0.1),
+      ("leave a held-out result that is clearly ahead alone, however good the training figure behind it", 0.99, 0.01)
+    ).foreach { case (description, trainingA, trainingB) =>
+      description in
+        validatorOver(Map("a" -> 0.1, "b" -> 0.9))
+          .flatMap { case (validator, _) => validator.validate(trained("a" -> trainingA, "b" -> trainingB)) }
+          .asserting(_ mustBe Vector(("b", Fitness(trainingB), Fitness(0.9)), ("a", Fitness(trainingA), Fitness(0.1))))
+    }
 
     "carry the training fitness through untouched alongside the validation one" in
       // The pair is what says whether a run found anything; a validator that recomputed or dropped the training figure
@@ -96,14 +97,6 @@ class ValidatorSpec extends IOWordSpec {
       validatorOver(Map("a" -> 0.0, "b" -> 0.3, "c" -> 0.0))
         .flatMap { case (validator, _) => validator.validate(trained("a" -> 0.9, "b" -> 0.8, "c" -> 0.7)) }
         .asserting(_.map(_._1) mustBe Vector("b", "a", "c"))
-
-    "leave a held-out result that is clearly ahead alone, however good the training figure behind it" in
-      // The guard on the tie-break. A rank-sum over both scores was tried first and rejected here: ranks discard
-      // magnitude, so replaying one over the rounds of 2026-09-01/02 swapped a validation of 0.1048 for 0.0045 to gain
-      // 0.02 of training. A gap this size is evidence, not noise, and no training figure may buy past it.
-      validatorOver(Map("a" -> 0.10, "b" -> 0.90))
-        .flatMap { case (validator, _) => validator.validate(trained("a" -> 0.99, "b" -> 0.01)) }
-        .asserting(_.map(_._1) mustBe Vector("b", "a"))
 
     "score an empty population without consulting the held-out evidence" in
       validatorOver(Map.empty)

@@ -8,22 +8,22 @@ import scala.util.Random
 
 class SelectorSpec extends IOWordSpec {
 
+  private val population = Vector(
+    (7, Fitness(35.0)),
+    (6, Fitness(20.0)),
+    (4, Fitness(10.0)),
+    (8, Fitness(7.0)),
+    (3, Fitness(5.0)),
+    (1, Fitness(4.0)),
+    (2, Fitness(2.0)),
+    (5, Fitness(1.0)),
+    (10, Fitness(-1.0)),
+    (9, Fitness(-7.0))
+  )
+
   "Selector.rouletteWheel" should {
 
     "distribute evaluated population into pairs" in {
-      val population = Vector(
-        (7, Fitness(35.0)), // 1
-        (6, Fitness(20.0)), // 2
-        (4, Fitness(10.0)), // 5
-        (8, Fitness(7.0)),  // 3
-        (3, Fitness(5.0)),  // 4
-        (1, Fitness(4.0)),  // 6
-        (2, Fitness(2.0)),
-        (5, Fitness(1.0)),
-        (10, Fitness(-1.0)),
-        (9, Fitness(-7.0))
-      )
-
       given Random = Random(42)
       val result   = Selector.rouletteWheel[IO, Int].flatMap(_.selectPairs(population, 6))
 
@@ -32,19 +32,6 @@ class SelectorSpec extends IOWordSpec {
   }
 
   "Selector.tournament" should {
-
-    val population = Vector(
-      (7, Fitness(35.0)),
-      (6, Fitness(20.0)),
-      (4, Fitness(10.0)),
-      (8, Fitness(7.0)),
-      (3, Fitness(5.0)),
-      (1, Fitness(4.0)),
-      (2, Fitness(2.0)),
-      (5, Fitness(1.0)),
-      (10, Fitness(-1.0)),
-      (9, Fitness(-7.0))
-    )
 
     def selected(pairs: Vector[(Int, Int)]): Vector[Int] =
       pairs.flatMap { case (first, second) => Vector(first, second) }
