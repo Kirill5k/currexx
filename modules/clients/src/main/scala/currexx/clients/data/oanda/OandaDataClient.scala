@@ -2,6 +2,7 @@ package currexx.clients.data.oanda
 
 import cats.data.NonEmptyList
 import cats.effect.Temporal
+import cats.effect.std.KeyedMutex
 import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -28,7 +29,8 @@ private[clients] trait OandaDataClient[F[_]] extends MarketDataClient[F] with Fs
 final private class LiveOandaDataClient[F[_]](
     override protected val backend: WebSocketStreamBackend[F, Fs2Streams[F]],
     private val config: OandaDataConfig,
-    private val cache: Cache[F, (CurrencyPair, Interval), MarketTimeSeriesData]
+    private val cache: Cache[F, OandaDataClient.CacheKey, MarketTimeSeriesData],
+    private val requestMutex: KeyedMutex[F, OandaDataClient.CacheKey]
 )(using
     F: Temporal[F],
     logger: Logger[F],
@@ -43,7 +45,7 @@ final private class LiveOandaDataClient[F[_]](
   override def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] =
     for
       now            <- C.now
-      timeSeriesData <- fetchTimeSeriesData(pair, interval, config.fetchCandleCount, now)
+      timeSeriesData <- fetchTimeSeriesData(pair, interval, config.fetchCandleCount)
       result         <- filterIncompleteCandleIfNeeded(timeSeriesData, interval, now)
     yield result.copy(prices = NonEmptyList.fromListUnsafe(result.prices.take(config.signalCandleCount)))
 
@@ -69,46 +71,51 @@ final private class LiveOandaDataClient[F[_]](
       data.copy(prices = NonEmptyList.fromListUnsafe(data.prices.tail))
 
   override def latestPrice(pair: CurrencyPair): F[PriceRange] =
-    C.now.flatMap { now =>
-      fetchTimeSeriesData(pair, Interval.M1, 1, now).map(_.prices.head)
+    fetchTimeSeriesData(pair, Interval.M1, 1).map(_.prices.head)
+
+  private def fetchTimeSeriesData(pair: CurrencyPair, interval: Interval, numOfTicks: Int): F[MarketTimeSeriesData] =
+    val key: CacheKey = (pair, interval, numOfTicks)
+    requestMutex.lock(key).surround {
+      cache.evalPutIfNew(key)(requestTimeSeriesData(pair, interval, numOfTicks))
     }
 
-  private def fetchTimeSeriesData(pair: CurrencyPair, interval: Interval, numOfTicks: Int, now: Instant): F[MarketTimeSeriesData] =
-    cache.evalPutIfNew(pair -> interval) {
-      val instrument  = s"${pair.base}_${pair.quote}"
-      val granularity = interval match
-        case Interval.M1  => "M1"
-        case Interval.M5  => "M5"
-        case Interval.M15 => "M15"
-        case Interval.M30 => "M30"
-        case Interval.H1  => "H1"
-        case Interval.D1  => "D"
+  private def requestTimeSeriesData(pair: CurrencyPair, interval: Interval, numOfTicks: Int): F[MarketTimeSeriesData] = {
+    val instrument  = s"${pair.base}_${pair.quote}"
+    val granularity = interval match
+      case Interval.M1  => "M1"
+      case Interval.M5  => "M5"
+      case Interval.M15 => "M15"
+      case Interval.M30 => "M30"
+      case Interval.H1  => "H1"
+      case Interval.D1  => "D"
 
-      dispatch {
-        basicRequest
-          .get(uri"${config.baseUri}/v3/instruments/$instrument/candles?granularity=$granularity&count=$numOfTicks&alignmentTimezone=UTC")
-          .auth
-          .bearer(config.apiKey)
-          .response(asJson[CandlesResponse])
-      }.flatMap { r =>
-        r.body match
-          case Right(res) =>
-            MarketTimeSeriesData(pair, interval, res.prices, name).pure[F]
-          case Left(ResponseException.DeserializationException(responseBody, error, _)) =>
-            logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
-              F.raiseError(AppError.JsonParsingFailure(responseBody, s"Failed to parse $name response: ${error.getMessage}"))
-          case Left(ResponseException.UnexpectedStatusCode(body, meta))
-              if meta.code == StatusCode.Forbidden || meta.code == StatusCode.Unauthorized =>
-            logger.error(s"$name-client/${meta.code.code}\n$body") >>
-              F.raiseError(AppError.AccessDenied(s"$name authentication has expired or is invalid"))
-          case Left(ResponseException.UnexpectedStatusCode(body, meta)) =>
-            logger.error(s"$name-client/${meta.code.code}\n$body") >>
-              F.sleep(delayBetweenConnectionFailures) >> fetchTimeSeriesData(pair, interval, numOfTicks, now)
-      }
+    dispatch {
+      basicRequest
+        .get(uri"${config.baseUri}/v3/instruments/$instrument/candles?granularity=$granularity&count=$numOfTicks&alignmentTimezone=UTC")
+        .auth
+        .bearer(config.apiKey)
+        .response(asJson[CandlesResponse])
+    }.flatMap { r =>
+      r.body match
+        case Right(res) =>
+          MarketTimeSeriesData(pair, interval, res.prices, name).pure[F]
+        case Left(ResponseException.DeserializationException(responseBody, error, _)) =>
+          logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
+            F.raiseError(AppError.JsonParsingFailure(responseBody, s"Failed to parse $name response: ${error.getMessage}"))
+        case Left(ResponseException.UnexpectedStatusCode(body, meta))
+            if meta.code == StatusCode.Forbidden || meta.code == StatusCode.Unauthorized =>
+          logger.error(s"$name-client/${meta.code.code}\n$body") >>
+            F.raiseError(AppError.AccessDenied(s"$name authentication has expired or is invalid"))
+        case Left(ResponseException.UnexpectedStatusCode(body, meta)) =>
+          logger.error(s"$name-client/${meta.code.code}\n$body") >>
+            F.sleep(delayBetweenConnectionFailures) >> requestTimeSeriesData(pair, interval, numOfTicks)
     }
+  }
 }
 
 private[clients] object OandaDataClient {
+
+  type CacheKey = (CurrencyPair, Interval, Int)
 
   final case class CandleMid(
       o: String,
@@ -146,7 +153,8 @@ private[clients] object OandaDataClient {
       config: OandaDataConfig,
       fs2Backend: WebSocketStreamBackend[F, Fs2Streams[F]]
   ): F[OandaDataClient[F]] =
-    Cache
-      .make[F, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)
-      .map(cache => LiveOandaDataClient(fs2Backend, config, cache))
+    for
+      cache        <- Cache.make[F, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)
+      requestMutex <- KeyedMutex[F, CacheKey]
+    yield LiveOandaDataClient(fs2Backend, config, cache, requestMutex)
 }

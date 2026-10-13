@@ -1,6 +1,9 @@
 package currexx.clients.data.oanda
 
-import cats.effect.{IO, Temporal}
+import cats.effect.{Deferred, IO, Ref, Temporal}
+import cats.effect.std.KeyedMutex
+import cats.syntax.parallel.*
+import currexx.clients.data.oanda.OandaDataClient.CacheKey
 import currexx.domain.errors.AppError
 import currexx.domain.market.Currency.{EUR, USD}
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
@@ -23,6 +26,51 @@ class OandaDataClientSpec extends Sttp4WordSpec {
   val pair   = CurrencyPair(EUR, USD)
 
   "An OandaDataClient" should {
+    "reuse one successful fetch for overlapping requests with the same pair and interval" in {
+      given Clock[IO] = Clock.mock[IO](Instant.parse("2026-02-06T22:00:00Z"))
+
+      val response = readJson("oanda/instruments-rud-usd-success-response.json")
+      val result   = for
+        started <- Deferred[IO, Unit]
+        release <- Deferred[IO, Unit]
+        calls   <- Ref.of[IO, Int](0)
+        backend = fs2BackendStub.whenAnyRequest.thenRespondF {
+          calls.update(_ + 1) >> started.complete(()) >> release.get.as(ResponseStub.adjust(response))
+        }
+        cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+        requestMutex <- KeyedMutex[IO, CacheKey]
+        dataClient = LiveOandaDataClient[IO](backend, config, cache, requestMutex)
+        results <- dataClient
+          .timeSeriesData(pair, Interval.H1)
+          .start
+          .bracket { first =>
+            for
+              _   <- started.get
+              all <- List
+                .fill(12)(dataClient.timeSeriesData(pair, Interval.H1))
+                .parSequence
+                .start
+                .bracket { waiting =>
+                  for
+                    _      <- IO.sleep(100.millis)
+                    _      <- release.complete(())
+                    head   <- first.joinWithNever
+                    others <- waiting.joinWithNever
+                  yield head :: others
+                }(_.cancel)
+            yield all
+          }(_.cancel)
+        count <- calls.get
+      yield (results, count)
+
+      result.timeout(5.seconds).asserting { case (results, count) =>
+        results must have size 13
+        results.distinct must have size 1
+        results.head.prices must have size 100
+        count mustBe 1
+      }
+    }
+
     "retrieve the latest 100 completed candles in reverse chronological order" in {
       given Clock[IO] = Clock.mock[IO](Instant.parse("2026-02-06T22:00:00Z"))
 
@@ -40,8 +88,9 @@ class OandaDataClientSpec extends Sttp4WordSpec {
         }
 
       val result = for
-        cache <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        client = LiveOandaDataClient[IO](testingBackend, config, cache)
+        cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+        requestMutex <- KeyedMutex[IO, CacheKey]
+        client = LiveOandaDataClient[IO](testingBackend, config, cache, requestMutex)
         res <- client.timeSeriesData(pair, Interval.H1)
       yield res
 
@@ -74,8 +123,9 @@ class OandaDataClientSpec extends Sttp4WordSpec {
         }
 
       val result = for
-        cache <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        client = LiveOandaDataClient[IO](testingBackend, config, cache)
+        cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+        requestMutex <- KeyedMutex[IO, CacheKey]
+        client = LiveOandaDataClient[IO](testingBackend, config, cache, requestMutex)
         res <- client.timeSeriesData(pair, Interval.H1)
       yield res
 
@@ -118,8 +168,9 @@ class OandaDataClientSpec extends Sttp4WordSpec {
         }
 
       val result = for
-        cache <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        client = LiveOandaDataClient[IO](testingBackend, customConfig, cache)
+        cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+        requestMutex <- KeyedMutex[IO, CacheKey]
+        client = LiveOandaDataClient[IO](testingBackend, customConfig, cache, requestMutex)
         res <- client.timeSeriesData(pair, Interval.H1)
       yield res
 
@@ -147,8 +198,9 @@ class OandaDataClientSpec extends Sttp4WordSpec {
       }
 
       val result = for
-        cache <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        client = LiveOandaDataClient[IO](testingBackend, config, cache)
+        cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+        requestMutex <- KeyedMutex[IO, CacheKey]
+        client = LiveOandaDataClient[IO](testingBackend, config, cache, requestMutex)
         res    <- client.timeSeriesData(pair, Interval.H1)
         cached <- client.timeSeriesData(pair, Interval.H1)
       yield (res, cached)
@@ -172,8 +224,9 @@ class OandaDataClientSpec extends Sttp4WordSpec {
       }
 
       val result = for
-        cache <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        client = LiveOandaDataClient[IO](testingBackend, config, cache)
+        cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+        requestMutex <- KeyedMutex[IO, CacheKey]
+        client = LiveOandaDataClient[IO](testingBackend, config, cache, requestMutex)
         res <- client.timeSeriesData(pair, Interval.H1).attempt
       yield res
 
@@ -193,8 +246,9 @@ class OandaDataClientSpec extends Sttp4WordSpec {
       }
 
       val result = for
-        cache <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        client = LiveOandaDataClient[IO](testingBackend, config, cache)
+        cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+        requestMutex <- KeyedMutex[IO, CacheKey]
+        client = LiveOandaDataClient[IO](testingBackend, config, cache, requestMutex)
         res <- client.timeSeriesData(pair, Interval.H1).attempt
       yield res
 
@@ -215,8 +269,9 @@ class OandaDataClientSpec extends Sttp4WordSpec {
       }
 
       val result = for
-        cache <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        client = LiveOandaDataClient[IO](testingBackend, config, cache)
+        cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+        requestMutex <- KeyedMutex[IO, CacheKey]
+        client = LiveOandaDataClient[IO](testingBackend, config, cache, requestMutex)
         res <- client.latestPrice(pair)
       yield res
 
@@ -253,8 +308,9 @@ class OandaDataClientSpec extends Sttp4WordSpec {
         }
 
       val result = for
-        cache <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
-        client = LiveOandaDataClient[IO](testingBackend, config, cache)
+        cache        <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+        requestMutex <- KeyedMutex[IO, CacheKey]
+        client = LiveOandaDataClient[IO](testingBackend, config, cache, requestMutex)
         res <- client.latestPrice(pair)
       yield res
 
