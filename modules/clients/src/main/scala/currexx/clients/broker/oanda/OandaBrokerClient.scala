@@ -266,7 +266,7 @@ final private class LiveOandaBrokerClient[F[_]](
       r.body match
         case Right(res) if res.accounts.exists(_.id == params.accountId) => F.pure(params.accountId)
         case Right(_)  => F.raiseError(AppError.ClientFailure(name, s"Account id ${params.accountId} does not exist"))
-        case Left(err) => handleError("get-account", err)
+        case Left(err) => handleError(s"get-account-${params.accountId}", err)
     }
 
   private def handleError[A](endpoint: String, error: ResponseException[String]): F[A] =
