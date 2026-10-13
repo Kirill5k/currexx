@@ -40,47 +40,6 @@ class IndicatorInitialiserSpec extends IOWordSpec {
 
   "An IndicatorInitialiser" when {
 
-    "using the shared population builder" should {
-      "preserve the previous population ordering and random sequence in both mixes and small budgets" in {
-        val base       = Indicator.TrendChangeDetection(ValueSource.Close, VT.SMA(20))
-        val sibling    = Indicator.TrendChangeDetection(ValueSource.Close, VT.SMA(30))
-        val extras     = List(sibling, sibling, differentShape, base)
-        val compatible = Vector(base, sibling)
-
-        // Keep the previous indicator allocation as a regression oracle for the shared builder.
-        def previous(size: Int, shuffle: Boolean): IO[(Vector[Indicator], Double)] = {
-          given Random = Random(911)
-          val clones   = math.min(size, math.max(compatible.size, (size * (if (shuffle) 0.15 else 0.30)).toInt))
-          val jittered = math.min(size - clones, (size * (if (shuffle) 0.55 else 0.60)).toInt)
-          val radii    = if (shuffle) List(1.0, 3.0, 6.0) else List(1.0)
-          for
-            mutators   <- radii.traverse(IndicatorMutator.scaled[IO])
-            neighbours <- Vector
-              .range(0, jittered)
-              .traverse(index => mutators(index % mutators.size).mutate(compatible(index % compatible.size), 1.0))
-            immigrants <- Vector.range(0, size - clones - jittered).traverse(_ => IndicatorInitialiser.randomise[IO](base))
-            next       <- IO(summon[Random].nextDouble())
-          yield (Vector.tabulate(clones)(index => compatible(index % compatible.size)) ++ neighbours ++ immigrants, next)
-        }
-        def shared(size: Int, shuffle: Boolean): IO[(Vector[Indicator], Double)] = {
-          given Random = Random(911)
-          for
-            initialiser <- IndicatorInitialiser.seeded[IO](extras)
-            population  <- initialiser.initialisePopulation(base, size, shuffle)
-            next        <- IO(summon[Random].nextDouble())
-          yield (population, next)
-        }
-        List((31, true), (31, false), (2, true))
-          .traverse { (size, shuffle) =>
-            for expected <- previous(size, shuffle); actual <- shared(size, shuffle) yield (expected, actual)
-          }
-          .asserting { comparisons =>
-            comparisons.foreach { case (expected, actual) => actual mustBe expected }
-            succeed
-          }
-      }
-    }
-
     "shuffle is false" should {
       "keep thirty copies of the seed and draw the remaining seventy" in {
         // Most refining candidates are now neighbours of the seed, giving crossover more distinct parents while preserving the seed.

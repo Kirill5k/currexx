@@ -80,8 +80,6 @@ object OptimisationSearchOperators {
       rules: TradeStrategySearchSpace,
       seeds: List[TestStrategy]
   )(using F: Sync[F], random: Random): OptimisationSearchOperators[F] = {
-    val ruleCrossover = TradeStrategySearchOperators.crossover[F](rules)
-
     def changeIndicator(operation: (IndicatorSearchSpace, IndicatorSearchOperators.Variation[F]) => F[Indicator]): F[Indicator] =
       indicators.fold(F.pure(space.template.indicator))((search, operators) => operation(search, operators))
 
@@ -103,7 +101,7 @@ object OptimisationSearchOperators {
     def crossCandidate(first: TestStrategy, second: TestStrategy)(using Random): F[TestStrategy] =
       for
         indicator <- changeIndicator((_, operators) => operators.crossover.cross(first.indicator, second.indicator))
-        strategy  <- ruleCrossover.cross(first.rules, second.rules)
+        strategy  <- TradeStrategySearchOperators.cross[F](rules, first.rules, second.rules)
       yield TestStrategy(indicator, strategy)
 
     val indicatorDistance = indicators.map((search, _) => IndicatorDistance.make(search))

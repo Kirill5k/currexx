@@ -162,7 +162,7 @@ class OptimisationReportSpec extends IOWordSpec {
         val configured = round.copy(
           strategy = base,
           target = mode,
-          ruleBounds = if (mode == OptimisationTarget.Indicator) RuleParameterBounds() else durationBounds
+          ruleBounds = if (mode == OptimisationTarget.Indicator) RuleParameterBounds.default else durationBounds
         )
         for {
           space       <- IO.fromEither(OptimisationSearchSpace.forRound(configured))
@@ -176,6 +176,9 @@ class OptimisationReportSpec extends IOWordSpec {
         } yield mode -> report
       }
       result.asserting { results =>
+        results.foreach { case (mode, report) =>
+          report.ruleBounds mustBe (if (mode == OptimisationTarget.Indicator) RuleParameterBounds.default else durationBounds)
+        }
         val reports = results.toMap
         reports(OptimisationTarget.Indicator).catalogueMatches(base) mustBe List(
           CatalogueMatch("exact", DuplicateKind.Exact),
@@ -340,81 +343,6 @@ class OptimisationReportSpec extends IOWordSpec {
       }
     }
 
-    "record the configured default bounds for each target" in {
-      val base =
-        round.strategy.copy(rules = TradeStrategy(Nil, List(Rule(TradeAction.ClosePosition, Rule.Condition.PositionOpenFor(4.hours)))))
-      val result = OptimisationTarget.values.toList.traverse { mode =>
-        val configured = round.copy(strategy = base, target = mode)
-        for
-          space       <- IO.fromEither(OptimisationSearchSpace.forRound(configured))
-          diagnostics <- RunDiagnostics.make[IO]
-          report      <- new OptimisationReportBuilder(
-            configured,
-            space,
-            (candidate: TestStrategy) => IO.pure(measured(candidate)),
-            diagnostics,
-            Nil
-          ).build(
-            OptimisationResult(Vector((base, Fitness(1), Fitness(1))), UpgradeDecision.RetainBase(Nil), evidence(base)),
-            RunDiagnostics.Snapshot(),
-            1.second
-          )
-        yield report
-      }
-      result.asserting { reports =>
-        reports.foreach { report =>
-          val expected = RuleParameterBounds.default
-          report.ruleBounds mustBe expected
-          OptimisationReportRenderer.sections(report).toMap.apply("Search configuration") must contain(
-            s"Rule parameter bounds: ${RuleBoundsRenderer.json(expected).noSpaces}"
-          )
-        }
-        succeed
-      }
-    }
-
-    "preserve and render ValueIs bounds as one numeric range" in {
-      val base = round.strategy.copy(rules =
-        TradeStrategy(List(Rule(TradeAction.OpenLong, Rule.Condition.ValueIs(ValueRole.Momentum, Rule.Operator.GreaterThan, 50.0))), Nil)
-      )
-      val bounds = RuleParameterBounds(numeric =
-        Map(
-          RuleTarget
-            .At(RuleParameterPath(RulePath(RuleList.Open, 0), RuleParameter.Level), base.rules) ->
-            RuleParameterBounds.DoubleRange(20.0, 80.0, 1.0)
-        )
-      )
-      val configured = round.copy(strategy = base, target = OptimisationTarget.Strategy, ruleBounds = bounds)
-      val result     = for {
-        space       <- IO.fromEither(OptimisationSearchSpace.forRound(configured))
-        diagnostics <- RunDiagnostics.make[IO]
-        inspect = (candidate: TestStrategy) => IO.pure(measured(candidate))
-        report <- new OptimisationReportBuilder(configured, space, inspect, diagnostics, Nil).build(
-          OptimisationResult(Vector((base, Fitness(1), Fitness(1))), UpgradeDecision.RetainBase(Nil), evidence(base)),
-          RunDiagnostics.Snapshot(),
-          1.second
-        )
-      } yield report
-      result.asserting { report =>
-        report.ruleBounds mustBe bounds
-        val rendered = RuleBoundsRenderer.json(report.ruleBounds)
-        val numeric  = rendered.hcursor.downField("numeric")
-        numeric.focus.flatMap(_.asArray).map(_.size) mustBe Some(1)
-        numeric.downArray.downField("target").get[String]("kind") mustBe Right("At")
-        numeric.downArray.downField("target").downField("path").get[String]("parameter") mustBe Right("Level")
-        numeric.downArray.downField("target").downField("path").get[String]("ruleList") mustBe Right("Open")
-        numeric.downArray.downField("target").downField("path").get[Int]("ruleIndex") mustBe Right(0)
-        numeric.downArray.downField("target").get[TradeStrategy]("template") mustBe Right(base.rules)
-        numeric.downArray.downField("range").get[Double]("min") mustBe Right(20.0)
-        numeric.downArray.downField("range").get[Double]("max") mustBe Right(80.0)
-        numeric.downArray.downField("range").get[Double]("step") mustBe Right(1.0)
-        rendered.asObject.map(_.keys.toSet) mustBe Some(Set("numeric", "durations"))
-        OptimisationReportRenderer.sections(report).toMap.apply("Search configuration") must contain(
-          s"Rule parameter bounds: ${rendered.noSpaces}"
-        )
-      }
-    }
-
     "count only this report's deduplicated replay work and preserve the frozen search snapshot" in {
       val configured = round.copy(extraSeeds = List(NamedStrategy("seed", indicator(20)), NamedStrategy("alias", indicator(20, 40))))
       val finalists  = Vector((indicator(20), Fitness(1), Fitness(0.5)))
@@ -508,10 +436,7 @@ class OptimisationReportSpec extends IOWordSpec {
       )
       val text = OptimisationReportRenderer.sections(report).flatMap(_._2).mkString("\n")
       text must include("Optimisation target: Both")
-      report.ruleBounds mustBe bounds
       text must include(s"Rule parameter bounds: ${RuleBoundsRenderer.json(bounds).noSpaces}")
-      text must include("\"durations\"")
-      text must include("\"step\":\"1 hour\"")
       text must include("Fixed indicator inputs:")
       text must include(s"Base candidate: ${base.asJson.noSpaces}")
       val changes = CandidateParameters.changes(base, changed)

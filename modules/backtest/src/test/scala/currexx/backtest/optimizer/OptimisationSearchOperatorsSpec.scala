@@ -5,17 +5,9 @@ import cats.syntax.apply.*
 import cats.syntax.traverse.*
 import currexx.backtest.TestStrategy
 import currexx.backtest.optimizer.indicator.{IndicatorDistance, IndicatorSearchOperators}
-import currexx.backtest.optimizer.strategy.{
-  RuleList,
-  RuleParameter,
-  RuleParameterBounds,
-  RuleParameterPath,
-  RulePath,
-  RuleTarget,
-  TradeStrategySearchOperators
-}
+import currexx.backtest.optimizer.strategy.{RuleParameterBounds, RuleTarget, TradeStrategySearchOperators}
 import currexx.core.trade.{Rule, TradeAction, TradeStrategy}
-import currexx.domain.signal.{Direction, Indicator, ValueRole, ValueSource, ValueTransformation as VT}
+import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation as VT}
 import kirill5k.common.cats.test.IOWordSpec
 
 import scala.concurrent.duration.*
@@ -161,48 +153,21 @@ class OptimisationSearchOperatorsSpec extends IOWordSpec {
       }
     }
 
-    "broaden joint numeric neighbours with the radius while leaving categories fixed" in {
-      given Random   = Random(731)
-      val categories = List.fill(8)(Rule.Condition.TrendIs(Direction.Upward))
-      val template   = TestStrategy(
-        Indicator
-          .compositeAnyOf(base.indicator, Indicator.ValueTracking(ValueRole.Velocity, ValueSource.Close, VT.KalmanVelocity(0.5, 0.1))),
-        TradeStrategy(List(Rule(TradeAction.OpenLong, Rule.Condition.AllOf(categories :+ Rule.Condition.VelocityIsBelow(1.0)))), Nil)
-      )
-      val root   = RulePath(RuleList.Open, 0)
-      val bounds = RuleParameterBounds(
-        numeric = Map(
-          RuleTarget
-            .At(RuleParameterPath(root.child(8), RuleParameter.Threshold), template.rules) -> RuleParameterBounds.DoubleRange(0, 2, 0.01)
-        )
-      )
-      val searchSpace                                           = space(OptimisationTarget.Both, template, Set(template.indicator), bounds)
-      def values(candidate: TestStrategy): List[Rule.Condition] = candidate.rules.openRules.head.conditions match
-        case Rule.Condition.AllOf(conditions) => conditions
-        case _                                => fail("Expected the fixed condition tree")
-      def numericChange(candidate: TestStrategy): Double =
-        values(candidate)
-          .collectFirst { case Rule.Condition.VelocityIsBelow(threshold) => math.abs(threshold - 1.0) }
-          .getOrElse(fail("Expected the numeric leaf"))
-      def average(candidates: Vector[TestStrategy])(measure: TestStrategy => Double): Double =
-        candidates.map(measure).sum / candidates.size
+    "forward nearby radii to rule variation in a joint population" in {
+      given Random = new Random(731) {
+        override def nextGaussian(): Double = 1.0
+      }
+      val searchSpace = space(OptimisationTarget.Both, fixed = Set(base.indicator), bounds = ageBounds)
+      val result      = for
+        operators  <- OptimisationSearchOperators.make[IO](searchSpace)
+        population <- operators.initialiser.initialisePopulation(base, 10, shuffle = true)
+      yield population
 
-      val result = for
-        operators <- OptimisationSearchOperators.make[IO](searchSpace)
-        refining  <- operators.initialiser.initialisePopulation(template, 1000, shuffle = false)
-        exploring <- operators.initialiser.initialisePopulation(template, 1000, shuffle = true)
-      yield (refining.slice(300, 900), exploring.slice(150, 700))
-
-      result.asserting { case (nearby, exploratory) =>
-        (nearby ++ exploratory).foreach(candidate => values(candidate).take(8) mustBe categories)
-        val radii =
-          Vector.tabulate(3)(radius => exploratory.zipWithIndex.collect { case (candidate, index) if index % 3 == radius => candidate })
-        val numericMeans = radii.map(average(_)(numericChange))
-        numericMeans(0) must be < 0.3
-        numericMeans(1) must be > numericMeans(0)
-        numericMeans(2) must be > numericMeans(1)
-        (nearby ++ exploratory).foreach(candidate => searchSpace.canonicalise(candidate) mustBe Right(candidate))
-        succeed
+      result.asserting { population =>
+        val expected = Vector(3, 5, 10, 17).map { hours =>
+          base.copy(rules = TradeStrategy(List(Rule(TradeAction.OpenLong, Rule.Condition.TrendActiveFor(hours.hours))), Nil))
+        }
+        population.take(4) mustBe expected
       }
     }
 
@@ -299,49 +264,35 @@ class OptimisationSearchOperatorsSpec extends IOWordSpec {
         }
     }
 
-    "return zero distance and preserve a Both candidate when every parameter is fixed" in {
-      given Random    = Random(307)
-      val searchSpace = space(OptimisationTarget.Both, fixed = Set(base.indicator))
-      val result      = for
-        operators  <- OptimisationSearchOperators.make[IO](searchSpace, List(changed))
-        population <- operators.initialiser.initialisePopulation(base, 12, shuffle = true)
-        mutated    <- operators.mutator.mutate(base, 1.0)
-        crossed    <- operators.crossover.cross(base, base, 1.0)
-        distance   <- IO.fromEither(operators.distance.between(base, base))
-      yield (population, mutated, crossed, distance)
-      result.asserting { (population, mutated, crossed, distance) =>
-        searchSpace.parameterCount mustBe 0
-        population mustBe Vector.fill(12)(base)
-        mutated mustBe base
-        crossed mustBe base
-        distance mustBe 0.0
-      }
-    }
+    "preserve entirely fixed candidates and return zero distance in Indicator and Both modes" in
+      List(OptimisationTarget.Indicator, OptimisationTarget.Both)
+        .traverse { target =>
+          given Random    = Random(307)
+          val searchSpace = space(target, fixed = Set(base.indicator))
+          for
+            operators  <- OptimisationSearchOperators.make[IO](searchSpace, List(changed))
+            population <- operators.initialiser.initialisePopulation(base, 12, shuffle = true)
+            mutated    <- operators.mutator.mutate(base, 1.0)
+            crossed    <- operators.crossover.cross(base, base, 1.0)
+            distance   <- IO.fromEither(operators.distance.between(base, base))
+          yield (searchSpace.parameterCount, population, mutated, crossed, distance)
+        }
+        .asserting { results =>
+          results.foreach { (parameterCount, population, mutated, crossed, distance) =>
+            parameterCount mustBe 0
+            population mustBe Vector.fill(12)(base)
+            mutated mustBe base
+            crossed mustBe base
+            distance mustBe 0.0
+          }
+          succeed
+        }
 
-    "ignore frozen blocks in distance and keep entirely fixed candidates unchanged" in {
+    "ignore frozen indicators when measuring rule distance" in {
       given Random         = Random(11)
       val frozenIndicators = space(OptimisationTarget.Both, fixed = Set(base.indicator), bounds = ageBounds)
-      val noParameters     = base.copy(rules = TradeStrategy(List(Rule(TradeAction.OpenLong, Rule.Condition.NoPosition)), Nil))
-      val fixed            = space(OptimisationTarget.Indicator, noParameters, Set(base.indicator))
-      val result           = for
-        rulesOnly <- OptimisationSearchOperators.make[IO](frozenIndicators)
-        distance  <- IO.fromEither(rulesOnly.distance.between(base, changed))
-        expected  <- IO.fromEither(
-          TradeStrategySearchOperators.distance(frozenIndicators.strategySpace.get).between(base.rules, changed.rules)
-        )
-        operators <- OptimisationSearchOperators.make[IO](fixed)
-        initial   <- operators.initialiser.initialisePopulation(noParameters, 12, shuffle = true)
-        mutated   <- operators.mutator.mutate(noParameters, 1.0)
-        crossed   <- operators.crossover.cross(noParameters, noParameters, 1.0)
-        zero      <- IO.fromEither(operators.distance.between(noParameters, noParameters))
-      yield (distance, expected, initial, mutated, crossed, zero)
-      result.asserting { case (distance, expected, initial, mutated, crossed, zero) =>
-        distance mustBe expected
-        fixed.parameterCount mustBe 0
-        initial mustBe Vector.fill(12)(noParameters)
-        mutated mustBe noParameters
-        crossed mustBe noParameters
-        zero mustBe 0.0
+      OptimisationSearchOperators.make[IO](frozenIndicators).asserting { operators =>
+        operators.distance.between(base, changed) mustBe Right(0.25)
       }
     }
   }

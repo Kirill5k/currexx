@@ -2,7 +2,6 @@ package currexx.backtest.optimizer.strategy
 
 import cats.syntax.traverse.*
 import cats.syntax.foldable.*
-import currexx.backtest.optimizer.Checks
 import currexx.core.trade.{Rule, TradeStrategy}
 import currexx.domain.signal.Indicator
 
@@ -53,25 +52,10 @@ final class TradeStrategySearchSpace private (
     else transform(candidate)((parameter, leaves) => parameter.mutate(leaves, probability))
 
   private[strategy] def cross(first: TradeStrategy, second: TradeStrategy)(using Random): Either[IllegalArgumentException, TradeStrategy] =
-    crossWhen(first, second)(true)
-
-  private[strategy] def cross(first: TradeStrategy, second: TradeStrategy, probability: Double)(using
-      random: Random
-  ): Either[IllegalArgumentException, TradeStrategy] =
-    Checks.probability(probability).flatMap { _ =>
-      crossWhen(first, second)(probability > 0 && parameterCount > 0 && random.nextDouble() < probability)
-    }
-
-  private def crossWhen(first: TradeStrategy, second: TradeStrategy)(
-      selected: => Boolean
-  )(using Random): Either[IllegalArgumentException, TradeStrategy] =
     for
       firstLeaves  <- validatedLeaves(first)
       secondLeaves <- validatedLeaves(second)
-      result       <-
-        if (!selected) Right(first)
-        else
-          change(firstLeaves)((parameter, leaves) => parameter.cross(leaves, secondLeaves)).flatMap(rebuild(first, _))
+      result       <- change(firstLeaves)((parameter, leaves) => parameter.cross(leaves, secondLeaves)).flatMap(rebuild(first, _))
     yield result
 
   private[strategy] def distance(first: TradeStrategy, second: TradeStrategy): Either[IllegalArgumentException, Double] =

@@ -3,10 +3,11 @@ package currexx.backtest.optimizer.strategy
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
+import scala.concurrent.duration.*
 import scala.util.Random
 
 class ParameterDomainSpec extends AnyWordSpec with Matchers {
-  import RuleParameterBounds.DoubleRange
+  import RuleParameterBounds.{DoubleRange, DurationRange}
 
   "Numeric rule grids" should {
     "use the represented grid for both membership and snapping" in {
@@ -41,6 +42,46 @@ class ParameterDomainSpec extends AnyWordSpec with Matchers {
       domain.contains(java.lang.Math.nextUp(4.0)) mustBe false
       domain.contains(Double.NaN) mustBe false
       domain.contains(Double.PositiveInfinity) mustBe false
+    }
+
+    "keep every represented decimal grid point valid through sampling, mutation and crossover" in {
+      var index    = 0
+      given Random = new Random(1):
+        override def nextInt(bound: Int): Int = { val current = index; index += 1; current }
+        override def nextGaussian(): Double   = 1.0
+        override def nextDouble(): Double     = 0.5
+      val domain    = ParameterDomain.real(DoubleRange(1.0, 1.000000000000003, 3e-16)).toOption.get
+      val samples   = List.fill(11)(domain.sample)
+      val mutations = samples.map(domain.mutate(_, 1.0))
+      val children  = samples.zip(samples.reverse).map(domain.cross(_, _))
+      samples.distinct.size must be > 1
+      (samples ++ mutations ++ children).foreach(value => domain.contains(value) mustBe true)
+    }
+
+    "scale nearby Gaussian changes by the requested radius" in {
+      given Random = new Random(1):
+        override def nextGaussian(): Double = 1.0
+      val domain = ParameterDomain.real(DoubleRange(0, 1, 0.01)).toOption.get
+      List(1.0, 3.0, 6.0).map(domain.nearby(0.5, _)) mustBe List(0.6, 0.8, 1.0)
+    }
+  }
+
+  "Duration rule grids" should {
+    "sample and vary exact nanosecond indices above Double's integer precision" in {
+      var index    = 0
+      given Random = new Random(1):
+        override def nextInt(bound: Int): Int = { val current = index; index += 1; current }
+        override def nextGaussian(): Double   = 1.0
+        override def nextDouble(): Double     = 0.5
+      val offset  = (1L << 53) + 1
+      val domain  = ParameterDomain.duration(DurationRange(offset.nanos, (offset + 10).nanos, 1.nano)).toOption.get
+      val samples = List.fill(11)(domain.sample)
+      samples.map(_.toNanos) mustBe (0L to 10L).map(offset + _).toList
+      samples.map(domain.mutate(_, 1.0)) mustBe samples.tail :+ samples.last
+      samples.init.zip(samples.tail).map(domain.cross(_, _)) mustBe samples.tail
+      samples.foreach(value => domain.contains(value) mustBe true)
+      domain.contains((offset - 1).nanos) mustBe false
+      domain.distance(samples.head, samples.last) mustBe 1.0
     }
   }
 }
