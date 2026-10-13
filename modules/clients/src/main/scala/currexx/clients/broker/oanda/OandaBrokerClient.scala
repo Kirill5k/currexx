@@ -32,7 +32,8 @@ private[clients] trait OandaBrokerClient[F[_]] extends Fs2HttpClient[F]:
 
 final private class LiveOandaBrokerClient[F[_]](
     override protected val backend: WebSocketStreamBackend[F, Fs2Streams[F]],
-    private val config: OandaBrokerConfig
+    private val config: OandaBrokerConfig,
+    override protected val maxRetries: Int
 )(using
     F: Async[F],
     logger: Logger[F],
@@ -451,7 +452,8 @@ object OandaBrokerClient {
 
   def make[F[_]: {Async, Logger, Clock}](
       config: OandaBrokerConfig,
-      backend: WebSocketStreamBackend[F, Fs2Streams[F]]
+      backend: WebSocketStreamBackend[F, Fs2Streams[F]],
+      maxRetries: Int = 6
   ): F[OandaBrokerClient[F]] =
-    LiveOandaBrokerClient(backend, config).pure[F]
+    LiveOandaBrokerClient(backend, config, maxRetries).pure[F]
 }

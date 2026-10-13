@@ -571,11 +571,11 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
         .thenRespondCyclic(ResponseStub.adjust("Server error", StatusCode.ServiceUnavailable))
 
       val result = for
-        client <- OandaBrokerClient.make[IO](config, testingBackend)
+        client <- OandaBrokerClient.make[IO](config, testingBackend, maxRetries = 2)
         orders <- client.getCurrentOrders(params, NonEmptyList.of(eurUsdPair))
       yield orders
 
-      result.assertThrows(AppError.ClientFailure("oanda", "get-account returned 503: Server error"))
+      result.assertThrows(AppError.ClientFailure("oanda", "get-account-123-456-789 returned 503: Server error"))
     }
   }
 

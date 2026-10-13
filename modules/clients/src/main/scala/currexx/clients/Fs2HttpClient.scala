@@ -19,6 +19,7 @@ trait Fs2HttpClient[F[_]] {
 
   protected val delayBetweenConnectionFailures: FiniteDuration  = 10.seconds
   protected val additionalRetryableStatusCodes: Set[StatusCode] = Set.empty
+  protected val maxRetries: Int                                 = 6
 
   protected def calculateBackoffDelay(
       attempt: Int,
@@ -40,7 +41,6 @@ trait Fs2HttpClient[F[_]] {
   private def dispatchWithRetry[T](
       request: Request[T],
       attempt: Int = 0,
-      maxRetries: Int = 6
   )(using
       F: Temporal[F],
       logger: Logger[F]
@@ -50,14 +50,14 @@ trait Fs2HttpClient[F[_]] {
       .flatMap { response =>
         if ((response.code.code >= 500 || additionalRetryableStatusCodes.contains(response.code)) && attempt < maxRetries) {
           val message = s"$name-client/http-error-${response.code.code}-attempt-$attempt: ${response.body}"
-          logger.debug(message) *> F.sleep(calculateBackoffDelay(attempt)) *> dispatchWithRetry(request, attempt + 1, maxRetries)
+          logger.debug(message) *> F.sleep(calculateBackoffDelay(attempt)) *> dispatchWithRetry(request, attempt + 1)
         } else F.pure(response)
       }
       .handleErrorWith { error =>
         if (attempt < maxRetries) {
           val cause   = Option(error.getCause).getOrElse(error)
           val message = s"$name-client/${cause.getClass.getSimpleName.toLowerCase}-$attempt: ${cause.getMessage}\n$error"
-          logger.warn(message) *> F.sleep(calculateBackoffDelay(attempt)) *> dispatchWithRetry(request, attempt + 1, maxRetries)
+          logger.warn(message) *> F.sleep(calculateBackoffDelay(attempt)) *> dispatchWithRetry(request, attempt + 1)
         } else F.raiseError(error)
       }
 
