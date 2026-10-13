@@ -13,17 +13,20 @@ final class LoggingTracker[F[_], I] private (
     showTopMember: Boolean,
     showTopN: Int,
     showStats: Boolean,
-    finalTopN: Int
+    finalTopN: Int,
+    renderIndividual: I => String
 )(using
     F: Async[F]
 ) extends Tracker[F, I]:
+
+  override protected def individualText(individual: I): String = renderIndividual(individual)
 
   override def displayInitial(target: I, params: Parameters[?]): F[Unit] =
     for
       now <- Async[F].realTimeInstant
       _   <- startTimeRef.set(Some(now))
       header = s"Starting ${params.name}${if (label.nonEmpty) s" round $label" else ""} at $now"
-      _ <- Async[F].delay(println(s"$header\nTarget: $target\nParameters: $params"))
+      _ <- Async[F].delay(println(s"$header\nTarget: ${individualText(target)}\nParameters: $params"))
     yield ()
 
   override def displayProgress(progress: Progress[I]): F[Unit] =
@@ -59,10 +62,11 @@ object LoggingTracker:
       showTopMember: Boolean = true,
       showTopN: Int = 1,
       showStats: Boolean = false,
-      finalTopN: Int = 25
+      finalTopN: Int = 25,
+      renderIndividual: I => String = (individual: I) => individual.toString
   ): F[Tracker[F, I]] =
     Ref
       .of[F, Option[Instant]](None)
       .map { startTimeRef =>
-        new LoggingTracker[F, I](label, startTimeRef, logInterval, showTopMember, showTopN, showStats, finalTopN)
+        new LoggingTracker[F, I](label, startTimeRef, logInterval, showTopMember, showTopN, showStats, finalTopN, renderIndividual)
       }

@@ -4,7 +4,7 @@ import currexx.algorithms.Parameters
 import currexx.algorithms.operators.Validator
 import currexx.backtest.{RiskSettings, TestSettings}
 import currexx.backtest.MarketDataProvider.DateRange
-import currexx.backtest.optimizer.indicator.reporting.UpgradeDecisionRenderer
+import currexx.backtest.optimizer.reporting.{RuleBoundsRenderer, UpgradeDecisionRenderer}
 import io.circe.Json
 import io.circe.syntax.*
 
@@ -26,14 +26,16 @@ object WalkForwardReportRenderer:
       "seedDerivation" -> WalkForwardWindow.seedVersion.asJson,
       "baseStrategy"   -> round.strategy.asJson,
       "search"         -> Json.obj(
-        "parameters"    -> parameters(round.parameters),
-        "scoring"       -> round.scoringFunction.description.asJson,
-        "objective"     -> UpgradeDecisionRenderer.objective(round.searchObjective),
-        "upgradePolicy" -> UpgradeDecisionRenderer.policy(round.upgradePolicy),
-        "shortlistSize" -> round.shortlistSize.asJson,
-        "extraSeeds"    -> round.extraSeeds.map(seed => Json.obj("name" -> seed.name.asJson, "indicator" -> seed.indicator.asJson)).asJson,
-        "fixedIndicators"          -> round.fixedIndicators.toList.sortBy(_.toString).asJson,
-        "selectionGate"            -> "explicit baseline-relative upgrade requirements after validation".asJson,
+        "target"          -> round.target.toString.asJson,
+        "ruleBounds"      -> RuleBoundsRenderer.json(round.ruleBounds),
+        "parameters"      -> parameters(round.parameters),
+        "scoring"         -> round.scoringFunction.description.asJson,
+        "objective"       -> UpgradeDecisionRenderer.objective(round.searchObjective),
+        "upgradePolicy"   -> UpgradeDecisionRenderer.policy(round.upgradePolicy),
+        "shortlistSize"   -> round.shortlistSize.asJson,
+        "extraSeeds"      -> round.extraSeeds.map(seed => Json.obj("name" -> seed.name.asJson, "strategy" -> seed.strategy.asJson)).asJson,
+        "fixedIndicators" -> round.fixedIndicators.toList.sortBy(_.toString).asJson,
+        "selectionGate"   -> "explicit baseline-relative upgrade requirements after validation".asJson,
         "selectionTieBandRelative" -> Validator.defaultTieBand.relative.asJson,
         "selectionOrdering" -> "Existing Validator consensus ordering; skip base, then approve the first challenger meeting every upgrade requirement".asJson
       ),
@@ -174,6 +176,7 @@ object WalkForwardReportRenderer:
         "",
         s"Experiment: `${experiment.id}`; master seed: ${experiment.masterSeed}; status: ${status(experiment, totals.completedWindows, failure)}.",
         s"Completed ${results.size} of ${experiment.plan.windows.size} windows. Full settings and source hashes: [manifest.json](manifest.json).",
+        s"Optimisation target: ${experiment.round.target}.",
         s"Search objective: `${UpgradeDecisionRenderer.objective(experiment.round.searchObjective).noSpaces}`.",
         s"Upgrade policy: `${UpgradeDecisionRenderer.policy(experiment.round.upgradePolicy).noSpaces}`.",
         "",

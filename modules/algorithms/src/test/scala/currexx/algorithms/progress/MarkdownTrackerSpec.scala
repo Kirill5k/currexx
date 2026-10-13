@@ -59,6 +59,39 @@ class MarkdownTrackerSpec extends IOWordSpec {
       }
     }
 
+    "use a display callback without changing candidate identity or training ranks" in {
+      val resultsDir = Path("optimisation-results")
+      val files      = Files.forAsync[IO]
+      val label      = s"render-test-${UUID.randomUUID()}"
+      val first      = ("visible", "fixed-a")
+      val second     = ("visible", "fixed-b")
+      val result     = for {
+        tracker <- Tracker.markdown[IO, (String, String)](
+          algorithmName = params.name,
+          label = label,
+          logInterval = 1,
+          showTopN = 2,
+          renderIndividual = _._1
+        )
+        _       <- tracker.displayInitial(first, params)
+        _       <- tracker.displayProgress(Progress.Population(1, 10, Vector(first -> Fitness(10), second -> Fitness(5))))
+        _       <- tracker.displayFinal(Vector((second, Fitness(5), Fitness(4)), (first, Fitness(10), Fitness(1))))
+        written <- files.list(resultsDir).compile.toList
+        path = written.find(_.fileName.toString.endsWith(s"-$label.md")).get
+        text <- files.readUtf8(path).compile.string
+        _    <- files.deleteIfExists(path)
+      } yield text
+      result.asserting { text =>
+        text must include("**Target:** visible")
+        text must include("* #1: 10.0 - `visible`")
+        text must include("* #2: 5.0 - `visible`")
+        text must include("1       2    5.000000    4.000000     80.0%  visible")
+        text must include("2       1   10.000000    1.000000     10.0%  visible")
+        (text must not).include("fixed-a")
+        (text must not).include("fixed-b")
+      }
+    }
+
     "write one SCGA generation report and apply the interval to its population and breeding telemetry together" in {
       val resultsDir        = Path("optimisation-results")
       val filesS            = Files.forAsync[IO]

@@ -63,7 +63,7 @@ class IndicatorSCGASpec extends IOWordSpec {
         progress        <- Ref.of[IO, Vector[EvaluatedPopulation[Indicator]]](Vector.empty)
         events          <- Ref.of[IO, Vector[String]](Vector.empty)
         validationCalls <- Ref.of[IO, Int](0)
-        operators       <- IndicatorSearchOperators.make[IO](space, List(fixedAlias, otherSeed))
+        operators       <- IndicatorSearchFixture.operators(TestStrategy(template, TradeStrategy(Nil, Nil)), List(fixedAlias, otherSeed))
         species         <- SpeciesOperators.make[IO, Indicator](IndicatorDistance.make(space))
         evaluator = new Evaluator[IO, Indicator] {
           override def evaluateIndividual(individual: Indicator, phase: EvaluationPhase): IO[(Indicator, Fitness)] =
@@ -132,7 +132,7 @@ class IndicatorSCGASpec extends IOWordSpec {
       val result = for
         progress  <- Ref.of[IO, Vector[EvaluatedPopulation[Indicator]]](Vector.empty)
         validated <- Ref.of[IO, Vector[Indicator]](Vector.empty)
-        operators <- IndicatorSearchOperators.make[IO](space, aliases)
+        operators <- IndicatorSearchFixture.operators(TestStrategy(template, TradeStrategy(Nil, Nil)), aliases, Set(template))
         species   <- SpeciesOperators.make[IO, Indicator](IndicatorDistance.make(space))
         evaluator <- Evaluator.cached[IO, Indicator](individual => IO.pure(individual -> score(individual)))
         validator <- Validator.speciesShortlisted[IO, Indicator](

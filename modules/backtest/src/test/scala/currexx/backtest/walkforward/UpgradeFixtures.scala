@@ -1,15 +1,15 @@
 package currexx.backtest.walkforward
 
 import currexx.backtest.DataWindow
-import currexx.backtest.optimizer.indicator.*
+import currexx.backtest.optimizer.*
 import currexx.domain.market.CurrencyPair
-import currexx.domain.signal.Indicator
+import currexx.backtest.TestStrategy
 import eu.timepit.refined.types.numeric.PosBigDecimal
 
 import java.time.{Instant, YearMonth}
 
 private[walkforward] object UpgradeFixtures:
-  def evidence(indicator: Indicator, net: BigDecimal = 400): SelectionEvidence = SelectionEvidence
+  def evidence(indicator: TestStrategy, net: BigDecimal = 400): SelectionEvidence = SelectionEvidence
     .from(
       candidate = indicator,
       coverage = Map(
@@ -31,7 +31,7 @@ private[walkforward] object UpgradeFixtures:
     .toOption
     .get
 
-  def approved(base: Indicator, candidate: Indicator): UpgradeDecision.Approved =
+  def approved(base: TestStrategy, candidate: TestStrategy): UpgradeDecision.Approved =
     val original   = evidence(base)
     val challenger = evidence(candidate, 500)
     UpgradeDecision.Approved(

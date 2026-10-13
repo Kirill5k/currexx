@@ -5,8 +5,17 @@ import currexx.algorithms.Parameters
 import currexx.backtest.{MarketDataProvider, TestStrategy}
 import currexx.backtest.MarketDataProvider.Dataset
 import currexx.backtest.optimizer.ScoringFunction
-import currexx.backtest.optimizer.indicator.{OptimisationRound, SearchObjectiveConfig, UpgradeDecision, UpgradeFailure, UpgradeRejection}
+import currexx.backtest.optimizer.{
+  NamedStrategy,
+  OptimisationRound,
+  OptimisationTarget,
+  SearchObjectiveConfig,
+  UpgradeDecision,
+  UpgradeFailure,
+  UpgradeRejection
+}
 import currexx.core.trade.TradeStrategy
+import currexx.backtest.optimizer.strategy.{RuleParameterBounds, RuleTarget}
 import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation}
 import fs2.io.file.Path
 import io.circe.Json
@@ -24,7 +33,13 @@ class WalkForwardReportSpec extends IOWordSpec {
     Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SMA(10)),
     TradeStrategy(Nil, Nil)
   )
-  private val round      = OptimisationRound("report", strategy, Parameters.GA(2, 0, 0.7, 0.1, 0.02, false), ScoringFunction.Consistent())
+  private val round = OptimisationRound(
+    "report",
+    strategy,
+    Parameters.GA(2, 0, 0.7, 0.1, 0.02, false),
+    ScoringFunction.Consistent(),
+    target = OptimisationTarget.Indicator
+  )
   private val source     = "eur-usd-1h-walk-forward-full.csv"
   private val experiment = WalkForwardExperiment("report-test", round, 42L, List(Dataset(source)), WalkForwardPlan.default.toOption.get)
   private val window     = experiment.plan.windows.head
@@ -32,7 +47,7 @@ class WalkForwardReportSpec extends IOWordSpec {
     WindowReadiness(window, List(PeriodReadiness("training fold 1", window.trainingFolds.head, "EUR/USD", 120, 0, 99)))
   )
   private val selection =
-    FrozenSelection(strategy, Some(0.5), Some(0.2), UpgradeDecision.RetainBase(Nil), UpgradeFixtures.evidence(strategy.indicator))
+    FrozenSelection(strategy, Some(0.5), Some(0.2), UpgradeDecision.RetainBase(Nil), UpgradeFixtures.evidence(strategy))
   private val base     = ForwardMetrics(100, 4, 10, 1, Some(BigDecimal(2)), 3, 10000)
   private val coverage = PeriodCoverage("EUR/USD", Instant.EPOCH, Instant.EPOCH.plusSeconds(3600), Instant.EPOCH.plusSeconds(7200), 0)
   private def result(index: Int, difference: Int, outcome: SelectionOutcome = SelectionOutcome.UpgradeApproved): WindowResult =
@@ -40,7 +55,7 @@ class WalkForwardReportSpec extends IOWordSpec {
       experiment.plan.windows(index - 1),
       experiment.plan.windows(index - 1).seed(experiment.masterSeed),
       selection.copy(decision = outcome match
-        case SelectionOutcome.UpgradeApproved => UpgradeFixtures.approved(strategy.indicator, strategy.indicator)
+        case SelectionOutcome.UpgradeApproved => UpgradeFixtures.approved(strategy, strategy)
         case SelectionOutcome.BaseRetained    => UpgradeDecision.RetainBase(Nil)),
       ForwardResult(base.copy(netProfit = base.netProfit + difference), base, List(coverage))
     )
@@ -61,7 +76,7 @@ class WalkForwardReportSpec extends IOWordSpec {
   "WalkForwardReportRenderer" should {
     "record full strategies, explicit configuration and chronology in the manifest" in {
       val manifest = WalkForwardReportRenderer.manifest(experiment, List(source -> "a" * 64)).hcursor
-      manifest.get[Int]("formatVersion") mustBe Right(2)
+      manifest.get[Int]("formatVersion") mustBe Right(3)
       manifest.downField("search").downField("objective").get[String]("mode") mustBe Right("Current")
       manifest.downField("search").downField("upgradePolicy").get[Int]("minMonths") mustBe Right(3)
       manifest.get[String]("evidence") mustBe Right("retrospective development evidence")
@@ -74,10 +89,39 @@ class WalkForwardReportSpec extends IOWordSpec {
       manifest.downField("schedule").focus.flatMap(_.asArray).get must have size 5
       manifest.downField("sourceFiles").downArray.get[String]("sha256") mustBe Right("a" * 64)
       val frozen = WalkForwardReportRenderer.frozen(window, 42L, selection).hcursor
-      frozen.get[Int]("formatVersion") mustBe Right(2)
+      frozen.get[Int]("formatVersion") mustBe Right(3)
       frozen.downField("selection").downField("strategy").focus mustBe Some(strategy.asJson)
       frozen.downField("selection").downField("upgradeDecision").get[String]("outcome") mustBe Right("BASE RETAINED")
       frozen.downField("selection").downField("baseEvidence").get[Int]("monthsCovered") mustBe Right(4)
+    }
+
+    "record the search target, complete seeds and exact rule bounds" in {
+      val bounds     = RuleParameterBounds(numeric = Map(RuleTarget.AtrStop -> RuleParameterBounds.DoubleRange(1.0, 8.0, 0.25)))
+      val configured =
+        round.copy(target = OptimisationTarget.Both, ruleBounds = bounds, extraSeeds = List(NamedStrategy("seed", strategy)))
+      val search = WalkForwardReportRenderer.manifest(experiment.copy(round = configured), Nil).hcursor.downField("search")
+      search.get[String]("target") mustBe Right("Both")
+      search.downField("extraSeeds").downArray.downField("strategy").focus mustBe Some(strategy.asJson)
+      val numeric = search.downField("ruleBounds").downField("numeric").downArray
+      numeric.downField("target").get[String]("kind") mustBe Right("AtrStop")
+      numeric.downField("range").get[Double]("step") mustBe Right(0.25)
+    }
+
+    "record the complete default preset together with the target and base" in {
+      OptimisationTarget.values.foreach { target =>
+        val configured = round.copy(strategy = TestStrategy.s10, target = target)
+        val search     = WalkForwardReportRenderer.manifest(experiment.copy(round = configured), Nil).hcursor.downField("search")
+        val numeric    = search.downField("ruleBounds").downField("numeric")
+        search.get[String]("target") mustBe Right(target.toString)
+        numeric.focus.flatMap(_.asArray).get.size mustBe 1
+        search.downField("ruleBounds").downField("durations").focus.flatMap(_.asArray).get.size mustBe 2
+        numeric.downArray.downField("target").get[String]("kind") mustBe Right("AtrStop")
+        val expected = RuleParameterBounds.default.numeric(RuleTarget.AtrStop)
+        numeric.downArray.downField("range").get[Double]("min") mustBe Right(expected.min)
+        numeric.downArray.downField("range").get[Double]("max") mustBe Right(expected.max)
+        numeric.downArray.downField("range").get[Double]("step") mustBe Right(expected.step)
+      }
+      succeed
     }
 
     "include every SCGA setting and effective species cap" in {
@@ -96,9 +140,9 @@ class WalkForwardReportSpec extends IOWordSpec {
     }
 
     "persist rejected comparisons and their exact policy reasons before forward evidence exists" in {
-      val approval  = UpgradeFixtures.approved(strategy.indicator, strategy.indicator)
+      val approval  = UpgradeFixtures.approved(strategy, strategy)
       val rejection = UpgradeRejection(
-        strategy.indicator,
+        strategy,
         approval.comparison,
         List(UpgradeFailure("net_improvement", "19.999", ">= 20"))
       )
@@ -126,7 +170,7 @@ class WalkForwardReportSpec extends IOWordSpec {
       report must include("| 43 | -10 | -5 | -10 | 0/2 | 1 |")
       report must include("| 42 | 20 | 20 | 20 | 1/1 | 1 |")
       val json = WalkForwardComparison.json(List(current, relative)).hcursor
-      json.get[Int]("formatVersion") mustBe Right(2)
+      json.get[Int]("formatVersion") mustBe Right(3)
       json.downField("runs").downArray.right.downField("objective").get[Double]("weight") mustBe Right(0.5)
     }
 

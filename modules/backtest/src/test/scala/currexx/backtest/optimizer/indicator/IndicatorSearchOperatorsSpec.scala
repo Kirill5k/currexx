@@ -20,7 +20,7 @@ class IndicatorSearchOperatorsSpec extends IOWordSpec {
       val space    = searchSpace(s10)
 
       val result = for
-        operators <- IndicatorSearchOperators.make[IO](space)
+        operators <- IndicatorSearchFixture.operators(s10)
         refining  <- operators.initialiser.initialisePopulation(s10.indicator, 100, shuffle = false)
         exploring <- operators.initialiser.initialisePopulation(s10.indicator, 100, shuffle = true)
       yield List(refining, exploring)
@@ -44,7 +44,7 @@ class IndicatorSearchOperatorsSpec extends IOWordSpec {
       val space    = searchSpace(s10)
 
       val result = for
-        operators <- IndicatorSearchOperators.make[IO](space)
+        operators <- IndicatorSearchFixture.operators(s10)
         unchanged <- operators.mutator.mutate(s10.indicator, 0.0)
         mutated   <- List.fill(40)(s10.indicator).traverse(operators.mutator.mutate(_, 1.0))
       yield (unchanged, mutated)
@@ -69,7 +69,7 @@ class IndicatorSearchOperatorsSpec extends IOWordSpec {
       }
 
       val result = for
-        operators <- IndicatorSearchOperators.make[IO](space)
+        operators <- IndicatorSearchFixture.operators(s10)
         forward   <- operators.crossover.cross(s10.indicator, sibling, 0.0)
         reverse   <- operators.crossover.cross(sibling, s10.indicator, 0.0)
         crossed   <- List.fill(30)((s10.indicator, sibling)).traverse { case (first, second) =>
@@ -101,7 +101,7 @@ class IndicatorSearchOperatorsSpec extends IOWordSpec {
       }
 
       val result = for
-        operators <- IndicatorSearchOperators.make[IO](space, List(sibling))
+        operators <- IndicatorSearchFixture.operators(s10, List(sibling))
         refining  <- operators.initialiser.initialisePopulation(s10.indicator, 100, shuffle = false)
         exploring <- operators.initialiser.initialisePopulation(s10.indicator, 100, shuffle = true)
       yield List(refining, exploring)
@@ -117,7 +117,6 @@ class IndicatorSearchOperatorsSpec extends IOWordSpec {
     }
 
     "give no extra clone share to seeds that differ only in an inactive tracker" in {
-      val space   = searchSpace(s5)
       val aliases = List(12, 25, 40).map { length =>
         replace(s5.indicator) { case Indicator.ValueTracking(ValueRole.Momentum, source, _) =>
           Indicator.ValueTracking(ValueRole.Momentum, source, VT.RSX(length))
@@ -127,7 +126,7 @@ class IndicatorSearchOperatorsSpec extends IOWordSpec {
       def initialise(extraSeeds: List[Indicator]): IO[Vector[Indicator]] = {
         given Random = Random(101)
         for
-          operators  <- IndicatorSearchOperators.make[IO](space, extraSeeds)
+          operators  <- IndicatorSearchFixture.operators(s5, extraSeeds)
           population <- operators.initialiser.initialisePopulation(s5.indicator, 100, shuffle = true)
         yield population
       }
@@ -147,7 +146,7 @@ class IndicatorSearchOperatorsSpec extends IOWordSpec {
       val space    = searchSpace(s5)
 
       val result = for
-        operators  <- IndicatorSearchOperators.make[IO](space)
+        operators  <- IndicatorSearchFixture.operators(s5)
         population <- operators.initialiser.initialisePopulation(s5.indicator, 100, shuffle = true)
         mutated    <- population.toList.traverse(operators.mutator.mutate(_, 1.0))
         crossed    <- mutated.traverse(operators.crossover.cross(_, s5.indicator, 1.0))
@@ -171,10 +170,8 @@ class IndicatorSearchOperatorsSpec extends IOWordSpec {
       val original = leaves(s10.indicator)
       val frozen   = Indicator.compositeAnyOf(original(0), original(1))
       val strategy = s10.copy(indicator = Indicator.compositeAnyOf(frozen, original.drop(2)*))
-      val space    = searchSpace(strategy, fixedIndicators = Set(frozen))
-
-      val result = for
-        operators  <- IndicatorSearchOperators.make[IO](space)
+      val result   = for
+        operators  <- IndicatorSearchFixture.operators(strategy, fixed = Set(frozen))
         population <- operators.initialiser.initialisePopulation(strategy.indicator, 80, shuffle = true)
         mutated    <- population.toList.traverse(operators.mutator.mutate(_, 1.0))
         crossed    <- mutated.traverse(operators.crossover.cross(_, strategy.indicator, 1.0))
@@ -192,14 +189,13 @@ class IndicatorSearchOperatorsSpec extends IOWordSpec {
 
     "return the template when all indicators are explicitly fixed" in {
       given Random = Random(8)
-      val space    = searchSpace(s10, fixedIndicators = Set(s10.indicator))
       val sibling  = replace(s10.indicator) {
         case Indicator.ValueTracking(ValueRole.Price, source, _) => Indicator.ValueTracking(ValueRole.Price, source, VT.SMA(67))
         case Indicator.TrendChangeDetection(source, _)           => Indicator.TrendChangeDetection(source, VT.JMA(50, -6, 1))
       }
 
       val result = for
-        operators  <- IndicatorSearchOperators.make[IO](space, List(sibling))
+        operators  <- IndicatorSearchFixture.operators(s10, List(sibling), Set(s10.indicator))
         population <- operators.initialiser.initialisePopulation(sibling, 30, shuffle = true)
         mutated    <- operators.mutator.mutate(sibling, 1.0)
         crossed    <- operators.crossover.cross(sibling, s10.indicator, 1.0)
@@ -220,7 +216,7 @@ class IndicatorSearchOperatorsSpec extends IOWordSpec {
       val invalid  = Indicator.TrendChangeDetection(ValueSource.Close, VT.SMA(20))
 
       val result = for
-        operators         <- IndicatorSearchOperators.make[IO](space, List(invalid))
+        operators         <- IndicatorSearchFixture.operators(s10, List(invalid))
         population        <- operators.initialiser.initialisePopulation(s10.indicator, 20, shuffle = true)
         badInitialisation <- operators.initialiser.initialisePopulation(invalid, 20, shuffle = true).attempt
         badMutation       <- operators.mutator.mutate(invalid, 0.0).attempt

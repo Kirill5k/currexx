@@ -2,8 +2,9 @@ package currexx.backtest
 
 import currexx.algorithms.{Fitness, Parameters}
 import currexx.backtest.optimizer.ScoringFunction
-import currexx.backtest.optimizer.indicator.{NamedIndicator, OptimisationRound, OptimisationRounds}
-import currexx.backtest.optimizer.indicator.reporting.OptimisationReportRenderer
+import currexx.backtest.optimizer.{NamedStrategy, OptimisationRound, OptimisationRounds, OptimisationSearchSpace, OptimisationTarget}
+import currexx.backtest.optimizer.reporting.OptimisationReportRenderer
+import currexx.backtest.optimizer.OptimisationSearchSpace.SeedDisposition
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -17,15 +18,46 @@ class OptimiserSpec extends AnyWordSpec with Matchers {
   )
 
   private def verdict(validation: Double, breaches: List[ScoringFunction.Violation]): List[String] =
-    OptimisationReportRenderer.verdict(reportRound, Vector((reportRound.strategy.indicator, Fitness(1.0), Fitness(validation))), breaches)
+    OptimisationReportRenderer.verdict(reportRound, Vector((reportRound.strategy, Fitness(1.0), Fitness(validation))), breaches)
 
   "Optimiser rounds" should {
+
+    "default every scheduled round to joint search with valid applicable rule bounds" in {
+      reportRound.target mustBe OptimisationTarget.Both
+      OptimisationRounds.rounds.foreach { round =>
+        withClue(s"${round.name}: ") {
+          round.target mustBe OptimisationTarget.Both
+          round.ruleBounds mustBe currexx.backtest.optimizer.strategy.RuleParameterBounds.default
+          OptimisationRounds.findByName(round.name) mustBe Right(round)
+          val search = OptimisationSearchSpace.forRound(round).fold(error => fail(error.getMessage), identity)
+          search.target mustBe OptimisationTarget.Both
+          search.indicatorParameterCount must be > 0
+          val ruleSearchFamilies = Set(TestStrategy.s10_optimized, TestStrategy.s10_v2, TestStrategy.s4_optimized_v2)
+          search.strategyParameterCount mustBe (if (ruleSearchFamilies.contains(round.strategy)) 1 else 0)
+          val resolved = search.resolveSeeds(round.extraSeeds.map(_.strategy)).toOption.get
+          resolved.map(_.disposition) mustBe List.fill(round.extraSeeds.size)(SeedDisposition.Accepted)
+        }
+      }
+      succeed
+    }
+
     "resolve a named preset and return an error for an unknown name" in {
       OptimisationRounds.findByName("s13_ga_refine").map(_.strategy) mustBe Right(TestStrategy.s13)
       OptimisationRounds.roundsByName("s13_ga_refine").parameters mustBe Optimiser.gaParameters
       val missing = OptimisationRounds.findByName("unknown-round").swap.toOption.get
       missing.getMessage must include("Unknown round 'unknown-round'")
       missing.getMessage must include("s13_ga_refine")
+    }
+
+    "retain all default walk-forward seed indicators under the configured base rules" in {
+      val round = OptimisationRounds.findByName(WalkForwardEvaluator.roundName).toOption.get
+      round.name mustBe "s5_optimized_v2_ga_refine"
+      val search   = OptimisationSearchSpace.forRound(round).toOption.get
+      val resolved = search.resolveSeeds(round.extraSeeds.map(_.strategy)).toOption.get
+      resolved.map(_.disposition) mustBe List.fill(3)(SeedDisposition.Accepted)
+      resolved.map(_.usedBaseRules) mustBe List(false, true, true)
+      resolved.foreach(_.effective.get.rules mustBe round.strategy.rules)
+      resolved.flatMap(_.effective).map(_.indicator).distinct must have size 3
     }
 
     "give every family two GA rounds and add SCGA only for enabled families" in {
@@ -67,24 +99,39 @@ class OptimiserSpec extends AnyWordSpec with Matchers {
 
     "search retained alternatives and reciprocal s6 parameters while retaining separate indicator families" in {
       val rounds = Optimiser.rounds.map(round => round.strategy -> round).toMap
-      rounds(TestStrategy.s2_optimized).extraSeeds mustBe List(NamedIndicator("s2_optimized_v2", TestStrategy.s2_optimized_v2.indicator))
-      rounds(TestStrategy.s10_optimized).extraSeeds mustBe List(NamedIndicator("s10", TestStrategy.s10.indicator))
+      rounds(TestStrategy.s2_optimized).extraSeeds mustBe List(NamedStrategy("s2_optimized_v2", TestStrategy.s2_optimized_v2))
+      rounds(TestStrategy.s10_optimized).extraSeeds mustBe List(NamedStrategy("s10", TestStrategy.s10))
       rounds(TestStrategy.s6_optimized).extraSeeds mustBe List(
-        NamedIndicator("s6", TestStrategy.s6.indicator),
-        NamedIndicator("s5_optimized_v2", TestStrategy.s5_optimized_v2.indicator),
-        NamedIndicator("s5_optimized_v3", TestStrategy.s5_optimized_v3.indicator)
+        NamedStrategy("s6", TestStrategy.s6),
+        NamedStrategy("s5_optimized_v2", TestStrategy.s5_optimized_v2),
+        NamedStrategy("s5_optimized_v3", TestStrategy.s5_optimized_v3)
       )
       rounds(TestStrategy.s5_optimized_v2).extraSeeds mustBe List(
-        NamedIndicator("s5_optimized_v3", TestStrategy.s5_optimized_v3.indicator),
-        NamedIndicator("s6", TestStrategy.s6.indicator),
-        NamedIndicator("s6_optimized", TestStrategy.s6_optimized.indicator)
+        NamedStrategy("s5_optimized_v3", TestStrategy.s5_optimized_v3),
+        NamedStrategy("s6", TestStrategy.s6),
+        NamedStrategy("s6_optimized", TestStrategy.s6_optimized)
       )
-      rounds(TestStrategy.s4_optimized_v2).extraSeeds mustBe List(NamedIndicator("s4_optimized_v1", TestStrategy.s4_optimized_v1.indicator))
+      rounds(TestStrategy.s4_optimized_v2).extraSeeds mustBe List(NamedStrategy("s4_optimized_v1", TestStrategy.s4_optimized_v1))
       rounds(TestStrategy.s10_v2).extraSeeds mustBe Nil
-      rounds(TestStrategy.s13).extraSeeds mustBe List(NamedIndicator("s13_optimized", TestStrategy.s13_optimized.indicator))
+      rounds(TestStrategy.s13).extraSeeds mustBe List(NamedStrategy("s13_optimized", TestStrategy.s13_optimized))
       rounds(TestStrategy.s1_v2_optimized).extraSeeds mustBe List(
-        NamedIndicator("s1_v2_optimized_v4", TestStrategy.s1_v2_optimized_v4.indicator)
+        NamedStrategy("s1_v2_optimized_v4", TestStrategy.s1_v2_optimized_v4)
       )
+
+      List(TestStrategy.s5_optimized_v2, TestStrategy.s6_optimized).foreach { strategy =>
+        val round     = rounds(strategy)
+        val both      = OptimisationSearchSpace.forRound(round).toOption.get
+        val indicator = OptimisationSearchSpace.forRound(round.copy(target = OptimisationTarget.Indicator)).toOption.get
+        val seeds     = round.extraSeeds.map(_.strategy)
+        val resolved  = both.resolveSeeds(seeds).toOption.get
+        resolved.map(_.disposition) mustBe List.fill(3)(SeedDisposition.Accepted)
+        resolved.map(_.effective) mustBe indicator.resolveSeeds(seeds).toOption.get.map(_.effective)
+        resolved.map(_.usedBaseRules) mustBe List(false, true, true)
+        resolved.filter(_.usedBaseRules).foreach { seed =>
+          seed.effective.get.rules mustBe strategy.rules
+          seed.reason.get must include("Using seed indicators with base rules")
+        }
+      }
     }
   }
 

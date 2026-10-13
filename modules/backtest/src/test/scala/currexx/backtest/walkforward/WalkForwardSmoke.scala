@@ -4,7 +4,7 @@ import cats.effect.{IO, IOApp}
 import cats.syntax.traverse.*
 import currexx.algorithms.Parameters
 import currexx.backtest.WalkForwardEvaluator
-import currexx.backtest.optimizer.indicator.OptimisationRounds
+import currexx.backtest.optimizer.OptimisationRounds
 import fs2.io.file.Path
 
 /** Preflight the configured history, then check its objective/seed matrix with a small separate search budget. */

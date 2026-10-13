@@ -10,17 +10,14 @@ import currexx.domain.signal.{Indicator, ValueTransformation as VT}
   * Bounds define coordinate scales, not repairs: finite values outside a search range retain their actual distance from that range.
   */
 object IndicatorDistance {
-  def make(space: IndicatorSearchSpace): Distance[Indicator] = new Distance[Indicator] {
-    private def project(indicator: Indicator): Either[IllegalArgumentException, Option[Indicator]] =
-      space.project(indicator).left.map {
-        case error: IllegalArgumentException => error
-        case error                           => new IllegalArgumentException(error.getMessage, error)
-      }
+  private[optimizer] def parameterCount(space: IndicatorSearchSpace): Int =
+    coordinates(space.projectedTemplate).size
 
+  def make(space: IndicatorSearchSpace): Distance[Indicator] = new Distance[Indicator] {
     override def between(a: Indicator, b: Indicator): Either[IllegalArgumentException, Double] =
       for
-        first  <- project(a)
-        second <- project(b)
+        first  <- space.project(a)
+        second <- space.project(b)
         left   <- coordinates(first).sequence
         right  <- coordinates(second).sequence
         _ <- Either.cond(left.size == right.size, (), new IllegalArgumentException("Indicator distance needs matching numeric schemas"))

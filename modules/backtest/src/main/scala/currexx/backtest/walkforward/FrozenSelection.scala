@@ -1,7 +1,7 @@
 package currexx.backtest.walkforward
 
 import currexx.backtest.TestStrategy
-import currexx.backtest.optimizer.indicator.{OptimisationResult, SelectionEvidence, UpgradeDecision}
+import currexx.backtest.optimizer.{OptimisationResult, SelectionEvidence, UpgradeDecision}
 
 enum SelectionOutcome:
   case UpgradeApproved, BaseRetained
@@ -21,12 +21,12 @@ final case class FrozenSelection(
 object FrozenSelection:
   /** Converts an already completed decision. Forward evaluation cannot apply another acceptance rule. */
   def fromResult(base: TestStrategy, result: OptimisationResult): FrozenSelection =
-    val indicator = result.decision match
+    val candidate = result.decision match
       case UpgradeDecision.Approved(candidate, _, _) => candidate
-      case UpgradeDecision.RetainBase(_)             => base.indicator
-    val fitness = result.finalists.find(_._1 == indicator)
+      case UpgradeDecision.RetainBase(_)             => base
+    val fitness = result.finalists.find(_._1 == candidate)
     FrozenSelection(
-      base.copy(indicator = indicator),
+      candidate,
       fitness.map(_._2.value),
       fitness.map(_._3.value),
       result.decision,

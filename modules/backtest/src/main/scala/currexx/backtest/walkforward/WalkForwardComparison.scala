@@ -1,6 +1,6 @@
 package currexx.backtest.walkforward
 
-import currexx.backtest.optimizer.indicator.reporting.UpgradeDecisionRenderer
+import currexx.backtest.optimizer.reporting.UpgradeDecisionRenderer
 import io.circe.Json
 import io.circe.syntax.*
 
@@ -15,6 +15,7 @@ object WalkForwardComparison:
       Json.obj(
         "experimentId"  -> run.experiment.id.asJson,
         "masterSeed"    -> run.experiment.masterSeed.asJson,
+        "target"        -> run.experiment.round.target.toString.asJson,
         "objective"     -> UpgradeDecisionRenderer.objective(run.experiment.round.searchObjective),
         "upgradePolicy" -> UpgradeDecisionRenderer.policy(run.experiment.round.upgradePolicy),
         "summary"       -> WalkForwardReportRenderer.summary(run.summary)
@@ -25,20 +26,20 @@ object WalkForwardComparison:
   def markdown(runs: List[Run]): String =
     val rows = runs.map { run =>
       val totals = run.summary
-      s"| [${run.experiment.id}](../${run.experiment.id}/report.md) | ${run.experiment.round.searchObjective} | " +
+      s"| [${run.experiment.id}](../${run.experiment.id}/report.md) | ${run.experiment.round.target} | ${run.experiment.round.searchObjective} | " +
         s"${run.experiment.masterSeed} | ${totals.totalNetDifference} | ${display(totals.medianNetDifference)} | " +
         s"${display(totals.worstNetDifference)} | ${totals.positiveWindows}/${totals.completedWindows} | ${totals.upgradeApprovedWindows} |"
     }
     (
       List(
-        "# Search objective comparison",
+        "# Optimisation comparison",
         "",
         s"**${WalkForwardReportRenderer.evidenceLabel}**. Reused history is development evidence, not independent confirmation.",
         "Each row uses separate search runs and fresh accounts. Differences compare the frozen strategy with the fixed original base.",
         "Freeze settings before a final test on new data. Approval qualifies a strategy for further evaluation; it does not deploy it.",
         "",
-        "| Experiment | Objective | Master seed | Total net difference | Median | Worst | Improved windows | Upgrades approved |",
-        "|---|---|---:|---:|---:|---:|---:|---:|"
+        "| Experiment | Target | Objective | Master seed | Total net difference | Median | Worst | Improved windows | Upgrades approved |",
+        "|---|---|---|---:|---:|---:|---:|---:|---:|"
       ) ++ rows ++ List("")
     ).mkString("\n")
 

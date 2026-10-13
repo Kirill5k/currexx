@@ -6,7 +6,7 @@ import currexx.algorithms.{Fitness, Parameters}
 import currexx.backtest.{MarketDataProvider, TestStrategy}
 import currexx.backtest.MarketDataProvider.Dataset
 import currexx.backtest.optimizer.ScoringFunction
-import currexx.backtest.optimizer.indicator.{OptimisationResult, OptimisationRound, UpgradeDecision}
+import currexx.backtest.optimizer.{OptimisationResult, OptimisationRound, OptimisationTarget, UpgradeDecision}
 import currexx.core.trade.{Rule, TradeAction, TradeStrategy}
 import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation as VT}
 import kirill5k.common.cats.test.IOWordSpec
@@ -17,17 +17,23 @@ class WalkForwardRunnerSpec extends IOWordSpec:
     TradeStrategy(List(Rule(TradeAction.OpenLong, Rule.Condition.NoPosition)), Nil)
   )
   private val candidate = base.copy(indicator = Indicator.TrendChangeDetection(ValueSource.Close, VT.SMA(20)))
-  private val round     = OptimisationRound("test", base, Parameters.GA(2, 0, 0.0, 0.0, 0.0, shuffle = false), ScoringFunction.Consistent())
-  private val plan      = WalkForwardPlan.validate(WalkForwardPlan.default.toOption.get.windows.take(2)).toOption.get
+  private val round     = OptimisationRound(
+    "test",
+    base,
+    Parameters.GA(2, 0, 0.0, 0.0, 0.0, shuffle = false),
+    ScoringFunction.Consistent(),
+    target = OptimisationTarget.Indicator
+  )
+  private val plan         = WalkForwardPlan.validate(WalkForwardPlan.default.toOption.get.windows.take(2)).toOption.get
   private val experiment   = WalkForwardExperiment("test-experiment", round, 42L, MarketDataProvider.majors1hHistory.take(1), plan)
-  private val finalists    = Vector((candidate.indicator, Fitness(2.0), Fitness(1.0)), (base.indicator, Fitness(1.0), Fitness(0.9)))
+  private val finalists    = Vector((candidate, Fitness(2.0), Fitness(1.0)), (base, Fitness(1.0), Fitness(0.9)))
   private val optimisation =
-    OptimisationResult(finalists, UpgradeFixtures.approved(base.indicator, candidate.indicator), UpgradeFixtures.evidence(base.indicator))
+    OptimisationResult(finalists, UpgradeFixtures.approved(base, candidate), UpgradeFixtures.evidence(base))
   private def metrics(net: Int): ForwardMetrics = ForwardMetrics(BigDecimal(net), 0, 0, 0, None, 0, 10000)
 
   "FrozenSelection" should {
     "convert the completed upgrade decision without applying another fitness gate" in {
-      val zeroScore = optimisation.copy(finalists = Vector((candidate.indicator, Fitness(2.0), Fitness(0.0))))
+      val zeroScore = optimisation.copy(finalists = Vector((candidate, Fitness(2.0), Fitness(0.0))))
       val frozen    = FrozenSelection.fromResult(base, zeroScore)
       frozen.strategy mustBe candidate
       frozen.strategy.rules mustBe base.rules
@@ -35,6 +41,19 @@ class WalkForwardRunnerSpec extends IOWordSpec:
       frozen.selectionFitness mustBe Some(0.0)
       frozen.decision mustBe optimisation.decision
       frozen.baseEvidence mustBe optimisation.base
+    }
+
+    "freeze changed rules even when the indicators are identical" in {
+      val changed = base.copy(rules = TradeStrategy(List(Rule(TradeAction.OpenShort, Rule.Condition.NoPosition)), Nil))
+      val result  = OptimisationResult(
+        Vector((changed, Fitness(1), Fitness(1))),
+        UpgradeFixtures.approved(base, changed),
+        UpgradeFixtures.evidence(base)
+      )
+      val frozen = FrozenSelection.fromResult(base, result)
+      frozen.strategy mustBe changed
+      frozen.strategy.rules must not be base.rules
+      frozen.strategy.indicator mustBe base.indicator
     }
 
     "retain the base when the policy rejects a candidate with positive fitness" in {
@@ -129,6 +148,33 @@ class WalkForwardRunnerSpec extends IOWordSpec:
           seed mustBe window.seed(42L)
         }
         succeed
+      }
+    }
+
+    OptimisationTarget.values.foreach { target =>
+      s"preserve $target settings and execute the complete frozen candidate in every window" in {
+        val changed = candidate.copy(rules = TradeStrategy(List(Rule(TradeAction.OpenShort, Rule.Condition.NoPosition)), Nil))
+        val result  = OptimisationResult(
+          Vector((changed, Fitness(1), Fitness(1))),
+          UpgradeFixtures.approved(base, changed),
+          UpgradeFixtures.evidence(base)
+        )
+        val search = new WindowSearch[IO]:
+          def search(request: OptimisationRound, seed: Long): IO[OptimisationResult] = IO {
+            request.target mustBe target
+            request.strategy mustBe base
+            result
+          }
+        val forward = new ForwardEvaluator[IO]:
+          def evaluate(selected: TestStrategy, original: TestStrategy, data: List[Dataset]): IO[ForwardResult] = IO {
+            selected mustBe changed
+            original mustBe base
+            ForwardResult(metrics(2), metrics(1), Nil)
+          }
+        val events = WalkForwardEvents[IO]((_, _, _) => IO.unit, _ => IO.unit, (_, _) => IO.unit, _ => IO.unit)
+        new WalkForwardRunner(search, forward, events)
+          .run(experiment.copy(round = round.copy(target = target)))
+          .asserting(results => results.map(_.selection.strategy) mustBe List.fill(plan.windows.size)(changed))
       }
     }
 

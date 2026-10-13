@@ -24,8 +24,10 @@ trait Tracker[F[_], I]:
     s"Breeding species: Count=${stats.sizes.size}, Parent sizes=${stats.sizes.mkString("[", ", ", "]")}, " +
       s"Offspring=${stats.offspringCounts.mkString("[", ", ", "]")}, Distinct parents=${stats.distinctCandidates}"
 
+  protected def individualText(individual: I): String = individual.toString
+
   private def memberMsg(idx: Int, individual: I, fitness: Fitness): String =
-    s"#${idx + 1}: $fitness - $individual"
+    s"#${idx + 1}: $fitness - ${individualText(individual)}"
 
   protected def membersMsg(population: EvaluatedPopulation[I], topN: Int): String =
     population
@@ -60,7 +62,7 @@ trait Tracker[F[_], I]:
     ("  rank  train#    training  validation  retained  individual" ::
       population.take(topN).toList.zipWithIndex.map { case ((individual, training, validation), idx) =>
         f"  ${idx + 1}%4d  ${ranks.indexOf(individual) + 1}%6d  ${training.value}%10.6f  ${validation.value}%10.6f  " +
-          f"${retainedMsg(training, validation)}%8s  $individual"
+          f"${retainedMsg(training, validation)}%8s  ${individualText(individual)}"
       }).mkString("\n")
 
   /** What the validated population says about the run as a whole, before anything is said about any one candidate.
@@ -124,9 +126,10 @@ object Tracker {
       showTopMember: Boolean = true,
       showTopN: Int = 1,
       showStats: Boolean = false,
-      finalTopN: Int = 25
+      finalTopN: Int = 25,
+      renderIndividual: I => String = (individual: I) => individual.toString
   ): F[Tracker[F, I]] =
-    LoggingTracker.make(label, logInterval, showTopMember, showTopN, showStats, finalTopN)
+    LoggingTracker.make(label, logInterval, showTopMember, showTopN, showStats, finalTopN, renderIndividual)
 
   def markdown[F[_]: Async, I](
       algorithmName: String,
@@ -135,9 +138,10 @@ object Tracker {
       showTopMember: Boolean = true,
       showTopN: Int = 1,
       showStats: Boolean = false,
-      finalTopN: Int = 25
+      finalTopN: Int = 25,
+      renderIndividual: I => String = (individual: I) => individual.toString
   ): F[Tracker[F, I]] =
-    MarkdownTracker.make(algorithmName, label, logInterval, showTopMember, showTopN, showStats, finalTopN)
+    MarkdownTracker.make(algorithmName, label, logInterval, showTopMember, showTopN, showStats, finalTopN, renderIndividual)
 
   def composite[F[_]: Monad, I](trackers: Tracker[F, I]*): Tracker[F, I] =
     CompositeTracker.make(trackers*)

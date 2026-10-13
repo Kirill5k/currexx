@@ -1,0 +1,672 @@
+package currexx.backtest.optimizer
+
+import currexx.algorithms.{EvaluatedPopulation, EvaluationPhase, Fitness, ValidatedPopulation}
+import currexx.algorithms.operators.Validator
+import currexx.backtest.{MarketDataProvider, OrderStats, TestStrategy}
+import currexx.backtest.MarketDataProvider.Corpus
+import currexx.backtest.optimizer.ScoringFunction
+import currexx.backtest.optimizer.reporting.{FoldDiagnostics, RunDiagnostics}
+import currexx.core.signal.{Signal, SignalDetector}
+import currexx.domain.market.MarketTimeSeriesData
+import currexx.domain.signal.{Indicator, ValueRole, ValueSource, ValueTransformation}
+import currexx.domain.user.UserId
+import cats.effect.{IO, Ref}
+import cats.syntax.apply.*
+import cats.syntax.foldable.*
+import cats.syntax.parallel.*
+import cats.syntax.traverse.*
+import kirill5k.common.cats.test.IOWordSpec
+
+import java.util.concurrent.atomic.AtomicInteger
+
+class OptimisationObjectiveSpec extends IOWordSpec {
+
+  private val strategy = TestStrategy.s12
+  private val scoring  = ScoringFunction.Robust()
+
+  /** The real split narrowed to one pair per segment, so these cases turn on the fold structure rather than on six files of each. */
+  private val corpus = Corpus(
+    searchFolds = MarketDataProvider.majors1hCorpus.searchFolds.map(fold => List(fold.head)),
+    validationFold = List(MarketDataProvider.majors1hCorpus.validationFold.head)
+  )
+
+  private def assembledValidator(
+      space: OptimisationSearchSpace,
+      objective: OptimisationObjective.Operators[IO],
+      validator: Validator[IO, TestStrategy],
+      size: Int
+  ): IO[Validator[IO, TestStrategy]] =
+    for {
+      baselines <- IO.fromEither(FinalistAssembler.protectedBaselines(space, Nil, size))
+      archive   <- SearchArchive.make[IO](size)
+      assembler = FinalistAssembler.ga(
+        space,
+        baselines,
+        objective.evaluator.evaluateIndividual(_, EvaluationPhase.Rescore)
+      )
+    } yield Optimisation.assemblingValidator(archive, assembler, validator)
+
+  "OptimisationObjective.make" should {
+
+    "cache complete candidates and execute each candidate's rules" in {
+      val noTrades       = strategy.copy(rules = currexx.core.trade.TradeStrategy(Nil, Nil))
+      val otherIndicator = noTrades.copy(indicator = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SMA(20)))
+      val result         = for {
+        diagnostics <- RunDiagnostics.make[IO]
+        objective   <- OptimisationObjective.make[IO](
+          corpus = corpus.copy(searchFolds = corpus.searchFolds.take(1)),
+          strategy = strategy,
+          poolSize = 1,
+          diagnostics = Some(diagnostics)
+        )
+        _ <- List(strategy, noTrades, otherIndicator, strategy).traverse_(
+          objective.evaluator.evaluateIndividual(_, EvaluationPhase.Rescore)
+        )
+        original <- objective.validate(strategy)
+        changed  <- objective.validate(noTrades)
+        snapshot <- diagnostics.snapshot
+      } yield (original, changed, snapshot)
+      result.asserting { case (original, changed, snapshot) =>
+        snapshot.uniqueComputedCandidates mustBe 3
+        snapshot.computationAttempts mustBe 3L
+        snapshot.cacheReuses mustBe 1L
+        original.map(_.total).sum must be > 0
+        changed.map(_.total).sum mustBe 0
+      }
+    }
+
+    "hand back a backtest that reproduces the run its fitness came from" in {
+      val result = for
+        objective <- OptimisationObjective.make[IO](
+          corpus = corpus,
+          strategy = strategy,
+          poolSize = 1,
+          scoringFunction = scoring
+        )
+        rescored <- objective.evaluator.evaluateIndividual(strategy, EvaluationPhase.Rescore)
+        searched <- objective.evaluator.evaluateIndividual(strategy, EvaluationPhase.Search(2))
+        stats    <- objective.backtest(strategy)
+      yield (rescored._2.value, searched._2.value, stats.map(scoring.score))
+
+      // The champion report re-runs the winner through this backtest to say whether it satisfies its constraints. If
+      // the replay were configured even slightly differently from the search it would be describing a different run,
+      // and the report would be confidently wrong about the candidate that is actually about to be used. Aggregating
+      // the replay the same way is part of that: the fitness is the folds combined, so a replay that reported one
+      // fold, or combined them differently, would not be the number selection sorted on.
+      //
+      // Which folds are combined is the phase's business, and the phase has to reach the aggregation for the rotation
+      // to mean anything at all: the two figures below come from the same cached fold scores and differ only in that one
+      // of them is not counting fold 2.
+      result.asserting { case (rescored, searched, foldScores) =>
+        rescored mustBe FoldAggregation.combine(foldScores)
+        searched mustBe FoldAggregation.combineExcluding(foldScores, Some(2))
+      }
+    }
+
+    "score every search fold rather than only the first" in {
+      // The whole of what folds buy is that a candidate has to hold up across several disjoint stretches, which is
+      // worth nothing if the evaluator quietly reads one of them. Each fold has to come back as its own run, over its
+      // own months, in the order the corpus offers them.
+      val result = for
+        objective <- OptimisationObjective.make[IO](
+          corpus = corpus,
+          strategy = strategy,
+          poolSize = 1,
+          scoringFunction = scoring
+        )
+        stats <- objective.backtest(strategy)
+      yield stats.flatMap(_.flatMap(_.dataWindow))
+
+      result.asserting { windows =>
+        windows must have size corpus.foldCount
+        windows.sliding(2).foreach {
+          case List(earlier, later) => earlier.to.isBefore(later.from) mustBe true
+          case _                    => succeed
+        }
+        succeed
+      }
+    }
+
+    "run the searched and the validated backtest over their own segments of the data" in {
+      // The point of the split is that a champion is ranked on months no candidate was ever scored against, so these
+      // two have to disagree about what period they are describing. Sharing a services pool is what makes that worth
+      // asserting: were the validation run to inherit any of the search runs' data the two would silently converge on
+      // the same answer, and selection would be ranking finalists on the sample that produced them.
+      val result = for
+        objective <- OptimisationObjective.make[IO](
+          corpus = corpus,
+          strategy = strategy,
+          poolSize = 1,
+          scoringFunction = scoring
+        )
+        trained   <- objective.backtest(strategy)
+        validated <- objective.validate(strategy)
+      yield (trained.flatMap(_.flatMap(_.dataWindow)), validated.flatMap(_.dataWindow))
+
+      result.asserting { case (trained, validated) =>
+        validated must have size 1
+        trained.map(_.to).max.isBefore(validated.head.from) mustBe true
+      }
+    }
+
+    "canonicalise before shortlisting and replay the same constrained strategy" in {
+      val target = TestStrategy.s5_optimized_v2
+      val alias  = target.copy(indicator = target.indicator match
+        case Indicator.Composite(children, combinator) =>
+          Indicator.Composite(
+            children.map {
+              case Indicator.ValueTracking(ValueRole.Momentum, source, _) =>
+                Indicator.ValueTracking(ValueRole.Momentum, source, ValueTransformation.RSX(40))
+              case child => child
+            },
+            combinator
+          )
+        case _ => fail("Expected s5 to be a composite"))
+      val alternative = target.copy(indicator = target.indicator match
+        case Indicator.Composite(children, combinator) =>
+          Indicator.Composite(
+            children.map {
+              case Indicator.ThresholdCrossing(source, transformation, _, lower) =>
+                Indicator.ThresholdCrossing(source, transformation, 70.0, lower)
+              case child => child
+            },
+            combinator
+          )
+        case _ => fail("Expected s5 to be a composite"))
+
+      val result = for
+        space     <- IO.fromEither(CandidateFixtures.space(target))
+        objective <- OptimisationObjective.make[IO](
+          corpus = corpus.copy(searchFolds = corpus.searchFolds.take(1)),
+          strategy = target,
+          poolSize = 1,
+          scoringFunction = scoring,
+          searchSpace = Some(space)
+        )
+        validator <- Validator.shortlisted[IO, TestStrategy](2, objective.validationObjective)
+        scoped    <- assembledValidator(space, objective, validator, 2)
+        finalists <- scoped.validate(
+          Vector(alias -> Fitness(3.0), target -> Fitness(2.0), alternative -> Fitness(1.0))
+        )
+        evaluated <- objective.evaluator.evaluateIndividual(alias, EvaluationPhase.Rescore)
+        replayed  <- objective.backtest(alias)
+        validated <- objective.validate(alias)
+      yield (finalists, evaluated, replayed.map(scoring.score), scoring.score(validated))
+
+      result.asserting { case (finalists, evaluated, replayed, validationScore) =>
+        alias must not be target
+        alternative must not be target
+        finalists.map(_._1).toSet mustBe Set(target, alternative)
+        evaluated._1 mustBe target
+        evaluated._2.value mustBe FoldAggregation.combine(replayed)
+        finalists.find(_._1 == target).map(_._3.value) mustBe Some(validationScore)
+      }
+    }
+
+    "assemble canonical distinct candidates before a configured validator reads validation evidence" in {
+      val target = TestStrategy.s5_optimized_v2
+      val alias  = target.copy(indicator = target.indicator match
+        case Indicator.Composite(children, combinator) =>
+          Indicator.Composite(
+            children.map {
+              case Indicator.ValueTracking(ValueRole.Momentum, source, _) =>
+                Indicator.ValueTracking(ValueRole.Momentum, source, ValueTransformation.RSX(40))
+              case child => child
+            },
+            combinator
+          )
+        case _ => fail("Expected s5 to be a composite"))
+      val alternative = target.copy(indicator = target.indicator match
+        case Indicator.Composite(children, combinator) =>
+          Indicator.Composite(
+            children.map {
+              case Indicator.ThresholdCrossing(source, transformation, _, lower) =>
+                Indicator.ThresholdCrossing(source, transformation, 70.0, lower)
+              case child => child
+            },
+            combinator
+          )
+        case _ => fail("Expected s5 to be a composite"))
+      val replayScoring = new ScoringFunction {
+        override def score(stats: List[OrderStats]): Double                               = stats.map(_.total.toDouble + 1.0).sum
+        override def violations(stats: List[OrderStats]): List[ScoringFunction.Violation] = Nil
+      }
+
+      val result = for
+        received      <- Ref.of[IO, Vector[EvaluatedPopulation[TestStrategy]]](Vector.empty)
+        callbackCalls <- Ref.of[IO, Int](0)
+        space         <- IO.fromEither(CandidateFixtures.space(target))
+        objective     <- OptimisationObjective.make[IO](
+          corpus = corpus.copy(searchFolds = corpus.searchFolds.take(1)),
+          strategy = target,
+          poolSize = 1,
+          scoringFunction = replayScoring,
+          searchSpace = Some(space)
+        )
+        validator = new Validator[IO, TestStrategy] {
+          override def validate(population: EvaluatedPopulation[TestStrategy]): IO[ValidatedPopulation[TestStrategy]] =
+            received.update(_ :+ population) *> population
+              .distinctBy(_._1)
+              .drop(1)
+              .take(1)
+              .toList
+              .traverse { case (individual, training) =>
+                callbackCalls
+                  .update(_ + 1) *> objective.validationObjective(individual).map(validation => (individual, training, validation))
+              }
+              .map(_.toVector)
+        }
+        scoped           <- assembledValidator(space, objective, validator, 2)
+        _                <- objective.evaluator.evaluateIndividual(alias, EvaluationPhase.Rescore)
+        beforeValidation <- (received.get, callbackCalls.get).tupled
+        finalists        <- scoped.validate(
+          Vector(alias -> Fitness(3.0), target -> Fitness(2.0), alternative -> Fitness(1.0))
+        )
+        replayed        <- objective.validate(alternative)
+        afterValidation <- (received.get, callbackCalls.get).tupled
+      yield (beforeValidation, finalists, replayed, afterValidation)
+
+      result.asserting { case (beforeValidation, finalists, replayed, afterValidation) =>
+        beforeValidation mustBe ((Vector.empty, 0))
+        afterValidation mustBe ((
+          Vector(Vector(target -> Fitness(3.0), alternative -> Fitness(1.0))),
+          1
+        ))
+        replayed must not be empty
+        finalists mustBe Vector((alternative, Fitness(1.0), Fitness(replayScoring.score(replayed))))
+      }
+    }
+
+    "return schema failures through every effectful entry point before starting candidate backtests" in {
+      val target      = TestStrategy.s5_optimized_v2
+      val invalid     = strategy.copy(indicator = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SMA(20)))
+      val signalCalls = new AtomicInteger(0)
+      val detector    = new SignalDetector {
+        override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal] = {
+          signalCalls.incrementAndGet()
+          None
+        }
+      }
+
+      val result = for
+        space       <- IO.fromEither(CandidateFixtures.space(target))
+        diagnostics <- RunDiagnostics.make[IO]
+        objective   <- OptimisationObjective.make[IO](
+          corpus = corpus.copy(searchFolds = corpus.searchFolds.take(1)),
+          strategy = target,
+          poolSize = 1,
+          signalDetector = detector,
+          scoringFunction = scoring,
+          searchSpace = Some(space),
+          diagnostics = Some(diagnostics)
+        )
+        validator <- Validator.shortlisted[IO, TestStrategy](1, objective.validationObjective)
+        scoped    <- assembledValidator(space, objective, validator, 1)
+        // Construction must succeed; only running each returned effect may fail with the schema error.
+        effects <- IO {
+          List(
+            objective.evaluator.evaluateIndividual(invalid, EvaluationPhase.Rescore).void,
+            objective.backtest(invalid).void,
+            objective.validate(invalid).void,
+            objective.validationObjective(invalid).void,
+            objective.selectionEvidence(invalid).void,
+            objective.inspect(invalid).void,
+            scoped
+              .validate(Vector(target -> Fitness(2.0), invalid -> Fitness(1.0)))
+              .void
+          )
+        }
+        failures <- effects.traverse(_.attempt)
+        snapshot <- diagnostics.snapshot
+      yield (failures, snapshot)
+
+      result.asserting { case (failures, snapshot) =>
+        failures.foreach {
+          case Left(error: IllegalArgumentException) => error.getMessage mustBe "Indicator does not match this round's search-space schema"
+          case other                                 => fail(s"Expected an effect containing a schema failure, got $other")
+        }
+        signalCalls.get() mustBe 0
+        snapshot mustBe RunDiagnostics.Snapshot()
+      }
+    }
+
+    "inspect the same fold results while keeping replay work separate from search and validation" in {
+      val smallCorpus                                        = corpus.copy(searchFolds = corpus.searchFolds.take(2))
+      def expected(stats: List[OrderStats]): FoldDiagnostics = {
+        val pooled = OrderStats.combine(stats)
+        FoldDiagnostics(
+          score = scoring.score(stats),
+          netProfit = pooled.totalProfit,
+          closedTrades = pooled.total,
+          forcedClosures = pooled.forcedClosureCount,
+          costs = pooled.totalCosts,
+          maxDrawdownPercent = pooled.maxDrawdownPercent,
+          violations = scoring.violations(stats)
+        )
+      }
+      val result = for
+        diagnostics <- RunDiagnostics.make[IO]
+        objective   <- OptimisationObjective.make[IO](
+          corpus = smallCorpus,
+          strategy = strategy,
+          poolSize = 1,
+          scoringFunction = scoring,
+          diagnostics = Some(diagnostics)
+        )
+        _             <- objective.evaluator.evaluateIndividual(strategy, EvaluationPhase.Search(0))
+        rescored      <- objective.evaluator.evaluateIndividual(strategy, EvaluationPhase.Rescore)
+        selected      <- objective.validationObjective(strategy)
+        before        <- diagnostics.snapshot
+        inspected     <- objective.inspect(strategy)
+        after         <- diagnostics.snapshot
+        rawSearch     <- objective.backtest(strategy)
+        rawValidation <- objective.validate(strategy)
+        afterDirect   <- diagnostics.snapshot
+      yield (rescored, selected, before, inspected, after, rawSearch, rawValidation, afterDirect)
+
+      result.asserting { case (rescored, selected, before, inspected, after, rawSearch, rawValidation, afterDirect) =>
+        inspected.candidate mustBe strategy
+        inspected.searchFolds mustBe rawSearch.map(expected)
+        inspected.validation mustBe Some(expected(rawValidation))
+        FoldAggregation.combine(inspected.searchFolds.map(_.score)) mustBe rescored._2.value
+        inspected.validation.map(_.score) mustBe Some(selected.value)
+        before.workloads(RunDiagnostics.Stage.Search) mustBe RunDiagnostics.Workload(2, 2, 2, 2, 2)
+        before.workloads(RunDiagnostics.Stage.Validation) mustBe RunDiagnostics.Workload(1, 1, 1, 1, 1)
+        before.workloads(RunDiagnostics.Stage.Reporting) mustBe RunDiagnostics.Workload()
+        after.workloads(RunDiagnostics.Stage.Search) mustBe before.workloads(RunDiagnostics.Stage.Search)
+        after.workloads(RunDiagnostics.Stage.Validation) mustBe before.workloads(RunDiagnostics.Stage.Validation)
+        after.workloads(RunDiagnostics.Stage.Reporting) mustBe RunDiagnostics.Workload(1, 2, 2, 2, 2)
+        after.firstSeen mustBe before.firstSeen
+        after.bestSeen mustBe before.bestSeen
+        after.computationAttempts mustBe 1L
+        after.cacheReuses mustBe 1L
+        afterDirect.workloads(RunDiagnostics.Stage.Validation) mustBe RunDiagnostics.Workload(2, 2, 2, 2, 2)
+        afterDirect.workloads(RunDiagnostics.Stage.Backtest) mustBe RunDiagnostics.Workload(1, 2, 2, 2, 2)
+        afterDirect.workloads(RunDiagnostics.Stage.Reporting) mustBe after.workloads(RunDiagnostics.Stage.Reporting)
+        afterDirect.workloads(RunDiagnostics.Stage.Search) mustBe after.workloads(RunDiagnostics.Stage.Search)
+        afterDirect.searchRequests mustBe after.searchRequests
+        afterDirect.rescoreRequests mustBe after.rescoreRequests
+        afterDirect.firstSeen mustBe after.firstSeen
+      }
+    }
+
+    "share compact selection evidence across canonical aliases, validation, and reporting" in {
+      val target = TestStrategy.s5_optimized_v2
+      val alias  = target.copy(indicator = target.indicator match
+        case Indicator.Composite(children, combinator) =>
+          Indicator.Composite(
+            children.map {
+              case Indicator.ValueTracking(ValueRole.Momentum, source, _) =>
+                Indicator.ValueTracking(ValueRole.Momentum, source, ValueTransformation.RSX(40))
+              case child => child
+            },
+            combinator
+          )
+        case _ => fail("Expected s5 to be a composite"))
+      val result = for
+        space       <- IO.fromEither(CandidateFixtures.space(target))
+        diagnostics <- RunDiagnostics.make[IO]
+        objective   <- OptimisationObjective.make[IO](
+          corpus = corpus.copy(searchFolds = corpus.searchFolds.take(1)),
+          strategy = target,
+          poolSize = 1,
+          searchSpace = Some(space),
+          diagnostics = Some(diagnostics)
+        )
+        shared    <- (objective.selectionEvidence(alias), objective.selectionEvidence(target)).parTupled
+        score     <- objective.validationObjective(alias)
+        before    <- diagnostics.snapshot
+        inspected <- objective.inspect(alias)
+        after     <- diagnostics.snapshot
+      yield (shared, score, before, inspected, after)
+
+      result.asserting { case ((first, second), score, before, inspected, after) =>
+        first mustBe second
+        first.candidate mustBe target
+        first.coverage.value.keySet mustBe Set(corpus.validationFold.head.currencyPair)
+        first.score.value mustBe score.value
+        before.workloads(RunDiagnostics.Stage.Validation) mustBe RunDiagnostics.Workload(3, 1, 1, 1, 1)
+        after.workloads(RunDiagnostics.Stage.Validation) mustBe before.workloads(RunDiagnostics.Stage.Validation)
+        inspected.validation.map(_.score) mustBe Some(first.score.value)
+        inspected.validation.map(_.netProfit) mustBe Some(first.netProfit)
+        after.workloads(RunDiagnostics.Stage.Reporting) mustBe RunDiagnostics.Workload(1, 1, 1, 1, 1)
+      }
+    }
+
+    "prepare each baseline fold once and report the actual relative score while keeping validation absolute" in {
+      val challenger = strategy.copy(indicator = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SMA(20)))
+      val mode       = SearchObjectiveConfig.BaselineRelative()
+      val quality    = new ScoringFunction {
+        override def score(stats: List[OrderStats]): Double                               = 1.0
+        override def violations(stats: List[OrderStats]): List[ScoringFunction.Violation] = Nil
+      }
+      val result = for
+        diagnostics <- RunDiagnostics.make[IO]
+        objective   <- OptimisationObjective.make[IO](
+          corpus = corpus.copy(searchFolds = corpus.searchFolds.take(2)),
+          strategy = strategy,
+          poolSize = 1,
+          scoringFunction = quality,
+          diagnostics = Some(diagnostics),
+          searchObjective = mode
+        )
+        prepared   <- diagnostics.snapshot
+        baseline   <- objective.evaluator.evaluateIndividual(strategy, EvaluationPhase.Rescore)
+        reused     <- diagnostics.snapshot
+        rescored   <- objective.evaluator.evaluateIndividual(challenger, EvaluationPhase.Rescore)
+        searched   <- objective.evaluator.evaluateIndividual(challenger, EvaluationPhase.Search(0))
+        validation <- objective.validationObjective(challenger)
+        inspected  <- objective.inspect(challenger)
+        baseStats  <- objective.backtest(strategy)
+        expected   <- baseStats.zip(inspected.searchFolds).traverse { case (stats, report) =>
+          IO.fromEither(SelectionEvidence.fromStats(strategy, stats.map(corpus.searchFolds.head.head.currencyPair -> _), quality))
+            .map(base => mode.adjust(1.0, report.netProfit, base, UpgradePolicyConfig()))
+        }
+      yield (prepared, baseline, reused, rescored, searched, validation, inspected, expected)
+
+      result.asserting { case (prepared, baseline, reused, rescored, searched, validation, inspected, expected) =>
+        prepared.workloads(RunDiagnostics.Stage.Search).foldCompleted mustBe 2L
+        prepared.workloads(RunDiagnostics.Stage.Search).pairCompleted mustBe 2L
+        reused.workloads(RunDiagnostics.Stage.Search).foldCompleted mustBe 2L
+        reused.workloads(RunDiagnostics.Stage.Search).pairCompleted mustBe 2L
+        reused.computationAttempts mustBe 1L
+        baseline._2.value mustBe 1.0
+        validation.value mustBe 1.0
+        inspected.validation.map(_.score) mustBe Some(1.0)
+        inspected.searchFolds.map(_.score) mustBe expected
+        rescored._2.value mustBe FoldAggregation.combine(expected)
+        searched._2.value mustBe FoldAggregation.combineExcluding(expected, Some(0))
+      }
+    }
+
+    "fail selection evidence when the corpus has no selection data" in {
+      val result = for
+        objective <- OptimisationObjective.make[IO](
+          corpus = Corpus(corpus.searchFolds.take(1)),
+          strategy = strategy,
+          poolSize = 1
+        )
+        evidence <- objective.selectionEvidence(strategy).attempt
+      yield evidence
+
+      result.asserting {
+        case Left(error: IllegalArgumentException) => error.getMessage mustBe "Selection data is required"
+        case other                                 => fail(s"Expected missing selection data to fail, got $other")
+      }
+    }
+
+    "leave validation absent in diagnostics when the corpus has no validation data" in {
+      val result = for
+        diagnostics <- RunDiagnostics.make[IO]
+        objective   <- OptimisationObjective.make[IO](
+          corpus = Corpus(corpus.searchFolds.take(1)),
+          strategy = strategy,
+          poolSize = 1,
+          scoringFunction = scoring,
+          diagnostics = Some(diagnostics)
+        )
+        inspected <- objective.inspect(strategy)
+        snapshot  <- diagnostics.snapshot
+      yield (inspected, snapshot)
+
+      result.asserting { case (inspected, snapshot) =>
+        inspected.searchFolds must have size 1
+        inspected.validation mustBe None
+        snapshot.workloads(RunDiagnostics.Stage.Reporting) mustBe RunDiagnostics.Workload(1, 1, 1, 1, 1)
+        snapshot.workloads(RunDiagnostics.Stage.Validation) mustBe RunDiagnostics.Workload()
+        snapshot.firstSeen mustBe empty
+      }
+    }
+  }
+
+  "FoldAggregation" should {
+
+    "refuse a candidate that earned nothing anywhere" in {
+      // The only absolute left. Earning in no fold at all is not a shape to be ranked below others, it is nothing.
+      FoldAggregation.combine(List(0.0, 0.0, 0.0)) mustBe 0.0
+      FoldAggregation.combine(List(0.0)) mustBe 0.0
+      FoldAggregation.combine(Nil) mustBe 0.0
+    }
+
+    "charge a failed fold heavily without pretending the rest did not happen" in {
+      // Until 2026-09-02 every one of these was exactly 0.0, so a candidate that earned in five folds of six ranked
+      // level with one that earned in none - and the s1_v2 and s2 lineages, which lose money in search folds 1 to 3 by
+      // record, were pinned there by construction. They have to be ordered, and ordered well below a clean sweep.
+      val clean     = FoldAggregation.combine(List.fill(6)(1.0))
+      val oneShort  = FoldAggregation.combine(0.0 :: List.fill(5)(1.0))
+      val twoShort  = FoldAggregation.combine(List.fill(2)(0.0) ++ List.fill(4)(1.0))
+      val fiveShort = FoldAggregation.combine(List.fill(5)(0.0) ++ List(1.0))
+
+      clean mustBe 1.0000 +- 0.0001
+      oneShort mustBe 0.4580 +- 0.0001
+      twoShort mustBe 0.2069 +- 0.0001
+      fiveShort mustBe 0.0116 +- 0.0001
+
+      val descending = List(clean, oneShort, twoShort, fiveShort)
+      descending.zip(descending.tail).forall((better, worse) => better > worse) mustBe true
+    }
+
+    "rank a barely-alive fold above a dead one" in {
+      // The regression that sank the first attempt at softening the cliff. Taking the mean over only the folds that
+      // earned something and discounting by how many did not scored [1.8, 0.0] at 0.225 and [1.8, 0.001] at 0.042, so
+      // the aggregate fell by a factor of five when a fold improved. Every fold has to be worth more alive than dead.
+      val dead  = FoldAggregation.combine(List(1.8, 0.0))
+      val alive = FoldAggregation.combine(List(1.8, 0.001))
+      val awake = FoldAggregation.combine(List(1.8, 0.1))
+
+      alive must be > dead
+      awake must be > alive
+    }
+
+    "keep a clean sweep ahead of a candidate that earned twice as much but missed a fold" in {
+      // The other failure of the filtered version, which scored the five-fold candidate 1.157 against the clean
+      // sweep's 1.000 - exactly the single-fitted-regime shape the aggregate exists to refuse.
+      val missedOne = FoldAggregation.combine(0.0 :: List.fill(5)(2.0))
+      val clean     = FoldAggregation.combine(List.fill(6)(1.0))
+
+      missedOne must be < clean
+    }
+
+    "still read the spread among the folds a candidate did earn in" in {
+      // The property the product was chosen for, kept under the ramp: having failed the same number of folds, one huge
+      // fold must not pay for a weak one.
+      val lumpy  = FoldAggregation.combine(List(0.0, 1.8, 0.2))
+      val steady = FoldAggregation.combine(List(0.0, 1.0, 1.0))
+
+      lumpy must be < steady
+    }
+
+    "prefer the balanced of two candidates that earned the same on average, at two folds as at three" in {
+      // Two folds is the case that matters, because it is the fewest the corpus can be cut into and it is where a
+      // counting statistic over folds stops discriminating: the profitable share can only be nought, a half or one,
+      // and a half of a fourfold advantage still wins. Both pairs below share an arithmetic mean, so only a rule that
+      // reads the spread can separate them.
+      val lumpyPair    = FoldAggregation.combine(List(0.8, 0.2))
+      val balancedPair = FoldAggregation.combine(List(0.5, 0.5))
+      val lumpyTriple  = FoldAggregation.combine(List(1.0, 0.4, 0.1))
+      val steadyTriple = FoldAggregation.combine(List(0.5, 0.5, 0.5))
+
+      // 0.4024 rather than the unshifted 0.4: `deadFoldFloor` lifts every score a little, and most where the folds are
+      // small and uneven. The ordering below is the assertion that matters; the level is recorded to catch a change in
+      // the shift itself.
+      lumpyPair mustBe 0.4024 +- 0.0001
+      balancedPair mustBe 0.5 +- 0.0001
+      lumpyPair must be < balancedPair
+      lumpyTriple must be < steadyTriple
+    }
+
+    "never let a single outstanding fold buy its way past a steady candidate" in {
+      // The regression this replaced: discounting the mean by the share of profitable folds scored the lumpy pair
+      // 0.675 against the steady pair's 0.450, so the shape being refused won the ranking outright at two folds. The
+      // earlier test only covered three folds, where the same rule happened to work, which is how it went unnoticed.
+      val lumpy  = FoldAggregation.combine(List(1.8, 0.0))
+      val steady = FoldAggregation.combine(List(0.45, 0.45))
+
+      lumpy must be < steady
+    }
+
+    "keep ranking candidates that are positive everywhere" in {
+      // The cliff is only reached on a fold worth exactly nothing, which ScoringFunction reserves for the genuinely
+      // disqualifying. Everywhere above it the aggregate has to stay strictly increasing, or selection loses the
+      // gradient it climbs.
+      val scores = List(List(0.2, 0.2), List(0.2, 0.4), List(0.4, 0.4), List(0.4, 0.8)).map(FoldAggregation.combine)
+
+      scores.foreach(_ must be > 0.0)
+      scores mustBe scores.sorted
+      scores.distinct must have size scores.size
+    }
+
+    "score an empty result as worthless rather than dividing by nothing" in {
+      FoldAggregation.combine(Nil) mustBe 0.0
+    }
+
+    "withhold nothing when asked to withhold nothing" in {
+      val scores = List(1.0, 0.5, 0.8, 0.2, 1.2, 0.9)
+      FoldAggregation.combineExcluding(scores, None) mustBe
+        FoldAggregation.combine(scores)
+    }
+
+    "leave the withheld fold out of the mean rather than scoring it as zero" in {
+      // Not the same as scoring it dead. A withheld fold does not reach `deadFoldFloor` either, or a rotation would cost every candidate
+      // most of its score once per orbit and selection would be reading the rotation rather than the candidates.
+      val scores = List(1.0, 0.0, 1.0, 1.0, 1.0, 1.0)
+      FoldAggregation.combineExcluding(scores, Some(1)) mustBe
+        FoldAggregation.combine(List(1.0, 1.0, 1.0, 1.0, 1.0))
+    }
+
+    "let a candidate off the fold it failed only on the generation that fold is withheld" in {
+      val scores  = List(1.0, 0.0, 1.0, 1.0, 1.0, 1.0)
+      val hidden  = FoldAggregation.combineExcluding(scores, Some(1))
+      val counted = FoldAggregation.combineExcluding(scores, Some(0))
+
+      hidden must be > counted
+    }
+  }
+
+  "A FoldRotatingEvaluator" should {
+
+    def over(foldCount: Int) = FoldRotatingEvaluator[IO](_ => IO.pure(Nil), foldCount)
+
+    "count every fold when the finished population is re-scored" in {
+      // The figure a run reports, and the only one comparable with another run's. Withholding anything here would make the training column
+      // of two reports mean different things depending on which generation each of them happened to stop at.
+      over(6).withheldFold(EvaluationPhase.Rescore) mustBe None
+    }
+
+    "withhold a different fold each generation, wrapping round the corpus" in {
+      // A hundred generations against a fixed six folds is long enough to fit them thoroughly. Rotating means no candidate is ever ranked
+      // on the whole corpus during the search, so a shape that only works because of one regime loses the generations that hold it back.
+      val withheld = (0 to 13).toList.map(g => over(6).withheldFold(EvaluationPhase.Search(g)))
+
+      withheld.take(6) mustBe (0 to 5).toList.map(Some(_))
+      withheld(6) mustBe Some(0)
+      withheld(13) mustBe Some(1)
+    }
+
+    "read a corpus with nothing to spare in full" in {
+      // Withholding the only fold there is scores every candidate on nothing and ranks them all equal, which is worse than not rotating.
+      over(1).withheldFold(EvaluationPhase.Search(0)) mustBe None
+      over(0).withheldFold(EvaluationPhase.Search(3)) mustBe None
+    }
+  }
+}

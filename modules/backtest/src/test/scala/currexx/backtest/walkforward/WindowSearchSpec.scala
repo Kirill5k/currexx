@@ -5,9 +5,9 @@ import currexx.algorithms.Parameters
 import currexx.backtest.{OrderStats, TestStrategy}
 import currexx.backtest.MarketDataProvider.{Corpus, Dataset, DateRange}
 import currexx.backtest.optimizer.ScoringFunction
-import currexx.backtest.optimizer.indicator.OptimisationRound
+import currexx.backtest.optimizer.{OptimisationRound, OptimisationTarget}
 import currexx.core.trade.{Rule, TradeAction, TradeStrategy}
-import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation as VT}
+import currexx.domain.signal.{Direction, Indicator, ValueSource, ValueTransformation as VT}
 import fs2.io.file.{Files, Path}
 import kirill5k.common.cats.test.IOWordSpec
 
@@ -57,10 +57,30 @@ class WindowSearchSpec extends IOWordSpec {
       Parameters.SCGA.from(ga).copy(speciesRadius = 0.1, maxSpecies = 2, interspeciesMatingProbability = 0.2)
     )
 
-    parameters.foreach { params =>
-      s"reproduce ${params.name} search and selection when the same effect is run after another seed" in {
-        val label    = s"walk-forward-${params.name.toLowerCase}-${UUID.randomUUID()}"
-        val round    = OptimisationRound(label, strategy, params, scoring, corpus, shortlistSize = 3)
+    val withoutNumericRules = strategy.copy(rules =
+      strategy.rules.copy(
+        closeRules = List(Rule(TradeAction.ClosePosition, Rule.Condition.TrendChangedTo(Direction.Downward)))
+      )
+    )
+    val searches = OptimisationTarget.values.toList.map(_ -> strategy) :+ (OptimisationTarget.Both -> withoutNumericRules)
+
+    (for {
+      params             <- parameters
+      (target, template) <- searches
+    } yield (params, target, template)).foreach { case (params, target, template) =>
+      val fixedRules    = template == withoutNumericRules
+      val configuration = if (fixedRules) "no tunable rule parameters" else "default bounds"
+      s"reproduce ${params.name} $target search with $configuration when the same effect is run after another seed" in {
+        val label = s"walk-forward-${params.name.toLowerCase}-$target-${UUID.randomUUID()}"
+        val round = OptimisationRound(
+          label,
+          template,
+          params,
+          scoring,
+          corpus,
+          shortlistSize = 3,
+          target = target
+        )
         val search   = WindowSearch.make[IO](poolSize = 2)
         val repeated = search.search(round, seed = 91L)
         val result   = (for {
@@ -72,9 +92,16 @@ class WindowSearchSpec extends IOWordSpec {
         result.asserting { case (first, again) =>
           first.finalists must not be empty
           first.finalists.size must be <= 3
-          first.finalists.map(_._1) must contain(strategy.indicator)
+          first.finalists.map(_._1) must contain(template)
           again mustBe first
-          first.finalists.foreach { case (_, training, selection) =>
+          if (fixedRules) FrozenSelection.fromResult(template, first).strategy.rules mustBe template.rules
+          else succeed
+          first.finalists.foreach { case (candidate, training, selection) =>
+            target match
+              case OptimisationTarget.Indicator          => candidate.rules mustBe template.rules
+              case OptimisationTarget.Strategy           => candidate.indicator mustBe template.indicator
+              case OptimisationTarget.Both if fixedRules => candidate.rules mustBe template.rules
+              case OptimisationTarget.Both               => succeed
             training.value must be > 0.0
             selection.value must be > 0.0
           }

@@ -3,11 +3,19 @@
 Open `currexx.backtest.WalkForwardEvaluator` and edit the settings at the top of
 the object, then run it directly from the IDE. No program arguments are needed.
 
-The configured experiment compares two search objectives for one fixed strategy:
+Each window uses the selected round's optimisation target. Set that target to
+`Indicator`, `Strategy` or `Both` in `OptimisationRounds`. The default is `Both`.
+The complete selected indicators and rules are frozen before the forward test.
+See [Configure optimisation](OPTIMISATION.md) for rule bounds, defaults, input
+checks, seed compatibility and scheduled rounds. Each window uses these same
+rules. The manifest records the configured bounds and complete base strategy.
+
+The default experiment compares two search objectives for one fixed base strategy:
 
 | Setting | Value |
 |---|---|
 | Round | `s5_optimized_v2_ga_refine` |
+| Target | `Both` |
 | Search objectives | `Current`, `BaselineRelative(weight = 0.5)` |
 | Master seeds | `42L`, `43L`, `44L` |
 | History | `MarketDataProvider.majors1hHistory`: six major currency pairs, hourly bars |
@@ -18,15 +26,16 @@ This is **six experiments and 30 independent searches**: two objectives × three
 master seeds × five windows. Runs execute sequentially; each search uses the
 configured evaluator pool. A full matrix can be expensive.
 
-Only the search objective and master seed vary. The existing refinement preset
+Only the search objective and master seed vary. The refinement preset
 keeps a population of 300, 150 generations, crossover probability 0.7, mutation
 probability 0.1, elitism ratio 0.02, `shuffle = false`, and shortlist size 25.
-`ScoringFunction.Consistent()`, extra seeds (`s5_optimized_v3`, `s6`,
-`s6_optimized`), fixed inputs, execution costs, capital, and the `trial-v1` upgrade
-policy stay unchanged. Extra seeds supply compatible indicator parameters under
-the target's rules.
+`ScoringFunction.Consistent()`, fixed inputs, execution costs, capital, and the
+`trial-v1` upgrade policy are shared across these experiments. The round lists
+three complete named seeds: `s5_optimized_v3`, `s6`, and `s6_optimized`. The target
+selects their active components before compatibility and duplicate checks. The
+baseline report records which seeds were accepted or excluded and why.
 
-`BaselineRelative(0.5)` adjusts the existing training quality score according to
+`BaselineRelative(0.5)` adjusts the training quality score according to
 net improvement over the same base on the same fold. A zero quality score stays
 zero. Both objectives still use the same absolute selection fitness and upgrade
 requirements; changing the search objective does not relax approval.
@@ -81,7 +90,8 @@ new run to fail.
 
 The directory contains:
 
-- `manifest.json`: full settings, original strategy, dates, per-window seeds and
+- `manifest.json`: search target, configured rule bounds, complete seeds, full settings,
+  original strategy, dates, per-window seeds and
   SHA-256 fingerprints of the original CSV files.
 - `preflight.json`: per-period bar availability, warm-up loss and executable bars,
   written before any search.
@@ -90,12 +100,14 @@ The directory contains:
 - `summary.json` and `report.md`: completed-window summaries and experiment status.
 - `window-N-failure.json`: a failed stage, if the experiment stops.
 
-Window seeds use the recorded `walk-forward-v2` derivation: explicit month boundaries,
-including exclusive end months. Seeds no longer depend on the display format of a
-date range. They differ from the earlier `walk-forward-v1` derivation for the same
-master seed.
+Reports use format version `3`. Candidate evidence and decisions store the
+complete `TestStrategy`.
 
-Existing optimiser reports remain in `optimisation-results/`, labelled with the
+Window seeds use the recorded `walk-forward-v2` derivation: explicit month
+boundaries, including exclusive end months. The derivation is independent of
+the display format of a date range.
+
+Optimiser reports are written to `optimisation-results/`, labelled with the
 experiment and window. Failed experiments retain completed artifacts and stop;
 automatic resume is not supported.
 
@@ -144,8 +156,10 @@ a separate strategy preset. It performs two stages:
 2. **Reduced search matrix:** run both objectives and all three master seeds on
    the first two windows and first currency pair. This is six small experiments
    and 12 searches, each with population 6, one generation, elitism 0.5 and
-   shortlist size 6. The target, three named indicator seeds, scoring, costs and
-   upgrade policy remain configured as above.
+   shortlist size 6. The target, configured complete strategy seeds, scoring, costs
+   and upgrade policy remain configured as above. Seed compatibility and
+   deduplication still apply; each initial population must fit the base and all
+   distinct accepted seeds.
 
 Each experiment must complete both paired tests. A retained base must reproduce
 exactly zero forward net difference. The smoke writes experiment artifacts and

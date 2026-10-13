@@ -18,10 +18,13 @@ final class MarkdownTracker[F[_], I] private (
     showTopMember: Boolean,
     showTopN: Int,
     showStats: Boolean,
-    finalTopN: Int
+    finalTopN: Int,
+    renderIndividual: I => String
 )(using
     F: Async[F]
 ) extends Tracker[F, I]:
+
+  override protected def individualText(individual: I): String = renderIndividual(individual)
 
   override def displayInitial(target: I, params: Parameters[?]): F[Unit] =
     for
@@ -31,7 +34,7 @@ final class MarkdownTracker[F[_], I] private (
         s"""# ${params.displayName} Run${if (label.nonEmpty) s": $label" else ""}
            |
            |**Started at:** $now
-           |**Target:** $target
+           |**Target:** ${individualText(target)}
            |**Parameters:** $params
            |
            |## Progress
@@ -100,7 +103,7 @@ final class MarkdownTracker[F[_], I] private (
     population
       .take(topN)
       .zipWithIndex
-      .map { case ((individual, fitness), idx) => s"* #${idx + 1}: $fitness - `$individual`" }
+      .map { case ((individual, fitness), idx) => s"* #${idx + 1}: $fitness - `${individualText(individual)}`" }
       .mkString("\n")
 
   private def writeToFile(content: String, append: Boolean): F[Unit] =
@@ -124,11 +127,12 @@ object MarkdownTracker:
       showTopMember: Boolean = true,
       showTopN: Int = 1,
       showStats: Boolean = false,
-      finalTopN: Int = 25
+      finalTopN: Int = 25,
+      renderIndividual: I => String = (individual: I) => individual.toString
   ): F[Tracker[F, I]] =
     for
       now          <- Async[F].realTimeInstant
       startTimeRef <- Ref.of[F, Option[Instant]](None)
       labelSuffix = if (label.nonEmpty) s"-$label" else ""
       path        = Path("optimisation-results") / s"${algorithmName.toLowerCase}-optimisation-${Formatter.format(now)}$labelSuffix.md"
-    yield new MarkdownTracker[F, I](label, path, startTimeRef, logInterval, showTopMember, showTopN, showStats, finalTopN)
+    yield new MarkdownTracker[F, I](label, path, startTimeRef, logInterval, showTopMember, showTopN, showStats, finalTopN, renderIndividual)

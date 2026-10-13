@@ -1,6 +1,6 @@
 package currexx.backtest.walkforward
 
-import currexx.backtest.optimizer.indicator.{IndicatorOptimisation, OptimisationResult, OptimisationRound}
+import currexx.backtest.optimizer.{Optimisation, OptimisationResult, OptimisationRound}
 import cats.Parallel
 import cats.effect.Async
 import cats.syntax.flatMap.*
@@ -17,5 +17,5 @@ object WindowSearch:
       Async[F].defer {
         // The initialiser captures this generator during construction. Recreate it and every search cache on each execution.
         given Random = Random(seed)
-        IndicatorOptimisation.make[F](round, poolSize).flatMap(_.optimise)
+        Optimisation.make[F](round, poolSize).flatMap(_.optimise)
       }

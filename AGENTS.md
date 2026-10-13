@@ -179,6 +179,7 @@ Testing a strategy against historical set of data via Backtester: `sbt "backtest
 - Extensive use of Scala 3 enums for domain types
 - JSON codecs use circe-tagged-adt-codec for ADT serialization
 - Do not use `require` to check preconditions. Use `refined`, `Either`, or effect error helpers such as `F.raiseUnless` and `F.raiseWhen`. Keep effectful validation deferred.
+- Do not use `import cats.syntax.all.*`. Use individual imports where necessary.
 
 ## Database Schema
 

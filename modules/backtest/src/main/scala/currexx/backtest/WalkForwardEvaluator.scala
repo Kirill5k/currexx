@@ -1,6 +1,6 @@
 package currexx.backtest
 
-import currexx.backtest.optimizer.indicator.{OptimisationRounds, SearchObjectiveConfig}
+import currexx.backtest.optimizer.{OptimisationRounds, SearchObjectiveConfig}
 import currexx.backtest.types.given
 import currexx.backtest.walkforward.*
 import cats.effect.{IO, IOApp}

@@ -1,9 +1,8 @@
 package currexx.backtest.optimizer.indicator
 
 import cats.data.NonEmptyList
-import cats.syntax.traverse.*
 import currexx.backtest.TestStrategy
-import currexx.core.trade.Rule
+import currexx.backtest.optimizer.strategy.RuleInputs
 import currexx.domain.signal.{CombinationLogic, Indicator, ValueRole, ValueSource, ValueTransformation as VT}
 
 /** A round's searchable leaves, with fixed indicators retained in the evaluated strategy.
@@ -16,7 +15,7 @@ final class IndicatorSearchSpace private (
     val fixedIndicators: Set[Indicator],
     private val fixedPaths: Set[Vector[Int]]
 ) {
-  import IndicatorSearchSpace.{ResolvedSeed, SeedDisposition, sameSchema}
+  import IndicatorSearchSpace.sameSchema
 
   private def activeLeaves(indicator: Indicator, path: Vector[Int]): List[(Vector[Int], Indicator)] =
     if (fixedPaths.contains(path)) Nil
@@ -26,12 +25,14 @@ final class IndicatorSearchSpace private (
           children.toList.zipWithIndex.flatMap((child, index) => activeLeaves(child, path :+ index))
         case leaf => List(path -> leaf)
 
-  private val activeTemplate = activeLeaves(template, Vector.empty)
+  private val activeTemplate                                  = activeLeaves(template, Vector.empty)
+  private[indicator] val projectedTemplate: Option[Indicator] =
+    NonEmptyList.fromList(activeTemplate.map(_._2)).map(Indicator.Composite(_, CombinationLogic.Any))
 
   /** Compatibility is stricter than crossover: sources, roles, combinators and transformation kinds are part of the strategy. */
   def accepts(candidate: Indicator): Boolean = sameSchema(template, candidate)
 
-  def canonicalise(candidate: Indicator): Either[Throwable, Indicator] = {
+  def canonicalise(candidate: Indicator): Either[IllegalArgumentException, Indicator] = {
     def restoreFixed(original: Indicator, current: Indicator, path: Vector[Int]): Indicator =
       if (fixedPaths.contains(path)) original
       else
@@ -50,45 +51,15 @@ final class IndicatorSearchSpace private (
   }
 
   /** A flat chromosome keeps fixed leaves out of random draws, mutation, crossover and their bounds repair. */
-  def project(candidate: Indicator): Either[Throwable, Option[Indicator]] =
+  def project(candidate: Indicator): Either[IllegalArgumentException, Option[Indicator]] =
     canonicalise(candidate).map { canonical =>
       NonEmptyList
         .fromList(activeLeaves(canonical, Vector.empty).map(_._2))
         .map(Indicator.Composite(_, CombinationLogic.Any))
     }
 
-  /** Resolve every configured seed under this round's fixed values, preserving aliases for reporting. */
-  def resolveSeeds(extraSeeds: List[Indicator]): Either[Throwable, List[ResolvedSeed]] =
-    project(template).flatMap { target =>
-      extraSeeds.zipWithIndex
-        .foldLeft[Either[Throwable, (List[ResolvedSeed], Map[Option[Indicator], Int])]](Right((Nil, Map.empty))) {
-          case (acc, (seed, index)) =>
-            acc.flatMap { case (resolved, seen) =>
-              if (!accepts(seed)) Right((ResolvedSeed(index, None, SeedDisposition.Incompatible) :: resolved, seen))
-              else
-                for
-                  effective <- canonicalise(seed)
-                  projected <- project(effective)
-                yield {
-                  val disposition =
-                    if (projected == target) SeedDisposition.TargetDuplicate
-                    else seen.get(projected).fold[SeedDisposition](SeedDisposition.Accepted)(SeedDisposition.SeedDuplicate.apply)
-                  val firstIndex = seen.updatedWith(projected)(_.orElse(Some(index)))
-                  (ResolvedSeed(index, Some(effective), disposition) :: resolved, firstIndex)
-                }
-            }
-        }
-        .map(_._1.reverse)
-    }
-
-  /** Project compatible extra seeds, excluding the target's genes and duplicate projections. */
-  def projectSeeds(extraSeeds: List[Indicator]): Either[Throwable, List[Indicator]] =
-    resolveSeeds(extraSeeds).flatMap { resolved =>
-      resolved.filter(_.disposition == SeedDisposition.Accepted).flatMap(_.effective).traverse(project).map(_.flatten)
-    }
-
   /** Rebuild the full strategy before scoring or reporting; gene values are not repaired here. */
-  def restore(genes: Option[Indicator]): Either[Throwable, Indicator] = {
+  def restore(genes: Option[Indicator]): Either[IllegalArgumentException, Indicator] = {
     val parsed: Either[IllegalArgumentException, List[Indicator]] = genes match
       case None                                                      => Right(Nil)
       case Some(Indicator.Composite(children, CombinationLogic.Any)) => Right(children.toList)
@@ -115,13 +86,6 @@ final class IndicatorSearchSpace private (
 }
 
 object IndicatorSearchSpace {
-  enum SeedDisposition {
-    case Accepted, TargetDuplicate, Incompatible
-    case SeedDuplicate(index: Int)
-  }
-
-  final case class ResolvedSeed(index: Int, effective: Option[Indicator], disposition: SeedDisposition)
-
   def forStrategy(
       strategy: TestStrategy,
       fixedIndicators: Set[Indicator] = Set.empty
@@ -136,7 +100,8 @@ object IndicatorSearchSpace {
     if (unknown.nonEmpty)
       Left(new IllegalArgumentException(s"Unknown fixed indicators: ${unknown.toList.map(_.toString).sorted.mkString(", ")}"))
     else {
-      val readRoles = (strategy.rules.openRules ++ strategy.rules.closeRules).flatMap(rule => trackedRoles(rule.conditions)).toSet
+      val readRoles =
+        (strategy.rules.openRules ++ strategy.rules.closeRules).flatMap(rule => RuleInputs.trackedRoles(rule.conditions)).toSet
       val automatic: Set[Indicator] = allNodes.collect {
         case (_, tracker @ Indicator.ValueTracking(ValueRole.Price, ValueSource.Close, VT.SMA(1))) => tracker
         case (_, tracker @ Indicator.ValueTracking(role, _, _)) if !readRoles.contains(role)       => tracker
@@ -146,32 +111,6 @@ object IndicatorSearchSpace {
       Right(new IndicatorSearchSpace(strategy.indicator, fixed, fixedPaths))
     }
   }
-
-  // Keep exhaustive: new rule conditions must declare which tracked values they read before the optimiser can freeze unused roles.
-  private def trackedRoles(condition: Rule.Condition): Set[ValueRole] = condition match
-    case Rule.Condition.AllOf(conditions)          => conditions.flatMap(trackedRoles).toSet
-    case Rule.Condition.AnyOf(conditions)          => conditions.flatMap(trackedRoles).toSet
-    case Rule.Condition.Not(inner)                 => trackedRoles(inner)
-    case Rule.Condition.ValueIs(role, _, _)        => Set(role)
-    case Rule.Condition.MomentumIs(_)              => Set(ValueRole.Momentum)
-    case Rule.Condition.VelocityIs(_)              => Set(ValueRole.Velocity)
-    case Rule.Condition.VelocityIsBelow(_)         => Set(ValueRole.Velocity)
-    case Rule.Condition.VelocityCrossedLevel(_, _) => Set(ValueRole.Velocity)
-    case Rule.Condition.PriceMovedAgainstEntry(_)  => Set(ValueRole.Price, ValueRole.Volatility)
-    case Rule.Condition.TrendChangedTo(_)          => Set.empty
-    case Rule.Condition.TrendIs(_)                 => Set.empty
-    case Rule.Condition.TrendActiveFor(_)          => Set.empty
-    case Rule.Condition.CrossoverOccurred(_)       => Set.empty
-    case Rule.Condition.MomentumEntered(_)         => Set.empty
-    case Rule.Condition.MomentumIsIn(_)            => Set.empty
-    case Rule.Condition.PreviousVolatilityIs(_)    => Set.empty
-    case Rule.Condition.VolatilityIs(_)            => Set.empty
-    case Rule.Condition.PositionIs(_)              => Set.empty
-    case Rule.Condition.PositionOpenFor(_)         => Set.empty
-    case Rule.Condition.NoPosition                 => Set.empty
-    case Rule.Condition.UpperBandCrossed(_)        => Set.empty
-    case Rule.Condition.LowerBandCrossed(_)        => Set.empty
-    case Rule.Condition.PriceCrossedLine(_, _)     => Set.empty
 
   private def sameSchema(a: Indicator, b: Indicator): Boolean = (a, b) match
     case (Indicator.Composite(as, ac), Indicator.Composite(bs, bc)) =>

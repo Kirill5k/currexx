@@ -2,10 +2,8 @@ package currexx.backtest.optimizer.indicator
 
 import cats.effect.Sync
 import cats.syntax.flatMap.*
-import cats.syntax.functor.*
-import cats.syntax.traverse.*
-import currexx.algorithms.Population
 import currexx.algorithms.operators.Initialiser
+import currexx.backtest.optimizer.SeededPopulation
 import currexx.backtest.optimizer.indicator.bounds.{GeneBounds, IndicatorBounds, ThresholdBounds}
 import currexx.backtest.optimizer.indicator.bounds.GeneBounds.{DoubleRange, IntRange}
 import currexx.domain.signal.{Indicator, ValueTransformation as VT}
@@ -14,32 +12,11 @@ import scala.util.Random
 
 object IndicatorInitialiser:
 
-  /** What a starting population is made of: copies of the seeds, jittered neighbours of them, and independent draws for the remainder.
-    *
-    * The radii are multiples of the mutator's own 10%-of-range step, so a jitter is a mutation held at a chosen distance rather than a
-    * separate kind of draw: one step out is a near neighbour, six is most of the way to an immigrant.
-    *
-    * @param cloneShare
-    *   a floor rather than the count. Every seed earns a place of its own however many are handed over.
-    * @param jitterShare
-    *   taken from what the clones leave, so a caller with more seeds than the population has room for still gets a population of the size
-    *   it asked for.
-    * @param jitterRadii
-    *   spread evenly over the jittered share, in whatever order they are given.
-    */
-  final private case class PopulationMix(cloneShare: Double, jitterShare: Double, jitterRadii: List[Double]):
-    require(cloneShare + jitterShare <= 1.0, s"clones and jitter cannot claim more than the whole population: $cloneShare + $jitterShare")
-    require(jitterRadii.nonEmpty, "a mix with a jitter share needs at least one radius to jitter by")
-
-  /** Searching for a shape the round does not have yet, so most of the population sits away from the seed. */
-  private val Exploring = PopulationMix(cloneShare = 0.15, jitterShare = 0.55, jitterRadii = List(1.0, 3.0, 6.0))
-
-  /** Refining a shape the round already believes in, so the population stays within a step of it - but not entirely, because a population
-    * that is nothing but its seed can only move as fast as mutation alone, and crossover between near-identical parents does nothing.
-    */
-  private val Refining = PopulationMix(cloneShare = 0.30, jitterShare = 0.60, jitterRadii = List(1.0))
-
   def make[F[_]](using F: Sync[F], rand: Random): F[Initialiser[F, Indicator]] = seeded(Nil)
+
+  /** Draw one projected indicator for a joint candidate; fixed leaves are restored by the caller's search space. */
+  private[optimizer] def randomise[F[_]](candidate: Indicator)(using F: Sync[F], rand: Random): F[Indicator] =
+    F.delay(IndicatorBounds.repair(randomiseInd(candidate)))
 
   /** The same population, with champions of the same shape mixed in alongside the round's own indicator. See
     * `OptimisationRound.extraSeeds`.
@@ -49,32 +26,12 @@ object IndicatorInitialiser:
     */
   def seeded[F[_]](extraSeeds: List[Indicator])(using F: Sync[F], rand: Random): F[Initialiser[F, Indicator]] =
     Initialiser.custom[F, Indicator] { (seed, size, shuffle) =>
-      buildPopulation(seed, extraSeeds, size, if (shuffle) Exploring else Refining)
+      val seeds = (seed +: extraSeeds.filter(sameShape(seed, _))).toVector
+      SeededPopulation.build(seeds, size, shuffle)(
+        (candidate, radius) => IndicatorMutator.scaled[F](radius).flatMap(_.mutate(candidate, 1.0)),
+        () => randomise[F](seed)
+      )
     }
-
-  private def buildPopulation[F[_]](
-      seed: Indicator,
-      extraSeeds: List[Indicator],
-      size: Int,
-      mix: PopulationMix
-  )(using
-      F: Sync[F],
-      rand: Random
-  ): F[Population[Indicator]] = {
-    // A seed that cannot be crossed with the target is a seed that fails the run the first time selection pairs it, so incompatible ones
-    // are dropped rather than trusted to the caller.
-    val seeds      = (seed +: extraSeeds.filter(sameShape(seed, _))).toVector
-    val clones     = math.min(size, math.max(seeds.size, (size * mix.cloneShare).toInt))
-    val jittered   = math.min(size - clones, (size * mix.jitterShare).toInt)
-    val immigrants = size - clones - jittered
-    val clonePop   = Vector.tabulate(clones)(i => seeds(i % seeds.size))
-    for
-      jitters   <- mix.jitterRadii.traverse(IndicatorMutator.scaled[F])
-      jitterPop <- Vector.range(0, jittered).traverse(i => jitters(i % jitters.size).mutate(seeds(i % seeds.size), 1.0))
-    // The draws are relationally correct by construction; repairing them anyway means the invariant is enforced in one place and a future
-    // change to a draw cannot quietly reintroduce a candidate the operators would have been forbidden to produce.
-    yield clonePop ++ jitterPop ++ Vector.fill(immigrants)(IndicatorBounds.repair(randomiseInd(seed)))
-  }
 
   /** Whether two indicators can be crossed. The question belongs to `IndicatorCrossover`, whose precondition it is, and is asked here
     * because a structural mismatch fails a whole run - so a hall-of-fame seed has to be checked before it enters the population.

@@ -6,14 +6,12 @@ import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import currexx.algorithms.Population
 import currexx.algorithms.operators.{Crossover, Initialiser, Mutator}
+import currexx.backtest.optimizer.{Checks, SeededPopulation}
 import currexx.domain.signal.Indicator
 
 import scala.util.Random
 
-/** Runs the numeric operators on searchable leaves only, then restores the full strategy before evaluation or reporting. Fixed inputs never
-  * enter mutation, interpolation, random draws or bounds repair. Keeping them in the restored indicator also keeps their signal emission
-  * and the original composite order intact.
-  */
+/** Apply numeric operators only to searchable leaves, then restore the original composite and fixed signal inputs. */
 final case class IndicatorSearchOperators[F[_]](
     initialiser: Initialiser[F, Indicator],
     crossover: Crossover[F, Indicator],
@@ -21,15 +19,15 @@ final case class IndicatorSearchOperators[F[_]](
 )
 
 object IndicatorSearchOperators {
-  def make[F[_]](space: IndicatorSearchSpace, extraSeeds: List[Indicator] = Nil)(using
+
+  /** The complete-candidate search has already resolved and deduplicated these projected seeds. */
+  private[optimizer] def fromProjectedSeeds[F[_]](space: IndicatorSearchSpace, seeds: List[Indicator])(using
       F: Sync[F],
       r: Random
   ): F[IndicatorSearchOperators[F]] =
     for
-      seeds       <- F.fromEither(space.projectSeeds(extraSeeds))
       initialiser <- IndicatorInitialiser.seeded[F](seeds)
-      crossover   <- IndicatorCrossover.make[F]
-      mutator     <- IndicatorMutator.make[F]
+      operators   <- variation[F](space)
     yield IndicatorSearchOperators(
       new Initialiser[F, Indicator] {
         override def initialisePopulation(seed: Indicator, populationSize: Int, shuffle: Boolean): F[Population[Indicator]] =
@@ -39,32 +37,63 @@ object IndicatorSearchOperators {
                 .initialisePopulation(genes, populationSize, shuffle)
                 .flatMap(_.traverse(g => F.fromEither(space.restore(Some(g)))))
             case None =>
-              F.pure(Vector.fill(populationSize)(space.template))
+              SeededPopulation
+                .build(Vector(space.template), populationSize, shuffle)((candidate, _) => F.pure(candidate), () => F.pure(space.template))
           }
       },
-      new Crossover[F, Indicator] {
-        override def cross(par1: Indicator, par2: Indicator)(using r: Random): F[Indicator] =
-          cross(par1, par2, 1.0)
+      operators.crossover,
+      operators.mutator
+    )
 
-        override def cross(par1: Indicator, par2: Indicator, crossoverProbability: Double)(using r: Random): F[Indicator] =
+  final private[optimizer] case class Variation[F[_]](crossover: Crossover[F, Indicator], mutator: Mutator[F, Indicator])
+
+  private[optimizer] def variation[F[_]](space: IndicatorSearchSpace)(using F: Sync[F]): F[Variation[F]] =
+    for
+      crossing <- IndicatorCrossover.make[F]
+      mutation <- IndicatorMutator.make[F]
+    yield Variation(
+      new Crossover[F, Indicator] {
+        private def projected(first: Indicator, second: Indicator)(cross: (Indicator, Indicator) => F[Indicator]): F[Indicator] =
           F.fromEither {
             for
-              first  <- space.project(par1)
-              second <- space.project(par2)
-            yield (first, second)
+              left  <- space.project(first)
+              right <- space.project(second)
+            yield (left, right)
           }.flatMap {
-            case (Some(first), Some(second)) =>
-              crossover.cross(first, second, crossoverProbability)(using r).flatMap(g => F.fromEither(space.restore(Some(g))))
-            case (None, None) => F.pure(space.template)
-            case _            => F.raiseError(new IllegalArgumentException("Parents have different searchable structures"))
+            case (Some(left), Some(right)) => cross(left, right).flatMap(result => F.fromEither(space.restore(Some(result))))
+            case (None, None)              => F.pure(space.template)
+            case _                         => F.raiseError(new IllegalArgumentException("Parents have different searchable structures"))
           }
+
+        override def cross(first: Indicator, second: Indicator)(using Random): F[Indicator] =
+          projected(first, second)(crossing.cross(_, _))
+        override def cross(first: Indicator, second: Indicator, probability: Double)(using Random): F[Indicator] =
+          projected(first, second)(crossing.cross(_, _, probability))
       },
       new Mutator[F, Indicator] {
-        override def mutate(ind: Indicator, mutationProbability: Double)(using r: Random): F[Indicator] =
-          F.fromEither(space.project(ind)).flatMap {
-            case Some(genes) => mutator.mutate(genes, mutationProbability)(using r).flatMap(g => F.fromEither(space.restore(Some(g))))
-            case None        => F.pure(space.template)
-          }
+        override def mutate(candidate: Indicator, probability: Double)(using Random): F[Indicator] =
+          change(space, candidate)(mutation.mutate(_, probability))
       }
     )
+
+  private[optimizer] def nearby[F[_]](space: IndicatorSearchSpace, candidate: Indicator, radius: Double)(using
+      F: Sync[F],
+      random: Random
+  ): F[Indicator] =
+    F.fromEither(Checks.scale(radius)).flatMap { _ =>
+      IndicatorMutator.scaled[F](radius).flatMap(underlying => change(space, candidate)(underlying.mutate(_, 1.0)))
+    }
+
+  private[optimizer] def randomise[F[_]](space: IndicatorSearchSpace, candidate: Indicator)(using
+      F: Sync[F],
+      random: Random
+  ): F[Indicator] = change(space, candidate)(IndicatorInitialiser.randomise[F])
+
+  private def change[F[_]](space: IndicatorSearchSpace, candidate: Indicator)(operation: Indicator => F[Indicator])(using
+      F: Sync[F]
+  ): F[Indicator] =
+    F.fromEither(space.project(candidate)).flatMap {
+      case Some(genes) => operation(genes).flatMap(result => F.fromEither(space.restore(Some(result))))
+      case None        => F.pure(space.template)
+    }
 }
