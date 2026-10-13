@@ -1,7 +1,7 @@
 package currexx.algorithms
 
 import cats.effect.IO
-import cats.syntax.all.*
+import cats.syntax.traverse.*
 import cats.~>
 import currexx.algorithms.operators.*
 import currexx.algorithms.operators.species.*

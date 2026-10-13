@@ -2,7 +2,9 @@ package currexx.backtest.optimizer
 
 import currexx.backtest.TestStrategy
 import cats.effect.IO
-import cats.syntax.all.*
+import cats.syntax.foldable.*
+import cats.syntax.parallel.*
+import cats.syntax.traverse.*
 import currexx.algorithms.Fitness
 import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation}
 import kirill5k.common.cats.test.IOWordSpec

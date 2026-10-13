@@ -6,7 +6,8 @@ import currexx.backtest.optimizer.ScoringFunction
 import currexx.backtest.optimizer.reporting.RunDiagnostics
 import currexx.domain.signal.{Indicator, ValueRole, ValueSource, ValueTransformation}
 import cats.effect.{Deferred, IO, Ref}
-import cats.syntax.all.*
+import cats.syntax.foldable.*
+import cats.syntax.traverse.*
 import kirill5k.common.cats.test.IOWordSpec
 
 import java.util.concurrent.ConcurrentLinkedQueue

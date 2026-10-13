@@ -1,7 +1,8 @@
 package currexx.algorithms.progress
 
 import cats.effect.{Async, Ref}
-import cats.syntax.all.*
+import cats.syntax.flatMap.*
+import cats.syntax.functor.*
 import currexx.algorithms.{Parameters, ValidatedPopulation}
 
 import java.time.Instant

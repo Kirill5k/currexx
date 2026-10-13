@@ -1,7 +1,7 @@
 package currexx.algorithms
 
 import cats.effect.{IO, IOApp, Ref}
-import cats.syntax.all.*
+import cats.syntax.foldable.*
 import currexx.algorithms.operators.*
 import currexx.algorithms.operators.species.{Distance, SpeciesOperators}
 import currexx.algorithms.progress.{Progress, Tracker}

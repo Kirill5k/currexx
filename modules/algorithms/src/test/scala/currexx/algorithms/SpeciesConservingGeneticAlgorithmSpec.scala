@@ -2,7 +2,8 @@ package currexx.algorithms
 
 import cats.effect.{IO, Ref}
 import cats.~>
-import cats.syntax.all.*
+import cats.syntax.apply.*
+import cats.syntax.traverse.*
 import currexx.algorithms.operators.{Crossover, Evaluator, Initialiser, Mutator, Validator}
 import currexx.algorithms.progress.{Progress, Tracker}
 import currexx.algorithms.operators.species.{Distance, SpeciesOperators, SpeciesStats}

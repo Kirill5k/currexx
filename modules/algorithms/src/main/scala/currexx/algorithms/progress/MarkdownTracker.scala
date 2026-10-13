@@ -1,7 +1,9 @@
 package currexx.algorithms.progress
 
 import cats.effect.{Async, Ref}
-import cats.syntax.all.*
+import cats.syntax.flatMap.*
+import cats.syntax.functor.*
+import cats.syntax.traverse.*
 import currexx.algorithms.{EvaluatedPopulation, Parameters, ValidatedPopulation}
 import fs2.Stream
 import fs2.io.file.{Files, Flags, Path}

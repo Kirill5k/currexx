@@ -1,7 +1,8 @@
 package currexx.algorithms.progress
 
 import cats.Monad
-import cats.syntax.all.*
+import cats.syntax.functor.*
+import cats.syntax.traverse.*
 import currexx.algorithms.{Parameters, ValidatedPopulation}
 
 final class CompositeTracker[F[_], I](

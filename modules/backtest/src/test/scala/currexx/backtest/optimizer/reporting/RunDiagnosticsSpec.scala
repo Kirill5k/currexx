@@ -3,7 +3,9 @@ package currexx.backtest.optimizer.reporting
 import currexx.backtest.TestStrategy
 import currexx.core.trade.{Rule, TradeAction, TradeStrategy}
 import cats.effect.IO
-import cats.syntax.all.*
+import cats.syntax.apply.*
+import cats.syntax.foldable.*
+import cats.syntax.parallel.*
 import currexx.algorithms.EvaluationPhase
 import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation}
 import kirill5k.common.cats.test.IOWordSpec

@@ -3,7 +3,8 @@ package currexx.core.market.db
 import cats.effect.{IO, Ref}
 import cats.effect.unsafe.IORuntime
 import cats.data.NonEmptyList
-import cats.syntax.all.*
+import cats.syntax.parallel.*
+import cats.syntax.traverse.*
 import currexx.core.{MockActionDispatcher, MongoSpec}
 import currexx.core.common.action.Action
 import currexx.core.common.db.Repository

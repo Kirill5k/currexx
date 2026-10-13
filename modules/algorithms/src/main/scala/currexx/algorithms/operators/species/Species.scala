@@ -1,7 +1,8 @@
 package currexx.algorithms.operators.species
 
 import cats.effect.Sync
-import cats.syntax.all.*
+import cats.syntax.flatMap.*
+import cats.syntax.functor.*
 import currexx.algorithms.{DistributedPopulation, EvaluatedPopulation, Fitness}
 
 /** Distance in the caller's search space. Equal candidates have zero distance; incompatible inputs or invalid distances return Left. */
