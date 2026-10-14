@@ -1,7 +1,7 @@
 package currexx.backtest
 
 import cats.effect.{IO, IOApp}
-import currexx.backtest.services.TestServices
+import currexx.backtest.services.{PeriodSimulation, TestServices}
 import currexx.core.signal.SignalDetector
 import fs2.Stream
 import org.typelevel.log4cats.Logger
@@ -22,13 +22,8 @@ object BatchBacktester extends IOApp.Simple {
       .parEvalMap(6) { dataset =>
         for
           settings = TestSettings.make(dataset.currencyPair, ts.rules, List(ts.indicator))
-          services <- TestServices.make[IO](settings)
-          _        <- MarketDataProvider
-            .read[IO](dataset)
-            .through(services.processMarketData(SignalDetector.pure))
-            .compile
-            .drain
-          orderStats <- services.getOrderStats(riskSettings)
+          services   <- TestServices.make[IO](settings)
+          orderStats <- PeriodSimulation.runStream(services, MarketDataProvider.read[IO](dataset), SignalDetector.pure, riskSettings)
         yield orderStats
       }
       .compile

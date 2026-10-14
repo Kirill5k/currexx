@@ -15,8 +15,15 @@ object PeriodSimulation:
       signalDetector: SignalDetector = SignalDetector.pure,
       riskSettings: RiskSettings = RiskSettings()
   ): F[OrderStats] =
-    Stream
-      .emits(data)
+    runStream(services, Stream.emits(data).covary[F], signalDetector, riskSettings)
+
+  private[backtest] def runStream[F[_]: Temporal](
+      services: TestServices[F],
+      data: Stream[F, MarketTimeSeriesData],
+      signalDetector: SignalDetector,
+      riskSettings: RiskSettings
+  ): F[OrderStats] =
+    data
       .through(services.processMarketData(signalDetector))
       .compile
       .drain

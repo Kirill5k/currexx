@@ -1,7 +1,7 @@
 package currexx.backtest
 
 import cats.effect.{ExitCode, IO, IOApp}
-import currexx.backtest.services.TestServices
+import currexx.backtest.services.{PeriodSimulation, TestServices}
 import currexx.core.signal.SignalDetector
 import currexx.domain.market.{CurrencyPair, TradeOrder as TO}
 import fs2.Stream
@@ -39,12 +39,7 @@ object StrategyAnalyser extends IOApp {
         val settings = TestSettings.make(cp, ts.rules, List(ts.indicator))
         for
           services <- TestServices.make[IO](settings)
-          _        <- MarketDataProvider
-            .read[IO](dataset)
-            .through(services.processMarketData(SignalDetector.pure))
-            .compile
-            .drain
-          stats <- services.getOrderStats(riskSettings)
+          stats    <- PeriodSimulation.runStream(services, MarketDataProvider.read[IO](dataset), SignalDetector.pure, riskSettings)
         yield cp -> stats
       }
       .compile

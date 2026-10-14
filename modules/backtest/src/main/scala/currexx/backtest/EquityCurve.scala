@@ -61,16 +61,22 @@ private[backtest] object EquityCurve {
         val closingEquity = curve.foldLeft(Map.empty[YearMonth, BigDecimal]) { (months, point) =>
           months.updated(YearMonth.from(point.time.atZone(ZoneOffset.UTC)), point.equity)
         }
-        Iterator
-          .iterate(first)(_.plusMonths(1))
-          .takeWhile(!_.isAfter(last))
-          .foldLeft(
-            (initialBalance, Map.empty[String, BigDecimal])
-          ) { case ((previous, profits), month) =>
-            val equity = closingEquity.getOrElse(month, previous)
-            (equity, profits.updated(month.toString, equity - previous))
-          }
-          ._2
+        profitsFromMonthEndEquity(closingEquity, initialBalance, first, last).map { case (month, profit) => month.toString -> profit }
     }
   }
+
+  def profitsFromMonthEndEquity(
+      closingEquity: Map[YearMonth, BigDecimal],
+      initialBalance: BigDecimal,
+      first: YearMonth,
+      last: YearMonth
+  ): Map[YearMonth, BigDecimal] =
+    Iterator
+      .iterate(first)(_.plusMonths(1))
+      .takeWhile(!_.isAfter(last))
+      .foldLeft((initialBalance, Map.empty[YearMonth, BigDecimal])) { case ((previous, profits), month) =>
+        val equity = closingEquity.getOrElse(month, previous)
+        (equity, profits.updated(month, equity - previous))
+      }
+      ._2
 }

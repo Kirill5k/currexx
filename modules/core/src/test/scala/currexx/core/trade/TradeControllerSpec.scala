@@ -145,6 +145,39 @@ class TradeControllerSpec extends HttpRoutesWordSpec {
       }
     }
 
+    "GET /trade/orders date validation" should {
+      "reject reversed dates before calling the service" in {
+        val svc = mock[TradeService[IO]]
+        val req = Request[IO](Method.GET, uri"/trade/orders?from=2020-12-31&to=2020-01-01").withAuthHeader()
+        val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        res mustHaveStatus (Status.UnprocessableContent, Some("""{"message":"Date 'from' must be before date 'to'"}"""))
+        verifyNoInteractions(svc)
+      }
+
+      List(
+        (
+          "equal dates",
+          uri"/trade/orders?from=2020-01-01&to=2020-01-01",
+          SearchParams(
+            Some(Instant.parse("2020-01-01T00:00:00Z")),
+            Some(Instant.parse("2020-01-01T00:00:00Z"))
+          )
+        ),
+        ("only an upper bound", uri"/trade/orders?to=2020-01-01", SearchParams(None, Some(Instant.parse("2020-01-01T00:00:00Z"))))
+      ).foreach { case (description, uri, expected) =>
+        s"accept $description" in {
+          val svc = mock[TradeService[IO]]
+          when(svc.getAllOrders(any[UserId], any[SearchParams])).thenReturnIO(Nil)
+          val req = Request[IO](Method.GET, uri).withAuthHeader()
+          val res = TradeController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+          res mustHaveStatus (Status.Ok, Some("[]"))
+          verify(svc).getAllOrders(Users.uid, expected)
+        }
+      }
+    }
+
     "GET /trade/orders/stats" should {
       "return order statistics" in {
         val svc   = mock[TradeService[IO]]

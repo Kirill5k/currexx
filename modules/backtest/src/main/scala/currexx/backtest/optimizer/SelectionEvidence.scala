@@ -1,6 +1,6 @@
 package currexx.backtest.optimizer
 
-import currexx.backtest.{DataWindow, OrderStats}
+import currexx.backtest.{DataWindow, EquityCurve, OrderStats}
 import currexx.backtest.types.{FiniteNonNegDouble, NonEmptyMap}
 import currexx.domain.market.CurrencyPair
 import currexx.backtest.TestStrategy
@@ -171,14 +171,7 @@ object SelectionEvidence {
         val month = if (point.time.isAfter(window.to)) last else YearMonth.from(point.time.atZone(ZoneOffset.UTC))
         months.updated(month, point.equity)
       }
-      Iterator
-        .iterate(first)(_.plusMonths(1))
-        .takeWhile(!_.isAfter(last))
-        .foldLeft((stats.initialBalance, Map.empty[YearMonth, BigDecimal])) { case ((previous, profits), month) =>
-          val equity = closingEquity.getOrElse(month, previous)
-          (equity, profits.updated(month, equity - previous))
-        }
-        ._2
+      EquityCurve.profitsFromMonthEndEquity(closingEquity, stats.initialBalance, first, last)
     }
   }
 

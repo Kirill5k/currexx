@@ -82,18 +82,7 @@ object Algorithm {
             _         <- Op.DisplayProgress(Progress.Population(i, params.maxGen, sortedPop)).freeM
           yield sortedPop
         }
-        // Scored once more on everything the objective has, because the ranking selection finished with was made under whatever reading
-        // that generation asked for, and a figure a run reports has to mean what another run's does. Re-sorting matters as much as
-        // re-scoring: `Op.ValidatePopulation` shortlists from the front, so a population rescored and left in its old order would spend
-        // the held-out evidence on candidates chosen by the numbers that were just replaced.
-        rescored <- Op.EvaluatePopulation(finalPop.map(_._1), EvaluationPhase.Rescore).freeM
-        ranked   <- Op.SortByFitness(rescored).freeM
-        // Validation is the last thing the run does and it happens exactly once, on the population selection has
-        // finished with. Anything earlier would be the search reading the held-out sample, which is the one thing that
-        // stops it being held out. Returning the validated population rather than the evaluated one is what makes a
-        // champion impossible to obtain without the reading that says whether it means anything.
-        validatedPop <- Op.ValidatePopulation(ranked).freeM
-        _            <- Op.DisplayFinal(validatedPop).freeM
+        validatedPop <- finish(finalPop.map(_._1))
       yield validatedPop
   }
 
@@ -125,12 +114,25 @@ object Algorithm {
             nextConserved <- Op.ConserveSpecies(nextSpecies, params.populationSize).freeM
           yield nextConserved
         }
-        rescored  <- Op.EvaluatePopulation(finalSpecies.population, EvaluationPhase.Rescore).freeM
-        ranked    <- Op.SortByFitness(rescored).freeM
-        validated <- Op.ValidatePopulation(ranked).freeM
-        _         <- Op.DisplayFinal(validated).freeM
+        validated <- finish(finalSpecies.population)
       yield validated
   }
+
+  private def finish[I](population: Population[I]): Free[Op[*, I], ValidatedPopulation[I]] =
+    for
+      // Scored once more on everything the objective has, because the ranking selection finished with was made under whatever reading
+      // that generation asked for, and a figure a run reports has to mean what another run's does. Re-sorting matters as much as
+      // re-scoring: `Op.ValidatePopulation` shortlists from the front, so a population rescored and left in its old order would spend
+      // the held-out evidence on candidates chosen by the numbers that were just replaced.
+      rescored <- Op.EvaluatePopulation(population, EvaluationPhase.Rescore).freeM
+      ranked   <- Op.SortByFitness(rescored).freeM
+      // Validation is the last thing the run does and it happens exactly once, on the population selection has
+      // finished with. Anything earlier would be the search reading the held-out sample, which is the one thing that
+      // stops it being held out. Returning the validated population rather than the evaluated one is what makes a
+      // champion impossible to obtain without the reading that says whether it means anything.
+      validated <- Op.ValidatePopulation(ranked).freeM
+      _         <- Op.DisplayFinal(validated).freeM
+    yield validated
 
   private def iterate[F[_], A](a: A, n: Int)(f: (A, Int) => Free[F, A]): Free[F, A] =
     LazyList.range(1, n + 1).foldLeft[Free[F, A]](Free.pure(a))((res, i) => res.flatMap(r => f(r, i)))

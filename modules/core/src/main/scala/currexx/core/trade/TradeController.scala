@@ -3,12 +3,10 @@ package currexx.core.trade
 import cats.syntax.applicative.*
 import cats.effect.Async
 import cats.effect.syntax.spawn.*
-import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import currexx.clients.broker.BrokerParameters
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema}
-import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, OrderExecution, TradeOrder}
 import io.circe.Codec
 import org.http4s.HttpRoutes
@@ -38,7 +36,7 @@ final private class TradeController[F[_]](
   private def getTradeOrders(using auth: Authenticator[F]) =
     getTradeOrdersEndpoint.withAuthenticatedSession
       .serverLogic { session => sp =>
-        (sp.from, sp.to).mapN((f, t) => F.raiseWhen(f.isAfter(t))(AppError.InvalidDateRange)).getOrElse(F.unit) >>
+        validateDateRange(sp) >>
           service
             .getAllOrders(session.userId, sp)
             .mapResponse(_.map(TradeOrderView.from))
@@ -47,7 +45,7 @@ final private class TradeController[F[_]](
   private def getOrderStats(using auth: Authenticator[F]) =
     getOrderStatsEndpoint.withAuthenticatedSession
       .serverLogic { session => sp =>
-        (sp.from, sp.to).mapN((f, t) => F.raiseWhen(f.isAfter(t))(AppError.InvalidDateRange)).getOrElse(F.unit) >>
+        validateDateRange(sp) >>
           service
             .getOrderStatistics(session.userId, sp)
             .mapResponse(identity)

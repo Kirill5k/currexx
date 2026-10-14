@@ -9,7 +9,7 @@ import currexx.core.trade.{Rule, TradeAction, TradeStrategy}
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import currexx.domain.signal.{Indicator, ValueRole, ValueSource, ValueTransformation}
 import currexx.domain.user.UserId
-import fs2.Stream
+import fs2.{Chunk, Stream}
 import kirill5k.common.cats.test.IOWordSpec
 
 import java.time.Instant
@@ -221,6 +221,54 @@ class TestServicesSpec extends IOWordSpec {
         case Left(error: IllegalArgumentException) =>
           error.getMessage.toLowerCase must include("conflict")
         case other => fail(s"Expected conflicting market marks to fail accounting, got $other")
+      }
+    }
+  }
+
+  "PeriodSimulation" should {
+    "preserve priming and open positions across source chunks" in {
+      val prime  = bar("2026-01-31T22:00:00Z", interval = Interval.H1)
+      val first  = bar("2026-01-31T23:00:00Z", close = 0.9, interval = Interval.H1)
+      val last   = bar("2026-02-01T00:00:00Z", close = 1.1, interval = Interval.H1)
+      val source = Stream.chunk(Chunk.from(List(prime, first))).covary[IO] ++ Stream.chunk(Chunk.singleton(last)).covary[IO]
+
+      val result = for
+        services <- TestServices.make[IO](settings)
+        stats    <- PeriodSimulation.runStream(services, source, SignalDetector.pure, risk)
+      yield stats
+
+      result.asserting { stats =>
+        stats.total mustBe 1
+        stats.forcedClosureCount mustBe 1
+        stats.invalidOrderCount mustBe 0
+        stats.completedTrades.head.openedAt mustBe first.latestTime
+        stats.completedTrades.head.closedAt mustBe closeTime(last)
+        stats.completedTrades.head.entryPrice mustBe BigDecimal(1)
+        stats.completedTrades.head.exitPrice mustBe BigDecimal("1.1")
+        stats.dataWindow mustBe Some(DataWindow(first.latestTime, closeTime(last)))
+        stats.equityCurve.find(_.time == closeTime(first)).map(_.equity) mustBe Some(BigDecimal(9000))
+        stats.equityCurve.last.equity mustBe BigDecimal(11000)
+        stats.profitByMonth mustBe Map("2026-01" -> BigDecimal(-1000), "2026-02" -> BigDecimal(2000))
+      }
+    }
+
+    "propagate a source failure after processing preceding input" in {
+      val prime   = bar("2026-01-31T22:00:00Z", interval = Interval.H1)
+      val first   = bar("2026-01-31T23:00:00Z", close = 0.9, interval = Interval.H1)
+      val failure = new RuntimeException("source failed")
+      val source  = Stream.chunk(Chunk.from(List(prime, first))).covary[IO] ++ Stream.raiseError[IO](failure)
+
+      val result = for
+        services <- TestServices.make[IO](settings)
+        outcome  <- PeriodSimulation.runStream(services, source, SignalDetector.pure, risk).attempt
+        orders   <- services.getAllOrders
+      yield (outcome, orders)
+
+      result.asserting { case (outcome, orders) =>
+        outcome mustBe Left(failure)
+        orders must have size 1
+        orders.head.order.price mustBe BigDecimal(1)
+        orders.head.time mustBe first.latestTime.plusSeconds(100)
       }
     }
   }

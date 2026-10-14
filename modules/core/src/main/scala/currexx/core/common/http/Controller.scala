@@ -2,6 +2,7 @@ package currexx.core.common.http
 
 import cats.MonadThrow
 import cats.effect.Sync
+import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.applicativeError.*
@@ -37,6 +38,9 @@ final case class SearchParams(
 trait Controller[F[_]] extends TapirJson with TapirSchema {
 
   def routes(using authenticator: Authenticator[F]): HttpRoutes[F]
+
+  protected def validateDateRange(sp: SearchParams)(using F: MonadThrow[F]): F[Unit] =
+    (sp.from, sp.to).mapN((f, t) => F.raiseWhen(f.isAfter(t))(AppError.InvalidDateRange)).getOrElse(F.unit)
 
   extension [A](fa: F[A])(using F: MonadThrow[F])
     def voidResponse: F[Either[(StatusCode, ErrorResponse), Unit]]             = mapResponse(_ => ())

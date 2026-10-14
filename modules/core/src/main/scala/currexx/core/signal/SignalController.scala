@@ -1,13 +1,11 @@
 package currexx.core.signal
 
 import cats.syntax.applicative.*
-import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.effect.Async
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
-import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.signal.{Condition, Indicator}
 import kirill5k.common.cats.Clock
@@ -47,7 +45,7 @@ final private class SignalController[F[_]](
   private def getAllSignals(using auth: Authenticator[F]) =
     getAllSignalsEndpoint.withAuthenticatedSession
       .serverLogic { session => sp =>
-        (sp.from, sp.to).mapN((f, t) => F.raiseWhen(f.isAfter(t))(AppError.InvalidDateRange)).getOrElse(F.unit) >>
+        validateDateRange(sp) >>
           service
             .getAll(session.userId, sp)
             .mapResponse(_.map(SignalView.from))

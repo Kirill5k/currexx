@@ -6,7 +6,7 @@ import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.clients.Fs2HttpClient
-import currexx.clients.data.MarketDataClient
+import currexx.clients.data.{MarketDataClient, SignalCandles}
 import kirill5k.common.cats.{Cache, Clock}
 import kirill5k.common.syntax.time.*
 import currexx.domain.errors.AppError
@@ -45,25 +45,8 @@ final private class LiveTwelveDataClient[F[_]](
     for
       now            <- C.now
       timeSeriesData <- fetchTimeSeriesData(pair, interval, config.fetchCandleCount, now)
-      result         <- filterIncompleteCandleIfNeeded(timeSeriesData, interval, now)
-    yield result.copy(prices = NonEmptyList.fromListUnsafe(result.prices.take(config.signalCandleCount)))
-
-  private def filterIncompleteCandleIfNeeded(
-      data: MarketTimeSeriesData,
-      interval: Interval,
-      now: Instant
-  ): F[MarketTimeSeriesData] =
-    val firstCandle   = data.prices.head
-    val candleEndTime = firstCandle.time.plus(interval.toDuration)
-    val shouldExclude = candleEndTime.isAfter(now)
-
-    if (shouldExclude && data.prices.size > 1) {
-      F.pure(data.copy(prices = NonEmptyList.fromListUnsafe(data.prices.tail)))
-    } else if (shouldExclude && data.prices.size == 1) {
-      logger.warn(s"Only incomplete candle available for ${data.currencyPair} at ${data.interval}") >> F.pure(data)
-    } else {
-      F.pure(data)
-    }
+      result         <- SignalCandles.prepare(timeSeriesData, interval, now, config.signalCandleCount)
+    yield result
 
   override def latestPrice(pair: CurrencyPair): F[PriceRange] =
     C.now.flatMap { now =>
