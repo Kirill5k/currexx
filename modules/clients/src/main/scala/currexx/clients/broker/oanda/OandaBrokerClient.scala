@@ -39,7 +39,8 @@ final private class LiveOandaBrokerClient[F[_]](
     logger: Logger[F],
     clock: Clock[F]
 ) extends OandaBrokerClient[F] {
-  override protected val name: String = "oanda"
+  override protected val name: String                                    = "oanda"
+  override protected val additionalRetryableStatusCodes: Set[StatusCode] = Set(StatusCode.Unauthorized)
 
   override def submit(params: BrokerParameters.Oanda, order: TradeOrder): F[OrderPlacementResult] = order match
     case enter: TradeOrder.Enter =>
