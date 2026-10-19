@@ -7,7 +7,6 @@ import currexx.backtest.optimizer.ScoringFunction
 import currexx.core.trade.{Rule, TradeAction, TradeStrategy}
 import currexx.domain.signal.{Indicator, ValueRole, ValueSource, ValueTransformation as VT}
 import cats.effect.IO
-import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import fs2.io.file.{Files, Path}
 import io.circe.syntax.*
@@ -67,16 +66,14 @@ class OptimisationSpec extends IOWordSpec {
     fixedIndicators = Set(frozen)
   )
 
-  private def readReports(label: String): IO[List[(Path, String)]] = {
+  private def readReports(outputDirectory: Path, label: String): IO[List[(Path, String)]] = {
     val files = Files.forAsync[IO]
     files
-      .list(Path("optimisation-results"))
+      .list(outputDirectory)
       .filter(_.fileName.toString.endsWith(s"-$label.md"))
       .compile
       .toList
-      .bracket(paths => paths.traverse(path => files.readUtf8(path).compile.string.map(path -> _)))(paths =>
-        paths.traverse_(files.deleteIfExists)
-      )
+      .flatMap(paths => paths.traverse(path => files.readUtf8(path).compile.string.map(path -> _)))
   }
 
   "The round-configured optimisation dispatcher" should {
@@ -85,11 +82,13 @@ class OptimisationSpec extends IOWordSpec {
       val params   = Parameters.GA(1, 0, 0.0, 0.0, 0.0, shuffle = false)
       val label    = s"undersized-population-${UUID.randomUUID()}"
 
-      val result = for
-        algorithm <- Optimisation.make[IO](round(label, params), 1)
-        outcome   <- algorithm.optimise.attempt
-        reports   <- readReports(label)
-      yield (outcome, reports)
+      val result = Files.forAsync[IO].tempDirectory.use { outputDirectory =>
+        for
+          algorithm <- Optimisation.make[IO](round(label, params), 1, outputDirectory = outputDirectory)
+          outcome   <- algorithm.optimise.attempt
+          reports   <- readReports(outputDirectory, label)
+        yield (outcome, reports)
+      }
 
       result.asserting { case (outcome, reports) =>
         outcome.isLeft mustBe true
@@ -111,13 +110,14 @@ class OptimisationSpec extends IOWordSpec {
       val params   = Parameters.GA(2, 0, 0.0, 0.0, 0.0, shuffle = false)
       val label    = s"fresh-run-archive-${UUID.randomUUID()}"
 
-      val result = for
-        algorithm <- Optimisation.make[IO](round(label, params).copy(extraSeeds = Nil), 1)
-        first     <- algorithm.optimise.map(_.finalists)
-        _         <- IO { random.jitter = 2.0 }
-        second    <- algorithm.optimise.map(_.finalists)
-        _         <- readReports(label)
-      yield (first, second)
+      val result = Files.forAsync[IO].tempDirectory.use { outputDirectory =>
+        for
+          algorithm <- Optimisation.make[IO](round(label, params).copy(extraSeeds = Nil), 1, outputDirectory = outputDirectory)
+          first     <- algorithm.optimise.map(_.finalists)
+          _         <- IO { random.jitter = 2.0 }
+          second    <- algorithm.optimise.map(_.finalists)
+        yield (first, second)
+      }
 
       result.asserting { case (first, second) =>
         first.map(_._1.indicator).head mustBe strategy.indicator
@@ -134,14 +134,16 @@ class OptimisationSpec extends IOWordSpec {
       val params   = Parameters.GA(2, 0, 0.0, 0.0, 0.0, shuffle = false)
       val label    = s"ga-factory-test-${UUID.randomUUID()}"
 
-      val result = for
-        algorithm   <- Optimisation.make[IO](round(label, params), evaluatorPoolSize = 1)
-        finalists   <- algorithm.optimise.map(_.finalists)
-        replayed    <- finalists.map(_._1).traverse(algorithm.validate)
-        aliasReplay <- algorithm.validate(strategy.copy(indicator = seedAlias))
-        _ <- algorithm.tracker.displayNote("Validation replay", List("Replayed both finalists through the configured validation corpus."))
-        reports <- readReports(label)
-      yield (algorithm.searchSpace, finalists, replayed, aliasReplay, reports)
+      val result = Files.forAsync[IO].tempDirectory.use { outputDirectory =>
+        for
+          algorithm   <- Optimisation.make[IO](round(label, params), evaluatorPoolSize = 1, outputDirectory = outputDirectory)
+          finalists   <- algorithm.optimise.map(_.finalists)
+          replayed    <- finalists.map(_._1).traverse(algorithm.validate)
+          aliasReplay <- algorithm.validate(strategy.copy(indicator = seedAlias))
+          _ <- algorithm.tracker.displayNote("Validation replay", List("Replayed both finalists through the configured validation corpus."))
+          reports <- readReports(outputDirectory, label)
+        yield (algorithm.searchSpace, finalists, replayed, aliasReplay, reports)
+      }
 
       result.asserting { case (space, finalists, replayed, aliasReplay, reports) =>
         space.template mustBe strategy
@@ -193,13 +195,15 @@ class OptimisationSpec extends IOWordSpec {
       )
       val label = s"scga-factory-test-${UUID.randomUUID()}"
 
-      val result = for
-        algorithm <- Optimisation.make[IO](round(label, params), evaluatorPoolSize = 1)
-        finalists <- algorithm.optimise.map(_.finalists)
-        replayed  <- finalists.map(_._1).traverse(algorithm.validate)
-        _         <- algorithm.tracker.displayNote("Validation replay", List("SCGA validation replay completed."))
-        reports   <- readReports(label)
-      yield (algorithm.searchSpace, finalists, replayed, reports)
+      val result = Files.forAsync[IO].tempDirectory.use { outputDirectory =>
+        for
+          algorithm <- Optimisation.make[IO](round(label, params), evaluatorPoolSize = 1, outputDirectory = outputDirectory)
+          finalists <- algorithm.optimise.map(_.finalists)
+          replayed  <- finalists.map(_._1).traverse(algorithm.validate)
+          _         <- algorithm.tracker.displayNote("Validation replay", List("SCGA validation replay completed."))
+          reports   <- readReports(outputDirectory, label)
+        yield (algorithm.searchSpace, finalists, replayed, reports)
+      }
 
       result.asserting { case (space, finalists, replayed, reports) =>
         space.fixedIndicators mustBe Set(frozen, raw, unread)
@@ -239,13 +243,15 @@ class OptimisationSpec extends IOWordSpec {
           if (scoring.score(stats) == 10.0) Nil else throw failure
       }
 
-      val result = for
-        completed <- List(round(label, params).copy(scoringFunction = failingDiagnostics), round(nextLabel, params)).traverse { config =>
-          Optimisation.make[IO](config, 1).flatMap(_.optimise)
-        }
-        reports     <- readReports(label)
-        nextReports <- readReports(nextLabel)
-      yield (completed, reports, nextReports)
+      val result = Files.forAsync[IO].tempDirectory.use { outputDirectory =>
+        for
+          completed <- List(round(label, params).copy(scoringFunction = failingDiagnostics), round(nextLabel, params)).traverse { config =>
+            Optimisation.make[IO](config, 1, outputDirectory = outputDirectory).flatMap(_.optimise)
+          }
+          reports     <- readReports(outputDirectory, label)
+          nextReports <- readReports(outputDirectory, nextLabel)
+        yield (completed, reports, nextReports)
+      }
 
       result.asserting { case (completed, reports, nextReports) =>
         completed.head.decision mustBe completed.last.decision
@@ -280,11 +286,14 @@ class OptimisationSpec extends IOWordSpec {
         override def violations(stats: List[OrderStats]): List[ScoringFunction.Violation] = Nil
       }
 
-      val result = for
-        algorithm <- Optimisation.make[IO](round(label, params).copy(scoringFunction = failingSearch), 1)
-        outcome   <- algorithm.optimise.attempt
-        reports   <- readReports(label)
-      yield (outcome, reports)
+      val result = Files.forAsync[IO].tempDirectory.use { outputDirectory =>
+        for
+          algorithm <- Optimisation
+            .make[IO](round(label, params).copy(scoringFunction = failingSearch), 1, outputDirectory = outputDirectory)
+          outcome <- algorithm.optimise.attempt
+          reports <- readReports(outputDirectory, label)
+        yield (outcome, reports)
+      }
 
       result.asserting { case (outcome, reports) =>
         outcome mustBe Left(failure)
@@ -305,11 +314,14 @@ class OptimisationSpec extends IOWordSpec {
         override def violations(stats: List[OrderStats]): List[ScoringFunction.Violation] = Nil
       }
 
-      val result = for
-        algorithm <- Optimisation.make[IO](round(label, params).copy(scoringFunction = failingValidation), 1)
-        outcome   <- algorithm.optimise.attempt
-        reports   <- readReports(label)
-      yield (outcome, reports)
+      val result = Files.forAsync[IO].tempDirectory.use { outputDirectory =>
+        for
+          algorithm <- Optimisation
+            .make[IO](round(label, params).copy(scoringFunction = failingValidation), 1, outputDirectory = outputDirectory)
+          outcome <- algorithm.optimise.attempt
+          reports <- readReports(outputDirectory, label)
+        yield (outcome, reports)
+      }
 
       result.asserting { case (outcome, reports) =>
         outcome mustBe Left(failure)

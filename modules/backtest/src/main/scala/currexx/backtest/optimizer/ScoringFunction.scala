@@ -27,8 +27,16 @@ trait ScoringFunction:
   def violations(stats: List[OrderStats]): List[ScoringFunction.Violation]
 
 object ScoringFunction {
+  val scoringVersion: Int = 2
+
+  // Bound each component so one lucky metric cannot outweigh every balanced candidate.
+  private val maxComponentScore = 3.0
+
   private def describe(name: String, config: Product): String =
-    config.productElementNames.zip(config.productIterator).map { case (key, value) => s"$key=$value" }.mkString(s"$name(", ", ", ")")
+    config.productElementNames
+      .zip(config.productIterator)
+      .map { case (key, value) => s"$key=$value" }
+      .mkString(s"$name(scoringVersion=$scoringVersion, ", ", ", ")")
 
   final case class Violation(constraint: String, actual: String, required: String):
     override def toString: String = s"$constraint is $actual, required $required"
@@ -42,11 +50,6 @@ object ScoringFunction {
     def violation: Option[Violation] = Option.when(satisfaction < 1.0)(Violation(name, actual, required))
 
   object Robust {
-    // Ceiling any single scaled component approaches but never reaches. Two of the four divide by a quantity nothing
-    // stops from approaching zero — recovery factor by drawdown, expectancy by average loss — so unbounded, one lucky
-    // axis outscores every balanced candidate.
-    private val maxComponentScore = 3.0
-
     final case class Config(
         // Per pair per month, multiplied up by `tradeFloor` into the pooled total the run has to reach, so the threshold
         // keeps its meaning however long the window and however many datasets the corpus holds. Five, so a month holds
@@ -96,29 +99,15 @@ object ScoringFunction {
       }
 
     private def quality(portfolio: OrderStats, dataMonths: Int, datasetCount: Int, config: Config): Double = {
-      // A vanished denominator means the metric is undefined rather than bad, so it is credited with its target — but
-      // only in proportion to the sample behind it, since all three can vanish at once and would otherwise hand a
-      // handful of tiny winning trades 0.65 of a full score for free.
-      val confidence = sampleConfidence(portfolio, config.minTradesPerMonth, dataMonths, datasetCount)
-
-      def credited(target: Double): Double = target * confidence
-
-      val netReturn      = (portfolio.totalProfit / portfolio.initialBalance).toDouble
-      val recoveryFactor = portfolio.recoveryFactor.fold(credited(config.targetRecoveryFactor.value))(_.toDouble)
-      // Only a ratio that was measured and found to have no downside earns the credit. One that could not be measured at
-      // all — the equity history covered only one calendar month — has demonstrated nothing.
-      val sortinoRatio = portfolio.sortinoRatio match
-        case RiskRatio.Defined(value)   => value
-        case RiskRatio.ZeroDeviation    => credited(config.targetSortinoRatio.value)
-        case RiskRatio.InsufficientData => 0.0
+      val confidence       = sampleConfidence(portfolio, config.minTradesPerMonth, dataMonths, datasetCount)
+      val netReturn        = (portfolio.totalProfit / portfolio.initialBalance).toDouble
+      val recovery         = ratioScore(portfolio.recoveryFactor.map(_.toDouble), config.targetRecoveryFactor.value, confidence)
+      val sortino          = ratioScore(portfolio.sortinoRatio, config.targetSortinoRatio.value, confidence)
       val expectancyToLoss =
-        if (portfolio.averageLoss == 0) credited(config.targetExpectancyToLossRatio.value)
-        else (portfolio.expectancy / portfolio.averageLoss).toDouble
+        ratioScore(portfolio.expectancyToLossRatio.map(_.toDouble), config.targetExpectancyToLossRatio.value, confidence)
 
       (0.350 * scaled(netReturn, config.targetNetReturn.value, maxScore = maxComponentScore)) +
-        (0.300 * scaled(recoveryFactor, config.targetRecoveryFactor.value, maxScore = maxComponentScore)) +
-        (0.175 * scaled(sortinoRatio, config.targetSortinoRatio.value, maxScore = maxComponentScore)) +
-        (0.175 * scaled(expectancyToLoss, config.targetExpectancyToLossRatio.value, maxScore = maxComponentScore))
+        (0.300 * recovery) + (0.175 * sortino) + (0.175 * expectancyToLoss)
     }
 
     private def profitableRatio(stats: List[OrderStats]): Double =
@@ -189,8 +178,6 @@ object ScoringFunction {
   }
 
   object Consistent {
-    private val maxComponentScore = 3.0
-
     final case class Config(
         // Per pair per month, multiplied up by `tradeFloor` into the pooled total the run has to reach, so the threshold
         // keeps its meaning however long the window and however many datasets the corpus holds. Five, because every
@@ -358,26 +345,16 @@ object ScoringFunction {
     }
 
     private def quality(portfolio: OrderStats, evidence: Evidence, config: Config): Double = {
-      val confidence = sampleConfidence(portfolio, config.minTradesPerMonth, evidence.dataMonths, evidence.datasetCount)
-
-      def credited(target: Double): Double = target * confidence
-
+      val confidence         = sampleConfidence(portfolio, config.minTradesPerMonth, evidence.dataMonths, evidence.datasetCount)
       val targetPeriodReturn = config.targetNetReturn.value / config.periodsPerYear
-      val periodProfitFactor = evidence.profitFactor.fold(credited(config.targetPeriodProfitFactor.value))(_.toDouble)
-      val recoveryFactor     = portfolio.recoveryFactor.fold(credited(config.targetRecoveryFactor.value))(_.toDouble)
-      val sortinoRatio       = evidence.sortino(config.periodsPerYear) match
-        case RiskRatio.Defined(value)   => value
-        case RiskRatio.ZeroDeviation    => credited(config.targetSortinoRatio.value)
-        case RiskRatio.InsufficientData => 0.0
-      val expectancyToLoss =
-        if (portfolio.averageLoss == 0) credited(config.targetExpectancyToLossRatio.value)
-        else (portfolio.expectancy / portfolio.averageLoss).toDouble
+      val periodProfitFactor = ratioScore(evidence.profitFactor.map(_.toDouble), config.targetPeriodProfitFactor.value, confidence)
+      val recovery           = ratioScore(portfolio.recoveryFactor.map(_.toDouble), config.targetRecoveryFactor.value, confidence)
+      val sortino            = ratioScore(evidence.sortino(config.periodsPerYear), config.targetSortinoRatio.value, confidence)
+      val expectancyToLoss   =
+        ratioScore(portfolio.expectancyToLossRatio.map(_.toDouble), config.targetExpectancyToLossRatio.value, confidence)
 
       (0.300 * scaled(evidence.medianPeriodReturn, targetPeriodReturn, maxScore = maxComponentScore)) +
-        (0.200 * scaled(periodProfitFactor, config.targetPeriodProfitFactor.value, maxScore = maxComponentScore)) +
-        (0.200 * scaled(recoveryFactor, config.targetRecoveryFactor.value, maxScore = maxComponentScore)) +
-        (0.150 * scaled(sortinoRatio, config.targetSortinoRatio.value, maxScore = maxComponentScore)) +
-        (0.150 * scaled(expectancyToLoss, config.targetExpectancyToLossRatio.value, maxScore = maxComponentScore))
+        (0.200 * periodProfitFactor) + (0.200 * recovery) + (0.150 * sortino) + (0.150 * expectancyToLoss)
     }
 
     private def profitableRatio(stats: List[OrderStats]): Double =
@@ -521,6 +498,17 @@ object ScoringFunction {
 
   private def sampleConfidence(portfolio: OrderStats, minTradesPerMonth: PosInt, dataMonths: Int, datasetCount: Int): Double =
     rampUp(portfolio.total.toDouble, 0.0, tradeFloor(minTradesPerMonth, dataMonths, datasetCount))
+
+  /** Quality is evaluated only after positive-performance gates pass. `None` means zero downside, so it earns the limit of the same curve
+    * used for measured ratios. Applying confidence to both cases prevents a tiny loss from bypassing the sparse-sample discount.
+    */
+  private def ratioScore(value: Option[Double], target: Double, confidence: Double): Double =
+    confidence * value.fold(maxComponentScore)(scaled(_, target, maxComponentScore))
+
+  private def ratioScore(value: RiskRatio, target: Double, confidence: Double): Double = value match
+    case RiskRatio.Defined(ratio)   => ratioScore(Some(ratio), target, confidence)
+    case RiskRatio.ZeroDeviation    => ratioScore(None, target, confidence)
+    case RiskRatio.InsufficientData => 0.0
 
   private def tradeFloorDescription(minTradesPerMonth: PosInt, dataMonths: Int, datasetCount: Int): String =
     f">= ${tradeFloor(minTradesPerMonth, dataMonths, datasetCount)}%.0f " +

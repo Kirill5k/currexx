@@ -17,6 +17,7 @@ class ScoringFunctionDescriptionSpec extends AnyWordSpec with Matchers {
 
       scorers.foreach { case (name, config, scoring) =>
         scoring.description must startWith(s"$name(")
+        scoring.description must include("scoringVersion=2")
         config.productElementNames.zip(config.productIterator).foreach { case (key, value) =>
           scoring.description must include(s"$key=$value")
         }

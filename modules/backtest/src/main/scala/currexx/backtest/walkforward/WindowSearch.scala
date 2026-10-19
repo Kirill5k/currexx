@@ -4,6 +4,7 @@ import currexx.backtest.optimizer.{Optimisation, OptimisationResult, Optimisatio
 import cats.Parallel
 import cats.effect.Async
 import cats.syntax.flatMap.*
+import fs2.io.file.Path
 
 import scala.util.Random
 
@@ -12,10 +13,13 @@ trait WindowSearch[F[_]]:
   def search(round: OptimisationRound, seed: Long): F[OptimisationResult]
 
 object WindowSearch:
-  def make[F[_]: {Async, Parallel}](poolSize: Int): WindowSearch[F] = new WindowSearch[F]:
+  def make[F[_]: {Async, Parallel}](
+      poolSize: Int,
+      outputDirectory: Path
+  ): WindowSearch[F] = new WindowSearch[F]:
     override def search(round: OptimisationRound, seed: Long): F[OptimisationResult] =
       Async[F].defer {
         // The initialiser captures this generator during construction. Recreate it and every search cache on each execution.
         given Random = Random(seed)
-        Optimisation.make[F](round, poolSize).flatMap(_.optimise)
+        Optimisation.make[F](round, poolSize, outputDirectory = outputDirectory).flatMap(_.optimise)
       }

@@ -4,7 +4,7 @@ import cats.effect.IO
 import kirill5k.common.cats.test.IOWordSpec
 import currexx.algorithms.operators.species.SpeciesStats
 import currexx.algorithms.{Fitness, Parameters}
-import fs2.io.file.{Files, Path}
+import fs2.io.file.Files
 
 import java.util.UUID
 
@@ -23,24 +23,32 @@ class MarkdownTrackerSpec extends IOWordSpec {
       ("ind2", Fitness(5.0), Fitness(1.0))
     )
 
-    "write progress to a markdown file in optimisation-results folder" in {
-      val resultsDir = Path("optimisation-results")
-      val filesS     = Files.forAsync[IO]
-      val label      = s"markdown-test-${UUID.randomUUID()}"
+    "write progress to a markdown file in the configured output directory" in {
+      val filesS = Files.forAsync[IO]
+      val label  = s"markdown-test-${UUID.randomUUID()}"
 
-      val result = for {
-        tracker <- Tracker.markdown[IO, String](algorithmName = params.name, label = label, logInterval = 1, showStats = true)
-        _       <- tracker.displayInitial("target-ind", params)
-        _       <- tracker.displayProgress(Progress.Population(1, 10, population))
-        _       <- tracker.displayFinal(validated)
-        _     <- tracker.displayNote("Champion: round-1", List("Fitness: 10.0", "BREACHES 1 constraint(s) despite winning:", "  - too few"))
-        files <- filesS.list(resultsDir).compile.toList
-        latestFile = files.find(_.fileName.toString.endsWith(s"-$label.md")).get
-        content <- filesS.readUtf8(latestFile).compile.string
-        _       <- filesS.deleteIfExists(latestFile)
-      } yield (latestFile, content)
+      val result = filesS.tempDirectory.use { directory =>
+        val resultsDir = directory / "reports"
+        for {
+          tracker <- Tracker.markdown[IO, String](
+            algorithmName = params.name,
+            label = label,
+            logInterval = 1,
+            showStats = true,
+            outputDirectory = resultsDir
+          )
+          _ <- tracker.displayInitial("target-ind", params)
+          _ <- tracker.displayProgress(Progress.Population(1, 10, population))
+          _ <- tracker.displayFinal(validated)
+          _ <- tracker.displayNote("Champion: round-1", List("Fitness: 10.0", "BREACHES 1 constraint(s) despite winning:", "  - too few"))
+          files <- filesS.list(resultsDir).compile.toList
+          latestFile = files.find(_.fileName.toString.endsWith(s"-$label.md")).get
+          content <- filesS.readUtf8(latestFile).compile.string
+        } yield (resultsDir, latestFile, content)
+      }
 
-      result.asserting { case (path, content) =>
+      result.asserting { case (resultsDir, path, content) =>
+        path.parent mustBe Some(resultsDir)
         path.fileName.toString must startWith("ga-optimisation-")
         content must include("# Genetic Algorithm Run")
         (content must not).include("SCGA")
@@ -60,27 +68,28 @@ class MarkdownTrackerSpec extends IOWordSpec {
     }
 
     "use a display callback without changing candidate identity or training ranks" in {
-      val resultsDir = Path("optimisation-results")
-      val files      = Files.forAsync[IO]
-      val label      = s"render-test-${UUID.randomUUID()}"
-      val first      = ("visible", "fixed-a")
-      val second     = ("visible", "fixed-b")
-      val result     = for {
-        tracker <- Tracker.markdown[IO, (String, String)](
-          algorithmName = params.name,
-          label = label,
-          logInterval = 1,
-          showTopN = 2,
-          renderIndividual = _._1
-        )
-        _       <- tracker.displayInitial(first, params)
-        _       <- tracker.displayProgress(Progress.Population(1, 10, Vector(first -> Fitness(10), second -> Fitness(5))))
-        _       <- tracker.displayFinal(Vector((second, Fitness(5), Fitness(4)), (first, Fitness(10), Fitness(1))))
-        written <- files.list(resultsDir).compile.toList
-        path = written.find(_.fileName.toString.endsWith(s"-$label.md")).get
-        text <- files.readUtf8(path).compile.string
-        _    <- files.deleteIfExists(path)
-      } yield text
+      val files  = Files.forAsync[IO]
+      val label  = s"render-test-${UUID.randomUUID()}"
+      val first  = ("visible", "fixed-a")
+      val second = ("visible", "fixed-b")
+      val result = files.tempDirectory.use { resultsDir =>
+        for {
+          tracker <- Tracker.markdown[IO, (String, String)](
+            algorithmName = params.name,
+            label = label,
+            logInterval = 1,
+            showTopN = 2,
+            renderIndividual = _._1,
+            outputDirectory = resultsDir
+          )
+          _       <- tracker.displayInitial(first, params)
+          _       <- tracker.displayProgress(Progress.Population(1, 10, Vector(first -> Fitness(10), second -> Fitness(5))))
+          _       <- tracker.displayFinal(Vector((second, Fitness(5), Fitness(4)), (first, Fitness(10), Fitness(1))))
+          written <- files.list(resultsDir).compile.toList
+          path = written.find(_.fileName.toString.endsWith(s"-$label.md")).get
+          text <- files.readUtf8(path).compile.string
+        } yield text
+      }
       result.asserting { text =>
         text must include("**Target:** visible")
         text must include("* #1: 10.0 - `visible`")
@@ -93,7 +102,6 @@ class MarkdownTrackerSpec extends IOWordSpec {
     }
 
     "write one SCGA generation report and apply the interval to its population and breeding telemetry together" in {
-      val resultsDir        = Path("optimisation-results")
       val filesS            = Files.forAsync[IO]
       val label             = s"scga-markdown-test-${UUID.randomUUID()}"
       val scgaParams        = Parameters.SCGA(10, 20, 0.5, 0.1, shuffle = true)
@@ -101,18 +109,25 @@ class MarkdownTrackerSpec extends IOWordSpec {
       val skippedPopulation = Vector("skipped-candidate" -> Fitness(99.0))
       val skippedStats      = SpeciesStats(Vector(9, 1), Vector(7, 1), 3)
 
-      val result = for {
-        tracker <- Tracker.markdown[IO, String](algorithmName = scgaParams.name, label = label, logInterval = 2, showStats = true)
-        _       <- tracker.displayInitial("scga-target", scgaParams)
-        _       <- tracker.displayProgress(Progress.Species(1, 20, skippedPopulation, skippedStats))
-        _       <- tracker.displayProgress(Progress.Species(2, 20, population, stats))
-        _       <- tracker.displayFinal(validated)
-        _       <- tracker.displayNote("Champion after final", List("report still open"))
-        files   <- filesS.list(resultsDir).compile.toList
-        reports = files.filter(_.fileName.toString.endsWith(s"-$label.md"))
-        content <- filesS.readUtf8(reports.head).compile.string
-        _       <- filesS.deleteIfExists(reports.head)
-      } yield (reports, content)
+      val result = filesS.tempDirectory.use { resultsDir =>
+        for {
+          tracker <- Tracker.markdown[IO, String](
+            algorithmName = scgaParams.name,
+            label = label,
+            logInterval = 2,
+            showStats = true,
+            outputDirectory = resultsDir
+          )
+          _     <- tracker.displayInitial("scga-target", scgaParams)
+          _     <- tracker.displayProgress(Progress.Species(1, 20, skippedPopulation, skippedStats))
+          _     <- tracker.displayProgress(Progress.Species(2, 20, population, stats))
+          _     <- tracker.displayFinal(validated)
+          _     <- tracker.displayNote("Champion after final", List("report still open"))
+          files <- filesS.list(resultsDir).compile.toList
+          reports = files.filter(_.fileName.toString.endsWith(s"-$label.md"))
+          content <- filesS.readUtf8(reports.head).compile.string
+        } yield (reports, content)
+      }
 
       result.asserting { case (reports, content) =>
         reports.size mustBe 1

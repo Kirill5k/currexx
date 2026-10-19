@@ -95,6 +95,8 @@ The directory contains:
   SHA-256 fingerprints of the original CSV files.
 - `preflight.json`: per-period bar availability, warm-up loss and executable bars,
   written before any search.
+- `search/`: per-window optimisation Markdown reports, labelled with the
+  experiment and window.
 - `window-N-frozen.json`: the complete selection decision, written before testing.
 - `window-N-result.json`: paired financial metrics and execution coverage.
 - `summary.json` and `report.md`: completed-window summaries and experiment status.
@@ -107,9 +109,10 @@ Window seeds use the recorded `walk-forward-v2` derivation: explicit month
 boundaries, including exclusive end months. The derivation is independent of
 the display format of a date range.
 
-Optimiser reports are written to `optimisation-results/`, labelled with the
-experiment and window. Failed experiments retain completed artifacts and stop;
-automatic resume is not supported.
+Standalone `Optimiser` runs continue to write reports to `optimisation-results/`.
+Walk-forward search reports stay inside each experiment's `search/` directory.
+Failed experiments retain completed artifacts and stop; automatic resume is not
+supported.
 
 After all six experiments complete, a sibling `<first-experiment-id>-comparison/`
 directory contains `comparison.json` and `report.md`. The comparison reports each
@@ -162,10 +165,11 @@ a separate strategy preset. It performs two stages:
    distinct accepted seeds.
 
 Each experiment must complete both paired tests. A retained base must reproduce
-exactly zero forward net difference. The smoke writes experiment artifacts and
-an objective comparison under `target/walk-forward-smoke/`; the full-history
-preflight is reported in the console, while each smoke experiment's
-`preflight.json` describes its reduced two-window, one-pair schedule.
+exactly zero forward net difference. The smoke writes experiment artifacts,
+including each experiment's `search/` reports, and an objective comparison under
+`target/walk-forward-smoke/`; the full-history preflight is reported in the console,
+while each smoke experiment's `preflight.json` describes its reduced two-window,
+one-pair schedule.
 
 There is no separate preflight-only command. Running this smoke does **not**
 launch the full 30-search matrix or change its budget. It verifies data coverage,

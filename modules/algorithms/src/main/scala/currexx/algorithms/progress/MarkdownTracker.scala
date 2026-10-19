@@ -130,11 +130,12 @@ object MarkdownTracker:
       showTopN: Int = 1,
       showStats: Boolean = false,
       finalTopN: Int = 25,
-      renderIndividual: I => String = (individual: I) => individual.toString
+      renderIndividual: I => String = (individual: I) => individual.toString,
+      outputDirectory: Path = Tracker.defaultOutputDirectory
   ): F[Tracker[F, I]] =
     for
       now          <- Async[F].realTimeInstant
       startTimeRef <- Ref.of[F, Option[Instant]](None)
       labelSuffix = if (label.nonEmpty) s"-$label" else ""
-      path        = Path("optimisation-results") / s"${algorithmName.toLowerCase}-optimisation-${Formatter.format(now)}$labelSuffix.md"
+      path        = outputDirectory / s"${algorithmName.toLowerCase}-optimisation-${Formatter.format(now)}$labelSuffix.md"
     yield new MarkdownTracker[F, I](label, path, startTimeRef, logInterval, showTopMember, showTopN, showStats, finalTopN, renderIndividual)

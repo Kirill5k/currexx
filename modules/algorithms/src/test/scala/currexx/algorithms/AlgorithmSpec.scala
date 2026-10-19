@@ -3,6 +3,8 @@ package currexx.algorithms
 import cats.data.State
 import cats.~>
 import cats.syntax.flatMap.*
+import cats.syntax.traverse.*
+import currexx.algorithms.collections.*
 import currexx.algorithms.progress.Progress
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -25,19 +27,29 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
           |Initialise population of size 5 with shuffle=true
           |Evaluate entire population for Search(0)
           |Sorting evaluated population by fitness
-          |Select 1.25 elites from the current population
-          |Distribute population in pairs
-          |Applied to the entire population: Crossover 2 individuals with probability 0.5
-          |Applied to the entire population: Crossover 2 individuals with probability 0.5
-          |Applied to the entire population: Mutate individual with probability 0.2
+          |Select 1 elites from the current population
+          |Select 4 parents and group them into pairs
+          |Crossover 2 individuals with probability 0.5
+          |Crossover 2 individuals with probability 0.5
+          |Crossover 2 individuals with probability 0.5
+          |Crossover 2 individuals with probability 0.5
+          |Mutate individual with probability 0.2
+          |Mutate individual with probability 0.2
+          |Mutate individual with probability 0.2
+          |Mutate individual with probability 0.2
           |Evaluate entire population for Search(1)
           |Sorting evaluated population by fitness
           |Iteration 1 of 2
-          |Select 1.25 elites from the current population
-          |Distribute population in pairs
-          |Applied to the entire population: Crossover 2 individuals with probability 0.5
-          |Applied to the entire population: Crossover 2 individuals with probability 0.5
-          |Applied to the entire population: Mutate individual with probability 0.2
+          |Select 1 elites from the current population
+          |Select 4 parents and group them into pairs
+          |Crossover 2 individuals with probability 0.5
+          |Crossover 2 individuals with probability 0.5
+          |Crossover 2 individuals with probability 0.5
+          |Crossover 2 individuals with probability 0.5
+          |Mutate individual with probability 0.2
+          |Mutate individual with probability 0.2
+          |Mutate individual with probability 0.2
+          |Mutate individual with probability 0.2
           |Evaluate entire population for Search(2)
           |Sorting evaluated population by fitness
           |Iteration 2 of 2
@@ -70,11 +82,14 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
         State.modify[List[String]](_ :+ s"Evaluate entire population for $phase\n") >>
           State.pure(population.map(i => (i, Fitness(1.0))))
       case Op.SelectElites(population, popSize, ratio) =>
-        State.modify[List[String]](_ :+ s"Select ${popSize * ratio} elites from the current population\n") >>
-          State.pure(population.map((i, _) => i))
+        val count = (popSize * ratio).toInt
+        State.modify[List[String]](_ :+ s"Select $count elites from the current population\n") >>
+          State.pure(population.take(count).map((i, _) => i))
       case Op.SelectPairs(population, limit) =>
-        State.modify[List[String]](_ :+ "Distribute population in pairs\n") >>
-          State.pure(population.map((i, _) => (i, i)))
+        State.modify[List[String]](_ :+ s"Select $limit parents and group them into pairs\n") >>
+          State.pure(
+            if (population.isEmpty) Vector.empty[(G, G)] else Vector.tabulate(limit)(index => population(index % population.size)._1).pairs
+          )
       case Op.ValidatePopulation(population) =>
         State.modify[List[String]](_ :+ "Validate the finished population\n") >>
           State.pure(population.map((i, f) => (i, f, f)))
@@ -82,8 +97,7 @@ class AlgorithmSpec extends AnyWordSpec with Matchers {
         State.modify[List[String]](_ :+ "Sorting evaluated population by fitness\n") >>
           State.pure(population.sortBy(_._2)(using Ordering[Fitness].reverse))
       case Op.ApplyToAll(population, op) =>
-        State.modify[List[String]](_ :+ "Applied to the entire population: ") >>
-          apply(op(population.head)).map(r => Vector(r))
+        population.traverse(individual => apply(op(individual)))
       case _ | null => ???
     }
   }

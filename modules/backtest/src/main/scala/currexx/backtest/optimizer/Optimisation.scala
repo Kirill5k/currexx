@@ -12,6 +12,7 @@ import currexx.algorithms.operators.species.SpeciesOperators
 import currexx.algorithms.progress.Tracker
 import currexx.backtest.{OrderStats, StrategyCatalogue, TestStrategy}
 import currexx.backtest.optimizer.reporting.{CandidateDisplay, OptimisationReportBuilder, ReportingTracker, RunDiagnostics}
+import fs2.io.file.Path
 
 import scala.util.Random
 
@@ -26,7 +27,8 @@ object Optimisation {
   def make[F[_]: {Async, Parallel}](
       round: OptimisationRound,
       evaluatorPoolSize: Int,
-      catalogue: List[StrategyCatalogue.Entry] = StrategyCatalogue.entries
+      catalogue: List[StrategyCatalogue.Entry] = StrategyCatalogue.entries,
+      outputDirectory: Path = Tracker.defaultOutputDirectory
   )(using Random): F[Optimisation[F]] =
     for
       _ <- Async[F].raiseWhen(round.corpus.validationFold.isEmpty)(
@@ -57,7 +59,8 @@ object Optimisation {
         showTopN = 3,
         showStats = false,
         finalTopN = baselines.shortlistSize,
-        renderIndividual = renderCandidate
+        renderIndividual = renderCandidate,
+        outputDirectory = outputDirectory
       )
       logging <- Tracker.logging[F, TestStrategy](
         label = round.name,

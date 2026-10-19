@@ -1,6 +1,6 @@
 package currexx.backtest.optimizer
 
-import currexx.backtest.{CompletedTrade, DataWindow, MarketMark, OrderStats, OrderStatsCollector, RiskSettings, TransactionCosts}
+import currexx.backtest.{CompletedTrade, DataWindow, MarketMark, OrderStats, OrderStatsCollector, RiskRatio, RiskSettings, TransactionCosts}
 import currexx.backtest.types.given
 import currexx.clients.broker.BrokerParameters
 import currexx.core.trade.TradeOrderPlacement
@@ -125,19 +125,60 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
     maxDrawdownPercent = 100.0
   )
 
+  private def fourMonthStats(lastMonth: BigDecimal): OrderStats =
+    statsClosingAt(
+      pairs.head,
+      List(BigDecimal(100), BigDecimal(100), BigDecimal(100), lastMonth).zipWithIndex.flatMap { case (profit, month) =>
+        (1 to 5).map(day => (profit / 5) -> Instant.parse(f"2025-${month + 1}%02d-${day * 5}%02dT12:00:00Z"))
+      },
+      Some(DataWindow(start, Instant.parse("2025-04-30T23:00:00Z")))
+    )
+
+  List(
+    ("Robust", ScoringFunction.Robust(), ScoringFunction.Robust(ScoringFunction.Robust.Config(minTradesPerMonth = 10))),
+    ("Consistent", ScoringFunction.Consistent(), ScoringFunction.Consistent(ScoringFunction.Consistent.Config(minTradesPerMonth = 10)))
+  ).foreach { case (name, fullConfidence, halfConfidence) =>
+    s"ScoringFunction.$name ratio boundaries" should
+      List("full" -> fullConfidence, "half" -> halfConfidence).foreach { case (confidence, scoring) =>
+        s"approach zero downside continuously at $confidence sample confidence without rewarding a tiny loss" in {
+          val zero       = fourMonthStats(BigDecimal(0))
+          val gain       = fourMonthStats(BigDecimal("0.01"))
+          val losses     = List("-0.01", "-0.0001", "-0.000001").map(value => fourMonthStats(BigDecimal(value)))
+          val zeroScore  = scoring.score(List(zero))
+          val gainScore  = scoring.score(List(gain))
+          val lossScores = losses.map(stats => scoring.score(List(stats)))
+
+          zero.sortinoRatio mustBe RiskRatio.ZeroDeviation
+          losses.foreach(_.sortinoRatio mustBe a[RiskRatio.Defined])
+          losses.head.totalProfit must be < gain.totalProfit
+          (lossScores :+ zeroScore :+ gainScore).foreach { score =>
+            score.isFinite mustBe true
+            score must be > 0.0
+            score must be <= 3.0
+          }
+          lossScores mustBe lossScores.sorted
+          lossScores.foreach(_ must be < zeroScore)
+          gainScore must be >= zeroScore
+          (zeroScore - lossScores.last) must be < 0.000001
+          // Changing the sign of this tiny month must not change acceptance or introduce another penalty.
+          losses.foreach(stats => scoring.violations(List(stats)) mustBe scoring.violations(List(gain)))
+        }
+      }
+  }
+
   "ScoringFunction.Robust" should {
     "return zero for no datasets" in {
       ScoringFunction.Robust().score(Nil) mustBe 0.0
     }
 
-    "credit metrics whose denominator is undefined with their target rather than zero" in {
+    "credit zero-downside metrics with the limit of their bounded score" in {
       val stats = pairs.map(pair => statsAtFloorRate(pair, BigDecimal(100), months = 5))
 
       // Never a drawdown, never a losing month and never a losing trade, so recovery factor, Sortino and
-      // expectancy-to-loss are all undefined and each is worth exactly its target. That leaves net return (150
+      // expectancy-to-loss are all undefined and each reaches its bounded maximum. That leaves net return (150
       // trades of 10 against a pooled balance of 30000, so half of the 0.1 target) as the only component below
-      // full marks: 0.35 * 0.5 + 0.30 + 0.175 + 0.175.
-      ScoringFunction.Robust().score(stats) mustBe 0.825 +- 0.0001
+      // full marks: 0.35 * 0.5 + 3 * (0.30 + 0.175 + 0.175).
+      ScoringFunction.Robust().score(stats) mustBe 2.125 +- 0.0001
     }
 
     "withhold credit for a Sortino ratio that could never be measured" in {
@@ -149,17 +190,16 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       // calendar month, leaving no monthly series to measure downside across. Paying that as generously as a year
       // without a losing month buys evidence that was never produced. Trading rarely is already covered by the
       // sample-size penalty, but trading in a burst is not, so the two Nones cannot share a fallback.
-      scoring.score(burst) mustBe scoring.score(spread) - 0.175 +- 0.0001
+      scoring.score(burst) mustBe scoring.score(spread) - 0.525 +- 0.0001
     }
 
     "discount the credit for an undefined metric when the sample behind it is thin" in {
       // Spread thin rather than simply few: 90 closed trades across twelve months is half the 180 that rate asks of
-      // three pairs over a run that long, so each of the three undefined metrics is credited half its target and
-      // scores 0.5 instead of 1.0, and the sample-size penalty halves the total again on top. Paying all three in full
-      // would hand 0.65 of a quality score to a candidate that was never really tested.
+      // three pairs over a run that long, so each ratio scores 1.5 instead of 3.0, and the sample-size penalty halves
+      // the total again on top. The same confidence discount applies to measured ratios with a nonzero denominator.
       val stats = pairs.map(pair => statsFor(pair, List.fill(30)(BigDecimal(10)), spacing = 12.days))
 
-      ScoringFunction.Robust().score(stats) mustBe 0.215 +- 0.0001
+      ScoringFunction.Robust().score(stats) mustBe 0.54 +- 0.0001
     }
 
     "penalise rather than reject candidates with too few closed trades" in {
@@ -289,9 +329,9 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       // A 1000x jump on the net-return axis buys about 0.03 of fitness, because the component is already deep into
       // saturation. Without a bound the unbounded logarithm would let one lucky axis outweigh every other combined.
       scoring.score(extreme) - scoring.score(strong) must be < 0.03
-      // The other three components are undefined here, so each scores exactly its target and the most this candidate
-      // can reach is 0.35 * maxComponentScore + 0.65. The asymptote means it stays strictly underneath.
-      scoring.score(extreme) must be < 1.7
+      // The other three components have no downside and reach 3.0. The return asymptote keeps the total below 3.0.
+      scoring.score(extreme) must be > 2.9
+      scoring.score(extreme) must be < 3.0
     }
 
     "keep ranking candidates a hard ceiling would have scored identically" in {
@@ -300,7 +340,7 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       val best   = pairs.map(pair => statsAtFloorRate(pair, BigDecimal(8000), months = 5))
 
       // Net returns of 1.0, 2.0 and 4.0 against a 0.1 target are all past the point where a ceiling of
-      // maxComponentScore used to flatten the component, which handed all three the same fitness of 1.7 and left
+      // maxComponentScore used to flatten the component, which handed all three the same fitness and left
       // selection unable to prefer any of them. Saturating asymptotically keeps the ordering intact.
       val scores = List(good, better, best).map(ScoringFunction.Robust().score)
 
@@ -329,6 +369,15 @@ class ScoringFunctionSpec extends AnyWordSpec with Matchers {
       val stats = pairs.map(pair => statsFor(pair, List.fill(50)(BigDecimal(10))))
 
       ScoringFunction.Consistent().score(stats) must be > 0.0
+    }
+
+    "withhold Sortino credit when only one period was measured" in {
+      val stats = statsFor(pairs.head, List.fill(10)(BigDecimal(10)), spacing = 1.hour)
+
+      stats.sortinoRatio mustBe RiskRatio.InsufficientData
+      // Median return contributes 0.354545; period profit factor, recovery and edge contribute 0.6 + 0.6 + 0.45.
+      // The unmeasurable Sortino contributes nothing, unlike a measured series without losing periods.
+      ScoringFunction.Consistent(permissive).score(List(stats)) mustBe 2.0045454545 +- 0.000000001
     }
 
     // Every fixture trades once per pair-month, below the configured rate of two. Changing the run length and

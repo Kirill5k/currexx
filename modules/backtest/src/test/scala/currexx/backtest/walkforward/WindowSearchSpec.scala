@@ -8,7 +8,7 @@ import currexx.backtest.optimizer.ScoringFunction
 import currexx.backtest.optimizer.{OptimisationRound, OptimisationTarget}
 import currexx.core.trade.{Rule, TradeAction, TradeStrategy}
 import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation as VT}
-import fs2.io.file.{Files, Path}
+import fs2.io.file.Files
 import kirill5k.common.cats.test.IOWordSpec
 
 import java.time.YearMonth
@@ -36,21 +36,6 @@ class WindowSearchSpec extends IOWordSpec {
   }
   private val ga = Parameters.GA(4, 1, 0.8, 0.7, 0.25, shuffle = true, initialOversampling = 2)
 
-  private def deleteReports(label: String): IO[Unit] = {
-    val files     = Files.forAsync[IO]
-    val directory = Path("optimisation-results")
-    files.exists(directory).flatMap { exists =>
-      if (exists)
-        files
-          .list(directory)
-          .filter(_.fileName.toString.endsWith(s"-$label.md"))
-          .evalMap(files.deleteIfExists)
-          .compile
-          .drain
-      else IO.unit
-    }
-  }
-
   "WindowSearch" should {
     val parameters: List[Parameters.GA | Parameters.SCGA] = List(
       ga,
@@ -69,15 +54,29 @@ class WindowSearchSpec extends IOWordSpec {
           shortlistSize = 3,
           target = OptimisationTarget.Both
         )
-        val search   = WindowSearch.make[IO](poolSize = 2)
-        val repeated = search.search(round, seed = 91L)
-        val result   = (for {
-          first <- repeated
-          _     <- search.search(round, seed = 117L)
-          again <- repeated
-        } yield (first, again)).guarantee(deleteReports(label))
+        val files  = Files.forAsync[IO]
+        val result = files.tempDirectory.use { directory =>
+          val outputDirectory = directory / "search"
+          val search          = WindowSearch.make[IO](poolSize = 2, outputDirectory = outputDirectory)
+          val repeated        = search.search(round, seed = 91L)
+          for {
+            first   <- repeated
+            _       <- search.search(round, seed = 117L)
+            again   <- repeated
+            reports <- files.list(outputDirectory).compile.toList
+            content <- files.readUtf8(reports.head).compile.string
+          } yield (first, again, outputDirectory, reports, content)
+        }
 
-        result.asserting { case (first, again) =>
+        result.asserting { case (first, again, outputDirectory, reports, content) =>
+          reports must not be empty
+          reports.foreach { path =>
+            path.parent mustBe Some(outputDirectory)
+            path.fileName.toString must startWith(s"${params.name.toLowerCase}-optimisation-")
+            path.fileName.toString must endWith(s"-$label.md")
+          }
+          content must include("## Final Results")
+          content must include(s"## Search ranking: $label")
           first.finalists must not be empty
           first.finalists.size must be <= 3
           first.finalists.map(_._1) must contain(strategy)

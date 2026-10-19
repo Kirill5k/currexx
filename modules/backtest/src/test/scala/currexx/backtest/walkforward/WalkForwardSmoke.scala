@@ -28,8 +28,12 @@ object WalkForwardSmoke extends IOApp.Simple:
               WalkForwardExperiment.create(round.copy(searchObjective = objective), seed, WalkForwardEvaluator.history.take(1), plan)
             )
             store   <- WalkForwardReportStore.make[IO](experiment, root)
-            results <- new WalkForwardRunner(WindowSearch.make[IO](2), ForwardEvaluator.make[IO](2), store.events).run(experiment)
-            _       <- IO.raiseUnless(results.size == plan.windows.size && results.forall(_.forward.coverage.size == 1))(
+            results <- new WalkForwardRunner(
+              WindowSearch.make[IO](2, outputDirectory = store.directory / "search"),
+              ForwardEvaluator.make[IO](2),
+              store.events
+            ).run(experiment)
+            _ <- IO.raiseUnless(results.size == plan.windows.size && results.forall(_.forward.coverage.size == 1))(
               new IllegalStateException("Smoke experiment did not complete every paired test")
             )
             _ <- IO.raiseUnless(results.forall { result =>

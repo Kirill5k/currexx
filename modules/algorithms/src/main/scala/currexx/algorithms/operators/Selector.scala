@@ -73,9 +73,9 @@ object Selector:
     * strong individual can win several tournaments and contribute its genes to several children — that amplification is the entire source
     * of selection pressure.
     *
-    * Drawing without replacement would remove it: callers ask for `populationLimit == populationSize` selections because each pair yields
-    * two children, so every individual would become a parent exactly once and fitness would only decide which handful of individuals are
-    * left over, leaving the search close to a random walk.
+    * GA callers reserve elite slots before requesting parents, rounding the remaining budget to complete pairs. Sampling without
+    * replacement would cap each individual's contribution at one selected slot; when most of the population is requested, fitness would
+    * mostly decide who is omitted rather than how often stronger individuals reproduce.
     *
     * The algorithm:
     *   1. For each selection, randomly pick two different individuals from the population

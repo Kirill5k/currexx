@@ -4,6 +4,7 @@ import cats.Monad
 import cats.effect.Async
 import currexx.algorithms.operators.species.SpeciesStats
 import currexx.algorithms.{EvaluatedPopulation, Fitness, Parameters, ValidatedPopulation}
+import fs2.io.file.Path
 
 import java.time.Instant
 
@@ -120,6 +121,8 @@ trait Tracker[F[_], I]:
 
 object Tracker {
 
+  val defaultOutputDirectory: Path = Path("optimisation-results")
+
   def logging[F[_]: Async, I](
       label: String = "",
       logInterval: Int = 10,
@@ -139,9 +142,20 @@ object Tracker {
       showTopN: Int = 1,
       showStats: Boolean = false,
       finalTopN: Int = 25,
-      renderIndividual: I => String = (individual: I) => individual.toString
+      renderIndividual: I => String = (individual: I) => individual.toString,
+      outputDirectory: Path = defaultOutputDirectory
   ): F[Tracker[F, I]] =
-    MarkdownTracker.make(algorithmName, label, logInterval, showTopMember, showTopN, showStats, finalTopN, renderIndividual)
+    MarkdownTracker.make(
+      algorithmName,
+      label,
+      logInterval,
+      showTopMember,
+      showTopN,
+      showStats,
+      finalTopN,
+      renderIndividual,
+      outputDirectory
+    )
 
   def composite[F[_]: Monad, I](trackers: Tracker[F, I]*): Tracker[F, I] =
     CompositeTracker.make(trackers*)

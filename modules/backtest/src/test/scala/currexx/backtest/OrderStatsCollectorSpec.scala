@@ -63,6 +63,7 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
       stats.winRate mustBe BigDecimal(1)
       stats.totalProfit mustBe BigDecimal(10)
       stats.expectancy mustBe BigDecimal(10)
+      stats.expectancyToLossRatio mustBe None
       stats.payoffRatio mustBe None
       stats.profitFactor mustBe None
       stats.recoveryFactor mustBe None
@@ -97,6 +98,7 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
       stats.winCount mustBe 1
       stats.lossTotal mustBe -10.0
       stats.totalProfit mustBe BigDecimal(0)
+      stats.expectancyToLossRatio mustBe Some(BigDecimal(0))
       stats.forcedClosureCount mustBe 1
     }
 
@@ -169,6 +171,7 @@ class OrderStatsCollectorSpec extends AnyWordSpec with Matchers {
       stats.expectancy mustBe BigDecimal("-12.50000000")
       stats.averageWin mustBe BigDecimal(100)
       stats.averageLoss mustBe BigDecimal(75)
+      stats.expectancyToLossRatio mustBe Some(BigDecimal("-0.1666666666666666666666666666666667"))
       stats.payoffRatio mustBe Some(BigDecimal("1.33333"))
       stats.profitFactor mustBe Some(BigDecimal("0.66667"))
       stats.maxDrawdown mustBe BigDecimal(150)

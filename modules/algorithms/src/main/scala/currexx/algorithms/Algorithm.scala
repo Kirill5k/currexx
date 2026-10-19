@@ -72,11 +72,15 @@ object Algorithm {
         initialSort <- Op.SortByFitness(initialEval).freeM
         finalPop    <- iterate(initialSort.take(params.populationSize), params.maxGen) { (currentPop, i) =>
           for
-            elites    <- Op.SelectElites(currentPop, params.populationSize, params.elitismRatio).freeM
-            pairs     <- Op.SelectPairs(currentPop, params.populationSize).freeM
-            crossed1  <- Op.ApplyToAll(pairs, (pair: (I, I)) => Op.Cross(pair._1, pair._2, params.crossoverProbability)).freeM
-            crossed2  <- Op.ApplyToAll(pairs, (pair: (I, I)) => Op.Cross(pair._2, pair._1, params.crossoverProbability)).freeM
-            mutated   <- Op.ApplyToAll(crossed1 ++ crossed2, (ind: I) => Op.Mutate(ind, params.mutationProbability)).freeM
+            elites <- Op.SelectElites(currentPop, params.populationSize, params.elitismRatio).freeM
+            offspringCount = params.populationSize - elites.size
+            // Select complete pairs, then discard the spare child before mutation when the offspring budget is odd.
+            parentCount = offspringCount + offspringCount % 2
+            pairs    <- Op.SelectPairs(currentPop, parentCount).freeM
+            crossed1 <- Op.ApplyToAll(pairs, (pair: (I, I)) => Op.Cross(pair._1, pair._2, params.crossoverProbability)).freeM
+            crossed2 <- Op.ApplyToAll(pairs, (pair: (I, I)) => Op.Cross(pair._2, pair._1, params.crossoverProbability)).freeM
+            offspring = (crossed1 ++ crossed2).take(offspringCount)
+            mutated   <- Op.ApplyToAll(offspring, (ind: I) => Op.Mutate(ind, params.mutationProbability)).freeM
             evPop     <- Op.EvaluatePopulation(mutated ++ elites, EvaluationPhase.Search(i)).freeM
             sortedPop <- Op.SortByFitness(evPop).freeM
             _         <- Op.DisplayProgress(Progress.Population(i, params.maxGen, sortedPop)).freeM

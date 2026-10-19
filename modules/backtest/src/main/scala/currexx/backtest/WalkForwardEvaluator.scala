@@ -37,7 +37,7 @@ object WalkForwardEvaluator extends IOApp.Simple {
             store      <- WalkForwardReportStore.make[IO](experiment)
             _          <- IO.println(s"Walk-forward evaluation (${WalkForwardReportRenderer.evidenceLabel}): ${store.directory}")
             results    <- WalkForwardRunner[IO](
-              WindowSearch.make[IO](evaluatorPoolSize),
+              WindowSearch.make[IO](evaluatorPoolSize, outputDirectory = store.directory / "search"),
               ForwardEvaluator.make[IO](evaluatorPoolSize),
               store.events
             )

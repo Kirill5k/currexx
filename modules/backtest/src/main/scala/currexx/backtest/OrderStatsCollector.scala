@@ -138,9 +138,10 @@ final case class OrderStats(
   def expectancy: BigDecimal = if (total == 0) BigDecimal(0) else (totalProfit / total).roundTo(8)
   // Relationship between winning and losing closed trades
   // Above 1 is profitable; 1.5 means $1.50 won for every $1 lost.
-  def profitFactor: Option[BigDecimal]   = Option.when(grossLoss != 0)((grossProfit / grossLoss).roundTo(5))
-  def recoveryFactor: Option[BigDecimal] = Option.when(maxDrawdown != 0)((totalProfit / maxDrawdown).roundTo(5))
-  def winLossRatio: BigDecimal           =
+  def profitFactor: Option[BigDecimal]          = Option.when(grossLoss != 0)((grossProfit / grossLoss).roundTo(5))
+  def recoveryFactor: Option[BigDecimal]        = Option.when(maxDrawdown != 0)((totalProfit / maxDrawdown).roundTo(5))
+  def expectancyToLossRatio: Option[BigDecimal] = Option.when(averageLoss != 0)(expectancy / averageLoss)
+  def winLossRatio: BigDecimal                  =
     if (lossCount == 0) BigDecimal(winCount)
     else (BigDecimal(winCount) / BigDecimal(lossCount)).roundTo(5)
 
