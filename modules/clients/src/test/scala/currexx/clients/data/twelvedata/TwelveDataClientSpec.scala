@@ -1,6 +1,9 @@
 package currexx.clients.data.twelvedata
 
-import cats.effect.{IO, Temporal}
+import cats.effect.{Deferred, IO, Ref, Temporal}
+import cats.syntax.parallel.*
+import currexx.clients.data.twelvedata.TwelveDataClient.CacheKey
+import currexx.domain.errors.AppError
 import currexx.domain.market.Currency.{EUR, USD}
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import kirill5k.common.sttp.test.Sttp4WordSpec
@@ -10,6 +13,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import sttp.capabilities.fs2.Fs2Streams
 import sttp.client4.WebSocketStreamBackend
 import sttp.client4.testing.ResponseStub
+import sttp.model.StatusCode
 
 import java.time.Instant
 import scala.concurrent.duration.*
@@ -22,6 +26,171 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
   val pair   = CurrencyPair(EUR, USD)
 
   "A TwelveDataClient" should {
+    "reuse one successful fetch for overlapping requests with the same pair and interval" in {
+      given Clock[IO] = Clock.mock[IO](Instant.parse("2026-01-19T13:00:00Z"))
+
+      val response = readJson("twelvedata/eur-usd-hourly-prices.response.json")
+      val result   = for
+        started <- Deferred[IO, Unit]
+        release <- Deferred[IO, Unit]
+        calls   <- Ref.of[IO, Int](0)
+        backend = fs2BackendStub.whenAnyRequest.thenRespondF {
+          calls.update(_ + 1) >> started.complete(()) >> release.get.as(ResponseStub.adjust(response))
+        }
+        client  <- makeClient(backend)
+        results <- client
+          .timeSeriesData(pair, Interval.H1)
+          .start
+          .bracket { first =>
+            started.get >>
+              List
+                .fill(12)(client.timeSeriesData(pair, Interval.H1))
+                .parSequence
+                .start
+                .bracket { waiting =>
+                  for
+                    _      <- IO.sleep(100.millis)
+                    _      <- release.complete(())
+                    head   <- first.joinWithNever
+                    others <- waiting.joinWithNever
+                  yield head :: others
+                }(_.cancel)
+          }(_.cancel)
+        count <- calls.get
+      yield (results, count)
+
+      result.timeout(5.seconds).asserting { case (results, count) =>
+        results must have size 13
+        results.distinct must have size 1
+        results.head.prices must have size 100
+        count mustBe 1
+      }
+    }
+
+    "serialize different requests for one pair while allowing other pairs to proceed" in {
+      given Clock[IO] = Clock.mock[IO](Instant.parse("2026-01-19T13:00:00Z"))
+
+      val response  = readJson("twelvedata/eur-usd-hourly-prices.response.json")
+      val otherPair = CurrencyPair(USD, EUR)
+      val result    = for
+        started      <- Deferred[IO, Unit]
+        release      <- Deferred[IO, Unit]
+        quoteStarted <- Deferred[IO, Unit]
+        backend = fs2BackendStub
+          .whenRequestMatches(_.hasParams(Map("symbol" -> "EUR/USD", "interval" -> "1h")))
+          .thenRespondF(started.complete(()) >> release.get.as(ResponseStub.adjust(response)))
+          .whenRequestMatches(_.hasParams(Map("symbol" -> "EUR/USD", "interval" -> "1min")))
+          .thenRespondF(quoteStarted.complete(()).as(ResponseStub.adjust(response)))
+          .whenRequestMatches(_.hasParams(Map("symbol" -> "USD/EUR")))
+          .thenRespond(ResponseStub.adjust(response))
+        client  <- makeClient(backend)
+        blocked <- client
+          .timeSeriesData(pair, Interval.H1)
+          .start
+          .bracket { first =>
+            started.get >> client
+              .latestPrice(pair)
+              .start
+              .bracket { quote =>
+                for
+                  _       <- client.latestPrice(otherPair)
+                  _       <- IO.sleep(100.millis)
+                  started <- quoteStarted.tryGet
+                  _       <- release.complete(())
+                  _       <- first.joinWithNever
+                  _       <- quote.joinWithNever
+                yield started.isEmpty
+              }(_.cancel)
+          }(_.cancel)
+      yield blocked
+
+      result.timeout(5.seconds).asserting(_ mustBe true)
+    }
+
+    "release the pair lock after a failed request" in {
+      given Clock[IO] = Clock.mock[IO](Instant.parse("2026-01-19T13:00:00Z"))
+
+      val backend = fs2BackendStub.whenAnyRequest.thenRespondCyclic(
+        ResponseStub.adjust("Forbidden", StatusCode.Forbidden),
+        ResponseStub.adjust(readJson("twelvedata/eur-usd-hourly-prices.response.json"))
+      )
+      val result = for
+        client <- makeClient(backend)
+        failed <- client.timeSeriesData(pair, Interval.H1).attempt
+        data   <- client.timeSeriesData(pair, Interval.H1)
+      yield (failed, data)
+
+      result.timeout(5.seconds).asserting { case (failed, data) =>
+        failed mustBe Left(AppError.AccessDenied("twelve-data authentication has expired"))
+        data.prices must have size 100
+      }
+    }
+
+    "release the pair lock when an in-flight request is cancelled" in {
+      given Clock[IO] = Clock.mock[IO](Instant.parse("2026-01-19T13:00:00Z"))
+
+      val response = readJson("twelvedata/eur-usd-hourly-prices.response.json")
+      val result   = for
+        started <- Deferred[IO, Unit]
+        calls   <- Ref.of[IO, Int](0)
+        backend = fs2BackendStub.whenAnyRequest.thenRespondF {
+          calls.getAndUpdate(_ + 1).flatMap {
+            case 0 => started.complete(()) >> IO.never
+            case _ => IO.pure(ResponseStub.adjust(response))
+          }
+        }
+        client <- makeClient(backend)
+        data   <- client
+          .timeSeriesData(pair, Interval.H1)
+          .start
+          .bracket { first =>
+            started.get >> first.cancel >> client.timeSeriesData(pair, Interval.H1)
+          }(_.cancel)
+        count <- calls.get
+      yield (data, count)
+
+      result.timeout(5.seconds).asserting { case (data, count) =>
+        data.prices must have size 100
+        count mustBe 2
+      }
+    }
+
+    List(true, false).foreach { quoteFirst =>
+      s"cache current quotes separately from M1 history when quoteFirst=$quoteFirst" in {
+        given Clock[IO] = Clock.mock[IO](Instant.parse("2026-01-19T13:00:00Z"))
+
+        val response      = readJson("twelvedata/eur-usd-hourly-prices.response.json")
+        val quoteResponse = io.circe.parser
+          .parse(response)
+          .toOption
+          .get
+          .hcursor
+          .downField("values")
+          .withFocus(_.mapArray(_.take(1)))
+          .top
+          .get
+          .noSpaces
+        val result = for
+          calls <- Ref.of[IO, Int](0)
+          backend = fs2BackendStub
+            .whenRequestMatches(_.hasParams(Map("outputsize" -> "1")))
+            .thenRespondF(calls.update(_ + 1).as(ResponseStub.adjust(quoteResponse)))
+            .whenRequestMatches(_.hasParams(Map("outputsize" -> "150")))
+            .thenRespondF(calls.update(_ + 1).as(ResponseStub.adjust(response)))
+          client <- makeClient(backend)
+          _      <- if quoteFirst then client.latestPrice(pair).void else client.timeSeriesData(pair, Interval.M1).void
+          data   <- client.timeSeriesData(pair, Interval.M1)
+          _      <- client.latestPrice(pair)
+          count  <- calls.get
+        yield (data, count)
+
+        result.timeout(5.seconds).asserting { case (data, count) =>
+          data.prices must have size 100
+          count mustBe 2
+        }
+      }
+    }
+
     "retrieve time-series data" in {
       given Clock[IO] = Clock.mock[IO](Instant.parse("2022-11-08T10:15:30Z"))
 
@@ -62,7 +231,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
 
       val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.D1))
 
-      result.asserting { timeSeriesData =>
+      result.timeout(5.seconds).asserting { timeSeriesData =>
         timeSeriesData.currencyPair mustBe pair
         timeSeriesData.interval mustBe Interval.D1
         timeSeriesData.prices must have size 100
@@ -203,7 +372,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
   )(using marketClock: Clock[IO]): IO[TwelveDataClient[IO]] =
     for
       // Cache expiry uses real time; the scenario clock controls candle completion.
-      cache  <- Cache.make[IO, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
+      cache  <- Cache.make[IO, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)(using Temporal[IO], Clock.make[IO])
       client <- TwelveDataClient.make[IO](clientConfig, backend, cache, 100.millis)
     yield client
 }

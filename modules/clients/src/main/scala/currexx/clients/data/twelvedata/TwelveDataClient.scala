@@ -2,6 +2,7 @@ package currexx.clients.data.twelvedata
 
 import cats.data.NonEmptyList
 import cats.effect.Temporal
+import cats.effect.std.KeyedMutex
 import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -30,7 +31,8 @@ final private class LiveTwelveDataClient[F[_]](
     override protected val backend: WebSocketStreamBackend[F, Fs2Streams[F]],
     private val config: TwelveDataConfig,
     private val delayBetweenClientFailures: FiniteDuration,
-    private val cache: Cache[F, (CurrencyPair, Interval), MarketTimeSeriesData]
+    private val cache: Cache[F, TwelveDataClient.CacheKey, MarketTimeSeriesData],
+    private val requestMutex: KeyedMutex[F, CurrencyPair]
 )(using
     F: Temporal[F],
     logger: Logger[F],
@@ -54,28 +56,32 @@ final private class LiveTwelveDataClient[F[_]](
     }
 
   private def fetchTimeSeriesData(pair: CurrencyPair, interval: Interval, numOfTicks: Int, now: Instant): F[MarketTimeSeriesData] =
-    cache.evalPutIfNew(pair -> interval) {
-      val sym = s"${pair.base}/${pair.quote}"
-      val int = s"${interval.number}${if (interval.unit == "hour") "h" else interval.unit.slice(0, 3)}"
-      val uri = uri"${config.baseUri}/time_series?symbol=$sym&interval=$int&apikey=${config.apiKey}&outputsize=$numOfTicks&timezone=UTC"
-      dispatch(basicRequest.get(uri).response(asJson[TimeSeriesResponse]))
-        .flatMap { r =>
-          r.body match
-            case Right(res) =>
-              MarketTimeSeriesData(pair, interval, res.toPriceRanges(now), name).pure[F]
-            case Left(ResponseException.DeserializationException(b, _, _)) if b.matches(".*\"code\":( )?429.*") =>
-              F.sleep(delayBetweenClientFailures) >> fetchTimeSeriesData(pair, interval, numOfTicks, now)
-            case Left(ResponseException.DeserializationException(responseBody, error, _)) =>
-              logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
-                F.raiseError(AppError.JsonParsingFailure(responseBody, s"Failed to parse $name response: ${error.getMessage}"))
-            case Left(ResponseException.UnexpectedStatusCode(body, meta)) if meta.code == StatusCode.Forbidden =>
-              logger.error(s"$name-client/forbidden\n$body") >>
-                F.raiseError(AppError.AccessDenied(s"$name authentication has expired"))
-            case Left(ResponseException.UnexpectedStatusCode(body, meta)) =>
-              logger.error(s"$name-client/${meta.code.code}\n$body") >>
-                F.sleep(delayBetweenConnectionFailures) >> fetchTimeSeriesData(pair, interval, numOfTicks, now)
-        }
+    requestMutex.lock(pair).surround {
+      cache.evalPutIfNew((pair, interval, numOfTicks))(requestTimeSeriesData(pair, interval, numOfTicks, now))
     }
+
+  private def requestTimeSeriesData(pair: CurrencyPair, interval: Interval, numOfTicks: Int, now: Instant): F[MarketTimeSeriesData] = {
+    val sym = s"${pair.base}/${pair.quote}"
+    val int = s"${interval.number}${if (interval.unit == "hour") "h" else interval.unit.slice(0, 3)}"
+    val uri = uri"${config.baseUri}/time_series?symbol=$sym&interval=$int&apikey=${config.apiKey}&outputsize=$numOfTicks&timezone=UTC"
+    dispatch(basicRequest.get(uri).response(asJson[TimeSeriesResponse]))
+      .flatMap { r =>
+        r.body match
+          case Right(res) =>
+            MarketTimeSeriesData(pair, interval, res.toPriceRanges(now), name).pure[F]
+          case Left(ResponseException.DeserializationException(b, _, _)) if b.matches(".*\"code\":( )?429.*") =>
+            F.sleep(delayBetweenClientFailures) >> requestTimeSeriesData(pair, interval, numOfTicks, now)
+          case Left(ResponseException.DeserializationException(responseBody, error, _)) =>
+            logger.error(s"$name-client/json-parsing: ${error.getMessage}\n$responseBody") >>
+              F.raiseError(AppError.JsonParsingFailure(responseBody, s"Failed to parse $name response: ${error.getMessage}"))
+          case Left(ResponseException.UnexpectedStatusCode(body, meta)) if meta.code == StatusCode.Forbidden =>
+            logger.error(s"$name-client/forbidden\n$body") >>
+              F.raiseError(AppError.AccessDenied(s"$name authentication has expired"))
+          case Left(ResponseException.UnexpectedStatusCode(body, meta)) =>
+            logger.error(s"$name-client/${meta.code.code}\n$body") >>
+              F.sleep(delayBetweenConnectionFailures) >> requestTimeSeriesData(pair, interval, numOfTicks, now)
+      }
+  }
 
   extension (ts: TimeSeriesResponse)
     private def toPriceRanges(now: Instant): NonEmptyList[PriceRange] =
@@ -93,6 +99,8 @@ final private class LiveTwelveDataClient[F[_]](
 }
 
 private[clients] object TwelveDataClient {
+
+  type CacheKey = (CurrencyPair, Interval, Int)
 
   final case class TimeSeriesMeta(
       symbol: String,
@@ -118,14 +126,16 @@ private[clients] object TwelveDataClient {
       delayBetweenClientFailures: FiniteDuration
   ): F[TwelveDataClient[F]] =
     Cache
-      .make[F, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)
+      .make[F, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)
       .flatMap(cache => make(config, fs2Backend, cache, delayBetweenClientFailures))
 
   def make[F[_]: {Temporal, Logger, Clock}](
       config: TwelveDataConfig,
       fs2Backend: WebSocketStreamBackend[F, Fs2Streams[F]],
-      cache: Cache[F, (CurrencyPair, Interval), MarketTimeSeriesData],
+      cache: Cache[F, CacheKey, MarketTimeSeriesData],
       delayBetweenClientFailures: FiniteDuration
   ): F[TwelveDataClient[F]] =
-    Temporal[F].pure(LiveTwelveDataClient(fs2Backend, config, delayBetweenClientFailures, cache))
+    KeyedMutex[F, CurrencyPair].map(requestMutex =>
+      LiveTwelveDataClient(fs2Backend, config, delayBetweenClientFailures, cache, requestMutex)
+    )
 }
