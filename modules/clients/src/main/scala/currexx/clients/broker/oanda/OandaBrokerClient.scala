@@ -9,10 +9,9 @@ import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import currexx.clients.Fs2HttpClient
 import currexx.clients.broker.BrokerParameters
-import currexx.clients.broker.oanda.OandaBrokerClient.ClosePositionRequest
 import currexx.domain.errors.AppError
 import currexx.domain.market.{CurrencyPair, OpenedTradeOrder, OrderExecution, OrderPlacementResult, OrderRef, TradeOrder}
-import io.circe.{Codec, Json, JsonObject}
+import io.circe.{Json, JsonObject}
 import kirill5k.common.cats.Clock
 import org.typelevel.log4cats.Logger
 import sttp.capabilities.fs2.Fs2Streams
@@ -21,7 +20,6 @@ import sttp.client4.circe.asJson
 import sttp.client4.WebSocketStreamBackend
 import sttp.model.StatusCode
 
-import java.time.Instant
 import java.util.UUID
 import scala.concurrent.duration.*
 
@@ -33,7 +31,8 @@ private[clients] trait OandaBrokerClient[F[_]] extends Fs2HttpClient[F]:
 final private class LiveOandaBrokerClient[F[_]](
     override protected val backend: WebSocketStreamBackend[F, Fs2Streams[F]],
     private val config: OandaBrokerConfig,
-    override protected val maxRetries: Int
+    override protected val maxRetries: Int,
+    private val maxMarketHaltRetries: Int
 )(using
     F: Async[F],
     logger: Logger[F],
@@ -51,7 +50,7 @@ final private class LiveOandaBrokerClient[F[_]](
     case exit: TradeOrder.Exit =>
       for
         accountId <- getAccountId(params)
-        position  <- getPosition(accountId, params, exit.currencyPair)
+        position  <- getPosition(accountId, params, exit.currencyPair.toInstrument)
         result    <- F.ifM(F.pure(position.exists(_.isOpen)))(
           closePosition(accountId, params, position.get),
           F.pure(OrderPlacementResult.NoPosition)
@@ -80,20 +79,20 @@ final private class LiveOandaBrokerClient[F[_]](
   ): F[List[OrderExecution]] =
     for
       accountId <- getAccountId(params)
-      current   <- getPosition(accountId, params, cp)
+      current   <- getPosition(accountId, params, cp.toInstrument)
       tradeIds = current.flatMap(_.side(position).tradeIDs).getOrElse(Nil)
       fills <- tradeIds.traverse(getFillTransaction(accountId, params, _))
       openedAll = fills.map(_.tradeOpened.map(_.tradeID)) == tradeIds.map(Some(_))
       _ <- F.unlessA(openedAll)(logger.warn(s"$name-client/find-entry-executions: fills of trades $tradeIds did not open them"))
     yield if openedAll then fills.map(_.toExecution) else Nil
 
-  private def getPositions(accountId: String, params: BrokerParameters.Oanda): F[List[OandaBrokerClient.Position]] =
+  private def getPositions(accountId: String, params: BrokerParameters.Oanda): F[List[Position]] =
     dispatch {
       basicRequest
         .get(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/positions")
         .auth
         .bearer(params.apiKey)
-        .response(asJson[OandaBrokerClient.PositionsResponse])
+        .response(asJson[PositionsResponse])
     }.flatMap { r =>
       r.body match
         case Right(res) => F.pure(res.positions)
@@ -103,20 +102,20 @@ final private class LiveOandaBrokerClient[F[_]](
   private def getPosition(
       accountId: String,
       params: BrokerParameters.Oanda,
-      currencyPair: CurrencyPair
-  ): F[Option[OandaBrokerClient.Position]] =
+      instrument: String
+  ): F[Option[Position]] =
     dispatch {
       basicRequest
-        .get(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/positions/${currencyPair.toInstrument}")
+        .get(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/positions/$instrument")
         .auth
         .bearer(params.apiKey)
-        .response(asJson[OandaBrokerClient.PositionResponse])
+        .response(asJson[PositionResponse])
     }.flatMap { r =>
       r.body match
         case Right(res) =>
           F.pure(Some(res.position))
         case Left(_) if r.code == StatusCode.NotFound =>
-          logger.warn(s"$name-client/get-position-404: No position for $accountId / ${currencyPair.toInstrument}") >>
+          logger.warn(s"$name-client/get-position-404: No position for $accountId / $instrument") >>
             F.pure(None)
         case Left(err) =>
           handleError("get-position", err)
@@ -125,7 +124,8 @@ final private class LiveOandaBrokerClient[F[_]](
   private def closePosition(
       accountId: String,
       params: BrokerParameters.Oanda,
-      position: OandaBrokerClient.Position
+      position: Position,
+      marketHaltAttempt: Int = 0
   ): F[OrderPlacementResult] = {
     val request = position.toClosePositionRequest
     dispatch {
@@ -134,9 +134,21 @@ final private class LiveOandaBrokerClient[F[_]](
         .auth
         .bearer(params.apiKey)
         .body(asJson(request))
-        .response(asJson[OandaBrokerClient.ClosePositionResponse])
+        .response(asJson[ClosePositionResponse])
     }.flatMap { r =>
       r.body match
+        case Right(res) if res.isMarketHalted && marketHaltAttempt < maxMarketHaltRetries =>
+          retryAfterMarketHalt(position.instrument, marketHaltAttempt) {
+            getPosition(accountId, params, position.instrument).flatMap {
+              case current if current.forall(p => !p.isOpen) =>
+                F.pure(OrderPlacementResult.NoPosition)
+              case Some(current) if position.hasSameTradesAs(current) =>
+                closePosition(accountId, params, current, marketHaltAttempt + 1)
+              case _ =>
+                logger.warn(s"$name-client/close-position: ${position.instrument} position changed while halted, not retrying the close") >>
+                  closeOutcome(position.instrument, request, res)
+            }
+          }
         case Right(res) => closeOutcome(position.instrument, request, res)
         case Left(err)  => handleError("close-position", err)
     }
@@ -145,7 +157,7 @@ final private class LiveOandaBrokerClient[F[_]](
   private def closeOutcome(
       instrument: String,
       request: ClosePositionRequest,
-      res: OandaBrokerClient.ClosePositionResponse
+      res: ClosePositionResponse
   ): F[OrderPlacementResult] =
     val missingFills = res.missingFills(request)
     res.fills match
@@ -161,14 +173,23 @@ final private class LiveOandaBrokerClient[F[_]](
 
   // The fills' presence already confirms the close, so fills that cannot be decoded only lose their execution details
   private def decodeFills(fills: NonEmptyList[JsonObject]): F[OrderPlacementResult] =
-    fills.traverse(Json.fromJsonObject(_).as[OandaBrokerClient.OrderFillTransaction]) match
+    fills.traverse(Json.fromJsonObject(_).as[OrderFillTransaction]) match
       case Right(transactions) => F.pure(OrderPlacementResult.Filled(transactions.map(_.toExecution)))
       case Left(error)         =>
         val body = fills.map(Json.fromJsonObject(_).noSpaces).toList.mkString("\n")
         logger.error(s"$name-client/json-parsing: filled with an unparseable order fill: ${error.getMessage}\n$body") >>
           F.pure(OrderPlacementResult.FilledWithoutExecution(fills.toList.flatMap(_("orderID").flatMap(_.asString)).headOption))
 
-  private def openPosition(accountId: String, params: BrokerParameters.Oanda, position: TradeOrder.Enter): F[OrderPlacementResult] =
+  private def retryAfterMarketHalt[A](instrument: String, attempt: Int)(retry: => F[A]): F[A] =
+    logger.warn(s"$name-client/$instrument: MARKET_HALTED, retrying in 3 minutes (retry ${attempt + 1}/$maxMarketHaltRetries)") >>
+      clock.sleep(3.minutes) >> retry
+
+  private def openPosition(
+      accountId: String,
+      params: BrokerParameters.Oanda,
+      position: TradeOrder.Enter,
+      marketHaltAttempt: Int = 0
+  ): F[OrderPlacementResult] =
     F.delay(UUID.randomUUID().toString).flatMap { clientOrderId =>
       def lookUpOrder(reason: String): F[OrderPlacementResult] =
         logger.warn(s"$name-client/open-position-$reason: looking up order $clientOrderId") >>
@@ -179,17 +200,21 @@ final private class LiveOandaBrokerClient[F[_]](
           .post(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/orders")
           .auth
           .bearer(params.apiKey)
-          .body(asJson(OandaBrokerClient.OpenPositionRequest.from(position, clientOrderId)))
-          .response(asJson[OandaBrokerClient.OpenPositionResponse])
+          .body(asJson(OpenPositionRequest.from(position, clientOrderId)))
+          .response(asJson[OpenPositionResponse])
       }.attempt.flatMap {
         case Left(error) => lookUpOrder(error.getClass.getSimpleName.toLowerCase)
         case Right(r)    =>
           (r.code, r.body) match
+            case (StatusCode.Created, Right(res)) if res.isMarketHalted && marketHaltAttempt < maxMarketHaltRetries =>
+              retryAfterMarketHalt(position.currencyPair.toInstrument, marketHaltAttempt) {
+                openPosition(accountId, params, position, marketHaltAttempt + 1)
+              }
             case (StatusCode.Created, Right(res)) => F.pure(res.toResult(clientOrderId))
             case (StatusCode.Created, Left(err))  => lookUpOrder(s"unparseable: $err")
             case (StatusCode.Forbidden, _)        =>
               logger.warn(s"$name-client/open-position: Rate limited, retrying in 30s") >>
-                clock.sleep(30.seconds) >> openPosition(accountId, params, position)
+                clock.sleep(30.seconds) >> openPosition(accountId, params, position, marketHaltAttempt)
             case (status, _) if status.isServerError => lookUpOrder(status.code.toString)
             case (status, body)                      =>
               logger.error(s"$name-client/open-position-${status.code}\n${body.fold(identity, _ => "")}") >>
@@ -207,13 +232,13 @@ final private class LiveOandaBrokerClient[F[_]](
       case Some(order)                               => F.pure(OrderPlacementResult.Pending(OrderRef(clientOrderId, Some(order.id))))
     }
 
-  private def getOrder(accountId: String, params: BrokerParameters.Oanda, clientOrderId: String): F[Option[OandaBrokerClient.Order]] =
+  private def getOrder(accountId: String, params: BrokerParameters.Oanda, clientOrderId: String): F[Option[Order]] =
     dispatch {
       basicRequest
         .get(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/orders/${s"@$clientOrderId"}")
         .auth
         .bearer(params.apiKey)
-        .response(asJson[OandaBrokerClient.OrderResponse])
+        .response(asJson[OrderResponse])
     }.flatMap { r =>
       r.body match
         case Right(res)                               => F.pure(Some(res.order))
@@ -225,7 +250,7 @@ final private class LiveOandaBrokerClient[F[_]](
   private def getOrderExecution(
       accountId: String,
       params: BrokerParameters.Oanda,
-      order: OandaBrokerClient.Order
+      order: Order
   ): F[OrderPlacementResult] =
     val withoutExecution = OrderPlacementResult.FilledWithoutExecution(Some(order.id))
     order.fillingTransactionID match
@@ -244,13 +269,13 @@ final private class LiveOandaBrokerClient[F[_]](
       accountId: String,
       params: BrokerParameters.Oanda,
       transactionId: String
-  ): F[OandaBrokerClient.OrderFillTransaction] =
+  ): F[OrderFillTransaction] =
     dispatch {
       basicRequest
         .get(uri"${config.baseUri(params.demo)}/v3/accounts/$accountId/transactions/$transactionId")
         .auth
         .bearer(params.apiKey)
-        .response(asJson[OandaBrokerClient.FillTransactionResponse])
+        .response(asJson[FillTransactionResponse])
     }.flatMap { r =>
       r.body match
         case Right(res) => F.pure(res.transaction)
@@ -263,7 +288,7 @@ final private class LiveOandaBrokerClient[F[_]](
         .get(uri"${config.baseUri(params.demo)}/v3/accounts")
         .auth
         .bearer(params.apiKey)
-        .response(asJson[OandaBrokerClient.AccountsResponse])
+        .response(asJson[AccountsResponse])
     }.flatMap { r =>
       r.body match
         case Right(res) if res.accounts.exists(_.id == params.accountId) => F.pure(params.accountId)
@@ -291,170 +316,13 @@ final private class LiveOandaBrokerClient[F[_]](
 }
 
 object OandaBrokerClient {
-  private val LotSize = 100000
-
-  final case class ClosePositionRequest(
-      longUnits: String,
-      shortUnits: String
-  ) derives Codec.AsObject
-
-  final case class OpenPositionRequest(order: OpenPositionOrder) derives Codec.AsObject
-
-  // Close outcomes depend on fill presence and cancellation reasons, not transaction metadata.
-  final case class ClosePositionResponse(
-      lastTransactionID: String,
-      longOrderFillTransaction: Option[JsonObject],
-      longOrderCancelTransaction: Option[CloseOrderCancelTransaction],
-      shortOrderFillTransaction: Option[JsonObject],
-      shortOrderCancelTransaction: Option[CloseOrderCancelTransaction]
-  ) derives Codec.AsObject:
-    def fills: List[JsonObject]                                   = List(longOrderFillTransaction, shortOrderFillTransaction).flatten
-    def cancellations: List[CloseOrderCancelTransaction]          = List(longOrderCancelTransaction, shortOrderCancelTransaction).flatten
-    def missingFills(request: ClosePositionRequest): List[String] = List(
-      Option.when(request.longUnits == "ALL" && longOrderFillTransaction.isEmpty)("long"),
-      Option.when(request.shortUnits == "ALL" && shortOrderFillTransaction.isEmpty)("short")
-    ).flatten
-
-  final case class CloseOrderCancelTransaction(reason: String) derives Codec.AsObject
-
-  final case class OpenPositionResponse(
-      orderCreateTransaction: OrderTransaction,
-      orderFillTransaction: Option[OrderFillTransaction],
-      orderCancelTransaction: Option[OrderCancelTransaction],
-      relatedTransactionIDs: List[String],
-      lastTransactionID: String
-  ) derives Codec.AsObject:
-    def toResult(clientOrderId: String): OrderPlacementResult =
-      (orderCancelTransaction, orderFillTransaction) match
-        case (Some(cancel), _)  => OrderPlacementResult.Cancelled(cancel.reason)
-        case (None, Some(fill)) => OrderPlacementResult.filled(fill.toExecution)
-        case (None, None)       => OrderPlacementResult.Pending(OrderRef(clientOrderId, Some(orderCreateTransaction.id)))
-
-  final case class OrderTransaction(
-      id: String,
-      time: Instant,
-      userID: Int,
-      accountID: String,
-      batchID: String,
-      requestID: Option[String]
-  ) derives Codec.AsObject
-
-  // Only the fields that make up an execution are decoded, so unrelated metadata cannot break fill detection.
-  final case class OrderFillTransaction(
-      id: String,
-      orderID: String,
-      time: Instant,
-      units: BigDecimal,
-      price: BigDecimal,
-      fullVWAP: Option[BigDecimal],
-      tradeOpened: Option[TradeRef],
-      tradesClosed: Option[List[TradeRef]],
-      tradeReduced: Option[TradeRef]
-  ) derives Codec.AsObject:
-    def toExecution: OrderExecution =
-      OrderExecution(
-        price = fullVWAP.getOrElse(price),
-        time = time,
-        volume = units.abs / LotSize,
-        orderId = orderID,
-        transactionId = id,
-        tradeIds = tradeOpened.toList.map(_.tradeID) ++ tradeReduced.map(_.tradeID) ++ tradesClosed.toList.flatten.map(_.tradeID)
-      )
-
-  final case class TradeRef(tradeID: String) derives Codec.AsObject
-
-  final case class FillTransactionResponse(transaction: OrderFillTransaction) derives Codec.AsObject
-
-  final case class OrderCancelTransaction(
-      id: String,
-      time: Instant,
-      userID: Int,
-      accountID: String,
-      batchID: String,
-      requestID: Option[String],
-      `type`: String,
-      reason: String
-  ) derives Codec.AsObject
-
-  object OpenPositionRequest:
-    def from(order: TradeOrder.Enter, clientOrderId: String): OpenPositionRequest =
-      val units = order.position match
-        case TradeOrder.Position.Buy  => (order.volume * LotSize).toInt
-        case TradeOrder.Position.Sell => -(order.volume * LotSize).toInt
-      OpenPositionRequest(
-        OpenPositionOrder(
-          instrument = s"${order.currencyPair.base}_${order.currencyPair.quote}",
-          units = units,
-          `type` = "MARKET",
-          positionFill = "DEFAULT",
-          clientExtensions = ClientExtensions(clientOrderId)
-        )
-      )
-
-  final case class OpenPositionOrder(
-      instrument: String,
-      units: Int,
-      `type`: String,
-      positionFill: String,
-      clientExtensions: ClientExtensions
-  ) derives Codec.AsObject
-
-  final case class ClientExtensions(id: String) derives Codec.AsObject
-
-  final case class OrderResponse(order: Order) derives Codec.AsObject
-
-  final case class Order(id: String, state: String, fillingTransactionID: Option[String]) derives Codec.AsObject
-
-  final case class AccountsResponse(accounts: List[Account]) derives Codec.AsObject
-
-  final case class Account(id: String) derives Codec.AsObject
-
-  final case class PositionsResponse(positions: List[Position]) derives Codec.AsObject
-
-  final case class PositionResponse(position: Position) derives Codec.AsObject
-
-  final case class Position(
-      instrument: String,
-      long: PositionSide,
-      short: PositionSide
-  ) derives Codec.AsObject {
-    def isOpen: Boolean                                   = long.units != 0 || short.units != 0
-    def isHedged: Boolean                                 = long.units != 0 && short.units != 0
-    def side(position: TradeOrder.Position): PositionSide = position match
-      case TradeOrder.Position.Buy  => long
-      case TradeOrder.Position.Sell => short
-    def toClosePositionRequest: ClosePositionRequest =
-      ClosePositionRequest(
-        longUnits = if (long.units == 0) "NONE" else "ALL",
-        shortUnits = if (short.units == 0) "NONE" else "ALL"
-      )
-    def toOpenedTradeOrder: Option[OpenedTradeOrder] =
-      Option.when(isOpen) {
-        val isBuy = long.units > 0
-        val side  = if isBuy then long else short
-        OpenedTradeOrder(
-          currencyPair = CurrencyPair.fromUnsafe(instrument.replace("_", "")),
-          position = if isBuy then TradeOrder.Position.Buy else TradeOrder.Position.Sell,
-          openPrice = side.averagePrice.getOrElse(BigDecimal(0)),
-          currentPrice = side.averagePrice
-            .getOrElse(BigDecimal(0)) + Option.when(side.units != 0)(side.unrealizedPL / side.units).getOrElse(BigDecimal(0)),
-          volume = side.units.abs / LotSize,
-          profit = side.unrealizedPL
-        )
-      }
-  }
-
-  final case class PositionSide(
-      units: BigDecimal,
-      tradeIDs: Option[List[String]],
-      averagePrice: Option[BigDecimal],
-      unrealizedPL: BigDecimal
-  ) derives Codec.AsObject
+  val LotSize = 100000
 
   def make[F[_]: {Async, Logger, Clock}](
       config: OandaBrokerConfig,
       backend: WebSocketStreamBackend[F, Fs2Streams[F]],
-      maxRetries: Int = 6
+      maxRetries: Int = 6,
+      maxMarketHaltRetries: Int = 3
   ): F[OandaBrokerClient[F]] =
-    LiveOandaBrokerClient(backend, config, maxRetries).pure[F]
+    LiveOandaBrokerClient(backend, config, maxRetries, maxMarketHaltRetries).pure[F]
 }

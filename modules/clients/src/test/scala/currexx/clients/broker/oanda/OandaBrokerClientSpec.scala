@@ -80,7 +80,7 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
           }
 
         val result = for
-          client <- OandaBrokerClient.make[IO](config, testingBackend)
+          client <- OandaBrokerClient.make[IO](config, testingBackend, maxMarketHaltRetries = 0)
           status <- client.submit(params, TradeOrder.Enter(TradeOrder.Position.Sell, eurUsdPair, BigDecimal(1), BigDecimal("0.5")))
         yield status
 
@@ -622,7 +622,7 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
       }
 
     for
-      client <- OandaBrokerClient.make[IO](config, testingBackend)
+      client <- OandaBrokerClient.make[IO](config, testingBackend, maxRetries = 0)
       result <- client.submit(params, TradeOrder.Enter(TradeOrder.Position.Buy, eurUsdPair, BigDecimal(1), BigDecimal("1.0"))).attempt
     yield (result, submissions.get)
   }
@@ -669,7 +669,7 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
       }
 
     for
-      client     <- OandaBrokerClient.make[IO](config, testingBackend)
+      client     <- OandaBrokerClient.make[IO](config, testingBackend, maxRetries = 0)
       executions <- client.findEntryExecutions(params, eurUsdPair, position)
     yield (executions, transactionRequests.get)
   }
@@ -740,7 +740,7 @@ class OandaBrokerClientSpec extends Sttp4WordSpec {
       }
 
     for
-      client <- OandaBrokerClient.make[IO](config, testingBackend)
+      client <- OandaBrokerClient.make[IO](config, testingBackend, maxMarketHaltRetries = 0)
       result <- client.submit(params, TradeOrder.Exit(eurUsdPair, BigDecimal(1))).attempt
       _      <- IO {
         if expectClose then {
