@@ -94,6 +94,11 @@ object OptimisationRounds:
       TestStrategy.s1_v2_optimized,
       List(NamedStrategy("s1_v2_optimized_v4", TestStrategy.s1_v2_optimized_v4)),
       runScga = true
+    ),
+    Family(
+      "s12",
+      TestStrategy.s12,
+      List(NamedStrategy("s12_optimized", TestStrategy.s12_optimized))
     )
   )
 
