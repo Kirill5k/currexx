@@ -31,52 +31,32 @@ class StrategyCatalogueSpec extends AnyWordSpec with Matchers {
 
     "preserve batch membership, strategy identities and evaluation order" in {
       val expected = List(
-        "s2_optimized" -> TestStrategy.s2_optimized,
-        "s2_optimized_v2" -> TestStrategy.s2_optimized_v2,
-        "s10" -> TestStrategy.s10,
-        "s10_optimized" -> TestStrategy.s10_optimized,
-        "s10_v2" -> TestStrategy.s10_v2,
-        "s5_optimized_v2" -> TestStrategy.s5_optimized_v2,
-        "s5_optimized_v3" -> TestStrategy.s5_optimized_v3,
-        "s1_v2_optimized" -> TestStrategy.s1_v2_optimized,
-        "s1_v2_optimized_v4" -> TestStrategy.s1_v2_optimized_v4,
-        "s4_optimized_v1" -> TestStrategy.s4_optimized_v1,
-        "s4_optimized_v2" -> TestStrategy.s4_optimized_v2,
-        "s6_optimized" -> TestStrategy.s6_optimized,
-        "s6" -> TestStrategy.s6,
-        "s13" -> TestStrategy.s13,
-        "s13_optimized" -> TestStrategy.s13_optimized,
-        "s12" -> TestStrategy.s12
+        "s2_optimized"       -> TestStrategy.s2_optimized,
+        "s2_optimized_v2"    -> TestStrategy.s2_optimized_v2,
+        "s2_optimized_v3"    -> TestStrategy.s2_optimized_v3,
+        "s10"                -> TestStrategy.s10,
+        "s10_optimized"      -> TestStrategy.s10_optimized,
+        "s10_v2"             -> TestStrategy.s10_v2,
+        "s5_optimized_v2"    -> TestStrategy.s5_optimized_v2,
+        "s5_optimized_v3"    -> TestStrategy.s5_optimized_v3,
+        "s1_v2_optimized"    -> TestStrategy.s1_v2_optimized,
+        "s1_v2_optimized_v2" -> TestStrategy.s1_v2_optimized_v2,
+        "s4_optimized_v1"    -> TestStrategy.s4_optimized_v1,
+        "s4_optimized_v2"    -> TestStrategy.s4_optimized_v2,
+        "s6_optimized"       -> TestStrategy.s6_optimized,
+        "s6"                 -> TestStrategy.s6,
+        "s13"                -> TestStrategy.s13,
+        "s13_optimized"      -> TestStrategy.s13_optimized,
+        "s12"                -> TestStrategy.s12,
+        "s12_optimized"      -> TestStrategy.s12_optimized
       )
 
       StrategyCatalogue.batch mustBe expected
       BatchBacktester.strategies mustBe expected
     }
 
-    "retain named lineage strategies without including them in batch runs" in {
-      StrategyCatalogue.entries.filterNot(_.includeInBatch) mustBe List(
-        StrategyCatalogue.Entry("s2_optimized_v18", TestStrategy.s2_optimized_v18, includeInBatch = false),
-        StrategyCatalogue.Entry("s2_optimized_v16", TestStrategy.s2_optimized_v16, includeInBatch = false),
-        StrategyCatalogue.Entry("s2_optimized_v17", TestStrategy.s2_optimized_v17, includeInBatch = false),
-        StrategyCatalogue.Entry("s10_optimized_v11", TestStrategy.s10_optimized_v11, includeInBatch = false),
-        StrategyCatalogue.Entry("s10_optimized_v12", TestStrategy.s10_optimized_v12, includeInBatch = false),
-        StrategyCatalogue.Entry("s5_optimized_v14", TestStrategy.s5_optimized_v14, includeInBatch = false),
-        StrategyCatalogue.Entry("s5_optimized_v15", TestStrategy.s5_optimized_v15, includeInBatch = false),
-        StrategyCatalogue.Entry("s4_optimized_v9", TestStrategy.s4_optimized_v9, includeInBatch = false),
-        StrategyCatalogue.Entry("s4_optimized_v10", TestStrategy.s4_optimized_v10, includeInBatch = false),
-        StrategyCatalogue.Entry("s6_optimized_v14", TestStrategy.s6_optimized_v14, includeInBatch = false),
-        StrategyCatalogue.Entry("s6_optimized_v15", TestStrategy.s6_optimized_v15, includeInBatch = false),
-        StrategyCatalogue.Entry("s10_v2_optimized_v13", TestStrategy.s10_v2_optimized_v13, includeInBatch = false),
-        StrategyCatalogue.Entry("s10_v2_optimized_v14", TestStrategy.s10_v2_optimized_v14, includeInBatch = false),
-        StrategyCatalogue.Entry("s13_optimized_v13", TestStrategy.s13_optimized_v13, includeInBatch = false),
-        StrategyCatalogue.Entry("s1_v2_optimized_v15", TestStrategy.s1_v2_optimized_v15, includeInBatch = false),
-        StrategyCatalogue.Entry("s1_v2_optimized_v16", TestStrategy.s1_v2_optimized_v16, includeInBatch = false),
-        StrategyCatalogue.Entry("s10_v2_optimized_v15", TestStrategy.s10_v2_optimized_v15, includeInBatch = false),
-        StrategyCatalogue.Entry("s13_optimized_v11", TestStrategy.s13_optimized_v11, includeInBatch = false),
-        StrategyCatalogue.Entry("s13_optimized_v14", TestStrategy.s13_optimized_v14, includeInBatch = false),
-        StrategyCatalogue.Entry("s1_v2_optimized_v17", TestStrategy.s1_v2_optimized_v17, includeInBatch = false),
-        StrategyCatalogue.Entry("s12_optimized", TestStrategy.s12_optimized, includeInBatch = false)
-      )
+    "include every retained strategy in batch evaluation" in {
+      StrategyCatalogue.entries.filterNot(_.includeInBatch) mustBe empty
     }
   }
 }

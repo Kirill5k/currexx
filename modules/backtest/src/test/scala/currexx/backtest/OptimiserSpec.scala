@@ -32,7 +32,13 @@ class OptimiserSpec extends AnyWordSpec with Matchers {
           val search = OptimisationSearchSpace.forRound(round).fold(error => fail(error.getMessage), identity)
           search.target mustBe OptimisationTarget.Both
           search.indicatorParameterCount must be > 0
-          val ruleSearchFamilies = Set(TestStrategy.s10_optimized, TestStrategy.s10_v2, TestStrategy.s4_optimized_v2, TestStrategy.s12)
+          val ruleSearchFamilies = Set(
+            TestStrategy.s10_optimized,
+            TestStrategy.s10_v2,
+            TestStrategy.s4_optimized_v2,
+            TestStrategy.s12,
+            TestStrategy.s12_optimized
+          )
           search.strategyParameterCount mustBe (if (ruleSearchFamilies.contains(round.strategy)) 1 else 0)
           val resolved = search.resolveSeeds(round.extraSeeds.map(_.strategy)).toOption.get
           resolved.map(_.disposition) mustBe List.fill(round.extraSeeds.size)(SeedDisposition.Accepted)
@@ -46,6 +52,9 @@ class OptimiserSpec extends AnyWordSpec with Matchers {
       OptimisationRounds.roundsByName("s13_ga_refine").parameters mustBe Optimiser.gaParameters
       OptimisationRounds.findByName("s12_ga_refine").map(_.strategy) mustBe Right(TestStrategy.s12)
       OptimisationRounds.findByName("s12_ga_explore").map(_.strategy) mustBe Right(TestStrategy.s12)
+      OptimisationRounds.findByName("s12_optimized_ga_refine").map(_.strategy) mustBe Right(TestStrategy.s12_optimized)
+      OptimisationRounds.findByName("s12_optimized_ga_explore").map(_.strategy) mustBe Right(TestStrategy.s12_optimized)
+      OptimisationRounds.findByName("s12_optimized_scga_explore").map(_.strategy) mustBe Right(TestStrategy.s12_optimized)
       val missing = OptimisationRounds.findByName("unknown-round").swap.toOption.get
       missing.getMessage must include("Unknown round 'unknown-round'")
       missing.getMessage must include("s13_ga_refine")
@@ -63,14 +72,20 @@ class OptimiserSpec extends AnyWordSpec with Matchers {
     }
 
     "give every family two GA rounds and add SCGA only for enabled families" in {
-      val rounds                  = Optimiser.rounds
-      val byStrategy              = rounds.groupBy(_.strategy)
-      val scgaStrategies          = Set(TestStrategy.s10_v2, TestStrategy.s13, TestStrategy.s1_v2_optimized)
+      val rounds         = Optimiser.rounds
+      val byStrategy     = rounds.groupBy(_.strategy)
+      val scgaStrategies = Set(
+        TestStrategy.s10_v2,
+        TestStrategy.s13,
+        TestStrategy.s1_v2_optimized,
+        TestStrategy.s12,
+        TestStrategy.s12_optimized
+      )
       val gaParametersWithShuffle = Optimiser.gaParameters.copy(shuffle = true, initialOversampling = 3)
       val emptyStats              = List(OrderStats())
 
-      rounds must have size 21
-      rounds.map(_.name).distinct must have size 21
+      rounds must have size 25
+      rounds.map(_.name).distinct must have size 25
       byStrategy.keySet mustBe Set(
         TestStrategy.s2_optimized,
         TestStrategy.s10_optimized,
@@ -80,7 +95,8 @@ class OptimiserSpec extends AnyWordSpec with Matchers {
         TestStrategy.s6_optimized,
         TestStrategy.s13,
         TestStrategy.s1_v2_optimized,
-        TestStrategy.s12
+        TestStrategy.s12,
+        TestStrategy.s12_optimized
       )
       byStrategy.foreach { case (strategy, familyRounds) =>
         val expected: List[Parameters.GA | Parameters.SCGA] = List(Optimiser.gaParameters, gaParametersWithShuffle) :::
@@ -118,14 +134,17 @@ class OptimiserSpec extends AnyWordSpec with Matchers {
       rounds(TestStrategy.s10_v2).extraSeeds mustBe Nil
       rounds(TestStrategy.s13).extraSeeds mustBe List(NamedStrategy("s13_optimized", TestStrategy.s13_optimized))
       rounds(TestStrategy.s1_v2_optimized).extraSeeds mustBe List(
-        NamedStrategy("s1_v2_optimized_v4", TestStrategy.s1_v2_optimized_v4)
+        NamedStrategy("s1_v2_optimized_v2", TestStrategy.s1_v2_optimized_v2)
       )
       rounds(TestStrategy.s12).extraSeeds mustBe List(NamedStrategy("s12_optimized", TestStrategy.s12_optimized))
+      rounds(TestStrategy.s12_optimized).extraSeeds mustBe List(NamedStrategy("s12", TestStrategy.s12))
 
-      val s12Search = OptimisationSearchSpace.forRound(rounds(TestStrategy.s12)).toOption.get
-      val s12Seed   = s12Search.resolveSeeds(List(TestStrategy.s12_optimized)).toOption.get.head
-      s12Seed.effective mustBe Some(TestStrategy.s12_optimized)
-      s12Seed.usedBaseRules mustBe false
+      List(TestStrategy.s12 -> TestStrategy.s12_optimized, TestStrategy.s12_optimized -> TestStrategy.s12).foreach { (base, seed) =>
+        val search   = OptimisationSearchSpace.forRound(rounds(base)).toOption.get
+        val resolved = search.resolveSeeds(List(seed)).toOption.get.head
+        resolved.effective mustBe Some(seed)
+        resolved.usedBaseRules mustBe false
+      }
 
       List(TestStrategy.s5_optimized_v2, TestStrategy.s6_optimized).foreach { strategy =>
         val round     = rounds(strategy)

@@ -92,13 +92,13 @@ object OptimisationRounds:
     Family(
       "s1_v2_optimized",
       TestStrategy.s1_v2_optimized,
-      List(NamedStrategy("s1_v2_optimized_v4", TestStrategy.s1_v2_optimized_v4)),
+      List(NamedStrategy("s1_v2_optimized_v2", TestStrategy.s1_v2_optimized_v2)),
       runScga = true
     ),
     Family(
-      "s12",
-      TestStrategy.s12,
-      List(NamedStrategy("s12_optimized", TestStrategy.s12_optimized)),
+      "s12_optimized",
+      TestStrategy.s12_optimized,
+      List(NamedStrategy("s12", TestStrategy.s12)),
       runScga = true
     )
   )
