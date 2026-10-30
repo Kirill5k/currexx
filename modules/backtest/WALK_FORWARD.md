@@ -10,30 +10,40 @@ See [Configure optimisation](OPTIMISATION.md) for rule bounds, defaults, input
 checks, seed compatibility and scheduled rounds. Each window uses these same
 rules. The manifest records the configured bounds and complete base strategy.
 
-The default experiment compares two search objectives for one fixed base strategy:
+The default configuration compares two search objectives separately for five fixed base strategies:
 
 | Setting | Value |
 |---|---|
-| Round | `s5_optimized_v2_ga_refine` |
+| Rounds (`roundNames`) | `s2_optimized_ga_refine`, `s12_optimized_ga_refine`, `s13_ga_refine`, `s1_v2_optimized_ga_refine`, `s6_optimized_ga_refine` |
 | Target | `Both` |
 | Search objectives | `Current`, `BaselineRelative(weight = 0.5)` |
-| Master seeds | `42L`, `43L`, `44L` |
+| Master seeds | `42L`, `43L` |
 | History | `MarketDataProvider.majors1hHistory`: six major currency pairs, hourly bars |
 | Schedule | `WalkForwardPlan.default`: five expanding windows |
 | Evaluator pool | `Runtime.getRuntime.availableProcessors()` |
 
-This is **six experiments and 30 independent searches**: two objectives × three
-master seeds × five windows. Runs execute sequentially; each search uses the
-configured evaluator pool. A full matrix can be expensive.
+This is **20 experiments and 100 window searches**: five rounds × two objectives × two
+master seeds × five windows. All round names are resolved before searches begin.
+Rounds and their runs execute sequentially; each search uses the configured
+evaluator pool. A full matrix can be expensive.
 
-Only the search objective and master seed vary. The refinement preset
+Within each round, only the search objective and master seed vary. The refinement preset
 keeps a population of 300, 150 generations, crossover probability 0.7, mutation
 probability 0.1, elitism ratio 0.02, `shuffle = false`, and shortlist size 25.
 `ScoringFunction.Consistent()`, fixed inputs, execution costs, capital, and the
-`trial-v1` upgrade policy are shared across these experiments. The round lists
-three complete named seeds: `s5_optimized_v3`, `s6`, and `s6_optimized`. The target
-selects their active components before compatibility and duplicate checks. The
-baseline report records which seeds were accepted or excluded and why.
+`trial-v1` upgrade policy are shared across these experiments. Each round uses its
+own base strategy and complete named seeds from `OptimisationRounds`:
+
+| Base | Named seeds |
+|---|---|
+| `s2_optimized` | `s2_optimized_v2` |
+| `s12_optimized` | `s12` |
+| `s13` | `s13_optimized` |
+| `s1_v2_optimized` | `s1_v2_optimized_v2` |
+| `s6_optimized` | `s6`, `s5_optimized_v2`, `s5_optimized_v3` |
+
+The target selects their active components before compatibility and duplicate
+checks. The baseline report records which seeds were accepted or excluded and why.
 
 `BaselineRelative(0.5)` adjusts the training quality score according to
 net improvement over the same base on the same fold. A zero quality score stays
@@ -42,7 +52,7 @@ requirements; changing the search objective does not relax approval.
 
 Run the [small verification run](#small-verification-run) first; it checks the full
 history coverage before exercising a reduced search matrix. To launch the full
-30-search matrix, run the configured object through sbt:
+100-search matrix, run the configured object through sbt:
 
 ```sh
 sbt "backtest/runMain currexx.backtest.WalkForwardEvaluator"
@@ -114,14 +124,15 @@ Walk-forward search reports stay inside each experiment's `search/` directory.
 Failed experiments retain completed artifacts and stop; automatic resume is not
 supported.
 
-After all six experiments complete, a sibling `<first-experiment-id>-comparison/`
-directory contains `comparison.json` and `report.md`. The comparison reports each
+After each round's four experiments complete, a sibling `<first-experiment-id>-comparison/`
+directory contains `comparison.json` and `report.md`. Each round gets its own
+comparison before the next round starts. The comparison reports each
 objective/seed run's total, median and worst forward net difference from the fixed
 base, positive windows, and approved upgrades.
 
-Compare the two objectives **at the same master seed and window**. Their derived
+Compare the two objectives **for the same round, master seed and window**. Their derived
 window seed, base, date ranges and execution settings then match. Start with the
-15 paired forward-net differences between objectives, and check whether the
+10 paired forward-net differences between objectives per round, and check whether the
 direction survives across seeds and windows; do not select an objective from its
 best individual run or compare the objectives' differently scaled search scores.
 Use each experiment's per-window results for drawdown, costs and trade activity.
@@ -149,16 +160,16 @@ is:
 sbt "backtest/Test/runMain currexx.backtest.walkforward.WalkForwardSmoke"
 ```
 
-The smoke entry point reads the round, objectives, master seeds, history and plan
-from `WalkForwardEvaluator`, so it verifies the configured experiment rather than
-a separate strategy preset. It performs two stages:
+The smoke entry point reads the rounds, objectives, master seeds, history and plan
+from `WalkForwardEvaluator`, so it verifies the configured experiments rather than
+separate strategy presets. It performs two stages:
 
 1. **Full data preflight:** inspect all six configured pairs and all five windows
    without running a search. Success prints
    `Full history preflight passed: 6 pairs, 5 windows`. Missing data stops the run.
-2. **Reduced search matrix:** run both objectives and all three master seeds on
-   the first two windows and first currency pair. This is six small experiments
-   and 12 searches, each with population 6, one generation, elitism 0.5 and
+2. **Reduced search matrix:** run all five rounds, both objectives and both master seeds on
+   the first two windows and first currency pair. This is 20 small experiments
+   and 40 searches, each with population 6, one generation, elitism 0.5 and
    shortlist size 6. The target, configured complete strategy seeds, scoring, costs
    and upgrade policy remain configured as above. Seed compatibility and
    deduplication still apply; each initial population must fit the base and all
@@ -166,12 +177,12 @@ a separate strategy preset. It performs two stages:
 
 Each experiment must complete both paired tests. A retained base must reproduce
 exactly zero forward net difference. The smoke writes experiment artifacts,
-including each experiment's `search/` reports, and an objective comparison under
+including each experiment's `search/` reports, and a separate objective comparison per round under
 `target/walk-forward-smoke/`; the full-history preflight is reported in the console,
 while each smoke experiment's `preflight.json` describes its reduced two-window,
 one-pair schedule.
 
 There is no separate preflight-only command. Running this smoke does **not**
-launch the full 30-search matrix or change its budget. It verifies data coverage,
+launch the full 100-search matrix or change its budget. It verifies data coverage,
 objective/seed wiring and persistence; its small search budget is not a
 strategy-quality test.
