@@ -15,7 +15,7 @@ permissions:
 jobs:
   delete-artifacts:
     name: Delete Artifacts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:

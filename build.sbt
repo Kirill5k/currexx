@@ -8,7 +8,9 @@ ThisBuild / version                             := scala.sys.process.Process("gi
 ThisBuild / organization                        := "io.github.kirill5k"
 ThisBuild / githubWorkflowPublishTargetBranches := Nil
 ThisBuild / githubWorkflowJavaVersions          := Seq(JavaSpec.corretto("27"))
-githubWorkflowDir                               := (LocalRootProject / baseDirectory).value / ".github"
+// Embedded MongoDB 7.0.0 supports Ubuntu 22.04; newer runner images can fail package resolution.
+ThisBuild / githubWorkflowOSes := Seq("ubuntu-22.04")
+githubWorkflowDir              := (LocalRootProject / baseDirectory).value / ".github"
 
 val noPublish = Seq(
   publish         := {},

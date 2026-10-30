@@ -21,7 +21,7 @@ jobs:
     name: Build and Test
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-22.04]
         scala: [3.9.0]
         java: [corretto@27]
     runs-on: ${{ matrix.os }}
