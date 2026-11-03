@@ -129,6 +129,8 @@ gc.log*
 
 optimisation-results/
 walk-forward-results/
+counterfactual-results/
+evidence-results/
 
 # Cordova
 /src-cordova/platforms
