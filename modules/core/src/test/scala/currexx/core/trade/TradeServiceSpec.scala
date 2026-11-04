@@ -5,14 +5,23 @@ import cats.effect.IO
 import currexx.clients.broker.{BrokerClient, BrokerParameters}
 import currexx.clients.data.MarketDataClient
 import currexx.core.MockActionDispatcher
-import currexx.core.common.action.Action
+import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Settings, Trades, Users}
 import currexx.core.market.{MarketProfile, TrendState}
 import currexx.core.trade.db.{OrderStatusRepository, TradeOrderRepository, TradeSettingsRepository}
 import kirill5k.common.cats.test.IOWordSpec
 import currexx.domain.errors.AppError
-import currexx.domain.market.{CurrencyPair, OrderExecution, OrderPlacementResult, OrderPlacementStatus, OrderRef, TradeOrder}
+import currexx.domain.market.{
+  CandleCount,
+  CurrencyPair,
+  Interval,
+  OrderExecution,
+  OrderPlacementResult,
+  OrderPlacementStatus,
+  OrderRef,
+  TradeOrder
+}
 import currexx.domain.monitor.Limits
 import currexx.domain.signal.Direction
 import currexx.domain.user.UserId
@@ -41,6 +50,35 @@ class TradeServiceSpec extends IOWordSpec {
   "A TradeService" when {
     val now         = Instant.now()
     given Clock[IO] = Clock.mock[IO](now)
+
+    "fetchMarketData" should {
+      "request the configured candle count for every pair and dispatch the returned data" in {
+        val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, _) = mocks
+        val disp                                                                = mock[ActionDispatcher[IO]]
+        when(disp.dispatch(any[Action])).thenReturnUnit
+        val count = CandleCount.from(250).toOption.get
+        val pairs = NonEmptyList.of(Markets.gbpeur, Markets.gbpusd)
+        pairs.toList.foreach { pair =>
+          when(dataClient.timeSeriesData(pair, Interval.H1, count))
+            .thenReturnIO(Markets.timeSeriesData.copy(currencyPair = pair))
+        }
+
+        val result = for
+          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+          _   <- svc.fetchMarketData(Users.uid, pairs, Interval.H1, count)
+        yield ()
+
+        result.asserting { _ =>
+          pairs.toList.foreach(pair => verify(dataClient).timeSeriesData(pair, Interval.H1, count))
+          verifyNoMoreInteractions(dataClient)
+          pairs.toList.foreach { pair =>
+            verify(disp).dispatch(Action.ProcessMarketData(Users.uid, Markets.timeSeriesData.copy(currencyPair = pair)))
+          }
+          verifyNoMoreInteractions(disp)
+          succeed
+        }
+      }
+    }
 
     "getAllOrders" should {
       "return all orders from the repository" in {

@@ -6,7 +6,7 @@ import cats.syntax.parallel.*
 import currexx.clients.data.oanda.OandaDataClient.CacheKey
 import currexx.domain.errors.AppError
 import currexx.domain.market.Currency.{EUR, USD}
-import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
+import currexx.domain.market.{CandleCount, CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import kirill5k.common.sttp.test.Sttp4WordSpec
 import kirill5k.common.cats.{Cache, Clock}
 import org.typelevel.log4cats.Logger
@@ -41,13 +41,13 @@ class OandaDataClientSpec extends Sttp4WordSpec {
         }
         dataClient <- makeClient(backend)
         results    <- dataClient
-          .timeSeriesData(pair, Interval.H1)
+          .timeSeriesData(pair, Interval.H1, CandleCount.Default)
           .start
           .bracket { first =>
             for
               _   <- started.get
               all <- List
-                .fill(12)(dataClient.timeSeriesData(pair, Interval.H1))
+                .fill(12)(dataClient.timeSeriesData(pair, Interval.H1, CandleCount.Default))
                 .parSequence
                 .start
                 .bracket { waiting =>
@@ -90,7 +90,7 @@ class OandaDataClientSpec extends Sttp4WordSpec {
 
         val requestParams = Map(
           "granularity"       -> "H1",
-          "count"             -> "150",
+          "count"             -> "101",
           "alignmentTimezone" -> "UTC"
         )
 
@@ -101,7 +101,7 @@ class OandaDataClientSpec extends Sttp4WordSpec {
             case _ => throw new RuntimeException()
           }
 
-        val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.H1))
+        val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.H1, CandleCount.Default))
 
         result.asserting { timeSeriesData =>
           timeSeriesData.currencyPair mustBe pair
@@ -115,13 +115,12 @@ class OandaDataClientSpec extends Sttp4WordSpec {
       }
     }
 
-    "use configured fetch and signal candle counts" in {
+    "request one extra candle before returning the requested signal window" in {
       given Clock[IO] = Clock.mock[IO](Instant.parse("2026-02-06T21:03:00Z"))
 
-      val customConfig  = config.copy(fetchCandleCount = 120, signalCandleCount = 80)
       val requestParams = Map(
         "granularity"       -> "H1",
-        "count"             -> "120",
+        "count"             -> "81",
         "alignmentTimezone" -> "UTC"
       )
       val response = io.circe.parser
@@ -130,7 +129,7 @@ class OandaDataClientSpec extends Sttp4WordSpec {
         .get
         .hcursor
         .downField("candles")
-        .withFocus(_.mapArray(_.takeRight(120)))
+        .withFocus(_.mapArray(_.takeRight(81)))
         .top
         .get
         .noSpaces
@@ -142,7 +141,7 @@ class OandaDataClientSpec extends Sttp4WordSpec {
           case _ => throw new RuntimeException()
         }
 
-      val result = makeClient(testingBackend, customConfig).flatMap(_.timeSeriesData(pair, Interval.H1))
+      val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.H1, CandleCount.from(80).toOption.get))
 
       result.asserting { timeSeriesData =>
         timeSeriesData.prices must have size 80
@@ -151,10 +150,40 @@ class OandaDataClientSpec extends Sttp4WordSpec {
       }
     }
 
-    "reject invalid configured candle counts" in {
-      an[IllegalArgumentException] must be thrownBy config.copy(signalCandleCount = 0)
-      an[IllegalArgumentException] must be thrownBy config.copy(fetchCandleCount = 100)
-      an[IllegalArgumentException] must be thrownBy config.copy(fetchCandleCount = 99)
+    "cache different candle counts separately and reuse matching windows" in {
+      given Clock[IO] = Clock.mock[IO](Instant.parse("2026-02-06T21:03:00Z"))
+
+      def response(count: Int): String = io.circe.parser
+        .parse(readJson("oanda/instruments-rud-usd-success-response.json"))
+        .toOption
+        .get
+        .hcursor
+        .downField("candles")
+        .withFocus(_.mapArray(_.takeRight(count)))
+        .top
+        .get
+        .noSpaces
+
+      val result = for
+        calls <- Ref.of[IO, Int](0)
+        backend = fs2BackendStub
+          .whenRequestMatches(_.hasParams(Map("count" -> "81")))
+          .thenRespondF(calls.update(_ + 1).as(ResponseStub.adjust(response(81))))
+          .whenRequestMatches(_.hasParams(Map("count" -> "126")))
+          .thenRespondF(calls.update(_ + 1).as(ResponseStub.adjust(response(126))))
+        client <- makeClient(backend)
+        small  <- client.timeSeriesData(pair, Interval.H1, CandleCount.from(80).toOption.get)
+        large  <- client.timeSeriesData(pair, Interval.H1, CandleCount.from(125).toOption.get)
+        cached <- client.timeSeriesData(pair, Interval.H1, CandleCount.from(80).toOption.get)
+        count  <- calls.get
+      yield (small, large, cached, count)
+
+      result.asserting { case (small, large, cached, count) =>
+        small.prices must have size 80
+        large.prices must have size 125
+        cached mustBe small
+        count mustBe 2
+      }
     }
 
     "retry unauthorized responses and cache the successful response" in {
@@ -169,8 +198,8 @@ class OandaDataClientSpec extends Sttp4WordSpec {
 
       val result = for
         client <- makeClient(testingBackend)
-        res    <- client.timeSeriesData(pair, Interval.H1)
-        cached <- client.timeSeriesData(pair, Interval.H1)
+        res    <- client.timeSeriesData(pair, Interval.H1, CandleCount.Default)
+        cached <- client.timeSeriesData(pair, Interval.H1, CandleCount.Default)
       yield (res, cached)
 
       result.asserting { case (timeSeriesData, cached) =>
@@ -191,7 +220,7 @@ class OandaDataClientSpec extends Sttp4WordSpec {
         ResponseStub.adjust("Unauthorized", StatusCode.Unauthorized)
       }
 
-      val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.H1).attempt)
+      val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.H1, CandleCount.Default).attempt)
 
       result.asserting { res =>
         res mustBe Left(AppError.AccessDenied("oanda-data authentication has expired or is invalid"))
@@ -208,7 +237,7 @@ class OandaDataClientSpec extends Sttp4WordSpec {
         ResponseStub.adjust("Forbidden", StatusCode.Forbidden)
       }
 
-      val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.H1).attempt)
+      val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.H1, CandleCount.Default).attempt)
 
       result.asserting { res =>
         res mustBe Left(AppError.AccessDenied("oanda-data authentication has expired or is invalid"))

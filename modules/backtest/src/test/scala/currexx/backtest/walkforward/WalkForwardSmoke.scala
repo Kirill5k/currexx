@@ -19,8 +19,8 @@ object WalkForwardSmoke extends IOApp.Simple:
       )
       bases       <- WalkForwardEvaluator.roundNames.traverse(name => IO.fromEither(OptimisationRounds.findByName(name)))
       defaultPlan <- IO.fromEither(WalkForwardEvaluator.plan)
-      ready       <- WalkForwardPreflight.inspect[IO](WalkForwardEvaluator.history, defaultPlan)
-      _           <- IO.println(s"Full history preflight passed: ${WalkForwardEvaluator.history.size} pairs, ${ready.size} windows")
+      ready       <- bases.traverse(base => WalkForwardPreflight.inspect[IO](WalkForwardEvaluator.history, defaultPlan, base.candleCount))
+      _           <- IO.println(s"Full history preflight passed: ${WalkForwardEvaluator.history.size} pairs, ${ready.head.size} windows")
       plan        <- IO.fromEither(WalkForwardPlan.validate(defaultPlan.windows.take(2)))
       root = Path("target/walk-forward-smoke")
       _ <- bases.traverse_ { base =>

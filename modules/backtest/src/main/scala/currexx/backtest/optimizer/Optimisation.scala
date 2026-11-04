@@ -44,6 +44,7 @@ object Optimisation {
         corpus = round.corpus,
         strategy = round.strategy,
         poolSize = evaluatorPoolSize,
+        candleCount = round.candleCount,
         scoringFunction = round.scoringFunction,
         searchSpace = Some(space),
         diagnostics = Some(diagnostics),

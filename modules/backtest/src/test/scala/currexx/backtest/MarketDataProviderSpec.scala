@@ -1,5 +1,6 @@
 package currexx.backtest
 
+import currexx.domain.market.CandleCount
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.parallel.*
@@ -15,7 +16,7 @@ class MarketDataProviderSpec extends IOWordSpec {
 
   private def pricesOf(filePath: String): IO[List[PriceRange]] =
     MarketDataProvider
-      .read[IO](Dataset(filePath))
+      .read[IO](Dataset(filePath), CandleCount.Default)
       .compile
       .toList
       // Consecutive sliding windows overlap, so the first window holds the oldest 100 bars and every window after it
@@ -24,7 +25,7 @@ class MarketDataProviderSpec extends IOWordSpec {
 
   /** The bars a segment actually offers a strategy, which is the newest bar of each window it emits. */
   private def tradedBars(dataset: Dataset): IO[List[Instant]] =
-    MarketDataProvider.read[IO](dataset).compile.toList.map(_.map(_.latestTime))
+    MarketDataProvider.read[IO](dataset, CandleCount.Default).compile.toList.map(_.map(_.latestTime))
 
   /** The calendar months a run of bars touched, oldest first. */
   private def monthsOf(bars: List[Instant]): List[String] = bars.map(_.toString.take(7)).distinct.sorted
@@ -46,12 +47,44 @@ class MarketDataProviderSpec extends IOWordSpec {
   private def range(from: String, until: String): Option[DateRange] = Some(DateRange(YearMonth.parse(from), YearMonth.parse(until)))
 
   private def failsReading(dataset: Dataset, message: String): IO[org.scalatest.Assertion] =
-    MarketDataProvider.read[IO](dataset).compile.toList.attempt.map {
+    MarketDataProvider.read[IO](dataset, CandleCount.Default).compile.toList.attempt.map {
       case Left(error: IllegalArgumentException) => error.getMessage must include(message)
       case other                                 => fail(s"Expected an invalid dataset, got $other")
     }
 
   "MarketDataProvider.read" should {
+
+    "use the requested size for every window and preserve chronological coverage" in
+      List(1, 50, 150)
+        .traverse { size =>
+          val count = CandleCount.from(size).toOption.get
+          MarketDataProvider.read[IO](splitFixture, count).compile.toList.map { windows =>
+            windows must have size (221 - size)
+            windows.map(_.prices.size).distinct mustBe List(size)
+            windows.head.latestTime mustBe Instant.parse("2024-01-27T20:00:00Z").plusSeconds((size - 1L) * 3600L)
+            windows.last.latestTime mustBe Instant.parse("2024-02-05T23:00:00Z")
+            windows.foreach(_.prices.toList.sliding(2).foreach {
+              case List(newer, older) => newer.time.isAfter(older.time) mustBe true
+              case _                  => succeed
+            })
+            succeed
+          }
+        }
+        .asserting(_ => succeed)
+
+    "use preceding history for a larger window and suppress partial windows at the cutoff" in {
+      val count = CandleCount.from(150).toOption.get
+      (for
+        warmed <- MarketDataProvider.read[IO](splitFixture.copy(range = range("2024-02", "2024-03")), count).compile.toList
+        cutoff <- MarketDataProvider.read[IO](splitFixture.copy(range = range("2024-01", "2024-02")), count).compile.toList
+      yield {
+        warmed must have size 71
+        warmed.head.prices.size mustBe 150
+        warmed.head.latestTime mustBe Instant.parse("2024-02-03T01:00:00Z")
+        warmed.head.prices.last.time mustBe Instant.parse("2024-01-27T20:00:00Z")
+        cutoff mustBe empty
+      }).asserting(identity)
+    }
 
     "parse the UTC timestamps every export is stamped with" in
       // The offset is spelled +00:00 rather than Z, which Instant.parse would reject.
@@ -63,7 +96,7 @@ class MarketDataProviderSpec extends IOWordSpec {
       val expected = (CurrencyPair.fromUnsafe("EURUSD"), Interval.H1)
 
       exports
-        .traverse(e => MarketDataProvider.read[IO](Dataset(e.filePath)).head.compile.lastOrError)
+        .traverse(e => MarketDataProvider.read[IO](Dataset(e.filePath), CandleCount.Default).head.compile.lastOrError)
         .asserting(_.map(d => (d.currencyPair, d.interval)) mustBe exports.map(_ => expected))
     }
 
@@ -77,7 +110,7 @@ class MarketDataProviderSpec extends IOWordSpec {
 
     "return every series oldest first within each window" in
       exports
-        .traverse(e => MarketDataProvider.read[IO](Dataset(e.filePath)).head.compile.lastOrError)
+        .traverse(e => MarketDataProvider.read[IO](Dataset(e.filePath), CandleCount.Default).head.compile.lastOrError)
         .asserting { data =>
           // PriceRange lists run latest to earliest, which every calculation in the calculations module relies on.
           data.foreach { d =>
@@ -92,8 +125,8 @@ class MarketDataProviderSpec extends IOWordSpec {
 
     "produce identical windows when the same raw bars are split between files" in
       (for
-        single <- MarketDataProvider.read[IO](Dataset(fullFixture)).compile.toList
-        split  <- MarketDataProvider.read[IO](splitFixture).compile.toList
+        single <- MarketDataProvider.read[IO](Dataset(fullFixture), CandleCount.Default).compile.toList
+        split  <- MarketDataProvider.read[IO](splitFixture, CandleCount.Default).compile.toList
       yield {
         split mustBe single
         split must have size 121
@@ -103,8 +136,8 @@ class MarketDataProviderSpec extends IOWordSpec {
     "warm the opening bar from the preceding file without consuming the requested period" in {
       val period = range("2024-02", "2024-03")
       (for
-        single <- MarketDataProvider.read[IO](Dataset(fullFixture, period)).compile.toList
-        split  <- MarketDataProvider.read[IO](splitFixture.copy(range = period)).compile.toList
+        single <- MarketDataProvider.read[IO](Dataset(fullFixture, period), CandleCount.Default).compile.toList
+        split  <- MarketDataProvider.read[IO](splitFixture.copy(range = period), CandleCount.Default).compile.toList
       yield {
         split mustBe single
         split must have size 120
@@ -117,7 +150,7 @@ class MarketDataProviderSpec extends IOWordSpec {
 
     "stop before the exclusive cutoff without opening a subsequent file" in {
       val bounded = Dataset(NonEmptyList.of(fullFixture, "eur-usd-1h-file-that-does-not-exist.csv"), range("2024-01", "2024-02"))
-      MarketDataProvider.read[IO](bounded).compile.toList.asserting { windows =>
+      MarketDataProvider.read[IO](bounded, CandleCount.Default).compile.toList.asserting { windows =>
         windows.map(_.latestTime) mustBe List(Instant.parse("2024-01-31T23:00:00Z"))
         windows.flatMap(_.prices.toList).forall(_.time.isBefore(Instant.parse("2024-02-01T00:00:00Z"))) mustBe true
       }
@@ -125,23 +158,28 @@ class MarketDataProviderSpec extends IOWordSpec {
 
     "avoid creating a short warm-up window when the date cutoff precedes the hundredth bar" in
       MarketDataProvider
-        .read[IO](Dataset("eur-usd-1h-walk-forward-short-before-cutoff.csv", range("2024-01", "2024-02")))
+        .read[IO](Dataset("eur-usd-1h-walk-forward-short-before-cutoff.csv", range("2024-01", "2024-02")), CandleCount.Default)
         .compile
         .toList
         .asserting(_ mustBe empty)
 
     "preserve one partial window when a short export ends naturally" in
-      MarketDataProvider.read[IO](Dataset("eur-usd-1h-walk-forward-missing-month.csv")).compile.toList.asserting { windows =>
-        windows must have size 1
-        windows.head.prices.toList.map(_.time) mustBe List(
-          Instant.parse("2024-03-01T00:00:00Z"),
-          Instant.parse("2024-01-01T00:00:00Z")
-        )
-        windows.head.prices.toList.forall(_.volume > 0) mustBe true
+      MarketDataProvider.read[IO](Dataset("eur-usd-1h-walk-forward-missing-month.csv"), CandleCount.Default).compile.toList.asserting {
+        windows =>
+          windows must have size 1
+          windows.head.prices.toList.map(_.time) mustBe List(
+            Instant.parse("2024-03-01T00:00:00Z"),
+            Instant.parse("2024-01-01T00:00:00Z")
+          )
+          windows.head.prices.toList.forall(_.volume > 0) mustBe true
       }
 
     "emit no windows when an export contains only zero-volume rows" in
-      MarketDataProvider.read[IO](Dataset("eur-usd-1h-walk-forward-empty-history.csv")).compile.toList.asserting(_ mustBe Nil)
+      MarketDataProvider
+        .read[IO](Dataset("eur-usd-1h-walk-forward-empty-history.csv"), CandleCount.Default)
+        .compile
+        .toList
+        .asserting(_ mustBe Nil)
 
     "reject files from different pairs or intervals before loading them" in
       List(
@@ -177,13 +215,14 @@ class MarketDataProviderSpec extends IOWordSpec {
     "group all three annual exports per pair and retain history over the June boundary" in {
       val histories = MarketDataProvider.majors1hHistory
       val eur       = histories.find(_.currencyPair == CurrencyPair.fromUnsafe("EURUSD")).get
-      MarketDataProvider.read[IO](eur.copy(range = range("2024-07", "2024-08"))).head.compile.lastOrError.asserting { first =>
-        histories must have size 6
-        histories.map(_.currencyPair).distinct must have size 6
-        histories.foreach(_.filePaths.size mustBe 3)
-        first.latestTime mustBe Instant.parse("2024-07-01T00:00:00Z")
-        first.prices.size mustBe 100
-        first.prices.last.time.isBefore(Instant.parse("2024-07-01T00:00:00Z")) mustBe true
+      MarketDataProvider.read[IO](eur.copy(range = range("2024-07", "2024-08")), CandleCount.Default).head.compile.lastOrError.asserting {
+        first =>
+          histories must have size 6
+          histories.map(_.currencyPair).distinct must have size 6
+          histories.foreach(_.filePaths.size mustBe 3)
+          first.latestTime mustBe Instant.parse("2024-07-01T00:00:00Z")
+          first.prices.size mustBe 100
+          first.prices.last.time.isBefore(Instant.parse("2024-07-01T00:00:00Z")) mustBe true
       }
     }
   }
@@ -312,7 +351,7 @@ class MarketDataProviderSpec extends IOWordSpec {
       } ::: List(MarketDataProvider.majors1hValidationFold.head, MarketDataProvider.majors1hHoldout.head)
 
       scored
-        .parTraverse(dataset => MarketDataProvider.read[IO](dataset).head.compile.lastOrError.map(dataset -> _))
+        .parTraverse(dataset => MarketDataProvider.read[IO](dataset, CandleCount.Default).head.compile.lastOrError.map(dataset -> _))
         .asserting { opened =>
           opened.foreach { case (dataset, first) =>
             val segmentStart = dataset.range.get.from.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant
@@ -344,7 +383,7 @@ class MarketDataProviderSpec extends IOWordSpec {
         MarketDataProvider.majors1hSearchFolds(3)   -> ("2024-07-01T00:00:00Z", "2024-07-05T03:00:00Z")
       ).parTraverse { case (fold, (oldest, latest)) =>
         fold
-          .parTraverse(dataset => MarketDataProvider.read[IO](dataset).head.compile.lastOrError.map(dataset -> _))
+          .parTraverse(dataset => MarketDataProvider.read[IO](dataset, CandleCount.Default).head.compile.lastOrError.map(dataset -> _))
           .map(opened => (opened, oldest, latest))
       }.asserting { folds =>
         folds.foreach { case (opened, oldest, latest) =>

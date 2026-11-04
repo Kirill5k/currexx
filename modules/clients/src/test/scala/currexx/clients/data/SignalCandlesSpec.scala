@@ -2,7 +2,7 @@ package currexx.clients.data
 
 import cats.data.{NonEmptyList, WriterT}
 import cats.effect.IO
-import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
+import currexx.domain.market.{CandleCount, CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import kirill5k.common.cats.test.IOWordSpec
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.extras.{LogLevel, LogMessage, WriterTLogger}
@@ -26,7 +26,7 @@ class SignalCandlesSpec extends IOWordSpec {
         "test"
       )
       val warning = "Only incomplete candle available for EURUSD at H1"
-      SignalCandles.prepare[Logged](data, Interval.H1, now, 100).run.asserting { case (logs, result) =>
+      SignalCandles.prepare[Logged](data, Interval.H1, now, CandleCount.Default).run.asserting { case (logs, result) =>
         logs mustBe List(LogMessage(LogLevel.Warn, None, warning))
         result mustBe data
       }
@@ -44,9 +44,23 @@ class SignalCandlesSpec extends IOWordSpec {
         "test"
       )
 
-      SignalCandles.prepare[Logged](data, Interval.H1, now, 1).run.asserting { case (logs, result) =>
+      SignalCandles.prepare[Logged](data, Interval.H1, now, CandleCount.from(1).toOption.get).run.asserting { case (logs, result) =>
         logs mustBe empty
         result mustBe data.copy(prices = NonEmptyList.one(data.prices.tail.head))
+      }
+    }
+
+    "return the available completed candles when the requested window is larger than the response" in {
+      val data = MarketTimeSeriesData(
+        CurrencyPair.fromUnsafe("EURUSD"),
+        Interval.H1,
+        NonEmptyList.of(candle("2026-01-19T11:00:00Z"), candle("2026-01-19T10:00:00Z")),
+        "test"
+      )
+
+      SignalCandles.prepare[Logged](data, Interval.H1, now, CandleCount.from(250).toOption.get).run.asserting { case (logs, result) =>
+        logs mustBe empty
+        result mustBe data
       }
     }
   }

@@ -7,7 +7,9 @@ import currexx.core.MongoSpec
 import currexx.core.fixtures.{Markets, Monitors, Users}
 import currexx.core.monitor.Monitor
 import currexx.domain.errors.AppError
-import currexx.domain.market.Interval
+import currexx.domain.market.{CandleCount, Interval}
+import mongo4cats.bson.Document
+import mongo4cats.bson.syntax.*
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
 
@@ -20,15 +22,16 @@ class MonitorRepositorySpec extends MongoSpec {
   "A MonitorRepository" when {
     "create" should {
       "create new monitor" in withEmbeddedMongoDb { client =>
+        val count  = CandleCount.from(250).toOption.get
         val result = for
           repo <- MonitorRepository.make(client)
-          mon  <- repo.create(Monitors.createMarketData())
+          mon  <- repo.create(Monitors.createMarketData(candleCount = count))
           res  <- repo.find(Users.uid, mon.id)
         yield (mon, res)
 
         result.map { (created, found) =>
-          found mustBe Monitors.genMarketData(mid = found.id, lastQueriedAt = None)
-          created mustBe Monitors.genMarketData(mid = created.id, lastQueriedAt = None)
+          found mustBe Monitors.genMarketData(mid = found.id, lastQueriedAt = None, candleCount = count)
+          created mustBe Monitors.genMarketData(mid = created.id, lastQueriedAt = None, candleCount = count)
         }
       }
 
@@ -46,6 +49,26 @@ class MonitorRepositorySpec extends MongoSpec {
     }
 
     "find" should {
+      "read a legacy BSON monitor without candleCount as 100" in withEmbeddedMongoDb { client =>
+        val legacy = Document(
+          "_id"           := Monitors.mid.toObjectId,
+          "userId"        := Users.uid.toObjectId,
+          "kind"          := "market-data",
+          "active"        := true,
+          "currencyPairs" := List(Markets.gbpeur.toString),
+          "schedule"      := Document.parse("""{"kind":"periodic","period":"3 hours"}"""),
+          "interval"      := "H1"
+        )
+        val result = for
+          collection <- client.getCollection("monitors")
+          _          <- collection.insertOne(legacy)
+          repo       <- MonitorRepository.make(client)
+          monitor    <- repo.find(Users.uid, Monitors.mid)
+        yield monitor
+
+        result.map(_ mustBe Monitors.genMarketData(mid = Monitors.mid, lastQueriedAt = None))
+      }
+
       "return error when monitor does not exist" in withEmbeddedMongoDb { client =>
         val result = for
           repo <- MonitorRepository.make(client)
@@ -163,16 +186,22 @@ class MonitorRepositorySpec extends MongoSpec {
 
     "update" should {
       "update monitor in db and return previous monitor" in withEmbeddedMongoDb { client =>
+        val count  = CandleCount.from(250).toOption.get
         val result = for
           repo <- MonitorRepository.make(client)
           mon  <- repo.create(Monitors.createMarketData())
-          old <- repo.update(Monitors.marketData.copy(id = mon.id, interval = Interval.M1, currencyPairs = NonEmptyList.of(Markets.gbpusd)))
+          old  <- repo.update(
+            Monitors.marketData
+              .copy(id = mon.id, interval = Interval.M1, currencyPairs = NonEmptyList.of(Markets.gbpusd), candleCount = count)
+          )
           upd <- repo.find(Users.uid, mon.id)
         yield (old, upd)
 
         result.map { case (oldMon, updMon) =>
           updMon.asInstanceOf[Monitor.MarketData].interval mustBe Interval.M1
           oldMon.asInstanceOf[Monitor.MarketData].interval mustBe Interval.H1
+          updMon.asInstanceOf[Monitor.MarketData].candleCount mustBe count
+          oldMon.asInstanceOf[Monitor.MarketData].candleCount mustBe CandleCount.Default
           updMon.currencyPairs mustBe NonEmptyList.of(Markets.gbpusd)
           oldMon.currencyPairs mustBe NonEmptyList.of(Markets.gbpeur)
         }

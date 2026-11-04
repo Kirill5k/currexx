@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import currexx.core.signal.Signal
 import currexx.core.monitor.MonitorId
 import currexx.core.trade.TradeOrderPlacement
-import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData}
+import currexx.domain.market.{CandleCount, CurrencyPair, Interval, MarketTimeSeriesData}
 import currexx.domain.monitor.Limits
 import currexx.domain.user.UserId
 
@@ -13,7 +13,7 @@ import scala.concurrent.duration.FiniteDuration
 enum Action:
   case RescheduleAllMonitors
   case ScheduleMonitor(uid: UserId, mid: MonitorId, period: FiniteDuration)
-  case FetchMarketData(uid: UserId, cps: NonEmptyList[CurrencyPair], interval: Interval)
+  case FetchMarketData(uid: UserId, cps: NonEmptyList[CurrencyPair], interval: Interval, candleCount: CandleCount)
   case AssertProfit(uid: UserId, cps: NonEmptyList[CurrencyPair], limits: Limits)
   case ProcessMarketData(uid: UserId, data: MarketTimeSeriesData)
   case ProcessSignals(uid: UserId, currencyPair: CurrencyPair, signals: List[Signal])

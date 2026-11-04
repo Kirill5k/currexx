@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import cats.effect.{Async, Ref}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
+import currexx.domain.market.{CandleCount, CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import fs2.io.readClassResource
 import fs2.{Pipe, Stream, text}
 
@@ -14,8 +14,6 @@ import java.security.MessageDigest
 import java.util.HexFormat
 
 object MarketDataProvider:
-
-  val priceWindowSize: Int = 100
 
   /** A half-open span of calendar months, `[from, until)`, used to carve one export into disjoint segments.
     *
@@ -177,9 +175,8 @@ object MarketDataProvider:
     * Each export is segmented on its own boundaries rather than as one continuous span, because the two are separate files: a fold may not
     * straddle them. Both are exactly twelve months, so each divides into three whole folds with no remainder.
     *
-    * The first fold of each export opens on that file's first bar, so its first hundred bars are spent forming the first window and never
-    * offered, while `coveredMonths` still bills that month whole. Five days of a four-month fold, and the alternative is giving a whole
-    * month of a twelve-month export to warm-up — `read` needs exactly 99 bars of history and every window it emits holds 100.
+    * The first fold of each export opens on that file's first bar, so the configured candle count determines its initial warm-up loss.
+    * Later folds use the preceding bars in their export to form full windows; `coveredMonths` still counts whole calendar months.
     */
   val majors1hSearchFolds: List[List[Dataset]] =
     segmentsOf(majorFiles1h_202307_202406, YearMonth.of(2023, 7), YearMonth.of(2024, 7)) :::
@@ -236,7 +233,7 @@ object MarketDataProvider:
     def observe(price: PriceRange): ReadProgress = copy(months = months + monthOf(price.time))
   }
 
-  def read[F[_]: Async](dataset: Dataset): Stream[F, MarketTimeSeriesData] =
+  def read[F[_]: Async](dataset: Dataset, candleCount: CandleCount): Stream[F, MarketTimeSeriesData] =
     Stream.eval(Ref.of[F, ReadProgress](ReadProgress())).flatMap { progress =>
       val prices = rawPrices[F](dataset)
         .through(beforePeriodEnd(dataset, progress))
@@ -244,7 +241,7 @@ object MarketDataProvider:
         .evalTap(price => progress.update(_.observe(price)))
       val checkCoverage = Stream.eval(progress.get).map(state => validateCoverage(dataset, state.months)).rethrow.drain
 
-      (prices ++ checkCoverage).through(priceWindows(dataset, progress))
+      (prices ++ checkCoverage).through(priceWindows(dataset, progress, candleCount))
     }
 
   private def rawPrices[F[_]: Async](dataset: Dataset): Stream[F, PriceRange] =
@@ -272,10 +269,14 @@ object MarketDataProvider:
       .rethrow
       .filter(_.volume > 0)
 
-  private def priceWindows[F[_]: Async](dataset: Dataset, progress: Ref[F, ReadProgress]): Pipe[F, PriceRange, MarketTimeSeriesData] =
-    _.sliding(priceWindowSize)
+  private def priceWindows[F[_]: Async](
+      dataset: Dataset,
+      progress: Ref[F, ReadProgress],
+      candleCount: CandleCount
+  ): Pipe[F, PriceRange, MarketTimeSeriesData] =
+    _.sliding(candleCount.value)
       // Preserve short exports, but do not invent a partial window when a date cutoff interrupts warm-up.
-      .evalFilter(prices => if (prices.size == priceWindowSize) Async[F].pure(true) else progress.get.map(!_.reachedCutoff))
+      .evalFilter(prices => if (prices.size == candleCount.value) Async[F].pure(true) else progress.get.map(!_.reachedCutoff))
       .map(_.toNel.map(prices => MarketTimeSeriesData(dataset.currencyPair, dataset.interval, prices.reverse, "csv")))
       .unNone
       .filter(data => dataset.range.forall(_.contains(data.latestTime)))

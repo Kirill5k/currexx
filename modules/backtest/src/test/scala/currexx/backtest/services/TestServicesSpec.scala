@@ -226,6 +226,21 @@ class TestServicesSpec extends IOWordSpec {
   }
 
   "PeriodSimulation" should {
+    "reject data with no execution window after priming" in {
+      val prime = bar("2026-01-31T22:00:00Z", interval = Interval.H1)
+      (for
+        services    <- TestServices.make[IO](settings)
+        empty       <- PeriodSimulation.run(services, Nil).attempt
+        primingOnly <- PeriodSimulation.run(services, List(prime)).attempt
+      yield List(empty, primingOnly)).asserting { outcomes =>
+        outcomes.foreach {
+          case Left(error: IllegalArgumentException) => error.getMessage must include("Insufficient market-data windows")
+          case other                                 => fail(s"Expected insufficient data, got $other")
+        }
+        succeed
+      }
+    }
+
     "preserve priming and open positions across source chunks" in {
       val prime  = bar("2026-01-31T22:00:00Z", interval = Interval.H1)
       val first  = bar("2026-01-31T23:00:00Z", close = 0.9, interval = Interval.H1)

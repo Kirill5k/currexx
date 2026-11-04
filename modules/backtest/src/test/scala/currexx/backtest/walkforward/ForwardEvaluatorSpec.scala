@@ -1,5 +1,6 @@
 package currexx.backtest.walkforward
 
+import currexx.domain.market.CandleCount
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.apply.*
@@ -23,9 +24,25 @@ class ForwardEvaluatorSpec extends IOWordSpec:
   private val short = long.copy(rules = TradeStrategy(List(Rule(TradeAction.OpenShort, Rule.Condition.NoPosition)), Nil))
 
   "ForwardEvaluator" should {
+    "apply the configured history size equally to the candidate and base" in
+      ForwardEvaluator.make[IO](1).evaluate(long, long, List(split), CandleCount.from(150).toOption.get).asserting { result =>
+        result.candidate mustBe result.base
+        result.coverage.head.firstWindow mustBe Instant.parse("2024-02-03T01:00:00Z")
+        result.coverage.head.firstExecution mustBe Instant.parse("2024-02-03T02:00:00Z")
+        result.coverage.head.warmupBarsLost mustBe 149
+      }
+
+    "reject a period that cannot form a window and a following execution bar" in
+      ForwardEvaluator.make[IO](1).evaluate(long, long, List(single), CandleCount.from(220).toOption.get).attempt.asserting {
+        case Left(error: IllegalArgumentException) =>
+          error.getMessage must include("Insufficient bars for 220-candle warm-up, priming and execution")
+          error.getMessage must include("eur-usd-1h-walk-forward-full.csv")
+        case other => fail(s"Expected insufficient history, got $other")
+      }
+
     "produce identical continuous trades across file boundaries, with one terminal liquidation" in {
       def simulate(dataset: Dataset) = for
-        data     <- MarketDataProvider.read[IO](dataset).compile.toList
+        data     <- MarketDataProvider.read[IO](dataset, CandleCount.Default).compile.toList
         services <- TestServices.make[IO](TestSettings.make(dataset.currencyPair, long.rules, List(long.indicator)))
         stats    <- PeriodSimulation.run(services, data)
       yield stats
@@ -41,7 +58,7 @@ class ForwardEvaluatorSpec extends IOWordSpec:
     }
 
     "use identical costs and execution coverage for the frozen strategy and base" in
-      ForwardEvaluator.make[IO](2).evaluate(short, long, List(split)).asserting { result =>
+      ForwardEvaluator.make[IO](2).evaluate(short, long, List(split), CandleCount.Default).asserting { result =>
         result.candidate.initialBalance mustBe result.base.initialBalance
         result.candidate.closedTrades mustBe 1
         result.base.closedTrades mustBe 1
@@ -57,7 +74,7 @@ class ForwardEvaluatorSpec extends IOWordSpec:
 
     "report zero paired differences when the base is retained and exclude prior prices from trading" in {
       val february = split.copy(range = Some(DateRange(YearMonth.of(2024, 2), YearMonth.of(2024, 3))))
-      ForwardEvaluator.make[IO](1).evaluate(long, long, List(february)).asserting { result =>
+      ForwardEvaluator.make[IO](1).evaluate(long, long, List(february), CandleCount.Default).asserting { result =>
         result.candidate mustBe result.base
         result.netDifference mustBe BigDecimal(0)
         result.coverage.head.firstExecution mustBe Instant.parse("2024-02-01T01:00:00Z")

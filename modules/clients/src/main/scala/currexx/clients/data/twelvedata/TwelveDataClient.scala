@@ -11,7 +11,7 @@ import currexx.clients.data.{MarketDataClient, SignalCandles}
 import kirill5k.common.cats.{Cache, Clock}
 import kirill5k.common.syntax.time.*
 import currexx.domain.errors.AppError
-import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
+import currexx.domain.market.{CandleCount, CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import org.typelevel.log4cats.Logger
 import io.circe.Codec
 import sttp.capabilities.fs2.Fs2Streams
@@ -25,7 +25,7 @@ import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.concurrent.duration.*
 
 private[clients] trait TwelveDataClient[F[_]] extends MarketDataClient[F] with Fs2HttpClient[F]:
-  def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData]
+  def timeSeriesData(pair: CurrencyPair, interval: Interval, candleCount: CandleCount): F[MarketTimeSeriesData]
 
 final private class LiveTwelveDataClient[F[_]](
     override protected val backend: WebSocketStreamBackend[F, Fs2Streams[F]],
@@ -43,11 +43,11 @@ final private class LiveTwelveDataClient[F[_]](
   override protected val name: String                                   = "twelve-data"
   override protected val delayBetweenConnectionFailures: FiniteDuration = 5.seconds
 
-  override def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] =
+  override def timeSeriesData(pair: CurrencyPair, interval: Interval, candleCount: CandleCount): F[MarketTimeSeriesData] =
     for
       now            <- C.now
-      timeSeriesData <- fetchTimeSeriesData(pair, interval, config.fetchCandleCount, now)
-      result         <- SignalCandles.prepare(timeSeriesData, interval, now, config.signalCandleCount)
+      timeSeriesData <- fetchTimeSeriesData(pair, interval, candleCount.value + 1, now)
+      result         <- SignalCandles.prepare(timeSeriesData, interval, now, candleCount)
     yield result
 
   override def latestPrice(pair: CurrencyPair): F[PriceRange] =

@@ -15,6 +15,7 @@ object WalkForwardComparison:
       Json.obj(
         "experimentId"  -> run.experiment.id.asJson,
         "masterSeed"    -> run.experiment.masterSeed.asJson,
+        "candleCount"   -> run.experiment.round.candleCount.value.asJson,
         "target"        -> run.experiment.round.target.toString.asJson,
         "objective"     -> UpgradeDecisionRenderer.objective(run.experiment.round.searchObjective),
         "upgradePolicy" -> UpgradeDecisionRenderer.policy(run.experiment.round.upgradePolicy),
@@ -27,7 +28,7 @@ object WalkForwardComparison:
     val rows = runs.map { run =>
       val totals = run.summary
       s"| [${run.experiment.id}](../${run.experiment.id}/report.md) | ${run.experiment.round.target} | ${run.experiment.round.searchObjective} | " +
-        s"${run.experiment.masterSeed} | ${totals.totalNetDifference} | ${display(totals.medianNetDifference)} | " +
+        s"${run.experiment.masterSeed} | ${run.experiment.round.candleCount.value} | ${totals.totalNetDifference} | ${display(totals.medianNetDifference)} | " +
         s"${display(totals.worstNetDifference)} | ${totals.positiveWindows}/${totals.completedWindows} | ${totals.upgradeApprovedWindows} |"
     }
     (
@@ -38,8 +39,8 @@ object WalkForwardComparison:
         "Each row uses separate search runs and fresh accounts. Differences compare the frozen strategy with the fixed original base.",
         "Freeze settings before a final test on new data. Approval qualifies a strategy for further evaluation; it does not deploy it.",
         "",
-        "| Experiment | Target | Objective | Master seed | Total net difference | Median | Worst | Improved windows | Upgrades approved |",
-        "|---|---|---|---:|---:|---:|---:|---:|---:|"
+        "| Experiment | Target | Objective | Master seed | Candles | Total net difference | Median | Worst | Improved windows | Upgrades approved |",
+        "|---|---|---|---:|---:|---:|---:|---:|---:|---:|"
       ) ++ rows ++ List("")
     ).mkString("\n")
 

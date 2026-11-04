@@ -10,7 +10,7 @@ import currexx.clients.Fs2HttpClient
 import currexx.clients.data.{MarketDataClient, SignalCandles}
 import kirill5k.common.cats.{Cache, Clock}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
+import currexx.domain.market.{CandleCount, CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import org.typelevel.log4cats.Logger
 import io.circe.Codec
 import sttp.capabilities.fs2.Fs2Streams
@@ -23,7 +23,7 @@ import java.time.Instant
 import scala.concurrent.duration.*
 
 private[clients] trait OandaDataClient[F[_]] extends MarketDataClient[F] with Fs2HttpClient[F]:
-  def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData]
+  def timeSeriesData(pair: CurrencyPair, interval: Interval, candleCount: CandleCount): F[MarketTimeSeriesData]
 
 final private class LiveOandaDataClient[F[_]](
     override protected val backend: WebSocketStreamBackend[F, Fs2Streams[F]],
@@ -41,11 +41,11 @@ final private class LiveOandaDataClient[F[_]](
   override protected val delayBetweenConnectionFailures: FiniteDuration  = 5.seconds
   override protected val additionalRetryableStatusCodes: Set[StatusCode] = Set(StatusCode.Unauthorized)
 
-  override def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] =
+  override def timeSeriesData(pair: CurrencyPair, interval: Interval, candleCount: CandleCount): F[MarketTimeSeriesData] =
     for
       now            <- C.now
-      timeSeriesData <- fetchTimeSeriesData(pair, interval, config.fetchCandleCount)
-      result         <- SignalCandles.prepare(timeSeriesData, interval, now, config.signalCandleCount)
+      timeSeriesData <- fetchTimeSeriesData(pair, interval, candleCount.value + 1)
+      result         <- SignalCandles.prepare(timeSeriesData, interval, now, candleCount)
     yield result
 
   override def latestPrice(pair: CurrencyPair): F[PriceRange] =

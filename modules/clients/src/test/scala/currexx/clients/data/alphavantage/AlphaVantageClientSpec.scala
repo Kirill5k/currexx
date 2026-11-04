@@ -1,16 +1,18 @@
 package currexx.clients.data.alphavantage
 
-import cats.effect.IO
+import cats.effect.{IO, Ref}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{CurrencyPair, Interval, PriceRange}
+import currexx.domain.market.{CandleCount, CurrencyPair, Interval, PriceRange}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import currexx.domain.market.Currency.{GBP, USD}
 import kirill5k.common.sttp.test.Sttp4WordSpec
+import io.circe.{Json, JsonObject}
 import sttp.client4.testing.ResponseStub
 import sttp.model.StatusCode
 
-import java.time.Instant
+import java.time.{Instant, LocalDateTime}
+import java.time.format.DateTimeFormatter
 import scala.concurrent.duration.*
 
 class AlphaVantageClientSpec extends Sttp4WordSpec {
@@ -38,7 +40,7 @@ class AlphaVantageClientSpec extends Sttp4WordSpec {
 
       val result = for
         client <- AlphaVantageClient.make[IO](config, testingBackend, 100.millis)
-        res    <- client.timeSeriesData(pair, Interval.H1)
+        res    <- client.timeSeriesData(pair, Interval.H1, CandleCount.Default)
       yield res
 
       result.asserting { timeSeriesData =>
@@ -61,7 +63,7 @@ class AlphaVantageClientSpec extends Sttp4WordSpec {
 
       val result = for
         client <- AlphaVantageClient.make[IO](config, testingBackend, 100.millis)
-        res    <- client.timeSeriesData(pair, Interval.D1)
+        res    <- client.timeSeriesData(pair, Interval.D1, CandleCount.Default)
       yield res
 
       result.asserting { timeSeriesData =>
@@ -91,6 +93,49 @@ class AlphaVantageClientSpec extends Sttp4WordSpec {
       }
     }
 
+    List(
+      (Interval.H1, "FX_INTRADAY", "Time Series FX (60min)", "alphavantage/gbp-usd-hourly-prices-response.json"),
+      (Interval.D1, "FX_DAILY", "Time Series FX (Daily)", "alphavantage/gbp-usd-daily-prices-response.json")
+    ).foreach { case (interval, function, field, resource) =>
+      s"select compact or full $interval history and trim each cached response to the requested count" in {
+        val response = io.circe.parser.parse(readJson(resource)).toOption.get
+        val price    = response.hcursor.downField(field).focus.get.asObject.get.values.head
+        val start    = LocalDateTime.of(2022, 4, 14, 0, 0)
+        val prices   = JsonObject.fromIterable((0 until 150).map { i =>
+          val time =
+            if (interval == Interval.D1) start.minusDays(i).toLocalDate.toString
+            else start.minusHours(i).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+          time -> price
+        })
+        val fullResponse = response.hcursor.downField(field).withFocus(_ => Json.fromJsonObject(prices)).top.get.noSpaces
+
+        val result = for
+          calls <- Ref.of[IO, Int](0)
+          backend = fs2BackendStub
+            .whenRequestMatches(_.hasParams(Map("function" -> function, "outputsize" -> "compact")))
+            .thenRespondF(calls.update(_ + 1).as(ResponseStub.adjust(response.noSpaces)))
+            .whenRequestMatches(_.hasParams(Map("function" -> function, "outputsize" -> "full")))
+            .thenRespondF(calls.update(_ + 1).as(ResponseStub.adjust(fullResponse)))
+          client <- AlphaVantageClient.make[IO](config, backend, 100.millis)
+          small  <- client.timeSeriesData(pair, interval, CandleCount.from(80).toOption.get)
+          normal <- client.timeSeriesData(pair, interval, CandleCount.Default)
+          large  <- client.timeSeriesData(pair, interval, CandleCount.from(125).toOption.get)
+          larger <- client.timeSeriesData(pair, interval, CandleCount.from(140).toOption.get)
+          count  <- calls.get
+        yield (small, normal, large, larger, count)
+
+        result.asserting { case (small, normal, large, larger, count) =>
+          small.prices must have size 80
+          normal.prices must have size 100
+          large.prices must have size 125
+          larger.prices must have size 140
+          small.prices.toList mustBe normal.prices.take(80)
+          large.prices.toList mustBe larger.prices.take(125)
+          count mustBe 2
+        }
+      }
+    }
+
     "retry on client or server error" in {
       val testingBackend = fs2BackendStub.whenAnyRequest
         .thenRespondCyclic(
@@ -100,7 +145,7 @@ class AlphaVantageClientSpec extends Sttp4WordSpec {
 
       val result = for
         client <- AlphaVantageClient.make[IO](config, testingBackend, 100.millis)
-        res    <- client.timeSeriesData(pair, Interval.H1)
+        res    <- client.timeSeriesData(pair, Interval.H1, CandleCount.Default)
       yield res
 
       result.asserting { timeSeriesData =>
@@ -116,7 +161,7 @@ class AlphaVantageClientSpec extends Sttp4WordSpec {
 
       val result = for
         client <- AlphaVantageClient.make[IO](config, testingBackend, 100.millis)
-        res    <- client.timeSeriesData(pair, Interval.D1)
+        res    <- client.timeSeriesData(pair, Interval.D1, CandleCount.Default)
       yield res
 
       result.assertThrows(AppError.NotEnoughDataPoints("alpha-vantage", 2))

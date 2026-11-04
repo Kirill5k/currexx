@@ -166,6 +166,7 @@ final private case class CacheKey(
     currencyPair: CurrencyPair,
     interval: Interval,
     latestTime: Instant,
+    candleCount: Int,
     indicator: Indicator
 )
 
@@ -175,7 +176,7 @@ final private class CachedSignalDetector(
   private val detector = new PureSignalDetector()
 
   override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal] =
-    val key = CacheKey(data.currencyPair, data.interval, data.latestTime, indicator)
+    val key = CacheKey(data.currencyPair, data.interval, data.latestTime, data.prices.size, indicator)
     cache.get(key, _ => detector.detect(uid, data)(indicator)).map(_.copy(userId = uid))
 }
 
@@ -189,7 +190,7 @@ object SignalDetector:
     // requires a heap-walking tool. A flat byte estimate ignores the key (which contains
     // a deep Indicator ADT) and the Signal's own Indicator + Condition fields, so
     // maximumWeight would give a false bound. Instead, cap by entry count.
-    // Each entry is (CurrencyPair, Interval, Instant, Indicator) → Option[Signal].
+    // Each entry is (CurrencyPair, Interval, Instant, candle count, Indicator) → Option[Signal].
     // In practice there are O(monitors × indicators) distinct keys per time tick,
     // so 100 000 entries comfortably covers real-world loads within a few hundred MB.
     val maxEntries = (maxSizeMB * 1024L * 1024L) / 1024 // ~1 KB per entry as a rough heuristic

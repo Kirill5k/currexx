@@ -59,9 +59,9 @@ final private class LiveActionProcessor[F[_]](
     case Action.ScheduleMonitor(uid, mid, period) =>
       F.sleep(period) *> logger.info(s"triggering monitor $uid/$mid") *>
         monitorService.triggerMonitor(uid, mid)
-    case Action.FetchMarketData(uid, cps, interval) =>
+    case Action.FetchMarketData(uid, cps, interval, candleCount) =>
       logger.info(s"fetching market data for $uid/${cps.toList.mkString("[", ",", "]")}") *>
-        tradeService.fetchMarketData(uid, cps, interval)
+        tradeService.fetchMarketData(uid, cps, interval, candleCount)
     case Action.ProcessMarketData(uid, data) =>
       logger.info(s"processing market data for $uid/${data.currencyPair} (time=${data.latestTime}, source=${data.source})") *>
         marketService.updateTimeState(uid, data) *>

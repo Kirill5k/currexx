@@ -3,6 +3,7 @@ package currexx.backtest.optimizer.reporting
 import cats.effect.{IO, Ref}
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
+import currexx.domain.market.CandleCount
 import currexx.algorithms.{EvaluationPhase, Fitness, Parameters, ValidatedPopulation}
 import currexx.backtest.{DataWindow, StrategyCatalogue, TestStrategy}
 import currexx.backtest.optimizer.ScoringFunction
@@ -432,10 +433,12 @@ class OptimisationReportSpec extends IOWordSpec {
         target = OptimisationTarget.Both,
         baseCandidate = base,
         fixedIndicators = Set(base.indicator),
-        ruleBounds = bounds
+        ruleBounds = bounds,
+        candleCount = CandleCount.from(250).toOption.get
       )
       val text = OptimisationReportRenderer.sections(report).flatMap(_._2).mkString("\n")
       text must include("Optimisation target: Both")
+      text must include("Candle count: 250")
       text must include(s"Rule parameter bounds: ${RuleBoundsRenderer.json(bounds).noSpaces}")
       text must include("Fixed indicator inputs:")
       text must include(s"Base candidate: ${base.asJson.noSpaces}")

@@ -40,6 +40,7 @@ object WalkForwardReportRenderer:
         "selectionOrdering" -> "Existing Validator consensus ordering; skip base, then approve the first challenger meeting every upgrade requirement".asJson
       ),
       "simulation" -> Json.obj(
+        "candleCount"           -> round.candleCount.value.asJson,
         "initialBalancePerPair" -> risk.initialBalance.value.asJson,
         "accountCurrency"       -> risk.accountCurrency.toString.asJson,
         "tradingParameters"     -> TestSettings.tradingParameters.asJson,
@@ -177,6 +178,7 @@ object WalkForwardReportRenderer:
         s"Experiment: `${experiment.id}`; master seed: ${experiment.masterSeed}; status: ${status(experiment, totals.completedWindows, failure)}.",
         s"Completed ${results.size} of ${experiment.plan.windows.size} windows. Full settings and source hashes: [manifest.json](manifest.json).",
         s"Optimisation target: ${experiment.round.target}.",
+        s"Candle count: ${experiment.round.candleCount.value}.",
         s"Search objective: `${UpgradeDecisionRenderer.objective(experiment.round.searchObjective).noSpaces}`.",
         s"Upgrade policy: `${UpgradeDecisionRenderer.policy(experiment.round.upgradePolicy).noSpaces}`.",
         "",

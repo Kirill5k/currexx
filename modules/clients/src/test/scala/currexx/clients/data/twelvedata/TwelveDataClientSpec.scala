@@ -5,7 +5,7 @@ import cats.syntax.parallel.*
 import currexx.clients.data.twelvedata.TwelveDataClient.CacheKey
 import currexx.domain.errors.AppError
 import currexx.domain.market.Currency.{EUR, USD}
-import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
+import currexx.domain.market.{CandleCount, CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import kirill5k.common.sttp.test.Sttp4WordSpec
 import kirill5k.common.cats.{Cache, Clock}
 import org.typelevel.log4cats.Logger
@@ -39,12 +39,12 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
         }
         client  <- makeClient(backend)
         results <- client
-          .timeSeriesData(pair, Interval.H1)
+          .timeSeriesData(pair, Interval.H1, CandleCount.Default)
           .start
           .bracket { first =>
             started.get >>
               List
-                .fill(12)(client.timeSeriesData(pair, Interval.H1))
+                .fill(12)(client.timeSeriesData(pair, Interval.H1, CandleCount.Default))
                 .parSequence
                 .start
                 .bracket { waiting =>
@@ -85,7 +85,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
           .thenRespond(ResponseStub.adjust(response))
         client  <- makeClient(backend)
         blocked <- client
-          .timeSeriesData(pair, Interval.H1)
+          .timeSeriesData(pair, Interval.H1, CandleCount.Default)
           .start
           .bracket { first =>
             started.get >> client
@@ -116,8 +116,8 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
       )
       val result = for
         client <- makeClient(backend)
-        failed <- client.timeSeriesData(pair, Interval.H1).attempt
-        data   <- client.timeSeriesData(pair, Interval.H1)
+        failed <- client.timeSeriesData(pair, Interval.H1, CandleCount.Default).attempt
+        data   <- client.timeSeriesData(pair, Interval.H1, CandleCount.Default)
       yield (failed, data)
 
       result.timeout(5.seconds).asserting { case (failed, data) =>
@@ -141,10 +141,10 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
         }
         client <- makeClient(backend)
         data   <- client
-          .timeSeriesData(pair, Interval.H1)
+          .timeSeriesData(pair, Interval.H1, CandleCount.Default)
           .start
           .bracket { first =>
-            started.get >> first.cancel >> client.timeSeriesData(pair, Interval.H1)
+            started.get >> first.cancel >> client.timeSeriesData(pair, Interval.H1, CandleCount.Default)
           }(_.cancel)
         count <- calls.get
       yield (data, count)
@@ -175,11 +175,11 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
           backend = fs2BackendStub
             .whenRequestMatches(_.hasParams(Map("outputsize" -> "1")))
             .thenRespondF(calls.update(_ + 1).as(ResponseStub.adjust(quoteResponse)))
-            .whenRequestMatches(_.hasParams(Map("outputsize" -> "150")))
+            .whenRequestMatches(_.hasParams(Map("outputsize" -> "101")))
             .thenRespondF(calls.update(_ + 1).as(ResponseStub.adjust(response)))
           client <- makeClient(backend)
-          _      <- if quoteFirst then client.latestPrice(pair).void else client.timeSeriesData(pair, Interval.M1).void
-          data   <- client.timeSeriesData(pair, Interval.M1)
+          _      <- if quoteFirst then client.latestPrice(pair).void else client.timeSeriesData(pair, Interval.M1, CandleCount.Default).void
+          data   <- client.timeSeriesData(pair, Interval.M1, CandleCount.Default)
           _      <- client.latestPrice(pair)
           count  <- calls.get
         yield (data, count)
@@ -198,7 +198,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
         "symbol"     -> "EUR/USD",
         "interval"   -> "1day",
         "apikey"     -> "api-key",
-        "outputsize" -> "150",
+        "outputsize" -> "101",
         "timezone"   -> "UTC"
       )
 
@@ -209,7 +209,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
           case _ => throw new RuntimeException()
         }
 
-      val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.D1))
+      val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.D1, CandleCount.Default))
 
       result.asserting { timeSeriesData =>
         timeSeriesData.currencyPair mustBe pair
@@ -229,7 +229,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
           ResponseStub.adjust(readJson("twelvedata/eur-usd-daily-prices.response.json"))
         )
 
-      val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.D1))
+      val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.D1, CandleCount.Default))
 
       result.timeout(5.seconds).asserting { timeSeriesData =>
         timeSeriesData.currencyPair mustBe pair
@@ -261,7 +261,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
           "symbol"     -> "EUR/USD",
           "interval"   -> "1h",
           "apikey"     -> "api-key",
-          "outputsize" -> "150",
+          "outputsize" -> "101",
           "timezone"   -> "UTC"
         )
 
@@ -272,7 +272,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
             case _ => throw new RuntimeException()
           }
 
-        val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.H1))
+        val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.H1, CandleCount.Default))
 
         result.asserting { timeSeriesData =>
           timeSeriesData.currencyPair mustBe pair
@@ -286,15 +286,14 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
       }
     }
 
-    "use configured fetch and signal candle counts" in {
+    "request one extra candle before returning the requested signal window" in {
       given Clock[IO] = Clock.mock[IO](Instant.parse("2026-01-19T12:03:00Z"))
 
-      val customConfig  = config.copy(fetchCandleCount = 120, signalCandleCount = 80)
       val requestParams = Map(
         "symbol"     -> "EUR/USD",
         "interval"   -> "1h",
         "apikey"     -> "api-key",
-        "outputsize" -> "120",
+        "outputsize" -> "81",
         "timezone"   -> "UTC"
       )
       val response = io.circe.parser
@@ -303,7 +302,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
         .get
         .hcursor
         .downField("values")
-        .withFocus(_.mapArray(_.take(120)))
+        .withFocus(_.mapArray(_.take(81)))
         .top
         .get
         .noSpaces
@@ -315,7 +314,7 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
           case _ => throw new RuntimeException()
         }
 
-      val result = makeClient(testingBackend, customConfig).flatMap(_.timeSeriesData(pair, Interval.H1))
+      val result = makeClient(testingBackend).flatMap(_.timeSeriesData(pair, Interval.H1, CandleCount.from(80).toOption.get))
 
       result.asserting { timeSeriesData =>
         timeSeriesData.prices must have size 80
@@ -324,10 +323,40 @@ class TwelveDataClientSpec extends Sttp4WordSpec {
       }
     }
 
-    "reject invalid configured candle counts" in {
-      an[IllegalArgumentException] must be thrownBy config.copy(signalCandleCount = 0)
-      an[IllegalArgumentException] must be thrownBy config.copy(fetchCandleCount = 100)
-      an[IllegalArgumentException] must be thrownBy config.copy(fetchCandleCount = 99)
+    "cache different candle counts separately and reuse matching windows" in {
+      given Clock[IO] = Clock.mock[IO](Instant.parse("2026-01-19T12:03:00Z"))
+
+      def response(count: Int): String = io.circe.parser
+        .parse(readJson("twelvedata/eur-usd-hourly-prices.response.json"))
+        .toOption
+        .get
+        .hcursor
+        .downField("values")
+        .withFocus(_.mapArray(_.take(count)))
+        .top
+        .get
+        .noSpaces
+
+      val result = for
+        calls <- Ref.of[IO, Int](0)
+        backend = fs2BackendStub
+          .whenRequestMatches(_.hasParams(Map("outputsize" -> "81")))
+          .thenRespondF(calls.update(_ + 1).as(ResponseStub.adjust(response(81))))
+          .whenRequestMatches(_.hasParams(Map("outputsize" -> "126")))
+          .thenRespondF(calls.update(_ + 1).as(ResponseStub.adjust(response(126))))
+        client <- makeClient(backend)
+        small  <- client.timeSeriesData(pair, Interval.H1, CandleCount.from(80).toOption.get)
+        large  <- client.timeSeriesData(pair, Interval.H1, CandleCount.from(125).toOption.get)
+        cached <- client.timeSeriesData(pair, Interval.H1, CandleCount.from(80).toOption.get)
+        count  <- calls.get
+      yield (small, large, cached, count)
+
+      result.asserting { case (small, large, cached, count) =>
+        small.prices must have size 80
+        large.prices must have size 125
+        cached mustBe small
+        count mustBe 2
+      }
     }
 
     "retrieve the current quote without filtering an incomplete candle" in {

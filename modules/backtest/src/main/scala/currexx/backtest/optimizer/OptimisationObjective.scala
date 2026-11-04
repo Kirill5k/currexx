@@ -5,7 +5,7 @@ import currexx.backtest.{OrderStats, TestStrategy}
 import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.optimizer.reporting.{CandidateDiagnostics, FoldDiagnostics, RunDiagnostics}
 import currexx.core.signal.SignalDetector
-import currexx.domain.market.CurrencyPair
+import currexx.domain.market.{CandleCount, CurrencyPair}
 import currexx.domain.signal.Indicator
 import cats.Parallel
 import cats.effect.Async
@@ -29,6 +29,7 @@ object OptimisationObjective {
       corpus: Corpus,
       strategy: TestStrategy,
       poolSize: Int,
+      candleCount: CandleCount,
       otherIndicators: List[Indicator] = Nil,
       signalDetector: SignalDetector = SignalDetector.pure,
       scoringFunction: ScoringFunction = ScoringFunction.Robust(),
@@ -38,7 +39,7 @@ object OptimisationObjective {
       upgradePolicy: UpgradePolicyConfig = UpgradePolicyConfig()
   ): F[Operators[F]] =
     for
-      backtests <- OptimisationBacktest.make(corpus, strategy, poolSize, otherIndicators, signalDetector, diagnostics)
+      backtests <- OptimisationBacktest.make(corpus, strategy, poolSize, candleCount, otherIndicators, signalDetector, diagnostics)
       canonicalise = (candidate: TestStrategy) =>
         searchSpace.fold[Either[Throwable, TestStrategy]](Right(candidate))(_.canonicalise(candidate))
       baseline  <- prepareBaseline(backtests, scoringFunction, searchObjective, strategy, canonicalise, diagnostics)

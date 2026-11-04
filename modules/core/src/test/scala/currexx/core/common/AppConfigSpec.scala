@@ -21,11 +21,7 @@ class AppConfigSpec extends IOWordSpec {
         config.mongo.user mustBe "user"
         config.clients.alphaVantage.apiKey mustBe "av-key"
         config.clients.twelveData.apiKey mustBe "td-key"
-        config.clients.twelveData.fetchCandleCount mustBe 150
-        config.clients.twelveData.signalCandleCount mustBe 100
         config.clients.oandaData.apiKey mustBe "od-key"
-        config.clients.oandaData.fetchCandleCount mustBe 150
-        config.clients.oandaData.signalCandleCount mustBe 100
         config.clients.ntfy.enabled mustBe false
         config.clients.ntfy.baseUri mustBe "https://ntfy.sh"
         config.clients.ntfy.topic mustBe ""

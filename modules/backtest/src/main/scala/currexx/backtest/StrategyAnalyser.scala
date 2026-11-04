@@ -3,7 +3,7 @@ package currexx.backtest
 import cats.effect.{ExitCode, IO, IOApp}
 import currexx.backtest.services.{PeriodSimulation, TestServices}
 import currexx.core.signal.SignalDetector
-import currexx.domain.market.{CurrencyPair, TradeOrder as TO}
+import currexx.domain.market.{CandleCount, CurrencyPair, TradeOrder as TO}
 import fs2.Stream
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -28,10 +28,11 @@ object StrategyAnalyser extends IOApp {
   inline given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
   val riskSettings: RiskSettings = RiskSettings()
+  val candleCount: CandleCount   = CandleCount.Default
 
   private val topTradeCounts = List(5, 10)
 
-  def statsPerPair(ts: TestStrategy): IO[List[(CurrencyPair, OrderStats)]] =
+  def statsPerPair(ts: TestStrategy, candleCount: CandleCount = StrategyAnalyser.candleCount): IO[List[(CurrencyPair, OrderStats)]] =
     Stream
       .emits(MarketDataProvider.majors1h)
       .parEvalMap(6) { dataset =>
@@ -39,7 +40,12 @@ object StrategyAnalyser extends IOApp {
         val settings = TestSettings.make(cp, ts.rules, List(ts.indicator))
         for
           services <- TestServices.make[IO](settings)
-          stats    <- PeriodSimulation.runStream(services, MarketDataProvider.read[IO](dataset), SignalDetector.pure, riskSettings)
+          stats    <- PeriodSimulation.runStream(
+            services,
+            MarketDataProvider.read[IO](dataset, candleCount),
+            SignalDetector.pure,
+            riskSettings
+          )
         yield cp -> stats
       }
       .compile
@@ -121,7 +127,11 @@ object StrategyAnalyser extends IOApp {
         f"PF=$pf%7s  DD=${s.maxDrawdownPercent.toDouble}%5.2f%%  forced=${s.forcedClosureCount}%d"
     }
 
-  def report(name: String, statsPerPair: List[(CurrencyPair, OrderStats)]): String = {
+  def report(
+      name: String,
+      statsPerPair: List[(CurrencyPair, OrderStats)],
+      candleCount: CandleCount = StrategyAnalyser.candleCount
+  ): String = {
     val portfolio = OrderStats.combine(statsPerPair.map(_._2))
     val sections  = List(
       ""              -> headline(portfolio),
@@ -135,7 +145,7 @@ object StrategyAnalyser extends IOApp {
       val heading = if (title.isEmpty) "" else s"  $title:\n"
       heading + lines.map(line => s"    $line").mkString("\n")
     }
-    s"=== $name\n${body.mkString("\n")}"
+    s"=== $name (candles=${candleCount.value})\n${body.mkString("\n")}"
   }
 
   override def run(args: List[String]): IO[ExitCode] = {

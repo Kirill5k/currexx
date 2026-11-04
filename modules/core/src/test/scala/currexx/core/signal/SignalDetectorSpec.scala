@@ -371,6 +371,25 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
     }
   }
 
+  "cached detection" should {
+    "calculate each history length independently at the same timestamp" in {
+      val indicator   = Indicator.ValueTracking(ValueRole.Momentum, ValueSource.Close, VT.EMA(3))
+      val shortData   = dataFor(List(4.0, 2.0))
+      val longData    = dataFor(List(4.0, 2.0, 10.0, 0.0))
+      val pure        = SignalDetector.pure
+      val shortSignal = pure.detect(Users.uid, shortData)(indicator)
+      val longSignal  = pure.detect(Users.uid, longData)(indicator)
+
+      shortSignal must not be longSignal
+      List(List(shortData, longData), List(longData, shortData)).foreach { windows =>
+        val cached = SignalDetector.cached(maxSizeMB = 1)
+        (windows ++ windows).foreach { data =>
+          cached.detect(Users.uid, data)(indicator) mustBe pure.detect(Users.uid, data)(indicator)
+        }
+      }
+    }
+  }
+
   private def bandIndicators(multiplier: Double): List[Indicator] = List(
     Indicator.KeltnerChannel(ValueSource.Close, VT.EMA(3), 2, multiplier),
     Indicator.BollingerBands(ValueSource.Close, VT.EMA(3), 3, multiplier)

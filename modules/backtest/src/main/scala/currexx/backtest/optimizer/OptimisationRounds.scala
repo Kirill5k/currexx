@@ -5,6 +5,7 @@ import currexx.backtest.{MarketDataProvider, TestStrategy}
 import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.optimizer.strategy.*
 import currexx.domain.signal.Indicator
+import currexx.domain.market.CandleCount
 
 final case class OptimisationRound(
     name: String,
@@ -23,7 +24,8 @@ final case class OptimisationRound(
     upgradePolicy: UpgradePolicyConfig = UpgradePolicyConfig(),
     target: OptimisationTarget = OptimisationTarget.Both,
     /** Named bounds apply only where that condition exists. Indicator-only rounds ignore rule bounds. */
-    ruleBounds: RuleParameterBounds = RuleParameterBounds.default
+    ruleBounds: RuleParameterBounds = RuleParameterBounds.default,
+    candleCount: CandleCount = CandleCount.Default
 )
 
 /** Shared search presets, independent of either entry point's execution and random generator. */

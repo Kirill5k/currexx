@@ -1,6 +1,7 @@
 package currexx.backtest.walkforward
 
 import cats.effect.{IO, Ref}
+import currexx.domain.market.CandleCount
 import cats.syntax.apply.*
 import currexx.algorithms.{Fitness, Parameters}
 import currexx.backtest.{MarketDataProvider, TestStrategy}
@@ -22,7 +23,8 @@ class WalkForwardRunnerSpec extends IOWordSpec:
     base,
     Parameters.GA(2, 0, 0.0, 0.0, 0.0, shuffle = false),
     ScoringFunction.Consistent(),
-    target = OptimisationTarget.Indicator
+    target = OptimisationTarget.Indicator,
+    candleCount = CandleCount.from(150).toOption.get
   )
   private val plan         = WalkForwardPlan.validate(WalkForwardPlan.default.toOption.get.windows.take(2)).toOption.get
   private val experiment   = WalkForwardExperiment("test-experiment", round, 42L, MarketDataProvider.majors1hHistory.take(1), plan)
@@ -75,7 +77,7 @@ class WalkForwardRunnerSpec extends IOWordSpec:
         def search(request: OptimisationRound, seed: Long): IO[OptimisationResult] =
           IO.raiseError(new AssertionError("search called"))
       val forward = new ForwardEvaluator[IO]:
-        def evaluate(selected: TestStrategy, original: TestStrategy, data: List[Dataset]): IO[ForwardResult] =
+        def evaluate(selected: TestStrategy, original: TestStrategy, data: List[Dataset], candleCount: CandleCount): IO[ForwardResult] =
           IO.raiseError(new AssertionError("test called"))
       (for
         failures <- Ref.of[IO, List[Int]](Nil)
@@ -101,7 +103,7 @@ class WalkForwardRunnerSpec extends IOWordSpec:
         def search(request: OptimisationRound, seed: Long): IO[OptimisationResult] =
           IO.raiseError(new AssertionError("search called"))
       val forward = new ForwardEvaluator[IO]:
-        def evaluate(selected: TestStrategy, original: TestStrategy, data: List[Dataset]): IO[ForwardResult] =
+        def evaluate(selected: TestStrategy, original: TestStrategy, data: List[Dataset], candleCount: CandleCount): IO[ForwardResult] =
           IO.raiseError(new AssertionError("test called"))
       val failure = new java.io.IOException("disk full")
       val events  = WalkForwardEvents[IO]((_, _, _) => IO.unit, _ => IO.unit, (_, _) => IO.unit, _ => IO.raiseError(failure))
@@ -119,10 +121,11 @@ class WalkForwardRunnerSpec extends IOWordSpec:
           def search(request: OptimisationRound, seed: Long): IO[OptimisationResult] =
             requests.update(_ :+ (request -> seed)) >> log.update(_ :+ "search").as(optimisation)
         forward = new ForwardEvaluator[IO]:
-          def evaluate(selected: TestStrategy, original: TestStrategy, data: List[Dataset]): IO[ForwardResult] =
+          def evaluate(selected: TestStrategy, original: TestStrategy, data: List[Dataset], candleCount: CandleCount): IO[ForwardResult] =
             IO {
               selected mustBe candidate
               original mustBe base
+              candleCount mustBe round.candleCount
               plan.windows.map(_.test) must contain(data.head.range.get)
             } >> log.update(_ :+ "test").as(ForwardResult(metrics(forwardNet), metrics(1), Nil))
         events = WalkForwardEvents[IO](
@@ -145,6 +148,7 @@ class WalkForwardRunnerSpec extends IOWordSpec:
           request.corpus.searchFolds.map(_.head.range.get) mustBe window.trainingFolds
           request.corpus.validationFold.head.range mustBe Some(window.selection)
           request.strategy mustBe base
+          request.candleCount mustBe round.candleCount
           seed mustBe window.seed(42L)
         }
         succeed
@@ -166,11 +170,12 @@ class WalkForwardRunnerSpec extends IOWordSpec:
             result
           }
         val forward = new ForwardEvaluator[IO]:
-          def evaluate(selected: TestStrategy, original: TestStrategy, data: List[Dataset]): IO[ForwardResult] = IO {
-            selected mustBe changed
-            original mustBe base
-            ForwardResult(metrics(2), metrics(1), Nil)
-          }
+          def evaluate(selected: TestStrategy, original: TestStrategy, data: List[Dataset], candleCount: CandleCount): IO[ForwardResult] =
+            IO {
+              selected mustBe changed
+              original mustBe base
+              ForwardResult(metrics(2), metrics(1), Nil)
+            }
         val events = WalkForwardEvents[IO]((_, _, _) => IO.unit, _ => IO.unit, (_, _) => IO.unit, _ => IO.unit)
         new WalkForwardRunner(search, forward, events)
           .run(experiment.copy(round = round.copy(target = target)))
@@ -186,7 +191,7 @@ class WalkForwardRunnerSpec extends IOWordSpec:
         called   <- Ref.of[IO, Boolean](false)
         failures <- Ref.of[IO, List[Int]](Nil)
         forward = new ForwardEvaluator[IO]:
-          def evaluate(selected: TestStrategy, original: TestStrategy, data: List[Dataset]): IO[ForwardResult] =
+          def evaluate(selected: TestStrategy, original: TestStrategy, data: List[Dataset], candleCount: CandleCount): IO[ForwardResult] =
             called.set(true).as(ForwardResult(metrics(1), metrics(1), Nil))
         events = WalkForwardEvents[IO](
           (_, _, _) => IO.raiseError(failure),
@@ -212,7 +217,7 @@ class WalkForwardRunnerSpec extends IOWordSpec:
       (for
         persisted <- Ref.of[IO, Boolean](false)
         forward = new ForwardEvaluator[IO]:
-          def evaluate(selected: TestStrategy, original: TestStrategy, data: List[Dataset]): IO[ForwardResult] =
+          def evaluate(selected: TestStrategy, original: TestStrategy, data: List[Dataset], candleCount: CandleCount): IO[ForwardResult] =
             persisted.get.flatMap { saved =>
               IO {
                 saved mustBe true
@@ -239,7 +244,7 @@ class WalkForwardRunnerSpec extends IOWordSpec:
         def search(request: OptimisationRound, seed: Long): IO[OptimisationResult] =
           IO.raiseError(new RuntimeException("search failed"))
       val forward = new ForwardEvaluator[IO]:
-        def evaluate(selected: TestStrategy, original: TestStrategy, data: List[Dataset]): IO[ForwardResult] =
+        def evaluate(selected: TestStrategy, original: TestStrategy, data: List[Dataset], candleCount: CandleCount): IO[ForwardResult] =
           IO.raiseError(new AssertionError("test called"))
       val events = WalkForwardEvents[IO](
         (_, _, _) => IO.raiseError(new AssertionError("selection recorded")),

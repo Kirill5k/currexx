@@ -1,5 +1,6 @@
 package currexx.backtest.walkforward
 
+import currexx.domain.market.CandleCount
 import currexx.backtest.MarketDataProvider.{DateRange, HistoryCoverage}
 import currexx.domain.market.{CurrencyPair, Interval}
 import kirill5k.common.cats.test.IOWordSpec
@@ -20,9 +21,23 @@ class WalkForwardPreflightSpec extends IOWordSpec:
     )
 
   "WalkForwardPreflight.validate" should {
+    "calculate warm-up and execution availability from the configured candle count" in {
+      val count = CandleCount.from(150).toOption.get
+      val ready = WalkForwardPreflight.validate(List(coverage()), plan, count).toOption.get
+      ready.head.periods.head.warmupBarsLost mustBe 149
+      ready.head.periods.head.executableBars mustBe 1850L
+      ready.head.periods.tail.foreach(_.warmupBarsLost mustBe 0)
+
+      val firstMonths = (0L until 4L).map(YearMonth.of(2023, 7).plusMonths)
+      val short       = coverage(counts = monthlyBars ++ firstMonths.map(_ -> 30L))
+      WalkForwardPreflight.validate(List(short), plan, CandleCount.Default).isRight mustBe true
+      val failure = WalkForwardPreflight.validate(List(short), plan, count).swap.toOption.get
+      failure.getMessage must include("Insufficient bars for warm-up, priming and execution")
+    }
+
     "check all five expanding windows and every pair before any window runs" in {
       val history = List(coverage(), coverage("GBPUSD"))
-      val ready   = WalkForwardPreflight.validate(history, plan).toOption.get
+      val ready   = WalkForwardPreflight.validate(history, plan, CandleCount.Default).toOption.get
 
       ready.map(_.window) mustBe plan.windows
       ready.map(_.periods.size) mustBe List(10, 12, 14, 16, 18)
@@ -36,7 +51,7 @@ class WalkForwardPreflightSpec extends IOWordSpec:
     }
 
     "report the oldest fold's 99-bar warm-up loss in every expanding window" in {
-      val ready  = WalkForwardPreflight.validate(List(coverage()), plan).toOption.get
+      val ready  = WalkForwardPreflight.validate(List(coverage()), plan, CandleCount.Default).toOption.get
       val oldest = ready.map(_.periods.find(_.stage == "training fold 1").get)
 
       oldest must have size 5
@@ -50,7 +65,7 @@ class WalkForwardPreflightSpec extends IOWordSpec:
     }
 
     "use earlier prices to warm later stages while excluding each simulator's priming bar" in {
-      val ready  = WalkForwardPreflight.validate(List(coverage()), plan).toOption.get
+      val ready  = WalkForwardPreflight.validate(List(coverage()), plan, CandleCount.Default).toOption.get
       val warmed = ready.flatMap(_.periods.filterNot(_.stage == "training fold 1"))
 
       warmed.foreach { period =>
@@ -64,7 +79,7 @@ class WalkForwardPreflightSpec extends IOWordSpec:
 
     "attribute a missing month first needed by a later window to that window" in {
       val history = coverage(counts = monthlyBars - YearMonth.of(2026, 6))
-      val failure = WalkForwardPreflight.validate(List(history), plan).swap.toOption.get
+      val failure = WalkForwardPreflight.validate(List(history), plan, CandleCount.Default).swap.toOption.get
 
       failure.window mustBe plan.windows.last
       failure.getMessage must include("Window 5")
@@ -74,7 +89,7 @@ class WalkForwardPreflightSpec extends IOWordSpec:
 
     "reject internal gaps even when the outer history bounds cover the whole plan" in {
       val history = coverage(counts = monthlyBars.updated(YearMonth.of(2024, 3), 0L))
-      val failure = WalkForwardPreflight.validate(List(history), plan).swap.toOption.get
+      val failure = WalkForwardPreflight.validate(List(history), plan, CandleCount.Default).swap.toOption.get
 
       history.firstBar mustBe coverage().firstBar
       history.lastBar mustBe coverage().lastBar
@@ -86,14 +101,14 @@ class WalkForwardPreflightSpec extends IOWordSpec:
     "require an execution bar after both price warm-up and simulator priming" in {
       val firstFoldMonths = (0L until 4L).map(YearMonth.of(2023, 7).plusMonths)
       val onlyOneWindow   = coverage(counts = monthlyBars ++ firstFoldMonths.map(_ -> 25L))
-      val failure         = WalkForwardPreflight.validate(List(onlyOneWindow), plan).swap.toOption.get
+      val failure         = WalkForwardPreflight.validate(List(onlyOneWindow), plan, CandleCount.Default).swap.toOption.get
 
       failure.window mustBe plan.windows.head
       failure.getMessage must include("Insufficient bars for warm-up, priming and execution")
       failure.getMessage must include("training fold 1")
 
       val oneExecution = onlyOneWindow.copy(perMonth = onlyOneWindow.perMonth.updated(YearMonth.of(2023, 7), 26L))
-      val ready        = WalkForwardPreflight.validate(List(oneExecution), plan).toOption.get
+      val ready        = WalkForwardPreflight.validate(List(oneExecution), plan, CandleCount.Default).toOption.get
       ready.head.periods.head.priceBars mustBe 101L
       ready.head.periods.head.warmupBarsLost mustBe 99
       ready.head.periods.head.executableBars mustBe 1L
@@ -107,7 +122,7 @@ class WalkForwardPreflightSpec extends IOWordSpec:
         firstBar = Instant.parse("2024-01-01T00:00:00Z"),
         lastBar = Instant.parse("2024-03-31T23:00:00Z")
       )
-      val failure = WalkForwardPreflight.validate(List(history), shortPlan).swap.toOption.get
+      val failure = WalkForwardPreflight.validate(List(history), shortPlan, CandleCount.Default).swap.toOption.get
 
       failure.window mustBe shortPlan.windows.head
       failure.getMessage must include("selection")

@@ -4,6 +4,7 @@ import cats.effect.Async
 import cats.syntax.flatMap.*
 import cats.syntax.traverse.*
 import currexx.backtest.MarketDataProvider
+import currexx.domain.market.CandleCount
 import currexx.backtest.MarketDataProvider.{Dataset, DateRange, HistoryCoverage}
 
 final case class PeriodReadiness(
@@ -24,10 +25,10 @@ object WalkForwardPreflight:
   final class Failure(val window: WalkForwardWindow, cause: IllegalArgumentException)
       extends IllegalArgumentException(s"Window ${window.index} (history preflight) failed: ${cause.getMessage}", cause)
 
-  def inspect[F[_]: Async](history: List[Dataset], plan: WalkForwardPlan): F[List[WindowReadiness]] =
-    history.traverse(MarketDataProvider.inspectHistory[F]).flatMap(coverage => Async[F].fromEither(validate(coverage, plan)))
+  def inspect[F[_]: Async](history: List[Dataset], plan: WalkForwardPlan, candleCount: CandleCount): F[List[WindowReadiness]] =
+    history.traverse(MarketDataProvider.inspectHistory[F]).flatMap(coverage => Async[F].fromEither(validate(coverage, plan, candleCount)))
 
-  def validate(history: List[HistoryCoverage], plan: WalkForwardPlan): Either[Failure, List[WindowReadiness]] =
+  def validate(history: List[HistoryCoverage], plan: WalkForwardPlan, candleCount: CandleCount): Either[Failure, List[WindowReadiness]] =
     plan.windows.traverse { window =>
       val ranges = window.trainingFolds.zipWithIndex.map { case (range, index) => s"training fold ${index + 1}" -> range } :::
         List("selection" -> window.selection, "forward test" -> window.test)
@@ -38,7 +39,7 @@ object WalkForwardPreflight:
             val missing   = months.filter(month => coverage.perMonth.getOrElse(month, 0L) == 0)
             val priorBars = coverage.countBefore(range.from)
             val priceBars = coverage.countIn(range)
-            val lost      = math.min(priceBars, math.max(0L, MarketDataProvider.priceWindowSize - 1L - priorBars)).toInt
+            val lost      = math.min(priceBars, math.max(0L, candleCount.value - 1L - priorBars)).toInt
             val ready     = PeriodReadiness(stage, range, coverage.currencyPair.toString, priceBars, priorBars, lost)
             val context   = s"$stage ($range), ${coverage.currencyPair} ${coverage.interval}"
             if (missing.nonEmpty)

@@ -21,7 +21,7 @@ import currexx.core.settings.TradeSettings
 import currexx.core.trade.TradeAction
 import currexx.core.trade.db.{OrderStatusRepository, TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{CurrencyPair, Interval, OrderPlacementResult, OrderPlacementStatus, TradeOrder}
+import currexx.domain.market.{CandleCount, CurrencyPair, Interval, OrderPlacementResult, OrderPlacementStatus, TradeOrder}
 import currexx.domain.monitor.Limits
 import kirill5k.common.cats.Clock
 import currexx.domain.user.UserId
@@ -38,7 +38,7 @@ trait TradeService[F[_]]:
   def closeOpenOrders(uid: UserId): F[Unit]
   def closeOpenOrders(uid: UserId, cp: CurrencyPair): F[Unit]
   def closeOrderIfProfitIsOutsideRange(uid: UserId, cps: NonEmptyList[CurrencyPair], limits: Limits): F[Unit]
-  def fetchMarketData(uid: UserId, cps: NonEmptyList[CurrencyPair], interval: Interval): F[Unit]
+  def fetchMarketData(uid: UserId, cps: NonEmptyList[CurrencyPair], interval: Interval, candleCount: CandleCount): F[Unit]
   def findBrokerPosition(uid: UserId, cp: CurrencyPair): F[BrokerPosition]
 
 final private class LiveTradeService[F[_]](
@@ -59,10 +59,10 @@ final private class LiveTradeService[F[_]](
   override def getOrderStatistics(uid: UserId, sp: SearchParams): F[OrderStatistics] =
     orderStatusRepository.getStatistics(uid, sp)
 
-  override def fetchMarketData(uid: UserId, cps: NonEmptyList[CurrencyPair], interval: Interval): F[Unit] =
+  override def fetchMarketData(uid: UserId, cps: NonEmptyList[CurrencyPair], interval: Interval, candleCount: CandleCount): F[Unit] =
     cps.parTraverse_ { cp =>
       marketDataClient
-        .timeSeriesData(cp, interval)
+        .timeSeriesData(cp, interval, candleCount)
         .map(Action.ProcessMarketData(uid, _))
         .flatMap(dispatcher.dispatch)
     }

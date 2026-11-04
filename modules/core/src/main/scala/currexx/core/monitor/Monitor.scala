@@ -2,7 +2,7 @@ package currexx.core.monitor
 
 import cats.data.NonEmptyList
 import currexx.domain.user.UserId
-import currexx.domain.market.{CurrencyPair, Interval}
+import currexx.domain.market.{CandleCount, CurrencyPair, Interval}
 import currexx.domain.monitor.{Limits, Schedule}
 import currexx.domain.types.IdType
 import kirill5k.common.syntax.time.*
@@ -39,7 +39,8 @@ object Monitor:
       currencyPairs: NonEmptyList[CurrencyPair],
       schedule: Schedule,
       lastQueriedAt: Option[Instant],
-      interval: Interval
+      interval: Interval,
+      candleCount: CandleCount
   ) extends Monitor("market-data")
 
   final case class Profit(
@@ -62,7 +63,8 @@ object CreateMonitor:
       userId: UserId,
       currencyPairs: NonEmptyList[CurrencyPair],
       schedule: Schedule,
-      interval: Interval
+      interval: Interval,
+      candleCount: CandleCount
   ) extends CreateMonitor("market-data")
 
   final case class Profit(

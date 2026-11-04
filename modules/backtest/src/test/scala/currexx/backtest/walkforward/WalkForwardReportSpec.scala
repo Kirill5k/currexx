@@ -1,6 +1,7 @@
 package currexx.backtest.walkforward
 
 import cats.effect.{IO, Resource}
+import currexx.domain.market.CandleCount
 import currexx.algorithms.Parameters
 import currexx.backtest.{MarketDataProvider, TestStrategy}
 import currexx.backtest.MarketDataProvider.Dataset
@@ -74,6 +75,16 @@ class WalkForwardReportSpec extends IOWordSpec {
   private def readJson(path: Path): IO[Json] = read(path).flatMap(value => IO.fromEither(parse(value)))
 
   "WalkForwardReportRenderer" should {
+    "record a nondefault candle count in manifests, reports and comparison rows" in {
+      val configured = experiment.copy(round = round.copy(candleCount = CandleCount.from(250).toOption.get))
+      val totals     = WalkForwardSummary.from(Nil)
+      val run        = WalkForwardComparison.Run(configured, totals)
+      WalkForwardReportRenderer.manifest(configured, Nil).hcursor.downField("simulation").get[Int]("candleCount") mustBe Right(250)
+      WalkForwardReportRenderer.markdown(configured, Nil, totals, None) must include("Candle count: 250")
+      WalkForwardComparison.json(List(run)).hcursor.downField("runs").downArray.get[Int]("candleCount") mustBe Right(250)
+      WalkForwardComparison.markdown(List(run)) must include("| 42 | 250 |")
+    }
+
     "record full strategies, explicit configuration and chronology in the manifest" in {
       val manifest = WalkForwardReportRenderer.manifest(experiment, List(source -> "a" * 64)).hcursor
       manifest.get[Int]("formatVersion") mustBe Right(3)
@@ -167,8 +178,8 @@ class WalkForwardReportSpec extends IOWordSpec {
       val report = WalkForwardComparison.markdown(List(current, relative))
       report must include("retrospective development evidence")
       report must include("BaselineRelative")
-      report must include("| 43 | -10 | -5 | -10 | 0/2 | 1 |")
-      report must include("| 42 | 20 | 20 | 20 | 1/1 | 1 |")
+      report must include("| 43 | 100 | -10 | -5 | -10 | 0/2 | 1 |")
+      report must include("| 42 | 100 | 20 | 20 | 20 | 1/1 | 1 |")
       val json = WalkForwardComparison.json(List(current, relative)).hcursor
       json.get[Int]("formatVersion") mustBe Right(3)
       json.downField("runs").downArray.right.downField("objective").get[Double]("weight") mustBe Right(0.5)

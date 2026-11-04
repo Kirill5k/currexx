@@ -1,13 +1,14 @@
 package currexx.core.common.action
 
-import cats.effect.IO
+import cats.data.NonEmptyList
+import cats.effect.{Deferred, IO}
 import currexx.core.fixtures.{Markets, Signals, Users}
 import currexx.core.market.{MarketService, MarketState}
 import currexx.core.monitor.MonitorService
 import currexx.core.signal.{Signal, SignalService}
 import currexx.core.trade.{BrokerPosition, TradeService}
 import currexx.core.settings.SettingsService
-import currexx.domain.market.{CurrencyPair, TradeOrder}
+import currexx.domain.market.{CandleCount, CurrencyPair, Interval, TradeOrder}
 import currexx.domain.signal.Direction
 import currexx.domain.user.UserId
 import kirill5k.common.cats.test.IOWordSpec
@@ -21,6 +22,27 @@ class ActionProcessorSpec extends IOWordSpec {
   given Logger[IO] = Slf4jLogger.getLogger[IO]
 
   "An ActionProcessor" should {
+    "forward the configured candle count when fetching market data" in {
+      val (monsvc, sigsvc, marksvc, tradesvc, settvc) = mocks
+      val count                                       = CandleCount.from(250).toOption.get
+      val pairs                                       = NonEmptyList.of(Markets.gbpeur)
+
+      val result = for
+        processed <- Deferred[IO, Unit]
+        _ = when(tradesvc.fetchMarketData(Users.uid, pairs, Interval.H1, count)).thenReturn(processed.complete(()).void)
+        dispatcher <- ActionDispatcher.make[IO]
+        processor  <- ActionProcessor.make[IO](dispatcher, monsvc, sigsvc, marksvc, tradesvc, settvc)
+        _          <- dispatcher.dispatch(Action.FetchMarketData(Users.uid, pairs, Interval.H1, count))
+        _          <- processor.run.interruptWhen(processed.get.attempt).compile.drain.timeout(3.seconds)
+      yield ()
+
+      result.asserting { _ =>
+        verify(tradesvc).fetchMarketData(Users.uid, pairs, Interval.H1, count)
+        verifyNoMoreInteractions(tradesvc)
+        succeed
+      }
+    }
+
     "process manual signals separately from detected candle batches" in {
       val (monsvc, sigsvc, marksvc, tradesvc, settvc) = mocks
       when(marksvc.processManualSignal(any[Signal])).thenReturn(IO.unit)

@@ -8,6 +8,7 @@ import cats.syntax.functor.*
 import currexx.clients.broker.{BrokerClient, BrokerParameters}
 import currexx.clients.data.MarketDataClient
 import currexx.domain.market.{
+  CandleCount,
   CurrencyPair,
   Interval,
   MarketTimeSeriesData,
@@ -50,8 +51,9 @@ final class TestMarketDataClient[F[_]](
     private val priceRef: Ref[F, Option[MarketTimeSeriesData]]
 )(using F: Monad[F])
     extends MarketDataClient[F]:
-  override def timeSeriesData(currencyPair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] = priceRef.get.map(_.get)
-  override def latestPrice(currencyPair: CurrencyPair): F[PriceRange]                                  = priceRef.get.map(_.get.prices.head)
+  override def timeSeriesData(currencyPair: CurrencyPair, interval: Interval, candleCount: CandleCount): F[MarketTimeSeriesData] =
+    priceRef.get.map(_.get).map(data => data.copy(prices = NonEmptyList(data.prices.head, data.prices.tail.take(candleCount.value - 1))))
+  override def latestPrice(currencyPair: CurrencyPair): F[PriceRange] = priceRef.get.map(_.get.prices.head)
 
   def setData(tsd: MarketTimeSeriesData): F[Unit] = priceRef.set(Some(tsd))
 

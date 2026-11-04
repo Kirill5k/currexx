@@ -37,7 +37,7 @@ final class WalkForwardRunner[F[_]](
         history.nonEmpty && history.forall(_.range.isEmpty) &&
           history.map(dataset => (dataset.currencyPair, dataset.interval)).distinct.size == history.size
       )(new IllegalArgumentException("History must contain distinct, unranged pair/interval series"))
-    }.flatMap(_ => WalkForwardPreflight.inspect[F](experiment.history, experiment.plan))
+    }.flatMap(_ => WalkForwardPreflight.inspect[F](experiment.history, experiment.plan, experiment.round.candleCount))
       .adaptError {
         case error: WalkForwardPreflight.Failure => error
         case error => new IllegalStateException(s"Window ${first.index} (history preflight) failed: ${error.getMessage}", error)
@@ -64,7 +64,7 @@ final class WalkForwardRunner[F[_]](
       decision = FrozenSelection.fromResult(experiment.round.strategy, optimisation)
       _          <- stage(window, "persist selection")(events.frozen(window, seed, decision))
       evaluation <- stage(window, "forward evaluation")(
-        forward.evaluate(decision.strategy, experiment.round.strategy, datasets(window.test))
+        forward.evaluate(decision.strategy, experiment.round.strategy, datasets(window.test), experiment.round.candleCount)
       )
       result = WindowResult(window, seed, decision, evaluation)
       _ <- stage(window, "persist result")(events.completed(result))

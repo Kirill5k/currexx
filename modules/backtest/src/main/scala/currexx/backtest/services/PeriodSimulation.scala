@@ -5,7 +5,7 @@ import cats.syntax.flatMap.*
 import currexx.backtest.{OrderStats, RiskSettings}
 import currexx.core.signal.SignalDetector
 import currexx.domain.market.MarketTimeSeriesData
-import fs2.Stream
+import fs2.{Pull, Stream}
 
 /** Executes one already prepared pair series without resetting at physical CSV boundaries. */
 object PeriodSimulation:
@@ -23,7 +23,13 @@ object PeriodSimulation:
       signalDetector: SignalDetector,
       riskSettings: RiskSettings
   ): F[OrderStats] =
-    data
+    data.pull
+      .unconsN(2, allowFewer = true)
+      .flatMap {
+        case Some((initial, remaining)) if initial.size == 2 => Pull.output(initial) >> remaining.pull.echo
+        case _ => Pull.raiseError[F](new IllegalArgumentException("Insufficient market-data windows for priming and execution"))
+      }
+      .stream
       .through(services.processMarketData(signalDetector))
       .compile
       .drain

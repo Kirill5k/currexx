@@ -5,10 +5,10 @@ import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import currexx.clients.data.twelvedata.TwelveDataClient
 import currexx.clients.data.oanda.OandaDataClient
-import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
+import currexx.domain.market.{CandleCount, CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 
 trait MarketDataClient[F[_]]:
-  def timeSeriesData(currencyPair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData]
+  def timeSeriesData(currencyPair: CurrencyPair, interval: Interval, candleCount: CandleCount): F[MarketTimeSeriesData]
   def latestPrice(currencyPair: CurrencyPair): F[PriceRange]
 
 final private class LiveMarketDataClient[F[_]: MonadThrow](
@@ -20,10 +20,10 @@ final private class LiveMarketDataClient[F[_]: MonadThrow](
       .latestPrice(cp)
       .handleErrorWith(_ => oandaDataClient.latestPrice(cp))
 
-  def timeSeriesData(cp: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] =
+  def timeSeriesData(cp: CurrencyPair, interval: Interval, candleCount: CandleCount): F[MarketTimeSeriesData] =
     oandaDataClient
-      .timeSeriesData(cp, interval)
-      .handleErrorWith(_ => twelveDataClient.timeSeriesData(cp, interval))
+      .timeSeriesData(cp, interval, candleCount)
+      .handleErrorWith(_ => twelveDataClient.timeSeriesData(cp, interval, candleCount))
 }
 
 object MarketDataClient:

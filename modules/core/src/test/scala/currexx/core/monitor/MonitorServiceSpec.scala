@@ -6,7 +6,7 @@ import currexx.core.MockActionDispatcher
 import currexx.core.common.action.Action
 import currexx.core.fixtures.{Markets, Monitors, Users}
 import currexx.core.monitor.db.MonitorRepository
-import currexx.domain.market.Interval
+import currexx.domain.market.{CandleCount, Interval}
 import currexx.domain.monitor.Schedule
 import currexx.domain.user.UserId
 import fs2.Stream
@@ -186,7 +186,8 @@ class MonitorServiceSpec extends IOWordSpec {
 
       "not reschedule monitor in case of manual query" in {
         val (repo, disp) = mocks
-        when(repo.find(any[UserId], any[MonitorId])).thenReturnIO(Monitors.marketData)
+        val count        = CandleCount.from(250).toOption.get
+        when(repo.find(any[UserId], any[MonitorId])).thenReturnIO(Monitors.marketData.copy(candleCount = count))
         when(repo.updateQueriedTimestamp(any[UserId], any[MonitorId])).thenReturn(IO.unit)
 
         val result = for
@@ -198,7 +199,7 @@ class MonitorServiceSpec extends IOWordSpec {
           verify(repo).find(Users.uid, Monitors.mid)
           verify(repo).updateQueriedTimestamp(Users.uid, Monitors.mid)
           verifyNoMoreInteractions(repo)
-          disp.submittedActions mustBe List(Action.FetchMarketData(Users.uid, NonEmptyList.of(Markets.gbpeur), Interval.H1))
+          disp.submittedActions mustBe List(Action.FetchMarketData(Users.uid, NonEmptyList.of(Markets.gbpeur), Interval.H1, count))
           res mustBe ()
         }
       }

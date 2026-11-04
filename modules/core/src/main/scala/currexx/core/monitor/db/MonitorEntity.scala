@@ -3,7 +3,7 @@ package currexx.core.monitor.db
 import cats.data.NonEmptyList
 import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder, Json}
 import io.circe.syntax.*
-import currexx.domain.market.{CurrencyPair, Interval}
+import currexx.domain.market.{CandleCount, CurrencyPair, Interval}
 import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId}
 import currexx.domain.JsonSyntax
 import currexx.domain.user.UserId
@@ -50,7 +50,8 @@ object MonitorEntity extends JsonSyntax {
       currencyPairs: NonEmptyList[CurrencyPair],
       schedule: Schedule,
       lastQueriedAt: Option[Instant],
-      interval: Interval
+      interval: Interval,
+      candleCount: Option[CandleCount] = None
   ) extends MonitorEntity("market-data") derives Codec.AsObject:
     override def toDomain: Monitor =
       Monitor.MarketData(
@@ -60,13 +61,14 @@ object MonitorEntity extends JsonSyntax {
         currencyPairs,
         schedule,
         lastQueriedAt,
-        interval
+        interval,
+        candleCount.getOrElse(CandleCount.Default)
       )
 
   def from(create: CreateMonitor): MonitorEntity =
     create match
-      case CreateMonitor.MarketData(userId, currencyPairs, schedule, interval) =>
-        MonitorEntity.MarketData(ObjectId.gen, userId.toObjectId, true, currencyPairs, schedule, None, interval)
+      case CreateMonitor.MarketData(userId, currencyPairs, schedule, interval, candleCount) =>
+        MonitorEntity.MarketData(ObjectId.gen, userId.toObjectId, true, currencyPairs, schedule, None, interval, Some(candleCount))
       case CreateMonitor.Profit(userId, currencyPairs, schedule, limits) =>
         MonitorEntity.Profit(ObjectId.gen, userId.toObjectId, true, currencyPairs, schedule, None, limits)
 

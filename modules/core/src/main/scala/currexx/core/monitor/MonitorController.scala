@@ -8,7 +8,7 @@ import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
 import currexx.domain.JsonSyntax
 import currexx.domain.errors.AppError
-import currexx.domain.market.{CurrencyPair, Interval}
+import currexx.domain.market.{CandleCount, CurrencyPair, Interval}
 import currexx.domain.monitor.{Limits, Schedule}
 import currexx.domain.user.UserId
 import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder, Json}
@@ -117,10 +117,11 @@ object MonitorController extends TapirSchema with TapirJson {
     final case class MarketData(
         currencyPairs: NonEmptySet[CurrencyPair],
         schedule: Schedule,
-        interval: Interval
+        interval: Interval,
+        candleCount: Option[CandleCount] = None
     ) extends CreateMonitorRequest("market-data") derives Codec.AsObject:
       def toDomain(uid: UserId): CreateMonitor =
-        CreateMonitor.MarketData(uid, currencyPairs.toNonEmptyList, schedule, interval)
+        CreateMonitor.MarketData(uid, currencyPairs.toNonEmptyList, schedule, interval, candleCount.getOrElse(CandleCount.Default))
 
     final case class Profit(
         currencyPairs: NonEmptySet[CurrencyPair],
@@ -161,10 +162,20 @@ object MonitorController extends TapirSchema with TapirJson {
         currencyPairs: NonEmptySet[CurrencyPair],
         schedule: Schedule,
         lastQueriedAt: Option[Instant],
-        interval: Interval
+        interval: Interval,
+        candleCount: Option[CandleCount] = None
     ) extends MonitorView("market-data") derives Codec.AsObject:
       def toDomain(uid: UserId): Monitor =
-        Monitor.MarketData(MonitorId(id), uid, active, currencyPairs.toNonEmptyList, schedule, lastQueriedAt, interval)
+        Monitor.MarketData(
+          MonitorId(id),
+          uid,
+          active,
+          currencyPairs.toNonEmptyList,
+          schedule,
+          lastQueriedAt,
+          interval,
+          candleCount.getOrElse(CandleCount.Default)
+        )
 
     final case class Profit(
         id: String,
@@ -179,8 +190,8 @@ object MonitorController extends TapirSchema with TapirJson {
 
     def from(m: Monitor): MonitorView =
       m match
-        case Monitor.MarketData(id, _, active, currencyPairs, schedule, lastQueriedAt, interval) =>
-          MonitorView.MarketData(id.value, active, currencyPairs.toNes, schedule, lastQueriedAt, interval)
+        case Monitor.MarketData(id, _, active, currencyPairs, schedule, lastQueriedAt, interval, candleCount) =>
+          MonitorView.MarketData(id.value, active, currencyPairs.toNes, schedule, lastQueriedAt, interval, Some(candleCount))
         case Monitor.Profit(id, _, active, currencyPairs, schedule, lastQueriedAt, limits) =>
           MonitorView.Profit(id.value, active, currencyPairs.toNes, schedule, lastQueriedAt, limits)
 

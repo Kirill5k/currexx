@@ -10,6 +10,36 @@ input checks and seed compatibility.
 The default target is `Both`. `OptimisationRounds` lists the scheduled GA and SCGA
 rounds; its name lookup contains these rounds only.
 
+## Candle history size
+
+Market-data monitors configure their candle count individually. Backtests use the
+same `CandleCount` type, defaulting to 100, and keep it fixed for a complete run.
+Set `BatchBacktester.candleCount` or `StrategyAnalyser.candleCount` for standalone
+runs; both methods also accept an explicit count. For optimisation, set
+`OptimisationRound.candleCount`, for example:
+
+```scala
+import currexx.domain.market.CandleCount
+
+val count = CandleCount.from(250).toOption.get
+val configuredRound = round.copy(candleCount = count)
+```
+
+`CandleCount.from` accepts integers from 1 through 4999 and returns `Left` for
+invalid values; unwrap only known valid constants as in the example above.
+
+Walk-forward experiments inherit their round's count for preflight, search,
+selection and paired forward evaluation. Reports and manifests record the count.
+It is not evolved as a strategy parameter. Recreate a run to compare another
+count; its prepared history and fitness caches belong to that run.
+
+`MarketDataProvider.read(dataset, candleCount)` emits newest-first sliding
+windows of the requested size. Earlier files can supply warm-up bars for a dated
+period. Larger counts can delay the first scored bar; simulations reject histories
+that cannot provide a priming window and a following execution window. Raw readers
+still preserve a single partial window when a short export ends naturally, and
+suppress it when a date cutoff interrupts warm-up.
+
 ## Package layout
 
 - `currexx.backtest` contains CLI entry points, strategy definitions, market data,

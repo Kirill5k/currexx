@@ -5,7 +5,9 @@ import kirill5k.common.http4s.test.HttpRoutesWordSpec
 import currexx.core.auth.Authenticator
 import currexx.core.fixtures.{Markets, Monitors, Sessions, Users}
 import currexx.domain.errors.AppError
+import currexx.domain.market.CandleCount
 import currexx.domain.user.UserId
+import io.circe.parser.decode
 import org.http4s.implicits.*
 import org.http4s.{Method, Request, Status, Uri}
 
@@ -33,6 +35,35 @@ class MonitorControllerSpec extends HttpRoutesWordSpec {
 
         res mustHaveStatus (Status.Created, Some(s"""{"id":"${Monitors.mid}"}"""))
         verify(svc).create(Monitors.createMarketData())
+      }
+
+      "pass a custom candle count to the service" in {
+        val count = CandleCount.from(250).toOption.get
+        val svc   = mock[MonitorService[IO]]
+        when(svc.create(any[CreateMonitor])).thenReturnIO(Monitors.mid)
+        given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
+
+        val req = Request[IO](Method.POST, uri"/monitors")
+          .withAuthHeader()
+          .withBody(marketDataBody("250"))
+        val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        res mustHaveStatus (Status.Created, Some(s"""{"id":"${Monitors.mid}"}"""))
+        verify(svc).create(Monitors.createMarketData(candleCount = count))
+      }
+
+      invalidCounts.foreach { (count, message) =>
+        s"reject candleCount=$count without creating a monitor" in {
+          val svc                       = mock[MonitorService[IO]]
+          given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
+          val req                       = Request[IO](Method.POST, uri"/monitors")
+            .withAuthHeader()
+            .withBody(marketDataBody(count))
+          val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+          res mustHaveStatus (Status.UnprocessableContent, Some(s"""{"message":"$message"}"""))
+          verifyNoInteractions(svc)
+        }
       }
 
       "return 409 if monitor for the requested currency pair already exists" in {
@@ -181,6 +212,7 @@ class MonitorControllerSpec extends HttpRoutesWordSpec {
              |"schedule": {"kind":"periodic","period":"3 hours"},
              |"lastQueriedAt": "${Monitors.queriedAt}",
              |"interval": "H1",
+             |"candleCount": 100,
              |"kind": "market-data"
              |},
              |{
@@ -201,8 +233,9 @@ class MonitorControllerSpec extends HttpRoutesWordSpec {
 
     "GET /monitors/:id" should {
       "find monitor by id" in {
-        val svc = mock[MonitorService[IO]]
-        when(svc.get(any[UserId], any[MonitorId])).thenReturnIO(Monitors.marketData)
+        val count = CandleCount.from(250).toOption.get
+        val svc   = mock[MonitorService[IO]]
+        when(svc.get(any[UserId], any[MonitorId])).thenReturnIO(Monitors.marketData.copy(candleCount = count))
 
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
 
@@ -216,7 +249,8 @@ class MonitorControllerSpec extends HttpRoutesWordSpec {
              |"currencyPairs": ["${Markets.gbpeur}"],
              |"schedule": {"kind":"periodic","period":"3 hours"},
              |"lastQueriedAt": "${Monitors.queriedAt}",
-             |"interval": "H1"
+             |"interval": "H1",
+             |"candleCount": 250
              |}""".stripMargin
 
         res mustHaveStatus (Status.Ok, Some(responseBody))
@@ -248,6 +282,35 @@ class MonitorControllerSpec extends HttpRoutesWordSpec {
         verify(svc).update(Monitors.marketData)
       }
 
+      "pass an updated candle count to the service" in {
+        val count = CandleCount.from(250).toOption.get
+        val svc   = mock[MonitorService[IO]]
+        when(svc.update(any[Monitor])).thenReturn(IO.unit)
+        given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
+
+        val req = Request[IO](Method.PUT, uriWith(Monitors.mid))
+          .withAuthHeader()
+          .withBody(marketDataBody("250"))
+        val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+        res mustHaveStatus (Status.NoContent, None)
+        verify(svc).update(Monitors.marketData.copy(candleCount = count))
+      }
+
+      invalidCounts.foreach { (count, message) =>
+        s"reject candleCount=$count without updating a monitor" in {
+          val svc                       = mock[MonitorService[IO]]
+          given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
+          val req                       = Request[IO](Method.PUT, uriWith(Monitors.mid))
+            .withAuthHeader()
+            .withBody(marketDataBody(count))
+          val res = MonitorController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
+
+          res mustHaveStatus (Status.UnprocessableContent, Some(s"""{"message":"$message"}"""))
+          verifyNoInteractions(svc)
+        }
+      }
+
       "return error when id in path is different from id in requesst" in {
         val svc                       = mock[MonitorService[IO]]
         given auth: Authenticator[IO] = _ => IO.pure(Sessions.sess)
@@ -271,4 +334,31 @@ class MonitorControllerSpec extends HttpRoutesWordSpec {
       }
     }
   }
+
+  "Monitor request codecs" should {
+    "default null candle counts to 100 when converting to domain models" in {
+      val json = marketDataBody("null")
+      decode[MonitorController.CreateMonitorRequest](json).map(_.toDomain(Users.uid)) mustBe Right(Monitors.createMarketData())
+      decode[MonitorController.MonitorView](json).map(_.toDomain(Users.uid)) mustBe Right(Monitors.marketData)
+    }
+  }
+
+  private def invalidCounts: List[(String, String)] = List(
+    "\"100\"" -> "candleCount must be an integer",
+    "1.5"     -> "candleCount must be an integer",
+    "0"       -> "candleCount must be between 1 and 4999",
+    "5000"    -> "candleCount must be between 1 and 4999"
+  )
+
+  private def marketDataBody(count: String): String =
+    s"""{
+       |"id": "${Monitors.mid}",
+       |"kind": "market-data",
+       |"active": true,
+       |"currencyPairs": ["${Markets.gbpeur}"],
+       |"schedule": {"kind":"periodic","period":"3 hours"},
+       |"lastQueriedAt": "${Monitors.queriedAt}",
+       |"interval": "H1",
+       |"candleCount": $count
+       |}""".stripMargin
 }

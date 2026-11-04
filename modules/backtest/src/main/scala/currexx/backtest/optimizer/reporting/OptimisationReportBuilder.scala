@@ -76,7 +76,8 @@ final class OptimisationReportBuilder[F[_]](
       target = round.target,
       baseCandidate = round.strategy,
       fixedIndicators = space.fixedIndicators,
-      ruleBounds = round.ruleBounds
+      ruleBounds = round.ruleBounds,
+      candleCount = round.candleCount
     )
 
   private def fixedInputsRestored(original: TestStrategy, effective: TestStrategy): Boolean = round.target match

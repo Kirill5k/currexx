@@ -7,18 +7,33 @@ import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import currexx.backtest.{MarketDataProvider, TestSettings, TestStrategy}
 import currexx.backtest.MarketDataProvider.Dataset
+import currexx.domain.market.CandleCount
 import currexx.backtest.services.{PeriodSimulation, TestServicesPool}
 
 trait ForwardEvaluator[F[_]]:
   /** Receives the nonempty, common-period datasets already checked by the runner's preflight. */
-  def evaluate(candidate: TestStrategy, base: TestStrategy, datasets: List[Dataset]): F[ForwardResult]
+  def evaluate(candidate: TestStrategy, base: TestStrategy, datasets: List[Dataset], candleCount: CandleCount): F[ForwardResult]
 
 object ForwardEvaluator:
   def make[F[_]: {Async, Parallel}](poolSize: Int): ForwardEvaluator[F] = new ForwardEvaluator[F]:
-    override def evaluate(candidate: TestStrategy, base: TestStrategy, datasets: List[Dataset]): F[ForwardResult] =
+    override def evaluate(
+        candidate: TestStrategy,
+        base: TestStrategy,
+        datasets: List[Dataset],
+        candleCount: CandleCount
+    ): F[ForwardResult] =
       for
-        prepared <- datasets.parTraverse(dataset => MarketDataProvider.read[F](dataset).compile.toList.map(dataset -> _))
-        pool     <- TestServicesPool.make[F](TestSettings.make(datasets.head.currencyPair, base.rules, List(base.indicator)), poolSize)
+        _        <- Async[F].raiseWhen(datasets.isEmpty)(new IllegalArgumentException("Forward evaluation requires nonempty datasets"))
+        prepared <- datasets.parTraverse { dataset =>
+          MarketDataProvider.read[F](dataset, candleCount).compile.toList.flatMap { data =>
+            Async[F]
+              .raiseUnless(data.size >= 2)(
+                new IllegalArgumentException(s"Insufficient bars for ${candleCount.value}-candle warm-up, priming and execution: $dataset")
+              )
+              .as(dataset -> data)
+          }
+        }
+        pool <- TestServicesPool.make[F](TestSettings.make(datasets.head.currencyPair, base.rules, List(base.indicator)), poolSize)
         run = (strategy: TestStrategy) =>
           prepared.parTraverse { case (dataset, data) =>
             pool.use(TestSettings.make(dataset.currencyPair, strategy.rules, List(strategy.indicator))) { services =>

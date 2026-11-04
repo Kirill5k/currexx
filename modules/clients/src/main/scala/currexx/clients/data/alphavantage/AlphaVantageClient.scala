@@ -9,7 +9,7 @@ import currexx.clients.data.MarketDataClient
 import currexx.clients.Fs2HttpClient
 import kirill5k.common.cats.Cache
 import currexx.domain.errors.AppError
-import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
+import currexx.domain.market.{CandleCount, CurrencyPair, Interval, MarketTimeSeriesData, PriceRange}
 import io.circe.{Codec, JsonObject}
 import org.typelevel.log4cats.Logger
 import sttp.capabilities.fs2.Fs2Streams
@@ -21,13 +21,13 @@ import sttp.model.{StatusCode, Uri}
 import scala.concurrent.duration.*
 
 private[clients] trait AlphaVantageClient[F[_]] extends MarketDataClient[F] with Fs2HttpClient[F]:
-  def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData]
+  def timeSeriesData(pair: CurrencyPair, interval: Interval, candleCount: CandleCount): F[MarketTimeSeriesData]
 
 final private class LiveAlphaVantageClient[F[_]](
     override protected val backend: WebSocketStreamBackend[F, Fs2Streams[F]],
     private val config: AlphaVantageConfig,
     private val delayBetweenClientFailures: FiniteDuration,
-    private val cache: Cache[F, (CurrencyPair, Interval), MarketTimeSeriesData]
+    private val cache: Cache[F, AlphaVantageClient.CacheKey, MarketTimeSeriesData]
 )(using
     F: Temporal[F],
     logger: Logger[F]
@@ -37,33 +37,38 @@ final private class LiveAlphaVantageClient[F[_]](
   override protected val delayBetweenConnectionFailures: FiniteDuration = 5.seconds
 
   override def latestPrice(pair: CurrencyPair): F[PriceRange] =
-    timeSeriesData(pair, Interval.D1).map(_.prices.head)
+    timeSeriesData(pair, Interval.D1, CandleCount.Default).map(_.prices.head)
 
-  override def timeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] =
-    cache.evalPutIfNew(pair -> interval)(fetchTimeSeriesData(pair, interval))
+  override def timeSeriesData(pair: CurrencyPair, interval: Interval, candleCount: CandleCount): F[MarketTimeSeriesData] =
+    val outputSize = if (candleCount.value <= 100) "compact" else "full"
+    cache
+      .evalPutIfNew((pair, interval, outputSize))(fetchTimeSeriesData(pair, interval, outputSize))
+      .map(data => data.copy(prices = NonEmptyList.fromListUnsafe(data.prices.take(candleCount.value))))
 
-  private def fetchTimeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] =
+  private def fetchTimeSeriesData(pair: CurrencyPair, interval: Interval, outputSize: String): F[MarketTimeSeriesData] =
     interval match
-      case Interval.D1 => dailyTimeSeriesData(pair)
-      case _           => intradayTimeSeriesData(pair, interval)
+      case Interval.D1 => dailyTimeSeriesData(pair, outputSize)
+      case _           => intradayTimeSeriesData(pair, interval, outputSize)
 
-  private def dailyTimeSeriesData(pair: CurrencyPair): F[MarketTimeSeriesData] = {
+  private def dailyTimeSeriesData(pair: CurrencyPair, outputSize: String): F[MarketTimeSeriesData] = {
     val params = Map(
       "function"    -> "FX_DAILY",
       "from_symbol" -> pair.base.code,
       "to_symbol"   -> pair.quote.code,
-      "apikey"      -> config.apiKey
+      "apikey"      -> config.apiKey,
+      "outputsize"  -> outputSize
     )
     sendRequest(uri"${config.baseUri}/query?$params", ResponseMapper.mapDailyTimeSeriesData)
       .map(prs => MarketTimeSeriesData(pair, Interval.D1, prs, name))
   }
 
-  private def intradayTimeSeriesData(pair: CurrencyPair, interval: Interval): F[MarketTimeSeriesData] = {
+  private def intradayTimeSeriesData(pair: CurrencyPair, interval: Interval, outputSize: String): F[MarketTimeSeriesData] = {
     val params = Map(
       "function"    -> "FX_INTRADAY",
       "from_symbol" -> pair.base.code,
       "to_symbol"   -> pair.quote.code,
       "apikey"      -> config.apiKey,
+      "outputsize"  -> outputSize,
       "interval"    -> (interval match
         case Interval.M1  => "1min"
         case Interval.M5  => "5min"
@@ -104,6 +109,8 @@ final private class LiveAlphaVantageClient[F[_]](
 
 private[clients] object AlphaVantageClient {
 
+  type CacheKey = (CurrencyPair, Interval, String)
+
   final case class OHLC(
       `1. open`: Double,
       `2. high`: Double,
@@ -137,6 +144,6 @@ private[clients] object AlphaVantageClient {
       delayBetweenClientFailures: FiniteDuration = 10.seconds
   ): F[AlphaVantageClient[F]] =
     Cache
-      .make[F, (CurrencyPair, Interval), MarketTimeSeriesData](3.minutes, 15.seconds)
+      .make[F, CacheKey, MarketTimeSeriesData](3.minutes, 15.seconds)
       .map(cache => LiveAlphaVantageClient(backend, config, delayBetweenClientFailures, cache))
 }

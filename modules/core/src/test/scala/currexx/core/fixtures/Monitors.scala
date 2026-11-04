@@ -2,7 +2,7 @@ package currexx.core.fixtures
 
 import cats.data.NonEmptyList
 import currexx.core.monitor.{CreateMonitor, Monitor, MonitorId}
-import currexx.domain.market.{CurrencyPair, Interval}
+import currexx.domain.market.{CandleCount, CurrencyPair, Interval}
 import currexx.domain.monitor.{Limits, Schedule}
 import currexx.domain.user.UserId
 import mongo4cats.bson.ObjectId
@@ -18,15 +18,17 @@ object Monitors {
   lazy val limits = Limits(Some(-10), Some(150), None, None)
 
   private val cps     = NonEmptyList.of(Markets.gbpeur)
-  lazy val marketData = Monitor.MarketData(mid, Users.uid, true, cps, Schedule.Periodic(3.hours), Some(queriedAt), Interval.H1)
-  lazy val profit     = Monitor.Profit(mid, Users.uid, true, cps, Schedule.Periodic(3.hours), Some(queriedAt), limits)
+  lazy val marketData =
+    Monitor.MarketData(mid, Users.uid, true, cps, Schedule.Periodic(3.hours), Some(queriedAt), Interval.H1, CandleCount.Default)
+  lazy val profit = Monitor.Profit(mid, Users.uid, true, cps, Schedule.Periodic(3.hours), Some(queriedAt), limits)
 
   def createMarketData(
       uid: UserId = Users.uid,
       pairs: NonEmptyList[CurrencyPair] = cps,
       schedule: Schedule = Schedule.Periodic(3.hours),
-      interval: Interval = Interval.H1
-  ): CreateMonitor = CreateMonitor.MarketData(uid, pairs, schedule, interval)
+      interval: Interval = Interval.H1,
+      candleCount: CandleCount = CandleCount.Default
+  ): CreateMonitor = CreateMonitor.MarketData(uid, pairs, schedule, interval, candleCount)
 
   def genMarketData(
       mid: MonitorId = MonitorId(ObjectId.gen),
@@ -34,8 +36,9 @@ object Monitors {
       pairs: NonEmptyList[CurrencyPair] = cps,
       schedule: Schedule = Schedule.Periodic(3.hours),
       interval: Interval = Interval.H1,
-      lastQueriedAt: Option[Instant] = Some(queriedAt)
+      lastQueriedAt: Option[Instant] = Some(queriedAt),
+      candleCount: CandleCount = CandleCount.Default
   ): Monitor =
-    Monitor.MarketData(mid, uid, true, pairs, schedule, lastQueriedAt, interval)
+    Monitor.MarketData(mid, uid, true, pairs, schedule, lastQueriedAt, interval, candleCount)
 
 }

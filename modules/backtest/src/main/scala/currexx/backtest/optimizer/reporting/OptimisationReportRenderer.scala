@@ -63,7 +63,7 @@ object OptimisationReportRenderer:
       round: OptimisationRound,
       population: ValidatedPopulation[TestStrategy],
       championBreaches: List[ScoringFunction.Violation]
-  ): List[String] = round.corpus.describe ::: List("") ::: outcome(
+  ): List[String] = round.corpus.describe ::: List(s"Candle count: ${round.candleCount.value}", "") ::: outcome(
     population,
     championBreaches,
     round.corpus.validationFold.nonEmpty,
@@ -121,6 +121,7 @@ object OptimisationReportRenderer:
       .toList
     List(
       s"Optimisation target: ${report.target}",
+      s"Candle count: ${report.candleCount.value}",
       s"Rule parameter bounds: ${RuleBoundsRenderer.json(report.ruleBounds).noSpaces}"
     ) ::: fixedIndicators ::: fixed ::: List(s"Base candidate: ${report.baseCandidate.asJson.noSpaces}")
 

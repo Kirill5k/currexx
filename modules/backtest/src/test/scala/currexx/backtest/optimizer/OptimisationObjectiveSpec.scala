@@ -1,5 +1,6 @@
 package currexx.backtest.optimizer
 
+import currexx.domain.market.CandleCount
 import currexx.algorithms.{EvaluatedPopulation, EvaluationPhase, Fitness, ValidatedPopulation}
 import currexx.algorithms.operators.Validator
 import currexx.backtest.{MarketDataProvider, OrderStats, TestStrategy}
@@ -18,6 +19,8 @@ import cats.syntax.traverse.*
 import kirill5k.common.cats.test.IOWordSpec
 
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.ConcurrentLinkedQueue
+import scala.jdk.CollectionConverters.*
 
 class OptimisationObjectiveSpec extends IOWordSpec {
 
@@ -48,6 +51,56 @@ class OptimisationObjectiveSpec extends IOWordSpec {
 
   "OptimisationObjective.make" should {
 
+    "use the configured candle count for search, validation and reporting replay" in {
+      val sizes    = new ConcurrentLinkedQueue[Int]()
+      val detector = new SignalDetector {
+        override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal] = {
+          sizes.add(data.prices.size)
+          None
+        }
+      }
+      val dataset   = MarketDataProvider.Dataset("eur-usd-1h-walk-forward-full.csv")
+      val candidate = strategy.copy(rules = currexx.core.trade.TradeStrategy(Nil, Nil))
+      (for
+        objective <- OptimisationObjective.make[IO](
+          corpus = Corpus(List(List(dataset)), List(dataset)),
+          strategy = candidate,
+          poolSize = 1,
+          candleCount = CandleCount.from(150).toOption.get,
+          signalDetector = detector
+        )
+        _         <- objective.evaluator.evaluateIndividual(candidate, EvaluationPhase.Rescore)
+        searched  <- IO(sizes.size())
+        _         <- objective.validate(candidate)
+        validated <- IO(sizes.size())
+        _         <- objective.inspect(candidate)
+        reported  <- IO(sizes.size())
+      yield {
+        searched must be > 0
+        validated must be > searched
+        reported must be > validated
+        sizes.iterator().asScala.toSet mustBe Set(150)
+      }).asserting(identity)
+    }
+
+    "reject insufficient history before creating the evaluator pool" in {
+      val dataset = MarketDataProvider.Dataset("eur-usd-1h-walk-forward-full.csv")
+      OptimisationObjective
+        .make[IO](
+          corpus = Corpus(List(List(dataset))),
+          strategy = strategy,
+          poolSize = 1,
+          candleCount = CandleCount.from(220).toOption.get
+        )
+        .attempt
+        .asserting {
+          case Left(error: IllegalArgumentException) =>
+            error.getMessage must include("Insufficient bars for 220-candle warm-up, priming and execution")
+            error.getMessage must include("eur-usd-1h-walk-forward-full.csv")
+          case other => fail(s"Expected insufficient history, got $other")
+        }
+    }
+
     "cache complete candidates and execute each candidate's rules" in {
       val noTrades       = strategy.copy(rules = currexx.core.trade.TradeStrategy(Nil, Nil))
       val otherIndicator = noTrades.copy(indicator = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SMA(20)))
@@ -57,6 +110,7 @@ class OptimisationObjectiveSpec extends IOWordSpec {
           corpus = corpus.copy(searchFolds = corpus.searchFolds.take(1)),
           strategy = strategy,
           poolSize = 1,
+          candleCount = CandleCount.Default,
           diagnostics = Some(diagnostics)
         )
         _ <- List(strategy, noTrades, otherIndicator, strategy).traverse_(
@@ -81,6 +135,7 @@ class OptimisationObjectiveSpec extends IOWordSpec {
           corpus = corpus,
           strategy = strategy,
           poolSize = 1,
+          candleCount = CandleCount.Default,
           scoringFunction = scoring
         )
         rescored <- objective.evaluator.evaluateIndividual(strategy, EvaluationPhase.Rescore)
@@ -112,6 +167,7 @@ class OptimisationObjectiveSpec extends IOWordSpec {
           corpus = corpus,
           strategy = strategy,
           poolSize = 1,
+          candleCount = CandleCount.Default,
           scoringFunction = scoring
         )
         stats <- objective.backtest(strategy)
@@ -137,6 +193,7 @@ class OptimisationObjectiveSpec extends IOWordSpec {
           corpus = corpus,
           strategy = strategy,
           poolSize = 1,
+          candleCount = CandleCount.Default,
           scoringFunction = scoring
         )
         trained   <- objective.backtest(strategy)
@@ -180,6 +237,7 @@ class OptimisationObjectiveSpec extends IOWordSpec {
           corpus = corpus.copy(searchFolds = corpus.searchFolds.take(1)),
           strategy = target,
           poolSize = 1,
+          candleCount = CandleCount.Default,
           scoringFunction = scoring,
           searchSpace = Some(space)
         )
@@ -240,6 +298,7 @@ class OptimisationObjectiveSpec extends IOWordSpec {
           corpus = corpus.copy(searchFolds = corpus.searchFolds.take(1)),
           strategy = target,
           poolSize = 1,
+          candleCount = CandleCount.Default,
           scoringFunction = replayScoring,
           searchSpace = Some(space)
         )
@@ -295,6 +354,7 @@ class OptimisationObjectiveSpec extends IOWordSpec {
           corpus = corpus.copy(searchFolds = corpus.searchFolds.take(1)),
           strategy = target,
           poolSize = 1,
+          candleCount = CandleCount.Default,
           signalDetector = detector,
           scoringFunction = scoring,
           searchSpace = Some(space),
@@ -350,6 +410,7 @@ class OptimisationObjectiveSpec extends IOWordSpec {
           corpus = smallCorpus,
           strategy = strategy,
           poolSize = 1,
+          candleCount = CandleCount.Default,
           scoringFunction = scoring,
           diagnostics = Some(diagnostics)
         )
@@ -410,6 +471,7 @@ class OptimisationObjectiveSpec extends IOWordSpec {
           corpus = corpus.copy(searchFolds = corpus.searchFolds.take(1)),
           strategy = target,
           poolSize = 1,
+          candleCount = CandleCount.Default,
           searchSpace = Some(space),
           diagnostics = Some(diagnostics)
         )
@@ -446,6 +508,7 @@ class OptimisationObjectiveSpec extends IOWordSpec {
           corpus = corpus.copy(searchFolds = corpus.searchFolds.take(2)),
           strategy = strategy,
           poolSize = 1,
+          candleCount = CandleCount.Default,
           scoringFunction = quality,
           diagnostics = Some(diagnostics),
           searchObjective = mode
@@ -484,7 +547,8 @@ class OptimisationObjectiveSpec extends IOWordSpec {
         objective <- OptimisationObjective.make[IO](
           corpus = Corpus(corpus.searchFolds.take(1)),
           strategy = strategy,
-          poolSize = 1
+          poolSize = 1,
+          candleCount = CandleCount.Default
         )
         evidence <- objective.selectionEvidence(strategy).attempt
       yield evidence
@@ -502,6 +566,7 @@ class OptimisationObjectiveSpec extends IOWordSpec {
           corpus = Corpus(corpus.searchFolds.take(1)),
           strategy = strategy,
           poolSize = 1,
+          candleCount = CandleCount.Default,
           scoringFunction = scoring,
           diagnostics = Some(diagnostics)
         )

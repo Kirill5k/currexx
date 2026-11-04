@@ -4,6 +4,7 @@ import currexx.algorithms.ValidatedPopulation
 import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.optimizer.strategy.RuleParameterBounds
 import currexx.domain.signal.Indicator
+import currexx.domain.market.CandleCount
 import currexx.backtest.optimizer.{
   FoldAggregation,
   OptimisationResult,
@@ -71,5 +72,6 @@ final case class OptimisationReport(
     target: OptimisationTarget,
     baseCandidate: TestStrategy,
     fixedIndicators: Set[Indicator],
-    ruleBounds: RuleParameterBounds
+    ruleBounds: RuleParameterBounds,
+    candleCount: CandleCount = CandleCount.Default
 )

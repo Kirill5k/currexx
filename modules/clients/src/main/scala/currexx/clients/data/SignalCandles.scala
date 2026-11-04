@@ -4,7 +4,7 @@ import cats.Monad
 import cats.data.NonEmptyList
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import currexx.domain.market.{Interval, MarketTimeSeriesData}
+import currexx.domain.market.{CandleCount, Interval, MarketTimeSeriesData}
 import kirill5k.common.syntax.time.*
 import org.typelevel.log4cats.Logger
 
@@ -15,7 +15,7 @@ private[data] object SignalCandles {
       data: MarketTimeSeriesData,
       interval: Interval,
       now: Instant,
-      signalCandleCount: Int
+      candleCount: CandleCount
   )(using F: Monad[F], logger: Logger[F]): F[MarketTimeSeriesData] = {
     val candleEndTime = data.prices.head.time.plus(interval.toDuration)
     val shouldExclude = candleEndTime.isAfter(now)
@@ -26,6 +26,6 @@ private[data] object SignalCandles {
         logger.warn(s"Only incomplete candle available for ${data.currencyPair} at ${data.interval}") >> F.pure(data)
       else F.pure(data)
 
-    filtered.map(result => result.copy(prices = NonEmptyList.fromListUnsafe(result.prices.take(signalCandleCount))))
+    filtered.map(result => result.copy(prices = NonEmptyList.fromListUnsafe(result.prices.take(candleCount.value))))
   }
 }

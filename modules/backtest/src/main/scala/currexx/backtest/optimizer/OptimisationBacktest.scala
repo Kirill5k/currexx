@@ -8,12 +8,12 @@ import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import currexx.backtest.{MarketDataProvider, OrderStats, TestSettings}
-import currexx.backtest.MarketDataProvider.Corpus
+import currexx.backtest.MarketDataProvider.{Corpus, Dataset}
 import currexx.backtest.optimizer.reporting.RunDiagnostics
 import currexx.backtest.services.{PeriodSimulation, TestServicesPool}
 import currexx.core.signal.SignalDetector
 import currexx.backtest.TestStrategy
-import currexx.domain.market.{CurrencyPair, MarketTimeSeriesData}
+import currexx.domain.market.{CandleCount, CurrencyPair, MarketTimeSeriesData}
 import currexx.domain.signal.Indicator
 
 /** Loads a corpus once and executes its pair simulations through a bounded, reusable services pool. */
@@ -61,14 +61,27 @@ private[optimizer] object OptimisationBacktest {
       corpus: Corpus,
       strategy: TestStrategy,
       poolSize: Int,
+      candleCount: CandleCount,
       otherIndicators: List[Indicator],
       signalDetector: SignalDetector,
       diagnostics: Option[RunDiagnostics[F]]
   ): F[OptimisationBacktest[F]] =
     for
-      folds      <- corpus.searchFolds.traverse(_.parTraverse(MarketDataProvider.read[F](_).compile.toList))
-      validation <- corpus.validationFold.parTraverse(MarketDataProvider.read[F](_).compile.toList)
+      _ <- Async[F].raiseWhen(corpus.searchFolds.isEmpty || corpus.searchFolds.exists(_.isEmpty))(
+        new IllegalArgumentException("Optimisation requires nonempty search folds")
+      )
+      folds      <- corpus.searchFolds.traverse(_.parTraverse(readData[F](_, candleCount)))
+      validation <- corpus.validationFold.parTraverse(readData[F](_, candleCount))
       settings = TestSettings.make(folds.head.head.head.currencyPair, strategy.rules, strategy.indicator :: otherIndicators)
       pool <- TestServicesPool.make[F](settings, poolSize)
     yield new OptimisationBacktest(folds, validation, pool, otherIndicators, signalDetector, diagnostics)
+
+  private def readData[F[_]: Async](dataset: Dataset, candleCount: CandleCount): F[List[MarketTimeSeriesData]] =
+    MarketDataProvider.read[F](dataset, candleCount).compile.toList.flatMap { data =>
+      Async[F]
+        .raiseUnless(data.size >= 2)(
+          new IllegalArgumentException(s"Insufficient bars for ${candleCount.value}-candle warm-up, priming and execution: $dataset")
+        )
+        .as(data)
+    }
 }

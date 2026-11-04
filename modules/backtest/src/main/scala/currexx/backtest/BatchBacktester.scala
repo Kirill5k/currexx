@@ -3,6 +3,7 @@ package currexx.backtest
 import cats.effect.{IO, IOApp}
 import currexx.backtest.services.{PeriodSimulation, TestServices}
 import currexx.core.signal.SignalDetector
+import currexx.domain.market.CandleCount
 import fs2.Stream
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -15,15 +16,26 @@ object BatchBacktester extends IOApp.Simple {
   val strategies: List[(String, TestStrategy)] = StrategyCatalogue.batch
 
   val riskSettings: RiskSettings = RiskSettings()
+  val candleCount: CandleCount   = CandleCount.Default
 
-  def runOne(name: String, ts: TestStrategy, datasets: List[MarketDataProvider.Dataset]): IO[String] =
+  def runOne(
+      name: String,
+      ts: TestStrategy,
+      datasets: List[MarketDataProvider.Dataset],
+      candleCount: CandleCount = BatchBacktester.candleCount
+  ): IO[String] =
     Stream
       .emits(datasets)
       .parEvalMap(6) { dataset =>
         for
           settings = TestSettings.make(dataset.currencyPair, ts.rules, List(ts.indicator))
           services   <- TestServices.make[IO](settings)
-          orderStats <- PeriodSimulation.runStream(services, MarketDataProvider.read[IO](dataset), SignalDetector.pure, riskSettings)
+          orderStats <- PeriodSimulation.runStream(
+            services,
+            MarketDataProvider.read[IO](dataset, candleCount),
+            SignalDetector.pure,
+            riskSettings
+          )
         yield orderStats
       }
       .compile
@@ -34,7 +46,7 @@ object BatchBacktester extends IOApp.Simple {
         val drawdown     = portfolio.maxDrawdownPercent
         val profitFactor = portfolio.profitFactor.fold("    N/A")(pf => f"$pf%7.3f")
         val sharpe       = portfolio.sharpeRatio.toOption.fold("    N/A")(s => f"$s%7.3f")
-        f"$name%-25s net=${portfolio.totalProfit}%10.5f  closed=${portfolio.total}%5d  forced=${portfolio.forcedClosureCount}%2d  " +
+        f"$name%-25s candles=${candleCount.value}%d net=${portfolio.totalProfit}%10.5f  closed=${portfolio.total}%5d  forced=${portfolio.forcedClosureCount}%2d  " +
           f"win=${winPct}%6.2f%%  exp=${portfolio.expectancy}%9.6f  PF=$profitFactor  " +
           f"DD=${drawdown}%6.2f%%  Sharpe=$sharpe  gross=${portfolio.preCostProfit}%10.5f  " +
           f"costs=${portfolio.totalCosts}%9.5f"

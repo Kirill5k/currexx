@@ -85,8 +85,8 @@ begin on the next bar. The cost model and capital are identical for both strateg
 Before any search, a metadata scan checks every requested month and sufficient bars
 for warm-up and execution across the complete schedule. Missing history fails the
 experiment immediately, identifying the affected window. The oldest training fold
-has no earlier prices: its first 99 trading bars form the initial price window in
-every expanding round. The report highlights this loss rather than hiding it in
+has no earlier prices: it loses `candleCount - 1` trading bars to warm-up (99 at the
+default count of 100) in every expanding round. The report highlights this loss rather than hiding it in
 forward coverage. Every period also skips one complete window to prime fresh state.
 
 ## Results
