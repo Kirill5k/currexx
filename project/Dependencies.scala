@@ -2,23 +2,23 @@ import sbt.*
 
 object Dependencies {
   object Versions {
-    val fs2            = "3.13.0"
+    val fs2            = "3.14.0"
     val cats           = "2.13.0"
     val commonScala    = "0.1.29"
-    val mongo4cats     = "0.7.18"
-    val pureConfig     = "0.17.10"
-    val circe          = "0.14.16"
+    val mongo4cats     = "0.8.0"
+    val pureConfig     = "0.17.11"
+    val circe          = "0.14.17"
     val circeRefined   = "0.15.1"
-    val sttp4          = "4.0.26"
-    val logback        = "1.6.3"
+    val sttp4          = "4.1.1"
+    val logback        = "1.6.6"
     val log4cats       = "2.8.0"
     val bcrypt         = "4.3.0"
     val refined        = "0.11.4"
-    val tapir          = "1.13.31"
-    val jwt            = "11.0.4"
+    val tapir          = "1.14.1"
+    val jwt            = "12.0.0"
     val cronUtils      = "9.2.1"
     val taggedAdtCodec = "0.11.0"
-    val caffeine       = "3.2.4"
+    val caffeine       = "3.3.1"
   }
 
   object Libraries {
