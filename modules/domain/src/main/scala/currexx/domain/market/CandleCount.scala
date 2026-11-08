@@ -21,7 +21,7 @@ object CandleCount {
     json.asNumber.flatMap(_.toInt).toRight("candleCount must be an integer").flatMap(from)
   }
   given Encoder[CandleCount] = Encoder.encodeInt.contramap(_.value)
-  given Schema[CandleCount] = Schema.schemaForInt
+  given Schema[CandleCount]  = Schema.schemaForInt
     .validate(Validator.min(1))
     .validate(Validator.max(4999))
     .map(count => from(count).toOption)(_.value)

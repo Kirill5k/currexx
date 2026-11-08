@@ -17,7 +17,6 @@ object Dependencies {
     val tapir          = "1.14.1"
     val jwt            = "12.0.0"
     val cronUtils      = "9.2.1"
-    val taggedAdtCodec = "0.11.0"
     val caffeine       = "3.3.1"
   }
 
@@ -28,7 +27,6 @@ object Dependencies {
     val bcrypt         = "com.github.t3hnar"            %% "scala-bcrypt"           % Versions.bcrypt
     val jwt            = "com.github.jwt-scala"         %% "jwt-circe"              % Versions.jwt
     val cronUtils      = "com.cronutils"                 % "cron-utils"             % Versions.cronUtils
-    val taggedAdtCodec = "org.latestbit"                %% "circe-tagged-adt-codec" % Versions.taggedAdtCodec
     val caffeine       = "com.github.ben-manes.caffeine" % "caffeine"               % Versions.caffeine
 
     object commonScala {
@@ -85,7 +83,6 @@ object Dependencies {
 
   val domain = Seq(
     Libraries.cronUtils,
-    Libraries.taggedAdtCodec,
     Libraries.mongo4cats.core,
     Libraries.mongo4cats.circe,
     Libraries.commonScala.cats,

@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import currexx.domain.JsonSyntax
 import currexx.domain.types.EnumType
 import io.circe.{Codec, CursorOp, Decoder, DecodingFailure, Encoder}
-import org.latestbit.circe.adt.codec.*
+import io.circe.derivation.{Configuration, ConfiguredCodec}
 
 import java.time.Instant
 
@@ -88,20 +88,16 @@ enum OrderPlacementResult:
 object OrderPlacementResult:
   def filled(execution: OrderExecution): OrderPlacementResult = Filled(NonEmptyList.one(execution))
 
-enum OrderPlacementStatus derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+enum OrderPlacementStatus derives ConfiguredCodec:
   case Success
   case Pending
   case NoPosition
   case Cancelled(reason: String)
 
 object OrderPlacementStatus:
-  given JsonTaggedAdt.Config[OrderPlacementStatus] = JsonTaggedAdt.Config.Values[OrderPlacementStatus](
-    mappings = Map(
-      "success"    -> JsonTaggedAdt.tagged[OrderPlacementStatus.Success.type],
-      "pending"    -> JsonTaggedAdt.tagged[OrderPlacementStatus.Pending.type],
-      "noPosition" -> JsonTaggedAdt.tagged[OrderPlacementStatus.NoPosition.type],
-      "cancelled"  -> JsonTaggedAdt.tagged[OrderPlacementStatus.Cancelled]
-    ),
-    strict = true,
-    typeFieldName = "kind"
-  )
+  given Configuration = Configuration.default
+    .withDiscriminator("kind")
+    .withTransformConstructorNames {
+      case "NoPosition" => "noPosition"
+      case other        => other.toLowerCase
+    }

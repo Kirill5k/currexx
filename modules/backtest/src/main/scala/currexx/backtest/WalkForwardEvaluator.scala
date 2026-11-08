@@ -31,7 +31,7 @@ object WalkForwardEvaluator extends IOApp.Simple {
       )
       rounds        <- roundNames.traverse(name => IO.fromEither(OptimisationRounds.findByName(name)))
       validatedPlan <- IO.fromEither(plan)
-      _ <- IO.println(
+      _             <- IO.println(
         s"${rounds.size} rounds: ${rounds.size * objectives.size * masterSeeds.size} experiments, " +
           s"${rounds.size * objectives.size * masterSeeds.size * validatedPlan.windows.size} window searches"
       )

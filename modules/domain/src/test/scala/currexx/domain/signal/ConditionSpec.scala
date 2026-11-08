@@ -32,6 +32,70 @@ class ConditionSpec extends AnyWordSpec with Matchers {
         condition.asJson.noSpaces mustBe json
         decode[Condition](json) mustBe Right(condition)
       }
+
+      "decode trend-direction-change condition with previousTrendLength from json" in {
+        val condition: Condition = Condition.TrendDirectionChange(Direction.Upward, Direction.Downward, Some(5))
+        val json                 = """{"from":"upward","to":"downward","previousTrendLength":5,"kind":"trend-direction-change"}"""
+
+        condition.asJson.noSpaces mustBe json
+        decode[Condition](json) mustBe Right(condition)
+      }
+
+      "decode composite condition from json" in {
+        val condition: Condition = Condition.Composite(cats.data.NonEmptyList.of(Condition.LinesCrossing(Direction.Upward)))
+        val json                 = """{"conditions":[{"direction":"upward","kind":"lines-crossing"}],"kind":"composite"}"""
+
+        condition.asJson.noSpaces mustBe json
+        decode[Condition](json) mustBe Right(condition)
+      }
+
+      "decode upper-band-crossing condition from json" in {
+        val condition: Condition = Condition.UpperBandCrossing(Direction.Upward)
+        val json                 = """{"direction":"upward","kind":"upper-band-crossing"}"""
+
+        condition.asJson.noSpaces mustBe json
+        decode[Condition](json) mustBe Right(condition)
+      }
+
+      "decode lower-band-crossing condition from json" in {
+        val condition: Condition = Condition.LowerBandCrossing(Direction.Downward)
+        val json                 = """{"direction":"downward","kind":"lower-band-crossing"}"""
+
+        condition.asJson.noSpaces mustBe json
+        decode[Condition](json) mustBe Right(condition)
+      }
+
+      "decode volatility-regime-change condition from json" in {
+        val conditionWithFrom: Condition = Condition.VolatilityRegimeChange(Some(VolatilityRegime.Low), VolatilityRegime.High)
+        val jsonWithFrom                 = """{"from":"low","to":"high","kind":"volatility-regime-change"}"""
+        conditionWithFrom.asJson.noSpaces mustBe jsonWithFrom
+        decode[Condition](jsonWithFrom) mustBe Right(conditionWithFrom)
+
+        val conditionWithoutFrom: Condition = Condition.VolatilityRegimeChange(None, VolatilityRegime.High)
+        val jsonWithoutFrom                 = """{"from":null,"to":"high","kind":"volatility-regime-change"}"""
+        conditionWithoutFrom.asJson.noSpaces mustBe jsonWithoutFrom
+        decode[Condition](jsonWithoutFrom) mustBe Right(conditionWithoutFrom)
+      }
+
+      "decode value-updated condition from json" in {
+        val condition: Condition = Condition.ValueUpdated(ValueRole.Momentum, BigDecimal(42.5))
+        val json                 = """{"role":"momentum","value":42.5,"kind":"value-updated"}"""
+
+        condition.asJson.noSpaces mustBe json
+        decode[Condition](json) mustBe Right(condition)
+      }
+
+      "decode price-crossed-line condition from json" in {
+        val condition: Condition = Condition.PriceCrossedLine(ValueRole.ChannelMiddleBand, Direction.Upward)
+        val json                 = """{"lineRole":"channel-middle-band","direction":"upward","kind":"price-crossed-line"}"""
+
+        condition.asJson.noSpaces mustBe json
+        decode[Condition](json) mustBe Right(condition)
+      }
+
+      "fail to decode unknown condition kind" in {
+        decode[Condition]("""{"kind":"unknown-kind"}""").isLeft mustBe true
+      }
     }
 
     "thresholdCrossing" should {

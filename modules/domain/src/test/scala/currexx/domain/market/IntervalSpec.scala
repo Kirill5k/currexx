@@ -30,8 +30,17 @@ class IntervalSpec extends AnyWordSpec with Matchers {
       Interval.D1.toDuration.toSeconds mustEqual 86400
     }
 
-    "decode order from json" in {
-      Interval.H1.asJson.noSpaces mustBe """"H1""""
+    "encode and decode interval from json" in {
+      val intervals = List(Interval.M1, Interval.M5, Interval.M15, Interval.M30, Interval.H1, Interval.D1)
+      intervals.foreach { interval =>
+        val json = s""""${interval.toString}""""
+        interval.asJson.noSpaces mustBe json
+        io.circe.parser.decode[Interval](json) mustBe Right(interval)
+      }
+    }
+
+    "fail to decode invalid interval from json" in {
+      io.circe.parser.decode[Interval](""""UNKNOWN"""").isLeft mustBe true
     }
   }
 }

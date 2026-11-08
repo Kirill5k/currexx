@@ -2,7 +2,7 @@ package currexx.domain.signal
 
 import cats.data.NonEmptyList
 import currexx.domain.types.EnumType
-import org.latestbit.circe.adt.codec.*
+import io.circe.derivation.{Configuration, ConfiguredCodec}
 
 object VolatilityRegime extends EnumType[VolatilityRegime](() => VolatilityRegime.values)
 enum VolatilityRegime:
@@ -16,7 +16,7 @@ object Boundary extends EnumType[Boundary](() => Boundary.values)
 enum Boundary:
   case Upper, Lower
 
-enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+enum Condition derives ConfiguredCodec:
   case Composite(conditions: NonEmptyList[Condition])
   case UpperBandCrossing(direction: Direction)
   case LowerBandCrossing(direction: Direction)
@@ -28,21 +28,9 @@ enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWit
   case PriceCrossedLine(lineRole: ValueRole, direction: Direction)
 
 object Condition {
-  given JsonTaggedAdt.Config[Condition] = JsonTaggedAdt.Config.Values[Condition](
-    mappings = Map(
-      "composite"                -> JsonTaggedAdt.tagged[Condition.Composite],
-      "upper-band-crossing"      -> JsonTaggedAdt.tagged[Condition.UpperBandCrossing],
-      "lower-band-crossing"      -> JsonTaggedAdt.tagged[Condition.LowerBandCrossing],
-      "lines-crossing"           -> JsonTaggedAdt.tagged[Condition.LinesCrossing],
-      "threshold-crossing"       -> JsonTaggedAdt.tagged[Condition.ThresholdCrossing],
-      "volatility-regime-change" -> JsonTaggedAdt.tagged[Condition.VolatilityRegimeChange],
-      "trend-direction-change"   -> JsonTaggedAdt.tagged[Condition.TrendDirectionChange],
-      "value-updated"            -> JsonTaggedAdt.tagged[Condition.ValueUpdated],
-      "price-crossed-line"       -> JsonTaggedAdt.tagged[Condition.PriceCrossedLine]
-    ),
-    strict = true,
-    typeFieldName = "kind"
-  )
+  given Configuration = Configuration.default
+    .withDiscriminator("kind")
+    .withKebabCaseConstructorNames
 
   /** Detects if a crossover occurred between two time-series lines on the most recent data point.
     *

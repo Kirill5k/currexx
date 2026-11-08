@@ -149,7 +149,7 @@ Testing a strategy against historical set of data via Backtester: `sbt "backtest
 - **Functional**: Cats Free (Free Monad for algorithms)
 - **HTTP**: Tapir (endpoint definitions) + Http4s (server) + Sttp4 (clients)
 - **Database**: MongoDB (mongo4cats)
-- **JSON**: Circe with tagged-adt-codec for ADT serialization
+- **JSON**: Circe for ADT and JSON serialization
 - **Configuration**: PureConfig
 - **Math**: Breeze
 - **Auth**: JWT (jwt-circe), BCrypt
@@ -177,7 +177,7 @@ Testing a strategy against historical set of data via Backtester: `sbt "backtest
 - Use `sbt scalafmtAll` to format code
 - Follows functional programming principles with pure functions
 - Extensive use of Scala 3 enums for domain types
-- JSON codecs use circe-tagged-adt-codec for ADT serialization
+- JSON codecs use pure Circe for ADT serialization
 - Do not use `require` to check preconditions. Use `refined`, `Either`, or effect error helpers such as `F.raiseUnless` and `F.raiseWhen`. Keep effectful validation deferred.
 - Do not use `import cats.syntax.all.*`. Use individual imports where necessary.
 

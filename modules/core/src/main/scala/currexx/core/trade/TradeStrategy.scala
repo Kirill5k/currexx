@@ -7,7 +7,7 @@ import currexx.domain.market.TradeOrder
 import currexx.domain.signal.{Boundary, Direction, ValueRole, VolatilityRegime}
 import currexx.domain.types.EnumType
 import io.circe.Codec
-import org.latestbit.circe.adt.codec.*
+import io.circe.derivation.{Configuration, ConfiguredCodec}
 import kirill5k.common.syntax.time.*
 
 import scala.concurrent.duration.FiniteDuration
@@ -46,7 +46,7 @@ object Rule extends JsonCodecs {
   enum Operator:
     case GreaterThan, LessThan, EqualTo
 
-  enum Condition derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+  enum Condition derives ConfiguredCodec:
     case AllOf(conditions: List[Condition])
     case AnyOf(conditions: List[Condition])
     case Not(condition: Condition)
@@ -75,35 +75,9 @@ object Rule extends JsonCodecs {
     case PriceMovedAgainstEntry(nAtr: Double)
 
   object Condition:
-    given JsonTaggedAdt.Config[Condition] = JsonTaggedAdt.Config.Values[Condition](
-      mappings = Map(
-        "all-of"                    -> JsonTaggedAdt.tagged[Condition.AllOf],
-        "any-of"                    -> JsonTaggedAdt.tagged[Condition.AnyOf],
-        "not"                       -> JsonTaggedAdt.tagged[Condition.Not],
-        "value-is"                  -> JsonTaggedAdt.tagged[Condition.ValueIs],
-        "trend-changed-to"          -> JsonTaggedAdt.tagged[Condition.TrendChangedTo],
-        "trend-is"                  -> JsonTaggedAdt.tagged[Condition.TrendIs],
-        "trend-active-for"          -> JsonTaggedAdt.tagged[Condition.TrendActiveFor],
-        "crossover-occurred"        -> JsonTaggedAdt.tagged[Condition.CrossoverOccurred],
-        "momentum-entered"          -> JsonTaggedAdt.tagged[Condition.MomentumEntered],
-        "momentum-is-in"            -> JsonTaggedAdt.tagged[Condition.MomentumIsIn],
-        "momentum-is"               -> JsonTaggedAdt.tagged[Condition.MomentumIs],
-        "previous-volatility-is"    -> JsonTaggedAdt.tagged[Condition.PreviousVolatilityIs],
-        "volatility-is"             -> JsonTaggedAdt.tagged[Condition.VolatilityIs],
-        "velocity-is"               -> JsonTaggedAdt.tagged[Condition.VelocityIs],
-        "velocity-is-below"         -> JsonTaggedAdt.tagged[Condition.VelocityIsBelow],
-        "velocity-crossed-level"    -> JsonTaggedAdt.tagged[Condition.VelocityCrossedLevel],
-        "position-is"               -> JsonTaggedAdt.tagged[Condition.PositionIs],
-        "position-open-for"         -> JsonTaggedAdt.tagged[Condition.PositionOpenFor],
-        "no-position"               -> JsonTaggedAdt.tagged[Condition.NoPosition.type],
-        "upper-band-crossed"        -> JsonTaggedAdt.tagged[Condition.UpperBandCrossed],
-        "lower-band-crossed"        -> JsonTaggedAdt.tagged[Condition.LowerBandCrossed],
-        "price-crossed-line"        -> JsonTaggedAdt.tagged[Condition.PriceCrossedLine],
-        "price-moved-against-entry" -> JsonTaggedAdt.tagged[Condition.PriceMovedAgainstEntry]
-      ),
-      strict = true,
-      typeFieldName = "kind"
-    )
+    given Configuration = Configuration.default
+      .withDiscriminator("kind")
+      .withKebabCaseConstructorNames
 
     val trendIsUpward: Condition             = Condition.TrendIs(Direction.Upward)
     val trendIsDownward: Condition           = Condition.TrendIs(Direction.Downward)

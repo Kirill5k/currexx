@@ -57,10 +57,7 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
           .withBody("""{"interval":"H1","currencyPair":"GBP/EUR","triggeredBy": {"kind": "foo"}}""")
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val validIndicators =
-          "trend-change-detection, keltner-channel, bollinger-bands, value-tracking, volatility-regime-detection, lines-crossing, threshold-crossing, price-line-crossing, composite"
-        val responseBody =
-          s"""{"message":"Missing required field condition, Received unknown type: 'foo'. Exists only types: $validIndicators."}"""
+        val responseBody = """{"message":"Missing required field condition, type Indicator has no class/object/case named 'foo'."}"""
         res mustHaveStatus (Status.UnprocessableContent, Some(responseBody))
         verifyNoInteractions(svc)
       }
@@ -78,9 +75,7 @@ class SignalControllerSpec extends HttpRoutesWordSpec {
               |}""".stripMargin)
         val res = SignalController.make[IO](svc).flatMap(_.routes.orNotFound.run(req))
 
-        val validCondition =
-          "value-updated, volatility-regime-change, lower-band-crossing, lines-crossing, composite, trend-direction-change, upper-band-crossing, threshold-crossing, price-crossed-line"
-        val responseBody = s"""{"message":"Received unknown type: 'foo'. Exists only types: $validCondition."}"""
+        val responseBody = """{"message":"type Condition has no class/object/case named 'foo'."}"""
         res mustHaveStatus (Status.UnprocessableContent, Some(responseBody))
         verifyNoInteractions(svc)
       }

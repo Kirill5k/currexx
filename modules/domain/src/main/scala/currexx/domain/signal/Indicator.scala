@@ -2,8 +2,7 @@ package currexx.domain.signal
 
 import cats.data.NonEmptyList
 import currexx.domain.types.EnumType
-import io.circe.{Decoder, Encoder}
-import org.latestbit.circe.adt.codec.*
+import io.circe.derivation.{Configuration, ConfiguredCodec, renaming}
 
 object MovingAverage extends EnumType[MovingAverage](() => MovingAverage.values)
 enum MovingAverage:
@@ -17,7 +16,7 @@ object ValueRole extends EnumType[ValueRole](() => ValueRole.values)
 enum ValueRole:
   case Momentum, Volatility, Velocity, ChannelMiddleBand, TrendStrength, Price
 
-enum ValueTransformation derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+enum ValueTransformation derives ConfiguredCodec:
   case Sequenced(sequence: List[ValueTransformation])
   case StandardDeviation(length: Int)
   case Kalman(gain: Double, measurementNoise: Double)
@@ -43,39 +42,21 @@ object ValueTransformation {
   def sequenced(vt: ValueTransformation, vtSequence: ValueTransformation*): ValueTransformation =
     ValueTransformation.Sequenced(vt :: vtSequence.toList)
 
-  given JsonTaggedAdt.Config[ValueTransformation] = JsonTaggedAdt.Config.Values[ValueTransformation](
-    mappings = Map(
-      "sequenced"       -> JsonTaggedAdt.tagged[ValueTransformation.Sequenced],
-      "kalman"          -> JsonTaggedAdt.tagged[ValueTransformation.Kalman],
-      "kalman-velocity" -> JsonTaggedAdt.tagged[ValueTransformation.KalmanVelocity],
-      "stdev"           -> JsonTaggedAdt.tagged[ValueTransformation.StandardDeviation],
-      "atr"             -> JsonTaggedAdt.tagged[ValueTransformation.ATR],
-      "rsx"             -> JsonTaggedAdt.tagged[ValueTransformation.RSX],
-      "jrsx"            -> JsonTaggedAdt.tagged[ValueTransformation.JRSX],
-      "stoch"           -> JsonTaggedAdt.tagged[ValueTransformation.STOCH],
-      "adx"             -> JsonTaggedAdt.tagged[ValueTransformation.ADX],
-      "williams-r"      -> JsonTaggedAdt.tagged[ValueTransformation.WilliamsR],
-      "cci"             -> JsonTaggedAdt.tagged[ValueTransformation.CCI],
-      "ichimoku-kijun"  -> JsonTaggedAdt.tagged[ValueTransformation.IchimokuKijunSen],
-      "parabolic-sar"   -> JsonTaggedAdt.tagged[ValueTransformation.ParabolicSAR],
-      "cmf"             -> JsonTaggedAdt.tagged[ValueTransformation.CMF],
-      "ema"             -> JsonTaggedAdt.tagged[ValueTransformation.EMA],
-      "hma"             -> JsonTaggedAdt.tagged[ValueTransformation.HMA],
-      "nma"             -> JsonTaggedAdt.tagged[ValueTransformation.NMA],
-      "sma"             -> JsonTaggedAdt.tagged[ValueTransformation.SMA],
-      "wma"             -> JsonTaggedAdt.tagged[ValueTransformation.WMA],
-      "jma"             -> JsonTaggedAdt.tagged[ValueTransformation.JMA]
-    ),
-    strict = true,
-    typeFieldName = "kind"
+  private val customMappings: Map[String, String] = Map(
+    "StandardDeviation" -> "stdev",
+    "IchimokuKijunSen"  -> "ichimoku-kijun"
   )
+
+  given Configuration = Configuration.default
+    .withDiscriminator("kind")
+    .withTransformConstructorNames(name => customMappings.getOrElse(name, renaming.kebabCase(name)))
 }
 
 object CombinationLogic extends EnumType[CombinationLogic](() => CombinationLogic.values)
 enum CombinationLogic:
   case All, Any
 
-enum Indicator derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWithConfig:
+enum Indicator derives ConfiguredCodec:
   case Composite(
       indicators: NonEmptyList[Indicator],
       combinator: CombinationLogic
@@ -123,21 +104,9 @@ enum Indicator derives JsonTaggedAdt.EncoderWithConfig, JsonTaggedAdt.DecoderWit
   )
 
 object Indicator:
-  given JsonTaggedAdt.Config[Indicator] = JsonTaggedAdt.Config.Values[Indicator](
-    mappings = Map(
-      "composite"                   -> JsonTaggedAdt.tagged[Indicator.Composite],
-      "volatility-regime-detection" -> JsonTaggedAdt.tagged[Indicator.VolatilityRegimeDetection],
-      "trend-change-detection"      -> JsonTaggedAdt.tagged[Indicator.TrendChangeDetection],
-      "threshold-crossing"          -> JsonTaggedAdt.tagged[Indicator.ThresholdCrossing],
-      "lines-crossing"              -> JsonTaggedAdt.tagged[Indicator.LinesCrossing],
-      "keltner-channel"             -> JsonTaggedAdt.tagged[Indicator.KeltnerChannel],
-      "bollinger-bands"             -> JsonTaggedAdt.tagged[Indicator.BollingerBands],
-      "value-tracking"              -> JsonTaggedAdt.tagged[Indicator.ValueTracking],
-      "price-line-crossing"         -> JsonTaggedAdt.tagged[Indicator.PriceLineCrossing]
-    ),
-    strict = true,
-    typeFieldName = "kind"
-  )
+  given Configuration = Configuration.default
+    .withDiscriminator("kind")
+    .withKebabCaseConstructorNames
 
   def compositeAllOf(indicator: Indicator, indicators: Indicator*): Indicator =
     Indicator.Composite(NonEmptyList.of(indicator, indicators*), CombinationLogic.All)
