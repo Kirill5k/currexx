@@ -1,10 +1,19 @@
 package currexx.backtest
 
+import currexx.core.trade.StrategyCheck
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 class StrategyCatalogueSpec extends AnyWordSpec with Matchers {
   "StrategyCatalogue" should {
+    StrategyCatalogue.entries.foreach { entry =>
+      s"pass strategy validation for ${entry.name}" in {
+        StrategyCheck
+          .validate(List(entry.strategy.indicator), Some(entry.strategy.rules))
+          .fold(error => fail(error), _ => succeed)
+      }
+    }
+
     "register every public strategy definition under its own name" in {
       // Discover definitions only in the test: production registration keeps deliberate batch inclusion and ordering.
       val definitions = TestStrategy.getClass.getMethods.iterator
