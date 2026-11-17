@@ -6,6 +6,7 @@ import cats.syntax.flatMap.*
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.Controller
 import currexx.core.market.db.MarketStateRepository
+import currexx.core.settings.StrategyRuntime
 import kirill5k.common.cats.Clock
 import mongo4cats.database.MongoDatabase
 import org.typelevel.log4cats.Logger
@@ -18,10 +19,11 @@ final class Markets[F[_]] private (
 object Markets:
   def make[F[_]: {Async, Clock, Logger}](
       database: MongoDatabase[F],
-      dispatcher: ActionDispatcher[F]
+      dispatcher: ActionDispatcher[F],
+      runtime: StrategyRuntime[F]
   ): F[Markets[F]] =
     for
       stateRepo <- MarketStateRepository.make[F](database)
-      svc       <- MarketService.make[F](stateRepo, dispatcher)
+      svc       <- MarketService.make[F](stateRepo, dispatcher, runtime)
       ctrl      <- MarketController.make[F](svc)
     yield Markets[F](svc, ctrl)

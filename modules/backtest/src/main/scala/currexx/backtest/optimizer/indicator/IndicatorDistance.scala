@@ -77,6 +77,7 @@ object IndicatorDistance {
       case VT.CMF(length) => Vector(normalise(length, GeneBounds.cmfLength))
 
     def indicator(current: Indicator): Vector[Either[IllegalArgumentException, Double]] = current match
+      case Indicator.Named(_, leaf)                         => indicator(leaf)
       case Indicator.Composite(children, _)                 => children.toList.toVector.flatMap(indicator)
       case Indicator.TrendChangeDetection(_, vt)            => transformation(vt)
       case Indicator.ThresholdCrossing(_, vt, upper, lower) =>

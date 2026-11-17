@@ -1,9 +1,10 @@
 package currexx.core.market.db
 
 import currexx.core.market.{MarketProfile, MarketState, PositionState}
-import currexx.domain.market.CurrencyPair
+import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.user.UserId
-import io.circe.Codec
+import io.circe.{Codec, Decoder}
+import currexx.domain.signal.{Indicator, IndicatorId}
 import mongo4cats.bson.ObjectId
 import mongo4cats.circe.given
 
@@ -20,8 +21,12 @@ final case class MarketStateEntity(
     previousProfile: Option[MarketProfile] = None,
     lastCandleTime: Option[Instant] = None,
     lastTimeStateCandle: Option[Instant] = None,
-    version: Option[Long] = None
-) derives Codec.AsObject:
+    version: Option[Long] = None,
+    configRevision: Option[Long] = None,
+    interval: Option[Interval] = None,
+    invalidated: Option[Set[IndicatorId]] = None,
+    sources: Option[Map[IndicatorId, Indicator]] = None
+):
   def toDomain: MarketState = MarketState(
     userId = UserId(userId),
     currencyPair = currencyPair,
@@ -33,5 +38,30 @@ final case class MarketStateEntity(
     lastCandleTime = lastCandleTime,
     lastTimeStateCandle = lastTimeStateCandle,
     // Documents written before versioning are stored, so they must never be treated as new.
-    version = Some(version.getOrElse(0L))
+    version = Some(version.getOrElse(0L)),
+    configRevision = configRevision,
+    interval = interval,
+    invalidated = invalidated.getOrElse(Set.empty),
+    sources = sources.getOrElse(Map.empty)
+  )
+
+object MarketStateEntity:
+  private lazy val derivedCodec           = Codec.AsObject.derived[MarketStateEntity]
+  given Codec.AsObject[MarketStateEntity] = Codec.AsObject.from(
+    Decoder.instance { cursor =>
+      derivedCodec(cursor).map { entity =>
+        if entity.configRevision.isEmpty || cursor.downField("profile").downField("readings").succeeded then entity
+        else
+          entity.copy(
+            profile = MarketProfile(),
+            previousProfile = None,
+            sources = Some(Map.empty),
+            invalidated = Some(
+              entity.invalidated.getOrElse(Set.empty) ++ entity.profile.readings.keySet ++
+                entity.previousProfile.toList.flatMap(_.readings.keySet)
+            )
+          )
+      }
+    },
+    derivedCodec
   )

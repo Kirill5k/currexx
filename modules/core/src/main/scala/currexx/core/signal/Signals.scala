@@ -5,7 +5,8 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.Controller
-import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
+import currexx.core.settings.StrategyRuntime
+import currexx.core.signal.db.SignalRepository
 import kirill5k.common.cats.Clock
 import mongo4cats.database.MongoDatabase
 import org.typelevel.log4cats.Logger
@@ -16,10 +17,13 @@ final class Signals[F[_]] private (
 )
 
 object Signals:
-  def make[F[_]: {Async, Clock, Logger}](database: MongoDatabase[F], dispatcher: ActionDispatcher[F]): F[Signals[F]] =
+  def make[F[_]: {Async, Clock, Logger}](
+      database: MongoDatabase[F],
+      dispatcher: ActionDispatcher[F],
+      runtime: StrategyRuntime[F]
+  ): F[Signals[F]] =
     for
       signRepo <- SignalRepository.make[F](database)
-      settRepo <- SignalSettingsRepository.make[F](database)
-      svc      <- SignalService.make[F](signRepo, settRepo, dispatcher)
+      svc      <- SignalService.make[F](signRepo, runtime, dispatcher)
       ctrl     <- SignalController.make[F](svc)
     yield Signals[F](svc, ctrl)

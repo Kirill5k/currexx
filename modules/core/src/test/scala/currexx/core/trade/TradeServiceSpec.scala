@@ -1,14 +1,19 @@
 package currexx.core.trade
 
+import currexx.core.market.LegacyMarketProfile.*
+
+import currexx.core.fixtures.Processing
+import currexx.core.market.LegacyMarketProfile
 import cats.data.NonEmptyList
 import cats.effect.IO
 import currexx.clients.broker.{BrokerClient, BrokerParameters}
 import currexx.clients.data.MarketDataClient
 import currexx.core.MockActionDispatcher
 import currexx.core.common.action.{Action, ActionDispatcher}
+import currexx.core.settings.StrategyRuntime
 import currexx.core.common.http.SearchParams
 import currexx.core.fixtures.{Markets, Settings, Trades, Users}
-import currexx.core.market.{MarketProfile, TrendState}
+import currexx.core.market.MarketProfile
 import currexx.core.trade.db.{OrderStatusRepository, TradeOrderRepository, TradeSettingsRepository}
 import kirill5k.common.cats.test.IOWordSpec
 import currexx.domain.errors.AppError
@@ -23,7 +28,7 @@ import currexx.domain.market.{
   TradeOrder
 }
 import currexx.domain.monitor.Limits
-import currexx.domain.signal.Direction
+import currexx.domain.signal.{Direction, IndicatorId}
 import currexx.domain.user.UserId
 import kirill5k.common.cats.Clock
 import org.typelevel.log4cats.Logger
@@ -51,6 +56,82 @@ class TradeServiceSpec extends IOWordSpec {
     val now         = Instant.now()
     given Clock[IO] = Clock.mock[IO](now)
 
+    "strategy validation scope" should {
+      "keep manual orders, broker lookup and profit exits available with an invalid strategy" in {
+        val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
+        when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
+        when(brokerClient.submit(any[BrokerParameters], any[TradeOrder])).thenReturnIO(entryFill)
+        when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]])).thenReturnIO(Nil)
+        when(orderStatusRepo.save(any[TradeOrderPlacement], any[OrderPlacementStatus])).thenReturnUnit
+        when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
+        val invalid = Processing.runtime(_ => IO.raiseError(AppError.FailedValidation("Invalid strategy")))
+        (for
+          svc      <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, invalid)
+          position <- svc.findBrokerPosition(Users.uid, Markets.gbpeur)
+          _ <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, NonEmptyList.one(Markets.gbpeur), Limits(Some(-10), Some(10), None, None))
+          _ <- svc.placeOrder(Users.uid, TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, 1.3, 0.1), false)
+        yield position).asserting(_ mustBe BrokerPosition.Flat)
+      }
+
+      "skip evaluation while the state and configuration revisions differ" in {
+        val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
+        val settings                                                               =
+          Settings.trade.copy(strategy = TradeStrategy(Nil, List(Rule(TradeAction.ClosePosition, Rule.Condition.trendIsUpward))))
+        val runtime = Processing.runtime(uid => Processing.fixed.load(uid).map(_.copy(trade = Some(settings))))
+        when(dataClient.latestPrice(any[CurrencyPair])).thenReturn(IO.raiseError(new AssertionError("stale state reached trading")))
+        (for
+          svc <- makeService(
+            settRepo,
+            orderRepo,
+            orderStatusRepo,
+            brokerClient,
+            dataClient,
+            disp,
+            runtime
+          )
+          _ <- svc.processMarketStateUpdate(Markets.state.copy(configRevision = Some(1L), sources = Processing.sources))
+        yield ()).asserting { _ =>
+          verifyNoInteractions(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient)
+          disp.submittedActions mustBe empty
+        }
+      }
+      "skip evaluation while indicator definitions differ at the same revision" in {
+        val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
+        val settings                                                               =
+          Settings.trade.copy(strategy = TradeStrategy(Nil, List(Rule(TradeAction.ClosePosition, Rule.Condition.trendIsUpward))))
+        val runtime = Processing.runtime(uid => Processing.fixed.load(uid).map(_.copy(trade = Some(settings))))
+        when(dataClient.latestPrice(any[CurrencyPair])).thenReturn(IO.raiseError(new AssertionError("stale state reached trading")))
+        (for
+          svc <- makeService(
+            settRepo,
+            orderRepo,
+            orderStatusRepo,
+            brokerClient,
+            dataClient,
+            disp,
+            runtime
+          )
+          _ <- svc.processMarketStateUpdate(Markets.state.copy(configRevision = Some(0L), sources = Processing.sources - IndicatorId.Trend))
+        yield ()).asserting { _ =>
+          verifyNoInteractions(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient)
+          disp.submittedActions mustBe empty
+        }
+      }
+      "raise NotSetup when trade settings are missing" in {
+        val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
+        val runtime = Processing.runtime(uid => Processing.fixed.load(uid).map(_.copy(trade = None)))
+        (for
+          svc    <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, runtime)
+          result <- svc.processMarketStateUpdate(Markets.state.copy(configRevision = Some(0L), sources = Processing.sources)).attempt
+        yield result).asserting { result =>
+          result mustBe Left(AppError.NotSetup("Trade"))
+          verifyNoInteractions(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient)
+          disp.submittedActions mustBe empty
+        }
+      }
+
+    }
+
     "fetchMarketData" should {
       "request the configured candle count for every pair and dispatch the returned data" in {
         val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, _) = mocks
@@ -64,7 +145,7 @@ class TradeServiceSpec extends IOWordSpec {
         }
 
         val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+          svc <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
           _   <- svc.fetchMarketData(Users.uid, pairs, Interval.H1, count)
         yield ()
 
@@ -86,7 +167,7 @@ class TradeServiceSpec extends IOWordSpec {
         when(orderRepo.getAll(any[UserId], any[SearchParams])).thenReturnIO(List(Trades.order))
 
         val result = for
-          svc    <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+          svc    <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
           orders <- svc.getAllOrders(Users.uid, SearchParams(None, Some(Trades.ts)))
         yield orders
 
@@ -122,7 +203,7 @@ class TradeServiceSpec extends IOWordSpec {
 
           val order  = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, 1.3, 0.1)
           val result = for
-            svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+            svc <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
             _   <- svc.placeOrder(Users.uid, order, false)
           yield ()
 
@@ -150,7 +231,7 @@ class TradeServiceSpec extends IOWordSpec {
 
         val order  = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, 1.3, 0.1)
         val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+          svc <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
           _   <- svc.placeOrder(Users.uid, order, false)
         yield ()
 
@@ -175,7 +256,7 @@ class TradeServiceSpec extends IOWordSpec {
 
         val order  = TradeOrder.Exit(Markets.gbpeur, 1.3)
         val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+          svc <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
           _   <- svc.placeOrder(Users.uid, order, false)
         yield ()
 
@@ -202,7 +283,7 @@ class TradeServiceSpec extends IOWordSpec {
           when(orderStatusRepo.save(any[TradeOrderPlacement], any[OrderPlacementStatus])).thenReturnUnit
 
           val result = for
-            svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+            svc <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
             _   <- svc.placeOrder(Users.uid, order, false)
           yield ()
 
@@ -228,7 +309,7 @@ class TradeServiceSpec extends IOWordSpec {
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
         val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+          svc <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
           _   <- svc.placeOrder(Users.uid, order, false)
         yield ()
 
@@ -253,7 +334,7 @@ class TradeServiceSpec extends IOWordSpec {
           when(orderStatusRepo.save(any[TradeOrderPlacement], any[OrderPlacementStatus])).thenReturnUnit
 
           val result = for
-            svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+            svc <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
             _   <- svc.placeOrder(Users.uid, order, true)
           yield ()
 
@@ -294,7 +375,7 @@ class TradeServiceSpec extends IOWordSpec {
           when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
           val result = for
-            svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+            svc <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
             _   <- svc.placeOrder(Users.uid, order, true)
           yield ()
 
@@ -329,7 +410,7 @@ class TradeServiceSpec extends IOWordSpec {
 
           val order  = TradeOrder.Enter(TradeOrder.Position.Buy, Markets.gbpeur, BigDecimal(1.3), BigDecimal(0.1))
           val result = for
-            svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+            svc <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
             _   <- svc.placeOrder(Users.uid, order, true)
           yield ()
 
@@ -355,7 +436,7 @@ class TradeServiceSpec extends IOWordSpec {
         when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturnNone
 
         val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+          svc <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
           _   <- svc.closeOpenOrders(Users.uid, Markets.gbpeur)
         yield ()
 
@@ -373,7 +454,7 @@ class TradeServiceSpec extends IOWordSpec {
           .thenReturnSome(Trades.order.copy(order = TradeOrder.Exit(Markets.gbpeur, 1.5)))
 
         val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+          svc <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
           _   <- svc.closeOpenOrders(Users.uid, Markets.gbpeur)
         yield ()
 
@@ -395,7 +476,7 @@ class TradeServiceSpec extends IOWordSpec {
         when(orderStatusRepo.save(any[TradeOrderPlacement], any[OrderPlacementStatus])).thenReturnUnit
 
         val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+          svc <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
           _   <- svc.closeOpenOrders(Users.uid, Markets.gbpeur)
         yield ()
 
@@ -420,7 +501,7 @@ class TradeServiceSpec extends IOWordSpec {
         when(orderRepo.findLatestBy(any[UserId], any[CurrencyPair])).thenReturnNone
 
         val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+          svc <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
           _   <- svc.closeOpenOrders(Users.uid)
         yield ()
 
@@ -448,7 +529,7 @@ class TradeServiceSpec extends IOWordSpec {
           when(brokerClient.find(any[BrokerParameters], any[NonEmptyList[CurrencyPair]])).thenReturn(positionLookup)
 
           val result = for
-            svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+            svc <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
             res <- svc.findBrokerPosition(Users.uid, Markets.gbpeur)
           yield res
 
@@ -475,7 +556,7 @@ class TradeServiceSpec extends IOWordSpec {
 
         val cps    = NonEmptyList.of(Markets.gbpeur)
         val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+          svc <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
           _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(None, Some(10), None, None))
         yield ()
 
@@ -505,7 +586,7 @@ class TradeServiceSpec extends IOWordSpec {
 
         val cps    = NonEmptyList.of(Markets.gbpeur)
         val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+          svc <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
           _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None))
         yield ()
 
@@ -531,7 +612,7 @@ class TradeServiceSpec extends IOWordSpec {
 
         val cps    = NonEmptyList.of(Markets.gbpeur)
         val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+          svc <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
           _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None))
         yield ()
 
@@ -552,7 +633,7 @@ class TradeServiceSpec extends IOWordSpec {
 
         val cps    = NonEmptyList.of(Markets.gbpeur)
         val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+          svc <- makeService(settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp, Processing.trades(settRepo))
           _   <- svc.closeOrderIfProfitIsOutsideRange(Users.uid, cps, Limits(Some(-10), Some(10), None, None))
         yield ()
 
@@ -568,16 +649,30 @@ class TradeServiceSpec extends IOWordSpec {
     }
 
     "processMarketStateUpdate" should {
-      val marketProfile = MarketProfile(trend = Some(TrendState(Direction.Downward, Markets.ts)))
-      val state         = Markets.state.copy(previousProfile = Some(marketProfile))
+      val marketProfile = MarketProfile.fromLegacy(LegacyMarketProfile(trend = Some(TrendState(Direction.Downward, Markets.ts))))
+      val state         = Markets.state
+        .copy(
+          configRevision = Some(0L),
+          sources = Processing.sources,
+          currentPosition = Markets.state.currentPosition.map(_.copy(openPrice = Some(BigDecimal(1.2))))
+        )
+        .copy(previousProfile = Some(marketProfile))
 
       "not do anything when no rules are triggered" in {
         val (settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp) = mocks
         when(settRepo.get(any[UserId])).thenReturnIO(Settings.trade)
 
         val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
-          _   <- svc.processMarketStateUpdate(state)
+          svc <- makeService(
+            settRepo,
+            orderRepo,
+            orderStatusRepo,
+            brokerClient,
+            dataClient,
+            disp,
+            Processing.trades(settRepo)
+          )
+          _ <- svc.processMarketStateUpdate(state)
         yield ()
 
         result.asserting { res =>
@@ -602,8 +697,16 @@ class TradeServiceSpec extends IOWordSpec {
 
         val tradeState = state.copy(currentPosition = None)
         val result     = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
-          _   <- svc.processMarketStateUpdate(tradeState)
+          svc <- makeService(
+            settRepo,
+            orderRepo,
+            orderStatusRepo,
+            brokerClient,
+            dataClient,
+            disp,
+            Processing.trades(settRepo)
+          )
+          _ <- svc.processMarketStateUpdate(tradeState)
         yield ()
 
         result.asserting { res =>
@@ -632,8 +735,16 @@ class TradeServiceSpec extends IOWordSpec {
         when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
         val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
-          _   <- svc.processMarketStateUpdate(state)
+          svc <- makeService(
+            settRepo,
+            orderRepo,
+            orderStatusRepo,
+            brokerClient,
+            dataClient,
+            disp,
+            Processing.trades(settRepo)
+          )
+          _ <- svc.processMarketStateUpdate(state)
         yield ()
 
         result.asserting { res =>
@@ -669,8 +780,16 @@ class TradeServiceSpec extends IOWordSpec {
             when(orderStatusRepo.save(any[TradeOrderPlacement], any[OrderPlacementStatus])).thenReturnUnit
 
             val result = for
-              svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
-              _   <- svc.processMarketStateUpdate(tradeState)
+              svc <- makeService(
+                settRepo,
+                orderRepo,
+                orderStatusRepo,
+                brokerClient,
+                dataClient,
+                disp,
+                Processing.trades(settRepo)
+              )
+              _ <- svc.processMarketStateUpdate(tradeState)
             yield ()
 
             result.attempt.asserting { res =>
@@ -711,8 +830,16 @@ class TradeServiceSpec extends IOWordSpec {
               when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
               val result = for
-                svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
-                _   <- svc.processMarketStateUpdate(tradeState)
+                svc <- makeService(
+                  settRepo,
+                  orderRepo,
+                  orderStatusRepo,
+                  brokerClient,
+                  dataClient,
+                  disp,
+                  Processing.trades(settRepo)
+                )
+                _ <- svc.processMarketStateUpdate(tradeState)
               yield ()
 
               result.asserting { _ =>
@@ -750,8 +877,16 @@ class TradeServiceSpec extends IOWordSpec {
               when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
               val result = for
-                svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
-                _   <- svc.processMarketStateUpdate(tradeState)
+                svc <- makeService(
+                  settRepo,
+                  orderRepo,
+                  orderStatusRepo,
+                  brokerClient,
+                  dataClient,
+                  disp,
+                  Processing.trades(settRepo)
+                )
+                _ <- svc.processMarketStateUpdate(tradeState)
               yield ()
 
               result.attempt.asserting { res =>
@@ -798,7 +933,15 @@ class TradeServiceSpec extends IOWordSpec {
           when(orderRepo.save(placedOpenOrder)).thenReturn(IO.raiseError(recordingError), IO.unit)
 
           val result = for
-            svc         <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
+            svc <- makeService(
+              settRepo,
+              orderRepo,
+              orderStatusRepo,
+              brokerClient,
+              dataClient,
+              disp,
+              Processing.trades(settRepo)
+            )
             firstResult <- svc.processMarketStateUpdate(tradeState).attempt
             exitActions <- IO(disp.submittedActions.toList)
             _           <- svc.processMarketStateUpdate(tradeState.copy(currentPosition = None))
@@ -851,8 +994,16 @@ class TradeServiceSpec extends IOWordSpec {
             when(orderRepo.save(any[TradeOrderPlacement])).thenReturnUnit
 
             val result = for
-              svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
-              _   <- svc.processMarketStateUpdate(tradeState)
+              svc <- makeService(
+                settRepo,
+                orderRepo,
+                orderStatusRepo,
+                brokerClient,
+                dataClient,
+                disp,
+                Processing.trades(settRepo)
+              )
+              _ <- svc.processMarketStateUpdate(tradeState)
             yield ()
 
             result.asserting { _ =>
@@ -874,8 +1025,16 @@ class TradeServiceSpec extends IOWordSpec {
         when(settRepo.get(any[UserId])).thenReturnIO(settings)
 
         val result = for
-          svc <- TradeService.make[IO](settRepo, orderRepo, orderStatusRepo, brokerClient, dataClient, disp)
-          _   <- svc.processMarketStateUpdate(state)
+          svc <- makeService(
+            settRepo,
+            orderRepo,
+            orderStatusRepo,
+            brokerClient,
+            dataClient,
+            disp,
+            Processing.trades(settRepo)
+          )
+          _ <- svc.processMarketStateUpdate(state)
         yield ()
 
         result.asserting { res =>
@@ -887,6 +1046,25 @@ class TradeServiceSpec extends IOWordSpec {
       }
     }
   }
+
+  private def makeService(
+      settings: TradeSettingsRepository[IO],
+      orders: TradeOrderRepository[IO],
+      statuses: OrderStatusRepository[IO],
+      broker: BrokerClient[IO],
+      data: MarketDataClient[IO],
+      dispatcher: ActionDispatcher[IO],
+      runtime: StrategyRuntime[IO]
+  )(using Clock[IO]): IO[TradeService[IO]] =
+    TradeService.make[IO](
+      settings,
+      orders,
+      statuses,
+      broker,
+      data,
+      dispatcher,
+      runtime
+    )
 
   def mocks: (
       TradeSettingsRepository[IO],

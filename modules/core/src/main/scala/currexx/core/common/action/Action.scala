@@ -1,7 +1,7 @@
 package currexx.core.common.action
 
 import cats.data.NonEmptyList
-import currexx.core.signal.Signal
+import currexx.core.signal.SignalBatch
 import currexx.core.monitor.MonitorId
 import currexx.core.trade.TradeOrderPlacement
 import currexx.domain.market.{CandleCount, CurrencyPair, Interval, MarketTimeSeriesData}
@@ -16,8 +16,7 @@ enum Action:
   case FetchMarketData(uid: UserId, cps: NonEmptyList[CurrencyPair], interval: Interval, candleCount: CandleCount)
   case AssertProfit(uid: UserId, cps: NonEmptyList[CurrencyPair], limits: Limits)
   case ProcessMarketData(uid: UserId, data: MarketTimeSeriesData)
-  case ProcessSignals(uid: UserId, currencyPair: CurrencyPair, signals: List[Signal])
-  case ProcessManualSignal(signal: Signal)
+  case ProcessSignals(uid: UserId, currencyPair: CurrencyPair, batch: SignalBatch)
   case ProcessMarketStateUpdate(uid: UserId, currencyPair: CurrencyPair)
   case ProcessTradeOrderPlacement(order: TradeOrderPlacement)
   case CloseOpenOrders(uid: UserId, currencyPair: CurrencyPair)

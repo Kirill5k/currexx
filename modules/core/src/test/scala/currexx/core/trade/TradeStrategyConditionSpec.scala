@@ -3,7 +3,7 @@ package currexx.core.trade
 import currexx.core.market.MomentumZone
 import currexx.core.trade.Rule.{Condition, Operator}
 import currexx.domain.market.TradeOrder
-import currexx.domain.signal.{Direction, ValueRole, VolatilityRegime}
+import currexx.domain.signal.{Direction, IndicatorId, ValueRole, VolatilityRegime}
 import io.circe.parser.decode
 import io.circe.syntax.*
 import org.scalatest.matchers.must.Matchers
@@ -68,6 +68,33 @@ class TradeStrategyConditionSpec extends AnyWordSpec with Matchers {
         cond.asJson.noSpaces mustBe json
         decode[Condition](json) mustBe Right(cond)
       }
+    }
+
+    "omit absent source references inside nested conditions just as in the legacy JSON" in {
+      val condition: Condition = Condition.AllOf(List(Condition.TrendIs(Direction.Upward)))
+      val json                 = """{"conditions":[{"direction":"upward","kind":"trend-is"}],"kind":"all-of"}"""
+      condition.asJson.noSpaces mustBe json
+      decode[Condition](json) mustBe Right(condition)
+    }
+
+    "round-trip named and default references through nested AllOf, AnyOf and Not" in {
+      val condition: Condition = Condition.AllOf(
+        List(
+          Condition.TrendIs(Direction.Upward, Some(IndicatorId("slow-trend"))),
+          Condition.AnyOf(
+            List(
+              Condition.Not(Condition.TrendIs(Direction.Downward)),
+              Condition.PriceMovedAgainstEntry(2, Some(IndicatorId("close-price")), Some(IndicatorId("atr-14")))
+            )
+          )
+        )
+      )
+      val json =
+        """{"conditions":[{"direction":"upward","of":"slow-trend","kind":"trend-is"},""" +
+          """{"conditions":[{"condition":{"direction":"downward","kind":"trend-is"},"kind":"not"},""" +
+          """{"nAtr":2.0,"priceOf":"close-price","atrOf":"atr-14","kind":"price-moved-against-entry"}],"kind":"any-of"}],"kind":"all-of"}"""
+      condition.asJson.noSpaces mustBe json
+      decode[Condition](json) mustBe Right(condition)
     }
 
     "fail to decode unknown condition kind" in {

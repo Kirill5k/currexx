@@ -107,10 +107,12 @@ object IndicatorBounds:
 
   /** Whether an indicator is one the search is allowed to hold: every gene in its own range, every related pair in its band. */
   def isValid(indicator: Indicator): Boolean = indicator match
+    case Indicator.Named(_, leaf)   => isValid(leaf)
     case Indicator.Composite(is, _) => is.forall(isValid)
     case other                      => genesInRange(other) && relationOf(other).forall((r, a, d, _) => r.holds(a, d))
 
   private def genesInRange(indicator: Indicator): Boolean = indicator match
+    case Indicator.Named(_, leaf)                   => genesInRange(leaf)
     case Indicator.Composite(is, _)                 => is.forall(genesInRange)
     case Indicator.TrendChangeDetection(_, vt)      => normalise(vt) == vt
     case Indicator.ValueTracking(_, _, vt)          => normalise(vt) == vt
@@ -130,6 +132,7 @@ object IndicatorBounds:
 
   /** Every gene back inside its own range, and every related pair as close to its band as the anchor allows. Idempotent. */
   def repair(indicator: Indicator): Indicator = indicator match
+    case Indicator.Named(id, leaf)           => Indicator.Named(id, repair(leaf))
     case Indicator.Composite(is, combinator) =>
       Indicator.Composite(is.map(repair), combinator)
     case Indicator.TrendChangeDetection(vs, vt) =>

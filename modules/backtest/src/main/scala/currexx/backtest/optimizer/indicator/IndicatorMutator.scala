@@ -144,6 +144,7 @@ object IndicatorMutator {
         def mutExceptLength(vt: VT, length: Int): VT = GeneBounds.withLength(mutVt(vt), length)
 
         def mutInd(indicator: Indicator): Indicator = indicator match
+          case Indicator.Named(id, leaf)     => Indicator.Named(id, mutInd(leaf))
           case Indicator.Composite(is, comb) =>
             Indicator.Composite(is.map(mutInd), comb)
           case Indicator.TrendChangeDetection(vs, vt) =>

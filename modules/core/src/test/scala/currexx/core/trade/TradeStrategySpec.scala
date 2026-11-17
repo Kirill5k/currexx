@@ -1,20 +1,12 @@
 package currexx.core.trade
 
+import currexx.core.market.LegacyMarketProfile.*
+
 import currexx.core.fixtures.Markets.*
-import currexx.core.market.{
-  BandCrossingState,
-  CrossoverState,
-  MarketProfile,
-  MarketState,
-  MomentumState,
-  MomentumZone,
-  PriceLineCrossingState,
-  TrendState,
-  VolatilityState
-}
+import currexx.core.market.{MarketProfile, MarketState, MomentumZone, PositionState, Reading}
 import currexx.core.trade.Rule.Condition
 import currexx.domain.market.TradeOrder
-import currexx.domain.signal.{Boundary, Direction, ValueRole, VolatilityRegime}
+import currexx.domain.signal.{Boundary, Direction, IndicatorId, ValueRole, VolatilityRegime}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -26,47 +18,115 @@ class TradeStrategySpec extends AnyWordSpec with Matchers {
   val anotherTradeAction: TradeAction  = TradeAction.OpenShort
   val closePositionAction: TradeAction = TradeAction.ClosePosition
 
-  val previousProfile: MarketProfile = profile.copy(lastMomentumValue = Some(10.0))
+  val previousProfile: MarketProfile = MarketProfile.fromLegacy(MarketProfile.toLegacy(profile).copy(lastMomentumValue = Some(10.0)))
   val trendChangedState: MarketState = state.copy(
-    profile = profile.copy(
-      trend = Some(TrendState(Direction.Downward, ts)),
-      crossover = Some(CrossoverState(Direction.Downward, ts)),
-      momentum = Some(MomentumState(MomentumZone.Oversold, ts)),
-      volatility = Some(VolatilityState(VolatilityRegime.High, ts)),
-      lastMomentumValue = Some(20.0)
+    profile = MarketProfile.fromLegacy(
+      MarketProfile
+        .toLegacy(profile)
+        .copy(
+          trend = Some(TrendState(Direction.Downward, ts)),
+          crossover = Some(CrossoverState(Direction.Downward, ts)),
+          momentum = Some(MomentumState(MomentumZone.Oversold, ts)),
+          volatility = Some(VolatilityState(VolatilityRegime.High, ts)),
+          lastMomentumValue = Some(20.0)
+        )
     )
   )
   val trendActiveForState: MarketState = trendChangedState.copy(
-    profile = trendChangedState.profile.copy(
-      trend = trendChangedState.profile.trend.map(_.copy(confirmedAt = ts.minusSeconds(100)))
+    profile = MarketProfile.fromLegacy(
+      MarketProfile
+        .toLegacy(trendChangedState.profile)
+        .copy(
+          trend = trendChangedState.profile.trend().map(t => TrendState(t.direction, ts.minusSeconds(100)))
+        )
     )
   )
   val momentumIsState: MarketState =
-    trendChangedState.copy(profile = trendChangedState.profile.copy(lastMomentumValue = Some(20.0)))
+    trendChangedState.copy(profile =
+      MarketProfile.fromLegacy(MarketProfile.toLegacy(trendChangedState.profile).copy(lastMomentumValue = Some(20.0)))
+    )
   val positionOpenForState: MarketState = trendChangedState.copy(
     currentPosition = Some(positionState.copy(openedAt = ts.minusSeconds(70)))
   )
   val noPositionState: MarketState    = trendChangedState.copy(currentPosition = None)
   val momentumStillState: MarketState =
-    trendChangedState.copy(profile = trendChangedState.profile.copy(lastMomentumValue = Some(10.0)))
+    trendChangedState.copy(profile =
+      MarketProfile.fromLegacy(MarketProfile.toLegacy(trendChangedState.profile).copy(lastMomentumValue = Some(10.0)))
+    )
   val momentumEnteredState: MarketState = trendChangedState.copy(
-    profile = trendChangedState.profile.copy(momentum = Some(MomentumState(MomentumZone.Overbought, ts)))
+    profile = MarketProfile.fromLegacy(
+      MarketProfile.toLegacy(trendChangedState.profile).copy(momentum = Some(MomentumState(MomentumZone.Overbought, ts)))
+    )
   )
   val crossoverOccurredState: MarketState = trendChangedState.copy(
-    profile = trendChangedState.profile.copy(crossover = Some(CrossoverState(Direction.Downward, ts)))
+    profile = MarketProfile.fromLegacy(
+      MarketProfile.toLegacy(trendChangedState.profile).copy(crossover = Some(CrossoverState(Direction.Downward, ts)))
+    )
   )
 
   val upperBandCrossedState: MarketState = trendChangedState.copy(
-    profile = trendChangedState.profile.copy(lastBandCrossing = Some(BandCrossingState(Boundary.Upper, Direction.Upward, ts)))
-  )
-  val lowerBandCrossedState: MarketState = trendChangedState.copy(
-    profile = trendChangedState.profile.copy(lastBandCrossing = Some(BandCrossingState(Boundary.Lower, Direction.Downward, ts)))
-  )
-  val priceCrossedLineState: MarketState = trendChangedState.copy(
-    profile = trendChangedState.profile.copy(lastPriceLineCrossing =
-      Some(PriceLineCrossingState(ValueRole.ChannelMiddleBand, Direction.Upward, ts))
+    profile = MarketProfile.fromLegacy(
+      MarketProfile
+        .toLegacy(trendChangedState.profile)
+        .copy(lastBandCrossing = Some(BandCrossingState(Boundary.Upper, Direction.Upward, ts)))
     )
   )
+  val lowerBandCrossedState: MarketState = trendChangedState.copy(
+    profile = MarketProfile.fromLegacy(
+      MarketProfile
+        .toLegacy(trendChangedState.profile)
+        .copy(lastBandCrossing = Some(BandCrossingState(Boundary.Lower, Direction.Downward, ts)))
+    )
+  )
+  val priceCrossedLineState: MarketState = trendChangedState.copy(
+    profile = MarketProfile.fromLegacy(
+      MarketProfile
+        .toLegacy(trendChangedState.profile)
+        .copy(lastPriceLineCrossing = Some(PriceLineCrossingState(ValueRole.ChannelMiddleBand, Direction.Upward, ts)))
+    )
+  )
+
+  "Rule readiness" should {
+    def firesReady(condition: Condition, current: MarketState): Boolean =
+      Rule
+        .findTriggeredAction(List(Rule(TradeAction.ClosePosition, condition)), current, current.previousProfile.getOrElse(MarketProfile()))
+        .nonEmpty
+
+    "keep a negated zone unknown without disabling an independent price stop" in {
+      val price   = IndicatorId.forValue(ValueRole.Price)
+      val atr     = IndicatorId.forValue(ValueRole.Volatility)
+      val current = state.copy(
+        invalidated = Set(IndicatorId.MomentumZone),
+        currentPosition = Some(PositionState(TradeOrder.Position.Buy, ts, Some(BigDecimal("1.2")))),
+        profile = MarketProfile().updated(price, Reading.Value(BigDecimal("1.1"))).updated(atr, Reading.Value(BigDecimal("0.01")))
+      )
+      val negated = Rule.Condition.Not(Rule.Condition.MomentumIsIn(MomentumZone.Overbought))
+      firesReady(negated, current) mustBe false
+      firesReady(Rule.Condition.anyOf(negated, Rule.Condition.PriceMovedAgainstEntry(2)), current) mustBe true
+      firesReady(
+        Rule.Condition.Not(Rule.Condition.PriceMovedAgainstEntry(2)),
+        current.copy(profile = MarketProfile(), invalidated = Set(price, atr))
+      ) mustBe false
+      firesReady(
+        Rule.Condition.Not(Rule.Condition.PriceMovedAgainstEntry(2)),
+        current.copy(currentPosition = None, profile = MarketProfile(), invalidated = Set(price, atr))
+      ) mustBe true
+    }
+
+    "withhold history conditions until comparable history exists" in {
+      val momentum = IndicatorId.forValue(ValueRole.Momentum)
+      val current  = state.copy(
+        profile = MarketProfile().updated(momentum, Reading.Value(BigDecimal("0.1"))),
+        previousProfile = Some(MarketProfile()),
+        invalidated = Set(momentum)
+      )
+      firesReady(Condition.MomentumIs(Direction.Still), current) mustBe false
+      firesReady(
+        Condition.MomentumIs(Direction.Still),
+        current.copy(previousProfile = Some(current.profile), invalidated = Set.empty)
+      ) mustBe true
+    }
+  }
 
   "A Rule.findTriggeredAction" should {
     "return None when no rules are provided" in {
@@ -173,8 +233,10 @@ class TradeStrategySpec extends AnyWordSpec with Matchers {
     }
 
     "not trigger UpperBandCrossed when it's not a fresh event" in {
-      val prevProfile = previousProfile.copy(lastBandCrossing = Some(BandCrossingState(Boundary.Upper, Direction.Upward, ts)))
-      val rule        = Rule(tradeAction, Condition.UpperBandCrossed(Direction.Upward))
+      val prevProfile = MarketProfile.fromLegacy(
+        MarketProfile.toLegacy(previousProfile).copy(lastBandCrossing = Some(BandCrossingState(Boundary.Upper, Direction.Upward, ts)))
+      )
+      val rule = Rule(tradeAction, Condition.UpperBandCrossed(Direction.Upward))
       Rule.findTriggeredAction(List(rule), upperBandCrossedState, prevProfile) mustBe None
     }
 
@@ -189,8 +251,10 @@ class TradeStrategySpec extends AnyWordSpec with Matchers {
     }
 
     "not trigger LowerBandCrossed when it's not a fresh event" in {
-      val prevProfile = previousProfile.copy(lastBandCrossing = Some(BandCrossingState(Boundary.Lower, Direction.Downward, ts)))
-      val rule        = Rule(tradeAction, Condition.LowerBandCrossed(Direction.Downward))
+      val prevProfile = MarketProfile.fromLegacy(
+        MarketProfile.toLegacy(previousProfile).copy(lastBandCrossing = Some(BandCrossingState(Boundary.Lower, Direction.Downward, ts)))
+      )
+      val rule = Rule(tradeAction, Condition.LowerBandCrossed(Direction.Downward))
       Rule.findTriggeredAction(List(rule), lowerBandCrossedState, prevProfile) mustBe None
     }
 
@@ -211,7 +275,11 @@ class TradeStrategySpec extends AnyWordSpec with Matchers {
 
     "not trigger PriceCrossedLine when it's not a fresh event" in {
       val prevProfile =
-        previousProfile.copy(lastPriceLineCrossing = Some(PriceLineCrossingState(ValueRole.ChannelMiddleBand, Direction.Upward, ts)))
+        MarketProfile.fromLegacy(
+          MarketProfile
+            .toLegacy(previousProfile)
+            .copy(lastPriceLineCrossing = Some(PriceLineCrossingState(ValueRole.ChannelMiddleBand, Direction.Upward, ts)))
+        )
       val rule = Rule(tradeAction, Condition.PriceCrossedLine(ValueRole.ChannelMiddleBand, Direction.Upward))
       Rule.findTriggeredAction(List(rule), priceCrossedLineState, prevProfile) mustBe None
     }

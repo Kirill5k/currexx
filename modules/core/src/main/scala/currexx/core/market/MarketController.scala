@@ -5,6 +5,7 @@ import cats.effect.Async
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirCodecs, TapirJson, TapirSchema}
 import currexx.domain.market.CurrencyPair
+import currexx.domain.signal.IndicatorId
 import io.circe.Codec
 import org.http4s.HttpRoutes
 import sttp.model.StatusCode
@@ -48,6 +49,8 @@ final private class MarketController[F[_]](
 }
 
 object MarketController extends TapirSchema with TapirJson with TapirCodecs {
+  given Schema[Map[IndicatorId, Reading]] =
+    Schema.schemaForMap[IndicatorId, Reading](_.value)
 
   final case class MarketStateView(
       currentPosition: Option[PositionState],

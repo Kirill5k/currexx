@@ -1,7 +1,10 @@
 package currexx.core.fixtures
 
+import currexx.core.market.LegacyMarketProfile.*
+
+import currexx.core.market.LegacyMarketProfile
 import cats.data.NonEmptyList
-import currexx.core.market.{MarketProfile, MarketState, PositionState, TrendState}
+import currexx.core.market.{MarketProfile, MarketState, PositionState}
 import currexx.domain.market.Currency.{EUR, GBP, USD}
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData, PriceRange, TradeOrder}
 import currexx.domain.signal.Direction
@@ -18,7 +21,7 @@ object Markets {
 
   lazy val positionState: PositionState = PositionState(TradeOrder.Position.Buy, ts)
 
-  lazy val profile: MarketProfile = MarketProfile(trend = Some(TrendState(Direction.Upward, ts)))
+  lazy val profile: MarketProfile = MarketProfile.fromLegacy(LegacyMarketProfile(trend = Some(TrendState(Direction.Upward, ts))))
 
   lazy val state: MarketState = MarketState(
     userId = Users.uid,

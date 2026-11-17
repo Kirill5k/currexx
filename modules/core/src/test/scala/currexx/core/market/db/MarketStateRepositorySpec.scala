@@ -1,23 +1,39 @@
 package currexx.core.market.db
 
-import cats.effect.{IO, Ref}
-import cats.effect.unsafe.IORuntime
 import cats.data.NonEmptyList
+import cats.effect.unsafe.IORuntime
+import cats.effect.{IO, Ref}
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import currexx.core.{MockActionDispatcher, MongoSpec}
 import currexx.core.common.action.Action
 import currexx.core.common.db.Repository
-import currexx.core.fixtures.{Markets, Signals, Users}
-import currexx.core.market.*
+import currexx.core.fixtures.{Markets, Processing, Signals, Trades, Users}
+import currexx.core.market.LegacyMarketProfile.*
+import currexx.core.market.{
+  LegacyMarketProfile,
+  MarketProfile,
+  MarketProfileUpdater,
+  MarketService,
+  MarketState,
+  PositionState,
+  ProfileTransition,
+  Reading
+}
+import currexx.core.settings.{SignalSettings, StrategyConfiguration}
+import currexx.core.signal.SignalBatch
+import currexx.core.trade.BrokerPosition
+import currexx.core.{MockActionDispatcher, MongoSpec}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{CurrencyPair, TradeOrder}
-import currexx.domain.signal.{Condition, Direction, ValueRole}
+import currexx.domain.market.{CurrencyPair, Interval, TradeOrder}
+import currexx.domain.signal.{Condition, Direction, Indicator, IndicatorId, ValueRole, ValueSource, ValueTransformation}
 import currexx.domain.user.UserId
+import io.circe.syntax.*
 import kirill5k.common.cats.Clock
+import mongo4cats.circe.given
 import mongo4cats.client.MongoClient
 import mongo4cats.database.MongoDatabase
 import mongo4cats.operations.{Filter, Update}
+import org.bson.BsonDocument
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
@@ -37,6 +53,109 @@ class MarketStateRepositorySpec extends MongoSpec {
 
   "A MarketStateRepository" when {
     "save" should {
+      "round-trip named readings, source definitions and lifecycle metadata without losing decimal precision" in withEmbeddedMongoDb { db =>
+        val id      = IndicatorId("flow")
+        val source  = Indicator.Named(id, Indicator.ValueTracking(ValueRole.Momentum, ValueSource.Close, ValueTransformation.CMF(20)))
+        val profile = MarketProfile().updated(id, Reading.Value(BigDecimal("0.12345678901234567890123456789")))
+        val state   = initial.copy(
+          profile = profile,
+          previousProfile = Some(profile),
+          configRevision = Some(3L),
+          interval = Some(Interval.H1),
+          invalidated = Set(IndicatorId.Trend),
+          sources = Map(id -> source)
+        )
+        (for
+          repo       <- MarketStateRepository.make(db)
+          _          <- repo.save(state)
+          loaded     <- repo.find(Users.uid, Markets.gbpeur)
+          collection <- db.getCollection(Repository.Collection.MarketState)
+          raw        <- collection.find(Filter.eq("userId", Users.uid.toObjectId)).first
+        yield (loaded, raw)).map { (loaded, raw) =>
+          loaded.map(_.withTime(ts)) mustBe Some(state.copy(version = Some(1L)))
+          raw.get.asJson.hcursor.downField("profile").downField("trend").succeeded mustBe false
+        }
+      }
+
+      "preserve candle cursors across downgrade, position repair and upgrade without replaying the candle" in withEmbeddedMongoDb { db =>
+        val legacy = initial.copy(
+          profile = Markets.profile,
+          configRevision = Some(0L),
+          lastCandleTime = Some(ts),
+          lastTimeStateCandle = Some(ts),
+          sources = Processing.sources
+        )
+        val signal     = Signals.trend(Direction.Downward, time = ts)
+        val dispatcher = MockActionDispatcher[IO]
+        (for
+          repo       <- MarketStateRepository.make(db)
+          _          <- repo.save(legacy)
+          collection <- db.getCollection(Repository.Collection.MarketState)
+          _          <- collection.updateOne(
+            Filter.eq("userId", Users.uid.toObjectId),
+            Update.set("profile", BsonDocument.parse(MarketProfile.toLegacy(legacy.profile).asJson.noSpaces))
+          )
+          service    <- MarketService.make[IO](repo, dispatcher, Processing.fixed)
+          _          <- service.processTradeOrderPlacement(Trades.order.copy(time = ts))
+          positioned <- service.getState(Users.uid, Markets.gbpeur)
+          _          <- service.reconcileEntryPrice(positioned, BrokerPosition.Open(TradeOrder.Position.Buy, BigDecimal("1.25")))
+          _          <- service.processSignals(Users.uid, Markets.gbpeur, Processing.batch(List(signal)))
+          sameCandle <- service.getState(Users.uid, Markets.gbpeur)
+          sameActions = dispatcher.submittedActions.toList
+          _          <- service.processSignals(Users.uid, Markets.gbpeur, Processing.batch(List(signal.copy(time = ts.plusSeconds(3600)))))
+          nextCandle <- service.getState(Users.uid, Markets.gbpeur)
+        yield (positioned, sameCandle, sameActions, nextCandle)).map { (positioned, same, actions, next) =>
+          positioned.profile.readings mustBe empty
+          same.profile.readings mustBe empty
+          same.invalidated must contain(IndicatorId.Trend)
+          same.lastCandleTime mustBe Some(ts)
+          same.lastTimeStateCandle mustBe Some(ts)
+          same.currentPosition.flatMap(_.openPrice) mustBe Some(BigDecimal("1.25"))
+          actions mustBe empty
+          next.profile.trend() mustBe Some(Reading.Trend(Direction.Downward, ts.plusSeconds(3600)))
+          next.sources(IndicatorId.Trend) mustBe signal.triggeredBy
+          dispatcher.submittedActions mustBe List(Action.ProcessMarketStateUpdate(Users.uid, Markets.gbpeur))
+        }
+      }
+
+      "detect a downgrade writer and rebuild on upgrade even when the settings revision did not change" in withEmbeddedMongoDb { db =>
+        val signal  = Signals.trend(Direction.Upward, time = ts)
+        val profile = MarketProfileUpdater.update(MarketProfile(), signal)
+        val state   = initial.copy(profile = profile, configRevision = Some(0L))
+        (for
+          repo       <- MarketStateRepository.make(db)
+          _          <- repo.save(state)
+          collection <- db.getCollection(Repository.Collection.MarketState)
+          mirrored   <- collection.find(Filter.eq("userId", Users.uid.toObjectId)).first
+          _          <- collection.updateOne(
+            Filter.eq("userId", Users.uid.toObjectId),
+            Update.set("profile", BsonDocument.parse(MarketProfile.toLegacy(profile).asJson.noSpaces))
+          )
+          old <- repo.find(Users.uid, Markets.gbpeur)
+          changed = Processing.indicators.map {
+            case i: Indicator.TrendChangeDetection => i.copy(transformation = ValueTransformation.EMA(30))
+            case i                                 => i
+          }
+          config = StrategyConfiguration(
+            0L,
+            changed.flatMap(i => i.resolvedId.map(_ -> i)).toMap,
+            Some(SignalSettings(changed)),
+            None
+          )
+          runtime = Processing.runtime(_ => IO.pure(config))
+          service <- MarketService.make[IO](repo, MockActionDispatcher[IO], runtime)
+          _       <- service.processSignals(Users.uid, Markets.gbpeur, Processing.batch(Nil).copy(sources = config.sources))
+          rebuilt <- repo.find(Users.uid, Markets.gbpeur)
+        yield (mirrored, old, rebuilt)).map { (mirrored, old, rebuilt) =>
+          mirrored.get.asJson.hcursor.downField("profile").downField("trend").succeeded mustBe true
+          old.get.profile.readings mustBe empty
+          old.flatMap(_.configRevision) mustBe Some(0L)
+          rebuilt.get.profile.readings mustBe empty
+          rebuilt.get.invalidated must contain(IndicatorId.Trend)
+          rebuilt.get.sources must not be empty
+        }
+      }
+
       "create a state that has not been stored yet" in withEmbeddedMongoDb { db =>
         val state  = initial.copy(profile = Markets.profile, previousProfile = Some(MarketProfile()), lastCandleTime = Some(ts))
         val result = for
@@ -191,48 +310,53 @@ class MarketStateRepositorySpec extends MongoSpec {
         val older      = Signals.trend(Direction.Downward, time = ts)
         val result     = for
           repo          <- MarketStateRepository.make(db)
-          service       <- MarketService.make[IO](repo, dispatcher)
-          _             <- service.processSignals(Users.uid, Markets.gbpeur, List(newer))
+          service       <- MarketService.make[IO](repo, dispatcher, Processing.fixed)
+          _             <- service.processSignals(Users.uid, Markets.gbpeur, Processing.batch(List(newer)))
           acceptedState <- repo.find(Users.uid, Markets.gbpeur)
-          _             <- service.processSignals(Users.uid, Markets.gbpeur, List(older))
-          _             <- service.processSignals(Users.uid, Markets.gbpeur, List(newer))
+          _             <- service.processSignals(Users.uid, Markets.gbpeur, Processing.batch(List(older)))
+          _             <- service.processSignals(Users.uid, Markets.gbpeur, Processing.batch(List(newer)))
           state         <- repo.find(Users.uid, Markets.gbpeur)
         yield (acceptedState, state)
 
         result.map { case (acceptedState, state) =>
           state mustBe acceptedState
-          state.flatMap(_.profile.trend) mustBe Some(TrendState(Direction.Upward, newer.time))
+          state.flatMap(_.profile.trend()) mustBe Some(Reading.Trend(Direction.Upward, newer.time))
           dispatcher.submittedActions.toList mustBe List(Action.ProcessMarketStateUpdate(Users.uid, Markets.gbpeur))
         }
       }
 
-      "keep a manual signal's wall-clock time out of the candle watermark" in withEmbeddedMongoDb { db =>
+      "advance the candle watermark and preserve readings across detected batches" in withEmbeddedMongoDb { db =>
         val previousCandle  = Instant.parse("2026-01-05T09:00:00Z")
         val completedCandle = Instant.parse("2026-01-05T10:00:00Z")
-        val manualSignal    = Signals.trend(Direction.Upward, time = Instant.parse("2026-01-05T10:37:00Z"))
+        val followingCandle = Instant.parse("2026-01-05T11:00:00Z")
+        val trendSignal     = Signals.trend(Direction.Upward, time = completedCandle)
         val candleSignal    =
-          Signals.make(Users.uid, completedCandle, Markets.gbpeur, Condition.ValueUpdated(ValueRole.Price, BigDecimal("1.25")))
+          Signals.make(Users.uid, followingCandle, Markets.gbpeur, Condition.ValueUpdated(ValueRole.Price, BigDecimal("1.25")))
         val dispatcher = MockActionDispatcher[IO]
         val result     = for
-          repo        <- MarketStateRepository.make(db)
-          service     <- MarketService.make[IO](repo, dispatcher)
-          _           <- service.processSignals(Users.uid, Markets.gbpeur, List(Signals.trend(Direction.Downward, time = previousCandle)))
-          _           <- service.processManualSignal(manualSignal)
-          manualState <- repo.find(Users.uid, Markets.gbpeur)
-          _           <- service.processSignals(Users.uid, Markets.gbpeur, List(candleSignal))
-          state       <- repo.find(Users.uid, Markets.gbpeur)
-        yield (manualState, state)
+          repo    <- MarketStateRepository.make(db)
+          service <- MarketService.make[IO](repo, dispatcher, Processing.fixed)
+          _       <- service.processSignals(
+            Users.uid,
+            Markets.gbpeur,
+            Processing.batch(List(Signals.trend(Direction.Downward, time = previousCandle)))
+          )
+          _          <- service.processSignals(trendSignal.userId, trendSignal.currencyPair, Processing.batch(List(trendSignal)))
+          trendState <- repo.find(Users.uid, Markets.gbpeur)
+          _          <- service.processSignals(Users.uid, Markets.gbpeur, Processing.batch(List(candleSignal)))
+          state      <- repo.find(Users.uid, Markets.gbpeur)
+        yield (trendState, state)
 
-        result.map { case (manualState, state) =>
-          manualState.flatMap(_.lastCandleTime) mustBe Some(previousCandle)
-          state.flatMap(_.lastCandleTime) mustBe Some(completedCandle)
-          state.flatMap(_.profile.lastClosePrice) mustBe Some(BigDecimal("1.25"))
-          state.flatMap(_.profile.trend) mustBe Some(TrendState(Direction.Upward, manualSignal.time))
+        result.map { case (trendState, state) =>
+          trendState.flatMap(_.lastCandleTime) mustBe Some(completedCandle)
+          state.flatMap(_.lastCandleTime) mustBe Some(followingCandle)
+          state.flatMap(s => MarketProfile.toLegacy(s.profile).lastClosePrice) mustBe Some(BigDecimal("1.25"))
+          state.flatMap(_.profile.trend()) mustBe Some(Reading.Trend(Direction.Upward, trendSignal.time))
           dispatcher.submittedActions.toList mustBe List.fill(3)(Action.ProcessMarketStateUpdate(Users.uid, Markets.gbpeur))
         }
       }
 
-      "apply a weekend adjustment once across a downstream failure and accept signals from the same candle" in withEmbeddedMongoDb { db =>
+      "apply a weekend adjustment and its signals once across a downstream failure" in withEmbeddedMongoDb { db =>
         val dispatcher = MockActionDispatcher[IO]
         val reopenedAt = ts.plusSeconds(72 * 3600)
         val shiftedAt  = ts.plusSeconds(71 * 3600)
@@ -240,45 +364,78 @@ class MarketStateRepositorySpec extends MongoSpec {
         val failure    = new RuntimeException("downstream signal processing failed")
         val result     = for
           repo <- MarketStateRepository.make(db)
-          _ <- repo.save(initial.copy(profile = MarketProfile(trend = Some(TrendState(Direction.Upward, ts))), lastCandleTime = Some(ts)))
-          _ <- repo.update(Users.uid, Markets.gbpeur, Some(PositionState(TradeOrder.Position.Buy, ts)))
-          service       <- MarketService.make[IO](repo, dispatcher)
-          firstAttempt  <- (service.updateTimeState(Users.uid, data) *> IO.raiseError[Unit](failure)).attempt
-          firstShift    <- repo.find(Users.uid, Markets.gbpeur)
-          _             <- service.updateTimeState(Users.uid, data)
+          _    <- repo.save(
+            initial.copy(
+              profile = MarketProfile.fromLegacy(LegacyMarketProfile(trend = Some(TrendState(Direction.Upward, ts)))),
+              lastCandleTime = Some(ts)
+            )
+          )
+          _            <- repo.update(Users.uid, Markets.gbpeur, Some(PositionState(TradeOrder.Position.Buy, ts)))
+          service      <- MarketService.make[IO](repo, dispatcher, Processing.fixed)
+          firstAttempt <- (service.processSignals(
+            Users.uid,
+            data.currencyPair,
+            Processing
+              .batch(List(Signals.trend(Direction.Downward, time = reopenedAt)))
+              .copy(interval = data.interval, candleTime = data.latestTime, closureGap = SignalBatch.closureGap(data))
+          ) *> IO.raiseError[Unit](failure)).attempt
+          firstShift <- repo.find(Users.uid, Markets.gbpeur)
+          _          <- service.processSignals(
+            Users.uid,
+            data.currencyPair,
+            Processing
+              .batch(List(Signals.trend(Direction.Downward, time = reopenedAt)))
+              .copy(interval = data.interval, candleTime = data.latestTime, closureGap = SignalBatch.closureGap(data))
+          )
           repeatedShift <- repo.find(Users.uid, Markets.gbpeur)
-          _             <- service.processSignals(Users.uid, Markets.gbpeur, List(Signals.trend(Direction.Downward, time = reopenedAt)))
-          state         <- repo.find(Users.uid, Markets.gbpeur)
+          _             <- service.processSignals(
+            Users.uid,
+            Markets.gbpeur,
+            Processing.batch(List(Signals.trend(Direction.Downward, time = reopenedAt)))
+          )
+          state <- repo.find(Users.uid, Markets.gbpeur)
         yield (firstAttempt, firstShift, repeatedShift, state)
 
         result.map { case (firstAttempt, firstShift, repeatedShift, state) =>
           firstAttempt mustBe Left(failure)
           repeatedShift mustBe firstShift
-          firstShift.flatMap(_.profile.trend).map(_.confirmedAt) mustBe Some(shiftedAt)
+          firstShift.flatMap(_.profile.trend()) mustBe Some(Reading.Trend(Direction.Downward, reopenedAt))
           firstShift.flatMap(_.currentPosition).map(_.openedAt) mustBe Some(shiftedAt)
           state.flatMap(_.lastCandleTime) mustBe Some(reopenedAt)
-          state.flatMap(_.profile.trend) mustBe Some(TrendState(Direction.Downward, reopenedAt))
+          state.flatMap(_.profile.trend()) mustBe Some(Reading.Trend(Direction.Downward, reopenedAt))
           dispatcher.submittedActions.toList mustBe List(Action.ProcessMarketStateUpdate(Users.uid, Markets.gbpeur))
         }
       }
 
-      "record the first post-weekend candle before signals so its replay cannot shift newly created state" in withEmbeddedMongoDb { db =>
+      "apply the first post-weekend candle atomically so replay cannot shift new state" in withEmbeddedMongoDb { db =>
         val dispatcher = MockActionDispatcher[IO]
         val reopenedAt = ts.plusSeconds(72 * 3600)
         val data       = weekendData(reopenedAt)
         val result     = for
-          repo          <- MarketStateRepository.make(db)
-          service       <- MarketService.make[IO](repo, dispatcher)
-          _             <- service.updateTimeState(Users.uid, data)
-          _             <- service.processSignals(Users.uid, Markets.gbpeur, List(Signals.trend(Direction.Upward, time = reopenedAt)))
+          repo    <- MarketStateRepository.make(db)
+          service <- MarketService.make[IO](repo, dispatcher, Processing.fixed)
+          _       <- service.processSignals(
+            Users.uid,
+            data.currencyPair,
+            Processing
+              .batch(List(Signals.trend(Direction.Upward, time = reopenedAt)))
+              .copy(interval = data.interval, candleTime = data.latestTime, closureGap = SignalBatch.closureGap(data))
+          )
+          _ <- service.processSignals(Users.uid, Markets.gbpeur, Processing.batch(List(Signals.trend(Direction.Upward, time = reopenedAt))))
           signaledState <- repo.find(Users.uid, Markets.gbpeur)
-          _             <- service.updateTimeState(Users.uid, data)
-          state         <- repo.find(Users.uid, Markets.gbpeur)
+          _             <- service.processSignals(
+            Users.uid,
+            data.currencyPair,
+            Processing
+              .batch(List(Signals.trend(Direction.Upward, time = reopenedAt)))
+              .copy(interval = data.interval, candleTime = data.latestTime, closureGap = SignalBatch.closureGap(data))
+          )
+          state <- repo.find(Users.uid, Markets.gbpeur)
         yield (signaledState, state)
 
         result.map { case (signaledState, state) =>
           state mustBe signaledState
-          state.flatMap(_.profile.trend) mustBe Some(TrendState(Direction.Upward, reopenedAt))
+          state.flatMap(_.profile.trend()) mustBe Some(Reading.Trend(Direction.Upward, reopenedAt))
         }
       }
 
@@ -291,17 +448,17 @@ class MarketStateRepositorySpec extends MongoSpec {
           realRepo <- MarketStateRepository.make(db)
           repo     <- interceptFirstSave(realRepo) {
             realRepo.find(Users.uid, Markets.gbpeur).flatMap { s =>
-              realRepo.save(s.getOrElse(initial).applyCandleSignals(List(older), olderTime).get).void
+              realRepo.save(ProfileTransition(s.getOrElse(initial), Processing.batch(List(older))).state).void
             }
           }
-          service <- MarketService.make[IO](repo, MockActionDispatcher[IO])
-          _       <- service.processSignals(Users.uid, Markets.gbpeur, List(later))
+          service <- MarketService.make[IO](repo, MockActionDispatcher[IO], Processing.fixed)
+          _       <- service.processSignals(Users.uid, Markets.gbpeur, Processing.batch(List(later)))
           state   <- realRepo.find(Users.uid, Markets.gbpeur)
         yield state
 
         result.map { state =>
-          state.flatMap(_.profile.trend) mustBe Some(TrendState(Direction.Downward, olderTime))
-          state.flatMap(_.profile.lastClosePrice) mustBe Some(BigDecimal("1.25"))
+          state.flatMap(_.profile.trend()) mustBe Some(Reading.Trend(Direction.Downward, olderTime))
+          state.flatMap(s => MarketProfile.toLegacy(s.profile).lastClosePrice) mustBe Some(BigDecimal("1.25"))
           state.flatMap(_.lastCandleTime) mustBe Some(laterTime)
         }
       }
@@ -311,17 +468,25 @@ class MarketStateRepositorySpec extends MongoSpec {
         val replacement = PositionState(TradeOrder.Position.Sell, reopenedAt.plusSeconds(60), Some(BigDecimal("1.30")))
         val result      = for
           realRepo <- MarketStateRepository.make(db)
-          _        <- realRepo.save(initial.copy(profile = MarketProfile(trend = Some(TrendState(Direction.Upward, ts)))))
-          _        <- realRepo.update(Users.uid, Markets.gbpeur, Some(PositionState(TradeOrder.Position.Buy, ts)))
-          repo     <- interceptFirstSave(realRepo)(realRepo.update(Users.uid, Markets.gbpeur, Some(replacement)).void)
-          service  <- MarketService.make[IO](repo, MockActionDispatcher[IO])
-          _        <- service.updateTimeState(Users.uid, weekendData(reopenedAt))
-          state    <- realRepo.find(Users.uid, Markets.gbpeur)
+          _        <- realRepo.save(
+            initial.copy(profile = MarketProfile.fromLegacy(LegacyMarketProfile(trend = Some(TrendState(Direction.Upward, ts)))))
+          )
+          _       <- realRepo.update(Users.uid, Markets.gbpeur, Some(PositionState(TradeOrder.Position.Buy, ts)))
+          repo    <- interceptFirstSave(realRepo)(realRepo.update(Users.uid, Markets.gbpeur, Some(replacement)).void)
+          service <- MarketService.make[IO](repo, MockActionDispatcher[IO], Processing.fixed)
+          _       <- service.processSignals(
+            Users.uid,
+            Markets.gbpeur,
+            Processing
+              .batch(Nil)
+              .copy(candleTime = reopenedAt, closureGap = SignalBatch.closureGap(weekendData(reopenedAt)))
+          )
+          state <- realRepo.find(Users.uid, Markets.gbpeur)
         yield state
 
         result.map { state =>
           state.flatMap(_.currentPosition) mustBe Some(replacement)
-          state.flatMap(_.profile.trend) mustBe Some(TrendState(Direction.Upward, ts.plusSeconds(71 * 3600)))
+          state.flatMap(_.profile.trend()) mustBe Some(Reading.Trend(Direction.Upward, ts.plusSeconds(71 * 3600)))
           state.flatMap(_.lastTimeStateCandle) mustBe Some(reopenedAt)
         }
       }

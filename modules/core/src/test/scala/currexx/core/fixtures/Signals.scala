@@ -3,15 +3,27 @@ package currexx.core.fixtures
 import cats.data.NonEmptyList
 import currexx.core.signal.Signal
 import currexx.domain.market.{CurrencyPair, Interval}
-import currexx.domain.signal.{Boundary, CombinationLogic, Condition, Direction, Indicator, ValueRole, ValueSource, ValueTransformation}
+import currexx.domain.signal.{
+  Boundary,
+  CombinationLogic,
+  Condition,
+  Direction,
+  Indicator,
+  IndicatorId,
+  ValueRole,
+  ValueSource,
+  ValueTransformation
+}
 import currexx.domain.user.UserId
 import kirill5k.common.syntax.time.*
 
 import java.time.Instant
 
 object Indicators {
-  val trendChangeDetection = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(16))
-  val linesCrossing        = Indicator.LinesCrossing(ValueSource.Close, ValueTransformation.EMA(22), ValueTransformation.EMA(14))
+  val trendChangeDetection                   = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.HMA(16))
+  val threshold: Indicator.ThresholdCrossing = Indicator.ThresholdCrossing(ValueSource.Close, ValueTransformation.RSX(14), 80, 20)
+  val bands                                  = Indicator.BollingerBands(ValueSource.Close, ValueTransformation.SMA(20), 20, 2)
+  val linesCrossing = Indicator.LinesCrossing(ValueSource.Close, ValueTransformation.EMA(22), ValueTransformation.EMA(14))
 }
 
 object Signals {
@@ -20,12 +32,25 @@ object Signals {
   val trendDirectionChange = Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(1))
   val linesCrossing        = Condition.LinesCrossing(Direction.Upward)
 
+  def make(uid: UserId, time: Instant, cp: CurrencyPair, condition: Condition): Signal =
+    make(uid, time, cp, condition, indicatorFor(condition))
+
+  private def indicatorFor(condition: Condition): Indicator = condition match
+    case _: Condition.TrendDirectionChange                               => Processing.sources(IndicatorId.Trend)
+    case _: Condition.LinesCrossing                                      => Processing.sources(IndicatorId.Crossover)
+    case _: Condition.VolatilityRegimeChange                             => Processing.sources(IndicatorId.VolatilityRegime)
+    case _: Condition.ThresholdCrossing                                  => Processing.sources(IndicatorId.MomentumZone)
+    case _: Condition.UpperBandCrossing | _: Condition.LowerBandCrossing => Processing.sources(IndicatorId.Band)
+    case Condition.ValueUpdated(role, _)                                 => Processing.sources(IndicatorId.forValue(role))
+    case Condition.PriceCrossedLine(role, _)                             => Processing.sources(IndicatorId.forLine(role))
+    case Condition.Composite(conditions) => Indicator.Composite(conditions.map(indicatorFor), CombinationLogic.All)
+
   def make(
       uid: UserId,
       time: Instant,
       cp: CurrencyPair,
       condition: Condition,
-      triggeredBy: Indicator = Indicators.trendChangeDetection
+      triggeredBy: Indicator
   ): Signal =
     Signal(
       userId = uid,
@@ -81,7 +106,7 @@ object Signals {
       time = time,
       cp = cp,
       condition = Condition.ThresholdCrossing(threshold, value, Direction.Upward, Boundary.Upper),
-      triggeredBy = Indicators.trendChangeDetection
+      triggeredBy = Indicators.threshold.copy(upperBoundary = threshold.toDouble)
     )
 
   def belowThreshold(
@@ -96,7 +121,7 @@ object Signals {
       time = time,
       cp = cp,
       condition = Condition.ThresholdCrossing(threshold, value, Direction.Downward, Boundary.Lower),
-      triggeredBy = Indicators.trendChangeDetection
+      triggeredBy = Indicators.threshold.copy(lowerBoundary = threshold.toDouble)
     )
 
   def upperBandCrossing(
@@ -110,7 +135,7 @@ object Signals {
       time = time,
       cp = cp,
       condition = Condition.UpperBandCrossing(direction),
-      triggeredBy = Indicators.trendChangeDetection
+      triggeredBy = Indicators.bands
     )
 
   def lowerBandCrossing(
@@ -124,7 +149,7 @@ object Signals {
       time = time,
       cp = cp,
       condition = Condition.LowerBandCrossing(direction),
-      triggeredBy = Indicators.trendChangeDetection
+      triggeredBy = Indicators.bands
     )
 
   def priceCrossedLine(
@@ -139,6 +164,6 @@ object Signals {
       time = time,
       cp = cp,
       condition = Condition.PriceCrossedLine(role, direction),
-      triggeredBy = Indicators.trendChangeDetection
+      triggeredBy = Indicator.PriceLineCrossing(ValueSource.Close, role, ValueTransformation.SMA(20))
     )
 }

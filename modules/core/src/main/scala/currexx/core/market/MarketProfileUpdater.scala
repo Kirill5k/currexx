@@ -1,67 +1,37 @@
 package currexx.core.market
 
 import currexx.core.signal.Signal
-import currexx.domain.signal.{Boundary, Condition, Direction, ValueRole}
+import currexx.domain.signal.{Boundary, Condition, Direction}
 
 object MarketProfileUpdater:
   def update(profile: MarketProfile, signal: Signal): MarketProfile =
-    signal.condition match {
-      case Condition.ValueUpdated(role, value) =>
-        role match
-          case ValueRole.Momentum          => profile.copy(lastMomentumValue = Some(value))
-          case ValueRole.Volatility        => profile.copy(lastVolatilityValue = Some(value))
-          case ValueRole.Velocity          => profile.copy(lastVelocityValue = Some(value))
-          case ValueRole.ChannelMiddleBand => profile.copy(lastChannelMiddleBandValue = Some(value))
-          case ValueRole.TrendStrength     => profile.copy(lastTrendStrengthValue = Some(value))
-          case ValueRole.Price             => profile.copy(lastClosePrice = Some(value))
-
-      case Condition.TrendDirectionChange(_, to, _) =>
-        val currentTrendDirection = profile.trend.map(_.direction)
-        if (currentTrendDirection.isEmpty || !currentTrendDirection.contains(to)) {
-          profile.copy(trend = Some(TrendState(direction = to, confirmedAt = signal.time)))
-        } else profile
-
-      case Condition.LinesCrossing(direction) =>
-        val currentCrossoverDirection = profile.crossover.map(_.direction)
-        if (currentCrossoverDirection.isEmpty || !currentCrossoverDirection.contains(direction)) {
-          profile.copy(crossover = Some(CrossoverState(direction = direction, confirmedAt = signal.time)))
-        } else profile
-
-      case Condition.ThresholdCrossing(_, value, direction, boundary) =>
-        val newZone = (direction, boundary) match {
-          case (Direction.Upward, Boundary.Upper)   => MomentumZone.Overbought
-          case (Direction.Downward, Boundary.Lower) => MomentumZone.Oversold
-          case (Direction.Downward, Boundary.Upper) => MomentumZone.Neutral
-          case (Direction.Upward, Boundary.Lower)   => MomentumZone.Neutral
-          case _                                    => profile.momentum.map(_.zone).getOrElse(MomentumZone.Neutral)
-        }
-        val currentZone = profile.momentum.map(_.zone)
-        if (!currentZone.contains(newZone)) {
-          profile.copy(
-            momentum = Some(MomentumState(zone = newZone, confirmedAt = signal.time)),
-            lastMomentumValue = Some(value)
-          )
-        } else {
-          profile.copy(lastMomentumValue = Some(value))
-        }
-
-      case Condition.VolatilityRegimeChange(_, to) =>
-        val currentRegime = profile.volatility.map(_.regime)
-        if (!currentRegime.contains(to)) {
-          profile.copy(volatility = Some(VolatilityState(regime = to, confirmedAt = signal.time)))
-        } else profile
-
-      case Condition.UpperBandCrossing(direction) =>
-        profile.copy(lastBandCrossing = Some(BandCrossingState(Boundary.Upper, direction, signal.time)))
-
-      case Condition.LowerBandCrossing(direction) =>
-        profile.copy(lastBandCrossing = Some(BandCrossingState(Boundary.Lower, direction, signal.time)))
-
-      case Condition.PriceCrossedLine(role, direction) =>
-        profile.copy(lastPriceLineCrossing = Some(PriceLineCrossingState(role, direction, signal.time)))
-
-      case Condition.Composite(conditions) =>
-        conditions.foldLeft(profile) { (current, innerCondition) =>
-          update(current, signal.copy(condition = innerCondition))
-        }
+    signal.triggeredBy.resolvedId.fold(profile) { id =>
+      def put(reading: Reading): MarketProfile = profile.updated(id, reading)
+      signal.condition match
+        case Condition.ValueUpdated(_, value)         => put(Reading.Value(value))
+        case Condition.TrendDirectionChange(_, to, _) =>
+          if profile.trend(id).exists(_.direction == to) then profile
+          else put(Reading.Trend(to, signal.time))
+        case Condition.LinesCrossing(direction) =>
+          if profile.crossover(id).exists(_.direction == direction) then profile
+          else put(Reading.Crossing(direction, signal.time))
+        case Condition.ThresholdCrossing(_, _, direction, boundary) =>
+          val zone = (direction, boundary) match
+            case (Direction.Upward, Boundary.Upper)                                        => MomentumZone.Overbought
+            case (Direction.Downward, Boundary.Lower)                                      => MomentumZone.Oversold
+            case (Direction.Downward, Boundary.Upper) | (Direction.Upward, Boundary.Lower) => MomentumZone.Neutral
+            case _ => profile.momentum(id).fold(MomentumZone.Neutral)(_.zone)
+          if profile.momentum(id).exists(_.zone == zone) then profile
+          else put(Reading.Zone(zone, signal.time))
+        case Condition.VolatilityRegimeChange(_, to) =>
+          if profile.volatility(id).exists(_.regime == to) then profile
+          else put(Reading.Regime(to, signal.time))
+        case Condition.UpperBandCrossing(direction) =>
+          put(Reading.BandCrossing(Boundary.Upper, direction, signal.time))
+        case Condition.LowerBandCrossing(direction) =>
+          put(Reading.BandCrossing(Boundary.Lower, direction, signal.time))
+        case Condition.PriceCrossedLine(_, direction) =>
+          put(Reading.Crossing(direction, signal.time))
+        // Historical composites remain readable, but processing accepts attributed leaves only.
+        case _: Condition.Composite => profile
     }

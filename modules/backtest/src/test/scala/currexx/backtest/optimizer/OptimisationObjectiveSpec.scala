@@ -1,25 +1,26 @@
 package currexx.backtest.optimizer
 
-import currexx.domain.market.CandleCount
-import currexx.algorithms.{EvaluatedPopulation, EvaluationPhase, Fitness, ValidatedPopulation}
-import currexx.algorithms.operators.Validator
-import currexx.backtest.{MarketDataProvider, OrderStats, TestStrategy}
-import currexx.backtest.MarketDataProvider.Corpus
-import currexx.backtest.optimizer.ScoringFunction
-import currexx.backtest.optimizer.reporting.{FoldDiagnostics, RunDiagnostics}
-import currexx.core.signal.{Signal, SignalDetector}
-import currexx.domain.market.MarketTimeSeriesData
-import currexx.domain.signal.{Indicator, ValueRole, ValueSource, ValueTransformation}
-import currexx.domain.user.UserId
 import cats.effect.{IO, Ref}
 import cats.syntax.apply.*
 import cats.syntax.foldable.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
+import currexx.algorithms.operators.Validator
+import currexx.algorithms.{EvaluatedPopulation, EvaluationPhase, Fitness, ValidatedPopulation}
+import currexx.backtest.MarketDataProvider.Corpus
+import currexx.backtest.optimizer.ScoringFunction
+import currexx.backtest.optimizer.reporting.{FoldDiagnostics, RunDiagnostics}
+import currexx.backtest.{MarketDataProvider, OrderStats, TestStrategy}
+import currexx.core.signal.{Signal, SignalDetector}
+import currexx.core.trade.TradeStrategy
+import currexx.domain.market.CandleCount
+import currexx.domain.market.MarketTimeSeriesData
+import currexx.domain.signal.{Indicator, ValueRole, ValueSource, ValueTransformation}
+import currexx.domain.user.UserId
 import kirill5k.common.cats.test.IOWordSpec
 
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicInteger
 import scala.jdk.CollectionConverters.*
 
 class OptimisationObjectiveSpec extends IOWordSpec {
@@ -54,13 +55,13 @@ class OptimisationObjectiveSpec extends IOWordSpec {
     "use the configured candle count for search, validation and reporting replay" in {
       val sizes    = new ConcurrentLinkedQueue[Int]()
       val detector = new SignalDetector {
-        override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal] = {
+        override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): List[Signal] = {
           sizes.add(data.prices.size)
-          None
+          Nil
         }
       }
       val dataset   = MarketDataProvider.Dataset("eur-usd-1h-walk-forward-full.csv")
-      val candidate = strategy.copy(rules = currexx.core.trade.TradeStrategy(Nil, Nil))
+      val candidate = strategy.copy(rules = TradeStrategy(Nil, Nil))
       (for
         objective <- OptimisationObjective.make[IO](
           corpus = Corpus(List(List(dataset)), List(dataset)),
@@ -102,7 +103,7 @@ class OptimisationObjectiveSpec extends IOWordSpec {
     }
 
     "cache complete candidates and execute each candidate's rules" in {
-      val noTrades       = strategy.copy(rules = currexx.core.trade.TradeStrategy(Nil, Nil))
+      val noTrades       = strategy.copy(rules = TradeStrategy(Nil, Nil))
       val otherIndicator = noTrades.copy(indicator = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SMA(20)))
       val result         = for {
         diagnostics <- RunDiagnostics.make[IO]
@@ -341,9 +342,9 @@ class OptimisationObjectiveSpec extends IOWordSpec {
       val invalid     = strategy.copy(indicator = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SMA(20)))
       val signalCalls = new AtomicInteger(0)
       val detector    = new SignalDetector {
-        override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal] = {
+        override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): List[Signal] = {
           signalCalls.incrementAndGet()
-          None
+          Nil
         }
       }
 
@@ -496,9 +497,14 @@ class OptimisationObjectiveSpec extends IOWordSpec {
     }
 
     "prepare each baseline fold once and report the actual relative score while keeping validation absolute" in {
-      val challenger = strategy.copy(indicator = Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SMA(20)))
-      val mode       = SearchObjectiveConfig.BaselineRelative()
-      val quality    = new ScoringFunction {
+      val challenger = strategy.copy(indicator =
+        Indicator.compositeAnyOf(
+          Indicator.TrendChangeDetection(ValueSource.Close, ValueTransformation.SMA(20)),
+          strategy.indicator.leaves.filterNot(_.isInstanceOf[Indicator.TrendChangeDetection])*
+        )
+      )
+      val mode    = SearchObjectiveConfig.BaselineRelative()
+      val quality = new ScoringFunction {
         override def score(stats: List[OrderStats]): Double                               = 1.0
         override def violations(stats: List[OrderStats]): List[ScoringFunction.Violation] = Nil
       }

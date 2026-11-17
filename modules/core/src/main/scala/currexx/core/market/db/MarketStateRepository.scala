@@ -6,13 +6,16 @@ import cats.syntax.functor.*
 import cats.syntax.flatMap.*
 import com.mongodb.MongoWriteException
 import com.mongodb.client.model.ReturnDocument
-import currexx.domain.market.CurrencyPair
+import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.user.UserId
 import currexx.domain.errors.AppError
 import currexx.core.common.db.Repository
 import currexx.core.market.{MarketProfile, MarketState, PositionState}
 import kirill5k.common.cats.syntax.applicative.*
 import mongo4cats.circe.MongoJsonCodecs
+import mongo4cats.bson.syntax.*
+import mongo4cats.circe.given
+import io.circe.syntax.*
 import mongo4cats.models.collection.{FindOneAndUpdateOptions, IndexOptions, UpdateOptions}
 import mongo4cats.collection.MongoCollection
 import mongo4cats.operations.{Filter, Index, Update}
@@ -52,12 +55,18 @@ final private class LiveMarketStateRepository[F[_]](
       case Some(version) => Filter.eq(VersionField, version) && Filter.eq("createdAt", state.createdAt)
 
   override def save(state: MarketState): F[Boolean] =
+    val mirror                           = MarketProfile.legacyCompatible(state.sources)
+    def document(profile: MarketProfile) = MarketProfile.encode(profile, mirror).asJson.toBson.asJava
     collection
       .updateOne(
         userIdAndCurrencyPairEq(state.userId, state.currencyPair) && sameSnapshot(state),
         Update
-          .set("profile", state.profile)
-          .set("previousProfile", state.previousProfile)
+          .set("profile", document(state.profile))
+          .set("previousProfile", state.previousProfile.map(document))
+          .set("configRevision", state.configRevision)
+          .set("interval", state.interval)
+          .set("invalidated", state.invalidated.toList.map(_.value))
+          .set("sources", state.sources.asJson.toBson.asJava)
           .set("currentPosition", state.currentPosition)
           .set("lastCandleTime", state.lastCandleTime)
           .set("lastTimeStateCandle", state.lastTimeStateCandle)
@@ -110,6 +119,11 @@ object MarketStateRepository extends MongoJsonCodecs {
     db.getCollectionWithCodec[MarketStateEntity](Repository.Collection.MarketState)
       .flatTap(_.createIndex(indexByUidAndCp, IndexOptions().unique(true)))
       .flatTap(_.createIndex(indexByUid))
-      .map(_.withAddedCodec[CurrencyPair].withAddedCodec[MarketProfile].withAddedCodec[PositionState])
+      .map(
+        _.withAddedCodec[CurrencyPair]
+          .withAddedCodec[MarketProfile]
+          .withAddedCodec[PositionState]
+          .withAddedCodec[Interval]
+      )
       .map(coll => LiveMarketStateRepository[F](coll))
 }

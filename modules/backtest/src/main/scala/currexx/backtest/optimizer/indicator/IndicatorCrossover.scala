@@ -101,6 +101,7 @@ object IndicatorCrossover:
           (ind1, ind2) match
             case (i1, i2) if !sameShape(i1, i2) =>
               Left(new IllegalArgumentException(s"both parent indicators must be of the same shape: $i1 vs $i2"))
+            case (Indicator.Named(id, left), Indicator.Named(_, right)) => crossInd(left, right).map(Indicator.Named(id, _))
             case (Indicator.VolatilityRegimeDetection(atr1, vt1), Indicator.VolatilityRegimeDetection(atr2, vt2)) =>
               cross(vt1, vt2).map(vt => Indicator.VolatilityRegimeDetection(blend.int(atr1, atr2), vt))
             case (Indicator.ValueTracking(vr, vs, vt1), Indicator.ValueTracking(_, _, vt2)) =>
@@ -171,7 +172,10 @@ object IndicatorCrossover:
   /** Whether two indicators can be crossed, which is the same question as whether they have the same shape: a structural mismatch fails a
     * whole run, so a hall-of-fame seed has to be checked before it enters the population rather than after.
     */
-  def sameShape(a: Indicator, b: Indicator): Boolean = (a, b) match
+  def sameShape(a: Indicator, b: Indicator): Boolean = a.explicitId == b.explicitId && sameDefinitionShape(a, b)
+
+  private def sameDefinitionShape(a: Indicator, b: Indicator): Boolean = (a, b) match
+    case (Indicator.Named(_, left), Indicator.Named(_, right))      => sameShape(left, right)
     case (Indicator.Composite(is1, _), Indicator.Composite(is2, _)) =>
       is1.length == is2.length && is1.toList.zip(is2.toList).forall(sameShape)
     case (Indicator.TrendChangeDetection(_, t1), Indicator.TrendChangeDetection(_, t2))           => sameVtShape(t1, t2)

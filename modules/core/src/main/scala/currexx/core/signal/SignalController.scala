@@ -2,16 +2,13 @@ package currexx.core.signal
 
 import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
-import cats.syntax.functor.*
 import cats.effect.Async
 import currexx.core.auth.Authenticator
 import currexx.core.common.http.{Controller, TapirJson, TapirSchema}
 import currexx.domain.market.{CurrencyPair, Interval}
 import currexx.domain.signal.{Condition, Indicator}
-import kirill5k.common.cats.Clock
 import io.circe.Codec
 import org.http4s.HttpRoutes
-import sttp.model.StatusCode
 import sttp.tapir.*
 import sttp.tapir.server.http4s.Http4sServerInterpreter
 
@@ -20,27 +17,9 @@ import java.time.Instant
 final private class SignalController[F[_]](
     private val service: SignalService[F]
 )(using
-    F: Async[F],
-    clock: Clock[F]
+    F: Async[F]
 ) extends Controller[F] {
   import SignalController.*
-
-  private def submitSignal(using auth: Authenticator[F]) =
-    submitSignalEndpoint.withAuthenticatedSession
-      .serverLogic { session => req =>
-        for
-          time <- clock.now
-          signal = Signal(
-            userId = session.userId,
-            interval = req.interval,
-            currencyPair = req.currencyPair,
-            condition = req.condition,
-            triggeredBy = req.triggeredBy,
-            time = time
-          )
-          res <- service.submit(signal).voidResponse
-        yield res
-      }
 
   private def getAllSignals(using auth: Authenticator[F]) =
     getAllSignalsEndpoint.withAuthenticatedSession
@@ -53,21 +32,11 @@ final private class SignalController[F[_]](
 
   def routes(using authenticator: Authenticator[F]): HttpRoutes[F] =
     Http4sServerInterpreter[F](Controller.serverOptions).toRoutes(
-      List(
-        submitSignal,
-        getAllSignals
-      )
+      List(getAllSignals)
     )
 }
 
 object SignalController extends TapirSchema with TapirJson {
-
-  final case class SubmitSignalRequest(
-      interval: Interval,
-      currencyPair: CurrencyPair,
-      condition: Condition,
-      triggeredBy: Indicator
-  ) derives Codec.AsObject
 
   final case class SignalView(
       interval: Interval,
@@ -89,18 +58,12 @@ object SignalController extends TapirSchema with TapirJson {
 
   private val basePath = "signals"
 
-  val submitSignalEndpoint = Controller.securedEndpoint.post
-    .in(basePath)
-    .in(jsonBody[SubmitSignalRequest])
-    .out(statusCode(StatusCode.NoContent))
-    .description("Submit signal triggered by indicator")
-
   val getAllSignalsEndpoint = Controller.securedEndpoint.get
     .in(basePath)
     .in(Controller.searchParams)
     .out(jsonBody[List[SignalView]])
-    .description("Retrieve all submitted signals")
+    .description("Retrieve stored signals")
 
-  def make[F[_]: Async: Clock](service: SignalService[F]): F[Controller[F]] =
+  def make[F[_]: Async](service: SignalService[F]): F[Controller[F]] =
     SignalController[F](service).pure[F]
 }

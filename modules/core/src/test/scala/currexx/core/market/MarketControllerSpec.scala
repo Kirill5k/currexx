@@ -77,21 +77,11 @@ class MarketControllerSpec extends HttpRoutesWordSpec {
              |      "openPrice" : null
              |    },
              |    "profile" : {
-             |      "trend" : {
-             |        "direction" : "upward",
-             |        "confirmedAt" : "${Markets.ts}"
-             |      },
-             |      "crossover" : null,
-             |      "momentum" : null,
-             |      "lastMomentumValue" : null,
-             |      "volatility" : null,
-             |      "lastVolatilityValue" : null,
-             |      "lastVelocityValue": null,
-             |      "lastBandCrossing" : null,
-             |      "lastChannelMiddleBandValue" : null,
-             |      "lastPriceLineCrossing" : null,
-             |      "lastTrendStrengthValue" : null,
-             |      "lastClosePrice" : null
+             |      "readings": {
+             |        "trend": {
+             |          "kind": "trend", "direction": "upward", "confirmedAt": "${Markets.ts}"
+             |        }
+             |      }
              |    },
              |    "lastUpdatedAt": "${Markets.ts}",
              |    "createdAt": "${Markets.ts}"

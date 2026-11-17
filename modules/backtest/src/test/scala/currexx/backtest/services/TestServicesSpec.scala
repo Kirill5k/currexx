@@ -23,7 +23,7 @@ class TestServicesSpec extends IOWordSpec {
   private val risk      = RiskSettings(transactionCosts = TransactionCosts(spreadPips = BigDecimal(0), slippagePipsPerSide = BigDecimal(0)))
 
   private val noSignals = new SignalDetector {
-    override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal] = None
+    override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): List[Signal] = Nil
   }
 
   private def bar(time: String, open: Double = 1.0, close: Double = 1.0, interval: Interval = Interval.M1): MarketTimeSeriesData =
@@ -90,8 +90,8 @@ class TestServicesSpec extends IOWordSpec {
       val losing   = bar("2026-01-15T11:00:00Z", close = 0.9, interval = Interval.H1)
       val recovery = bar("2026-01-15T12:00:00Z", close = 1.1, interval = Interval.H1)
       val detector = new SignalDetector {
-        override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal] =
-          if (data.latestTime == prime.latestTime) SignalDetector.pure.detect(uid, data)(indicator) else None
+        override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): List[Signal] =
+          if (data.latestTime == prime.latestTime) SignalDetector.pure.detect(uid, data)(indicator) else Nil
       }
 
       val result = for

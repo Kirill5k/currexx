@@ -1,26 +1,11 @@
 package currexx.backtest.services
 
 import cats.Monad
-import cats.effect.{Ref, Temporal}
-import cats.syntax.flatMap.*
-import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.SearchParams
-import currexx.core.settings.SignalSettings
-import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
-import currexx.core.signal.{Signal, SignalService}
+import currexx.core.signal.db.SignalRepository
+import currexx.core.signal.Signal
 import currexx.domain.user.UserId
-import kirill5k.common.cats.Clock
-import org.typelevel.log4cats.Logger
 
 final private class TestSignalRepository[F[_]](using F: Monad[F]) extends SignalRepository[F]:
   override def saveAll(signals: List[Signal]): F[Unit]                   = F.unit
   override def getAll(userId: UserId, sp: SearchParams): F[List[Signal]] = F.pure(Nil)
-
-final private class TestSignalSettingsRepository[F[_]](
-    private val settings: Ref[F, SignalSettings]
-) extends SignalSettingsRepository[F]:
-  override def get(uid: UserId): F[SignalSettings] = settings.get
-
-object TestSignalService:
-  def make[F[_]: {Temporal, Clock, Logger}](initialSettings: SignalSettings, dispatcher: ActionDispatcher[F]): F[SignalService[F]] =
-    Ref.of(initialSettings).flatMap(s => SignalService.make(TestSignalRepository[F], TestSignalSettingsRepository[F](s), dispatcher))

@@ -95,6 +95,7 @@ The `ActionDispatcher` queues actions and the `ActionProcessor` handles them asy
 
 Indicators define what to detect in market data: (Defined in `modules/domain/src/main/scala/currexx/domain/signal/Indicator.scala`)
 - **Composite** - Combine multiple indicators with All/Any logic
+- **Named** - Wrap a leaf indicator with an explicit `IndicatorId` when multiple indicators would share a derived default id
 - **TrendChangeDetection** - Detect trend reversals
 - **ThresholdCrossing** - Value crossing upper/lower boundaries (e.g., RSI overbought/oversold)
 - **LinesCrossing** - Two moving averages crossing (e.g., fast EMA crossing slow EMA)
@@ -127,6 +128,8 @@ Strategies are defined in `TradeStrategy` (modules/core/src/main/scala/currexx/c
 - **Volatility**: VolatilityIs, PreviousVolatilityIs
 - **Velocity**: VelocityIs, VelocityIsBelow, VelocityCrossedLevel
 - **Value**: ValueIs (compare tracked values)
+
+Rule conditions can select an indicator with an optional `of` reference. Without it, they use the derived default id for that condition. `PriceMovedAgainstEntry` has separate `priceOf` and `atrOf` references. `StrategyCheck` validates ids, reading kinds and tracker roles against the configured indicators.
 
 ## Strategy Optimization
 

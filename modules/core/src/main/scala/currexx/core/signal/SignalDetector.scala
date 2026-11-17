@@ -1,6 +1,5 @@
 package currexx.core.signal
 
-import cats.data.NonEmptyList
 import com.github.benmanes.caffeine.cache.{Cache, Caffeine}
 import currexx.calculations.Statistics
 import currexx.domain.market.{CurrencyPair, Interval, MarketTimeSeriesData}
@@ -10,7 +9,7 @@ import java.time.Instant
 import currexx.domain.user.UserId
 
 trait SignalDetector:
-  def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal]
+  def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): List[Signal]
 
 final private class PureSignalDetector extends SignalDetector {
   private def makeSignal(uid: UserId, window: NumericalWindow, indicator: Indicator)(cond: Condition): Signal =
@@ -24,20 +23,21 @@ final private class PureSignalDetector extends SignalDetector {
       time = data.latestTime
     )
 
-  override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal] =
+  override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): List[Signal] =
     detect(uid, new NumericalWindow(data))(indicator)
 
-  private def detect(uid: UserId, window: NumericalWindow)(indicator: Indicator): Option[Signal] =
+  private def detect(uid: UserId, window: NumericalWindow)(indicator: Indicator): List[Signal] =
     indicator match
-      case vt: Indicator.ValueTracking              => detectValue(uid, window, vt)
-      case tcd: Indicator.TrendChangeDetection      => detectTrendChange(uid, window, tcd)
-      case tc: Indicator.ThresholdCrossing          => detectThresholdCrossing(uid, window, tc)
-      case lc: Indicator.LinesCrossing              => detectLinesCrossing(uid, window, lc)
-      case kc: Indicator.KeltnerChannel             => detectBarrierCrossing(uid, window, kc)
-      case vrd: Indicator.VolatilityRegimeDetection => detectVolatilityRegimeChange(uid, window, vrd)
+      case named: Indicator.Named                   => detect(uid, window)(named.indicator).map(_.copy(triggeredBy = named))
+      case vt: Indicator.ValueTracking              => detectValue(uid, window, vt).toList
+      case tcd: Indicator.TrendChangeDetection      => detectTrendChange(uid, window, tcd).toList
+      case tc: Indicator.ThresholdCrossing          => detectThresholdCrossing(uid, window, tc).toList
+      case lc: Indicator.LinesCrossing              => detectLinesCrossing(uid, window, lc).toList
+      case kc: Indicator.KeltnerChannel             => detectBarrierCrossing(uid, window, kc).toList
+      case vrd: Indicator.VolatilityRegimeDetection => detectVolatilityRegimeChange(uid, window, vrd).toList
       case c: Indicator.Composite                   => detectComposite(uid, window, c)
-      case plc: Indicator.PriceLineCrossing         => detectPriceLineCrossing(uid, window, plc)
-      case bb: Indicator.BollingerBands             => detectBollingerBandsCrossing(uid, window, bb)
+      case plc: Indicator.PriceLineCrossing         => detectPriceLineCrossing(uid, window, plc).toList
+      case bb: Indicator.BollingerBands             => detectBollingerBandsCrossing(uid, window, bb).toList
 
   private def detectThresholdCrossing(
       uid: UserId,
@@ -109,19 +109,12 @@ final private class PureSignalDetector extends SignalDetector {
     }
   }
 
-  private def detectComposite(
-      uid: UserId,
-      window: NumericalWindow,
-      composite: Indicator.Composite
-  ): Option[Signal] =
-    val childSignals   = composite.indicators.toList.flatMap(detect(uid, window))
-    val isConditionMet = composite.combinator match
-      case CombinationLogic.All => childSignals.size == composite.indicators.size
-      case CombinationLogic.Any => childSignals.nonEmpty
-    Option
-      .when(isConditionMet) {
-        makeSignal(uid, window, composite)(Condition.Composite(NonEmptyList.fromListUnsafe(childSignals.map(_.condition))))
-      }
+  private def detectComposite(uid: UserId, window: NumericalWindow, composite: Indicator.Composite): List[Signal] =
+    val children = composite.indicators.toList.map(detect(uid, window))
+    val success  = composite.combinator match
+      case CombinationLogic.All => children.forall(_.nonEmpty)
+      case CombinationLogic.Any => children.exists(_.nonEmpty)
+    if success then children.flatten else Nil
 
   private def detectPriceLineCrossing(
       uid: UserId,
@@ -171,11 +164,11 @@ final private case class CacheKey(
 )
 
 final private class CachedSignalDetector(
-    private val cache: Cache[CacheKey, Option[Signal]]
+    private val cache: Cache[CacheKey, List[Signal]]
 ) extends SignalDetector {
   private val detector = new PureSignalDetector()
 
-  override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): Option[Signal] =
+  override def detect(uid: UserId, data: MarketTimeSeriesData)(indicator: Indicator): List[Signal] =
     val key = CacheKey(data.currencyPair, data.interval, data.latestTime, data.prices.size, indicator)
     cache.get(key, _ => detector.detect(uid, data)(indicator)).map(_.copy(userId = uid))
 }
@@ -197,5 +190,5 @@ object SignalDetector:
     val cache      = Caffeine
       .newBuilder()
       .maximumSize(maxEntries)
-      .build[CacheKey, Option[Signal]]()
+      .build[CacheKey, List[Signal]]()
     CachedSignalDetector(cache)

@@ -9,6 +9,7 @@ import mongo4cats.database.MongoDatabase
 
 final class Settings[F[_]] private (
     val service: SettingsService[F],
+    val runtime: StrategyRuntime[F],
     val controller: Controller[F]
 )
 
@@ -20,4 +21,4 @@ object Settings:
       settingsRepo <- SettingsRepository.make[F](database)
       svc          <- SettingsService.make[F](settingsRepo)
       ctrl         <- SettingsController.make[F](svc)
-    yield Settings[F](svc, ctrl)
+    yield Settings[F](svc, StrategyRuntime.make(settingsRepo), ctrl)

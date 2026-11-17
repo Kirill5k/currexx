@@ -2,7 +2,7 @@ package currexx.backtest.optimizer.indicator
 
 import cats.data.NonEmptyList
 import currexx.backtest.TestStrategy
-import currexx.backtest.optimizer.strategy.RuleInputs
+import currexx.core.trade.StrategyCheck
 import currexx.domain.signal.{CombinationLogic, Indicator, ValueRole, ValueSource, ValueTransformation as VT}
 
 /** A round's searchable leaves, with fixed indicators retained in the evaluated strategy.
@@ -100,19 +100,23 @@ object IndicatorSearchSpace {
     if (unknown.nonEmpty)
       Left(new IllegalArgumentException(s"Unknown fixed indicators: ${unknown.toList.map(_.toString).sorted.mkString(", ")}"))
     else {
-      val readRoles =
-        (strategy.rules.openRules ++ strategy.rules.closeRules).flatMap(rule => RuleInputs.trackedRoles(rule.conditions)).toSet
-      val automatic: Set[Indicator] = allNodes.collect {
-        case (_, tracker @ Indicator.ValueTracking(ValueRole.Price, ValueSource.Close, VT.SMA(1))) => tracker
-        case (_, tracker @ Indicator.ValueTracking(role, _, _)) if !readRoles.contains(role)       => tracker
-      }.toSet
+      val readIds =
+        (strategy.rules.openRules ++ strategy.rules.closeRules).flatMap(rule => StrategyCheck.inputs(rule.conditions).map(_.id)).toSet
+      def isAutomaticallyFixed(leaf: Indicator): Boolean = leaf.definition match
+        case Indicator.ValueTracking(ValueRole.Price, ValueSource.Close, VT.SMA(1)) => true
+        case _: Indicator.ValueTracking                                             => !leaf.resolvedId.exists(readIds.contains)
+        case _                                                                      => false
+      val automatic  = allNodes.collect { case (_, leaf) if isAutomaticallyFixed(leaf) => leaf }.toSet
       val fixed      = fixedIndicators ++ automatic
       val fixedPaths = allNodes.collect { case (path, indicator) if fixed.contains(indicator) => path }.toSet
       Right(new IndicatorSearchSpace(strategy.indicator, fixed, fixedPaths))
     }
   }
 
-  private def sameSchema(a: Indicator, b: Indicator): Boolean = (a, b) match
+  private def sameSchema(a: Indicator, b: Indicator): Boolean = a.explicitId == b.explicitId && sameDefinitionSchema(a, b)
+
+  private def sameDefinitionSchema(a: Indicator, b: Indicator): Boolean = (a, b) match
+    case (Indicator.Named(_, left), Indicator.Named(_, right))      => sameSchema(left, right)
     case (Indicator.Composite(as, ac), Indicator.Composite(bs, bc)) =>
       ac == bc && as.length == bs.length && as.toList.zip(bs.toList).forall(sameSchema)
     case (Indicator.TrendChangeDetection(as, at), Indicator.TrendChangeDetection(bs, bt))       => as == bs && sameTransformation(at, bt)

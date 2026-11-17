@@ -31,9 +31,9 @@ final private class LiveSettingsRepository[F[_]](
       .count(userIdEq(gs.userId))
       .flatMap {
         case 0 =>
-          collection.insertOne(GlobalSettingsEntity.from(gs.userId, gs.signal, gs.trade, gs.note)).void
+          collection.insertOne(GlobalSettingsEntity.from(gs.userId, gs.signal, gs.trade, gs.note).copy(revision = Some(1L))).void
         case _ =>
-          val settingsUpdate = Update.set("signal", gs.signal).set("trade", gs.trade).set("note", gs.note)
+          val settingsUpdate = Update.set("signal", gs.signal).set("trade", gs.trade).set("note", gs.note).inc("revision", 1)
           collection.updateOne(userIdEq(gs.userId), settingsUpdate).void
       }
 

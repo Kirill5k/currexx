@@ -32,6 +32,19 @@ class SettingsRepositorySpec extends MongoSpec {
     }
 
     "update" should {
+      "increment the revision after creating an empty account" in withEmbeddedMongoDb { db =>
+        (for
+          repo   <- SettingsRepository.make[IO](db)
+          _      <- repo.createFor(Users.uid)
+          before <- repo.get(Users.uid)
+          _      <- repo.update(Settings.global)
+          after  <- repo.get(Users.uid)
+        yield (before, after)).map { (before, after) =>
+          before.revision mustBe 0L
+          after mustBe Settings.global.copy(revision = 1L)
+        }
+      }
+
       "create new entry if settings do not exist" in
         withEmbeddedMongoDb { db =>
           val result = for
@@ -40,7 +53,7 @@ class SettingsRepositorySpec extends MongoSpec {
             res  <- repo.get(Users.uid)
           yield res
 
-          result.map(_ mustBe Settings.global)
+          result.map(_ mustBe Settings.global.copy(revision = 1L))
         }
 
       "update existing settings" in
@@ -52,7 +65,7 @@ class SettingsRepositorySpec extends MongoSpec {
             res  <- repo.get(Users.uid)
           yield res
 
-          result.map(_ mustBe Settings.global.copy(trade = None, note = Some("update")))
+          result.map(_ mustBe Settings.global.copy(trade = None, note = Some("update"), revision = 2L))
         }
     }
 

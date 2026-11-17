@@ -6,6 +6,7 @@ import currexx.core.trade.{Rule, TradeStrategy}
 import currexx.domain.signal.ValueRole
 import kirill5k.common.cats.test.IOWordSpec
 
+import scala.collection.immutable.ListMap
 import scala.concurrent.duration.*
 import scala.util.Random
 
@@ -53,9 +54,9 @@ class TradeStrategySearchOperatorsSpec extends IOWordSpec {
             } else {
               local.parameterCount mustBe 3
               leaves.foreach { values =>
-                val ages  = values.collect { case C.TrendActiveFor(value) => value }
+                val ages  = values.collect { case C.TrendActiveFor(value, _) => value }
                 val times = values.collect { case C.PositionOpenFor(value) => value }
-                val stops = values.collect { case C.PriceMovedAgainstEntry(value) => value }
+                val stops = values.collect { case C.PriceMovedAgainstEntry(value, _, _) => value }
                 List(ages.size, times.size, stops.size) mustBe List(2, 2, 2)
                 List(ages.distinct.size, times.distinct.size, stops.distinct.size) mustBe List(1, 1, 1)
               }
@@ -254,7 +255,7 @@ class TradeStrategySearchOperatorsSpec extends IOWordSpec {
       def run(seed: Long, reverse: Boolean): IO[List[TradeStrategy]] =
         given Random = Random(seed)
         val ordered  = linkedBounds.copy(
-          durations = scala.collection.immutable.ListMap.from(
+          durations = ListMap.from(
             if (reverse) linkedBounds.durations.toList.reverse else linkedBounds.durations.toList
           )
         )

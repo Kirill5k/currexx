@@ -1,58 +1,55 @@
 package currexx.core.signal
 
-import cats.syntax.applicative.*
 import cats.effect.Concurrent
-import cats.syntax.functor.*
+import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
-import currexx.domain.user.UserId
+import cats.syntax.functor.*
 import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
-import currexx.core.signal.db.{SignalRepository, SignalSettingsRepository}
-import currexx.domain.market.{CurrencyPair, MarketTimeSeriesData}
-import currexx.domain.signal.Indicator
+import currexx.core.settings.StrategyRuntime
+import currexx.core.signal.db.SignalRepository
+import currexx.domain.errors.AppError
+import currexx.domain.market.MarketTimeSeriesData
+import currexx.domain.user.UserId
 import kirill5k.common.cats.Clock
 import org.typelevel.log4cats.Logger
 
 trait SignalService[F[_]]:
-  def submit(signal: Signal): F[Unit]
   def getAll(uid: UserId, sp: SearchParams): F[List[Signal]]
   def processMarketData(uid: UserId, data: MarketTimeSeriesData, detector: SignalDetector = SignalDetector.pure): F[Unit]
 
 final private class LiveSignalService[F[_]](
     private val signalRepo: SignalRepository[F],
-    private val settingsRepo: SignalSettingsRepository[F],
+    private val runtime: StrategyRuntime[F],
     private val dispatcher: ActionDispatcher[F]
-)(using
-    F: Concurrent[F],
-    clock: Clock[F],
-    logger: Logger[F]
-) extends SignalService[F] {
-  override def getAll(uid: UserId, sp: SearchParams): F[List[Signal]] = signalRepo.getAll(uid, sp)
-  override def submit(signal: Signal): F[Unit]                        =
-    signalRepo.saveAll(List(signal)) >> dispatcher.dispatch(Action.ProcessManualSignal(signal))
+)(using F: Concurrent[F], clock: Clock[F], logger: Logger[F])
+    extends SignalService[F]:
+  def getAll(uid: UserId, sp: SearchParams): F[List[Signal]] = signalRepo.getAll(uid, sp)
 
-  override def processMarketData(uid: UserId, data: MarketTimeSeriesData, detector: SignalDetector): F[Unit] =
-    clock
-      .durationBetweenNowAnd(data.latestTime)
-      .flatMap { timeGap =>
-        if (timeGap < data.interval.toDuration * 2)
-          settingsRepo
-            .get(uid)
-            .map(_.indicators.flatMap(detector.detect(uid, data)))
-            .flatMap(signals => F.whenA(signals.nonEmpty)(saveAndDispatchAction(uid, data.currencyPair, signals)))
-        else
-          logger.info(s"skipping market data processing because of the time gap (time=${data.latestTime}, gap=${timeGap.toHours}h)")
-      }
-
-  private def saveAndDispatchAction(uid: UserId, cp: CurrencyPair, signals: List[Signal]) =
-    signalRepo.saveAll(signals) >>
-      dispatcher.dispatch(Action.ProcessSignals(uid, cp, signals))
-}
+  def processMarketData(uid: UserId, data: MarketTimeSeriesData, detector: SignalDetector): F[Unit] =
+    for
+      config   <- runtime.load(uid)
+      settings <- F.fromOption(config.signal, AppError.NotSetup("Signal"))
+      gap      <- clock.durationBetweenNowAnd(data.latestTime)
+      fresh   = gap < data.interval.toDuration * 2
+      signals = if fresh then settings.indicators.flatMap(detector.detect(uid, data)) else Nil
+      _ <- F.unlessA(fresh)(logger.info(s"skipping signal detection for stale candle ${data.latestTime}"))
+      batch = SignalBatch(
+        interval = data.interval,
+        revision = config.revision,
+        candleTime = data.latestTime,
+        closureGap = SignalBatch.closureGap(data),
+        sources = config.sources,
+        signals = signals
+      )
+      _ <- F.whenA(signals.nonEmpty)(signalRepo.saveAll(signals))
+      _ <- dispatcher.dispatch(Action.ProcessSignals(uid, data.currencyPair, batch))
+    yield ()
 
 object SignalService:
   def make[F[_]: {Concurrent, Clock, Logger}](
       signalRepo: SignalRepository[F],
-      settingsRepo: SignalSettingsRepository[F],
+      runtime: StrategyRuntime[F],
       dispatcher: ActionDispatcher[F]
   ): F[SignalService[F]] =
-    LiveSignalService[F](signalRepo, settingsRepo, dispatcher).pure[F]
+    LiveSignalService(signalRepo, runtime, dispatcher).pure[F]

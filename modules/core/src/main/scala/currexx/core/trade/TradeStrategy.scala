@@ -4,9 +4,9 @@ import currexx.core.market.{MarketProfile, MarketState, MomentumZone}
 import currexx.core.trade
 import currexx.domain.JsonCodecs
 import currexx.domain.market.TradeOrder
-import currexx.domain.signal.{Boundary, Direction, ValueRole, VolatilityRegime}
+import currexx.domain.signal.{Boundary, Direction, IndicatorId, ValueRole, VolatilityRegime}
 import currexx.domain.types.EnumType
-import io.circe.Codec
+import io.circe.{Codec, Decoder, Encoder}
 import io.circe.derivation.{Configuration, ConfiguredCodec}
 import kirill5k.common.syntax.time.*
 
@@ -46,38 +46,47 @@ object Rule extends JsonCodecs {
   enum Operator:
     case GreaterThan, LessThan, EqualTo
 
-  enum Condition derives ConfiguredCodec:
+  enum Condition:
     case AllOf(conditions: List[Condition])
     case AnyOf(conditions: List[Condition])
     case Not(condition: Condition)
-    case TrendChangedTo(direction: Direction)
-    case TrendIs(direction: Direction)
-    case TrendActiveFor(duration: FiniteDuration)
-    case CrossoverOccurred(direction: Direction)
-    case MomentumEntered(zone: MomentumZone)
-    case MomentumIsIn(zone: MomentumZone)
-    case MomentumIs(direction: Direction)
-    case PreviousVolatilityIs(regime: VolatilityRegime)
-    case VolatilityIs(regime: VolatilityRegime)
-    case VelocityIs(direction: Direction)
-    case VelocityCrossedLevel(level: Double, direction: Direction)
-    case VelocityIsBelow(threshold: Double)
+    case TrendChangedTo(direction: Direction, of: Option[IndicatorId] = None)
+    case TrendIs(direction: Direction, of: Option[IndicatorId] = None)
+    case TrendActiveFor(duration: FiniteDuration, of: Option[IndicatorId] = None)
+    case CrossoverOccurred(direction: Direction, of: Option[IndicatorId] = None)
+    case MomentumEntered(zone: MomentumZone, of: Option[IndicatorId] = None)
+    case MomentumIsIn(zone: MomentumZone, of: Option[IndicatorId] = None)
+    case MomentumIs(direction: Direction, of: Option[IndicatorId] = None)
+    case PreviousVolatilityIs(regime: VolatilityRegime, of: Option[IndicatorId] = None)
+    case VolatilityIs(regime: VolatilityRegime, of: Option[IndicatorId] = None)
+    case VelocityIs(direction: Direction, of: Option[IndicatorId] = None)
+    case VelocityCrossedLevel(level: Double, direction: Direction, of: Option[IndicatorId] = None)
+    case VelocityIsBelow(threshold: Double, of: Option[IndicatorId] = None)
     case PositionIs(position: TradeOrder.Position)
     case PositionOpenFor(duration: FiniteDuration)
     case NoPosition
-    case UpperBandCrossed(direction: Direction)
-    case LowerBandCrossed(direction: Direction)
-    case PriceCrossedLine(lineRole: ValueRole, direction: Direction)
-    case ValueIs(role: ValueRole, operator: Operator, level: Double)
+    case UpperBandCrossed(direction: Direction, of: Option[IndicatorId] = None)
+    case LowerBandCrossed(direction: Direction, of: Option[IndicatorId] = None)
+    case PriceCrossedLine(lineRole: ValueRole, direction: Direction, of: Option[IndicatorId] = None)
+    case ValueIs(role: ValueRole, operator: Operator, level: Double, of: Option[IndicatorId] = None)
     // Price-distance stop: true when price has moved at least `nAtr` * ATR against the open
-    // position. Requires the profile to track a Price value (lastClosePrice) and a Volatility
-    // value (lastVolatilityValue = ATR), and the position to carry its entry price (openPrice).
-    case PriceMovedAgainstEntry(nAtr: Double)
+    // position. Requires raw-close and ATR readings, and the position to carry its entry price (openPrice).
+    case PriceMovedAgainstEntry(nAtr: Double, priceOf: Option[IndicatorId] = None, atrOf: Option[IndicatorId] = None)
 
   object Condition:
     given Configuration = Configuration.default
       .withDiscriminator("kind")
       .withKebabCaseConstructorNames
+
+    private lazy val derivedCodec: Codec.AsObject[Condition] = ConfiguredCodec.derived[Condition]
+    given Codec.AsObject[Condition]                          = Codec.AsObject.from(
+      Decoder.instance(c => derivedCodec(c)),
+      Encoder.AsObject.instance(c =>
+        derivedCodec.encodeObject(c).filter { case (key, value) =>
+          !Set("of", "priceOf", "atrOf").contains(key) || !value.isNull
+        }
+      )
+    )
 
     val trendIsUpward: Condition             = Condition.TrendIs(Direction.Upward)
     val trendIsDownward: Condition           = Condition.TrendIs(Direction.Downward)
@@ -101,34 +110,46 @@ object Rule extends JsonCodecs {
       state: MarketState,
       previousProfile: MarketProfile
   ): Option[TradeAction] =
-    rules.collectFirst {
-      case rule if isSatisfied(rule.conditions, state, previousProfile) => rule.action
-    }
+    if state.invalidated.isEmpty then
+      rules.collectFirst { case rule if isSatisfied(rule.conditions, state, previousProfile) => rule.action }
+    else rules.collectFirst { case rule if evaluate(rule.conditions, state, previousProfile).contains(true) => rule.action }
 
-  private def isSatisfied(
+  private def evaluate(
       condition: Rule.Condition,
       state: MarketState,
       previousProfile: MarketProfile
-  ): Boolean = {
+  ): Option[Boolean] =
+    condition match
+      case Condition.AllOf(cs) => combine(cs.iterator.map(evaluate(_, state, previousProfile)), decisive = false)
+      case Condition.AnyOf(cs) => combine(cs.iterator.map(evaluate(_, state, previousProfile)), decisive = true)
+      case Condition.Not(c)    => evaluate(c, state, previousProfile).map(!_)
+      case leaf                => Option.unless(unavailable(leaf, state))(isSatisfied(leaf, state, previousProfile))
+
+  @scala.annotation.tailrec
+  private def combine(values: Iterator[Option[Boolean]], decisive: Boolean, unknown: Boolean = false): Option[Boolean] =
+    if !values.hasNext then Option.unless(unknown)(!decisive)
+    else
+      values.next() match
+        case Some(value) if value == decisive => Some(decisive)
+        case value                            => combine(values, decisive, unknown || value.isEmpty)
+
+  private def unavailable(condition: Condition, state: MarketState): Boolean =
+    val noPositionStop = condition.isInstanceOf[Condition.PriceMovedAgainstEntry] && state.currentPosition.isEmpty
+    !noPositionStop && StrategyCheck.inputs(condition).exists { input =>
+      state.invalidated.contains(input.id) && (input.timing match
+        case StrategyCheck.Timing.State   => !state.profile.readings.contains(input.id)
+        case StrategyCheck.Timing.History => true
+        case StrategyCheck.Timing.Event   => false)
+    }
+
+  private def isSatisfied(condition: Condition, state: MarketState, previousProfile: MarketProfile): Boolean = {
     val currentProfile = state.profile
     condition match {
-      case Condition.AllOf(conditions) =>
-        conditions.forall(c => isSatisfied(c, state, previousProfile))
-
-      case Condition.AnyOf(conditions) =>
-        conditions.exists(c => isSatisfied(c, state, previousProfile))
-
-      case Condition.Not(c) =>
-        !isSatisfied(c, state, previousProfile)
-
-      case Rule.Condition.ValueIs(role, operator, level) =>
-        val valueToTest = role match
-          case ValueRole.Momentum          => currentProfile.lastMomentumValue
-          case ValueRole.Volatility        => currentProfile.lastVolatilityValue
-          case ValueRole.Velocity          => currentProfile.lastVelocityValue
-          case ValueRole.ChannelMiddleBand => currentProfile.lastChannelMiddleBandValue
-          case ValueRole.TrendStrength     => currentProfile.lastTrendStrengthValue
-          case ValueRole.Price             => currentProfile.lastClosePrice
+      case Condition.AllOf(cs)                               => cs.forall(isSatisfied(_, state, previousProfile))
+      case Condition.AnyOf(cs)                               => cs.exists(isSatisfied(_, state, previousProfile))
+      case Condition.Not(c)                                  => !isSatisfied(c, state, previousProfile)
+      case Rule.Condition.ValueIs(role, operator, level, of) =>
+        val valueToTest = currentProfile.number(of.getOrElse(IndicatorId.forValue(role)))
         valueToTest.exists { value =>
           val bdLevel = BigDecimal.valueOf(level)
           operator match
@@ -137,36 +158,43 @@ object Rule extends JsonCodecs {
             case Operator.EqualTo     => value == bdLevel
         }
 
-      case Condition.TrendChangedTo(direction) =>
-        val currentDirection  = currentProfile.trend.map(_.direction)
-        val previousDirection = previousProfile.trend.map(_.direction)
+      case Condition.TrendChangedTo(direction, of) =>
+        val id                = of.getOrElse(IndicatorId.Trend)
+        val currentDirection  = currentProfile.trend(id).map(_.direction)
+        val previousDirection = previousProfile.trend(id).map(_.direction)
         currentDirection.contains(direction) && previousDirection != currentDirection
 
-      case Condition.TrendIs(direction) =>
-        currentProfile.trend.exists(_.direction == direction)
+      case Condition.TrendIs(direction, of) =>
+        currentProfile.trend(of.getOrElse(IndicatorId.Trend)).exists(_.direction == direction)
 
-      case Condition.TrendActiveFor(duration) =>
-        currentProfile.trend.exists { trendState =>
+      case Condition.TrendActiveFor(duration, of) =>
+        currentProfile.trend(of.getOrElse(IndicatorId.Trend)).exists { trendState =>
           val trendAge = trendState.confirmedAt.durationBetween(state.lastUpdatedAt)
           trendAge.toNanos >= duration.toNanos
         }
 
-      case Condition.CrossoverOccurred(direction) =>
-        val currentCrossover  = currentProfile.crossover
-        val previousCrossover = previousProfile.crossover
+      case Condition.CrossoverOccurred(direction, of) =>
+        val id                = of.getOrElse(IndicatorId.Crossover)
+        val currentCrossover  = currentProfile.crossover(id)
+        val previousCrossover = previousProfile.crossover(id)
         currentCrossover.exists(_.direction == direction) && currentCrossover != previousCrossover
 
-      case Condition.MomentumEntered(zone) =>
-        val currentZone  = currentProfile.momentum.map(_.zone)
-        val previousZone = previousProfile.momentum.map(_.zone)
+      case Condition.MomentumEntered(zone, of) =>
+        val id           = of.getOrElse(IndicatorId.MomentumZone)
+        val currentZone  = currentProfile.momentum(id).map(_.zone)
+        val previousZone = previousProfile.momentum(id).map(_.zone)
         // True if momentum is in the specified zone now, and was in a different zone before.
         currentZone.contains(zone) && previousZone != currentZone
 
-      case Condition.MomentumIsIn(zone) =>
-        currentProfile.momentum.exists(_.zone == zone)
+      case Condition.MomentumIsIn(zone, of) =>
+        currentProfile.momentum(of.getOrElse(IndicatorId.MomentumZone)).exists(_.zone == zone)
 
-      case Condition.MomentumIs(direction) =>
-        (currentProfile.lastMomentumValue, previousProfile.lastMomentumValue) match {
+      case Condition.MomentumIs(direction, of) =>
+        val id = of.getOrElse(IndicatorId.forValue(ValueRole.Momentum))
+        (
+          currentProfile.number(id),
+          previousProfile.number(id)
+        ) match {
           case (Some(current), Some(previous)) =>
             direction match {
               case Direction.Upward   => current > previous
@@ -176,11 +204,11 @@ object Rule extends JsonCodecs {
           case _ => false // Cannot determine direction without two consecutive values.
         }
 
-      case Condition.PreviousVolatilityIs(regime) =>
-        previousProfile.volatility.exists(_.regime == regime)
+      case Condition.PreviousVolatilityIs(regime, of) =>
+        previousProfile.volatility(of.getOrElse(IndicatorId.VolatilityRegime)).exists(_.regime == regime)
 
-      case Condition.VolatilityIs(regime) =>
-        currentProfile.volatility.exists(_.regime == regime)
+      case Condition.VolatilityIs(regime, of) =>
+        currentProfile.volatility(of.getOrElse(IndicatorId.VolatilityRegime)).exists(_.regime == regime)
 
       case Condition.PositionIs(position) =>
         state.currentPosition.exists(_.position == position)
@@ -193,8 +221,9 @@ object Rule extends JsonCodecs {
           val positionAge = pos.openedAt.durationBetween(state.lastUpdatedAt)
           positionAge.toNanos >= duration.toNanos
         }
-      case Condition.VelocityIs(direction) =>
-        currentProfile.lastVelocityValue match {
+
+      case Condition.VelocityIs(direction, of) =>
+        currentProfile.number(of.getOrElse(IndicatorId.forValue(ValueRole.Velocity))) match {
           case Some(v) =>
             val epsilon = 1e-10
             direction match {
@@ -205,12 +234,16 @@ object Rule extends JsonCodecs {
           case None => false // Cannot determine if velocity is not present.
         }
 
-      case Condition.VelocityIsBelow(threshold) =>
-        currentProfile.lastVelocityValue.exists(velocity => velocity.abs < threshold)
+      case Condition.VelocityIsBelow(threshold, of) =>
+        currentProfile.number(of.getOrElse(IndicatorId.forValue(ValueRole.Velocity))).exists(velocity => velocity.abs < threshold)
 
-      case Condition.VelocityCrossedLevel(level, direction) =>
+      case Condition.VelocityCrossedLevel(level, direction, of) =>
+        val id = of.getOrElse(IndicatorId.forValue(ValueRole.Velocity))
         // This requires both the current and previous velocity values.
-        (currentProfile.lastVelocityValue, previousProfile.lastVelocityValue) match {
+        (
+          currentProfile.number(id),
+          previousProfile.number(id)
+        ) match {
           case (Some(currentValue), Some(previousValue)) =>
             direction match {
               case Direction.Upward   => currentValue >= level && previousValue < level
@@ -220,25 +253,38 @@ object Rule extends JsonCodecs {
           case _ => false // Cannot determine a cross without two consecutive points.
         }
 
-      case Condition.UpperBandCrossed(direction) =>
+      case Condition.UpperBandCrossed(direction, of) =>
+        val id = of.getOrElse(IndicatorId.Band)
         // The condition is met if:
         // 1. A band crossing event exists.
         // 2. It was an UPPER band crossing.
         // 3. The direction matches the rule.
         // 4. AND it's a "fresh" event (different from the previous one).
-        currentProfile.lastBandCrossing.exists(cross => cross.boundary == Boundary.Upper && cross.direction == direction)
-        && currentProfile.lastBandCrossing != previousProfile.lastBandCrossing
+        currentProfile
+          .band(id)
+          .exists(cross => cross.boundary == Boundary.Upper && cross.direction == direction)
+        && currentProfile.band(id) != previousProfile.band(id)
 
-      case Condition.LowerBandCrossed(direction) =>
-        currentProfile.lastBandCrossing.exists(cross => cross.boundary == Boundary.Lower && cross.direction == direction)
-        && currentProfile.lastBandCrossing != previousProfile.lastBandCrossing
+      case Condition.LowerBandCrossed(direction, of) =>
+        val id = of.getOrElse(IndicatorId.Band)
+        currentProfile
+          .band(id)
+          .exists(cross => cross.boundary == Boundary.Lower && cross.direction == direction)
+        && currentProfile.band(id) != previousProfile.band(id)
 
-      case Condition.PriceCrossedLine(lineRole, direction) =>
-        currentProfile.lastPriceLineCrossing.exists(cross => cross.role == lineRole && cross.direction == direction)
-        && currentProfile.lastPriceLineCrossing != previousProfile.lastPriceLineCrossing
+      case Condition.PriceCrossedLine(lineRole, direction, of) =>
+        val id = of.getOrElse(IndicatorId.forLine(lineRole))
+        currentProfile.crossover(id).exists(_.direction == direction)
+        && currentProfile.crossover(id) != previousProfile.crossover(
+          id
+        )
 
-      case Condition.PriceMovedAgainstEntry(nAtr) =>
-        (state.currentPosition, currentProfile.lastClosePrice, currentProfile.lastVolatilityValue) match {
+      case Condition.PriceMovedAgainstEntry(nAtr, priceOf, atrOf) =>
+        (
+          state.currentPosition,
+          currentProfile.number(priceOf.getOrElse(IndicatorId.forValue(ValueRole.Price))),
+          currentProfile.number(atrOf.getOrElse(IndicatorId.forValue(ValueRole.Volatility)))
+        ) match {
           case (Some(pos), Some(currentPrice), Some(atr)) =>
             pos.openPrice.exists { entryPrice =>
               // Adverse excursion: how far price has moved against the position since entry.
@@ -249,6 +295,7 @@ object Rule extends JsonCodecs {
             }
           case _ => false // need position (with entry price), current price and ATR to evaluate
         }
+
     }
   }
 }

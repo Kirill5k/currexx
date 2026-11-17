@@ -76,6 +76,7 @@ object IndicatorInitialiser:
     case _: VT.CMF => VT.CMF(logUniform(GeneBounds.cmfLength))
 
   private def randomiseInd(indicator: Indicator)(using rand: Random): Indicator = indicator match
+    case Indicator.Named(id, leaf)              => Indicator.Named(id, randomiseInd(leaf))
     case Indicator.TrendChangeDetection(vs, vt) =>
       Indicator.TrendChangeDetection(vs, randomiseVt(vt))
     case Indicator.ThresholdCrossing(vs, vt, _, _) =>

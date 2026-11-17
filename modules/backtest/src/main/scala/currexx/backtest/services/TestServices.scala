@@ -9,6 +9,8 @@ import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.common.logging.Logger
 import currexx.core.market.MarketService
+import currexx.core.settings.{StrategyConfiguration, StrategyRuntime}
+import currexx.domain.user.UserId
 import currexx.core.signal.{SignalDetector, SignalService}
 import currexx.core.trade.{TradeOrderPlacement, TradeService}
 import currexx.domain.market.MarketTimeSeriesData
@@ -42,10 +44,9 @@ final class TestServices[F[_]] private (
         for
           _      <- appState.prepareExecution(currentData)
           userId <- appState.userIdRef.get
-          _      <- marketService.updateTimeState(userId, signalData)
           _      <- signalService.processMarketData(userId, signalData, signalDetector)
-          _      <- collectPendingActions { case Action.ProcessSignals(uid, cp, signals) =>
-            marketService.processSignals(uid, cp, signals)
+          _      <- collectPendingActions { case Action.ProcessSignals(uid, cp, batch) =>
+            marketService.processSignals(uid, cp, batch)
           }
           _ <- collectPendingActions { case Action.ProcessMarketStateUpdate(uid, cp) =>
             marketService.getState(uid, cp).flatMap(tradeService.processMarketStateUpdate)
@@ -84,11 +85,15 @@ object TestServices:
       appState   <- ApplicationState.make[F](settings)
       dispatcher <- ActionDispatcher.make[F](appState.dispatcherQueue)
 
+      runtime = new StrategyRuntime[F]:
+        def load(uid: UserId): F[StrategyConfiguration] = appState.configurationRef.get
+
       clock = TestClock[F](appState.clockRef)
 
       market <- MarketService.make[F](
         stateRepo = TestMarketStateRepository[F](appState.marketStateRef)(using Temporal[F], clock),
-        dispatcher = dispatcher
+        dispatcher = dispatcher,
+        runtime = runtime
       )
 
       clients = TestClients[F](TestBrokerClient[F](clock, appState.brokerPositionsRef), TestMarketDataClient[F](appState.dataRef))
@@ -99,12 +104,12 @@ object TestServices:
         orderStatusRepository = new TestOrderStatusRepository[F](),
         clients.broker,
         clients.data,
-        dispatcher
+        dispatcher,
+        runtime
       )(using
         Temporal[F],
         clock
       )
 
-      signalSettingsRepo = new TestSignalSettingsRepository[F](appState.signalSettingsRef)
-      signal <- SignalService.make[F](TestSignalRepository[F], signalSettingsRepo, dispatcher)(using Temporal[F], clock)
+      signal <- SignalService.make[F](TestSignalRepository[F], runtime, dispatcher)(using Temporal[F], clock)
     yield TestServices[F](signal, market, trade, appState)

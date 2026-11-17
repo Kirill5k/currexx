@@ -6,6 +6,7 @@ import cats.syntax.functor.*
 import currexx.clients.Clients
 import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.Controller
+import currexx.core.settings.StrategyRuntime
 import currexx.core.trade.db.{OrderStatusRepository, TradeOrderRepository, TradeSettingsRepository}
 import kirill5k.common.cats.Clock
 import mongo4cats.database.MongoDatabase
@@ -20,12 +21,14 @@ object Trades:
   def make[F[_]: {Async, Clock, Logger}](
       database: MongoDatabase[F],
       clients: Clients[F],
-      dispatcher: ActionDispatcher[F]
+      dispatcher: ActionDispatcher[F],
+      runtime: StrategyRuntime[F]
   ): F[Trades[F]] =
     for
       settingsRepo    <- TradeSettingsRepository.make[F](database)
       orderRepo       <- TradeOrderRepository.make[F](database)
       orderStatusRepo <- OrderStatusRepository.make[F](database)
-      svc             <- TradeService.make[F](settingsRepo, orderRepo, orderStatusRepo, clients.broker, clients.marketData, dispatcher)
-      ctrl            <- TradeController.make[F](svc)
+      svc             <- TradeService
+        .make[F](settingsRepo, orderRepo, orderStatusRepo, clients.broker, clients.marketData, dispatcher, runtime)
+      ctrl <- TradeController.make[F](svc)
     yield Trades[F](svc, ctrl)

@@ -3,17 +3,17 @@ package currexx.core.market
 import cats.MonadThrow
 import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
-import cats.syntax.functor.*
 import cats.syntax.foldable.*
+import cats.syntax.functor.*
 import currexx.core.common.action.{Action, ActionDispatcher}
-import currexx.core.signal.Signal
 import currexx.core.market.db.MarketStateRepository
+import currexx.core.settings.StrategyRuntime
+import currexx.core.signal.SignalBatch
 import currexx.core.trade.{BrokerPosition, TradeOrderPlacement}
 import currexx.domain.errors.AppError
-import currexx.domain.market.{CurrencyPair, MarketTimeSeriesData, TradeOrder}
+import currexx.domain.market.{CurrencyPair, TradeOrder}
 import currexx.domain.user.UserId
 import kirill5k.common.cats.Clock
-import kirill5k.common.syntax.time.*
 import org.typelevel.log4cats.Logger
 
 trait MarketService[F[_]]:
@@ -21,15 +21,14 @@ trait MarketService[F[_]]:
   def getState(uid: UserId, cp: CurrencyPair): F[MarketState]
   def clearState(uid: UserId, closePendingOrders: Boolean): F[Unit]
   def clearState(uid: UserId, cp: CurrencyPair, closePendingOrders: Boolean): F[Unit]
-  def processSignals(uid: UserId, cp: CurrencyPair, signals: List[Signal]): F[Unit]
-  def processManualSignal(signal: Signal): F[Unit]
+  def processSignals(uid: UserId, cp: CurrencyPair, batch: SignalBatch): F[Unit]
   def processTradeOrderPlacement(top: TradeOrderPlacement): F[Unit]
   def reconcileEntryPrice(state: MarketState, brokerPosition: BrokerPosition): F[MarketState]
-  def updateTimeState(uid: UserId, data: MarketTimeSeriesData): F[Unit]
 
 final private class LiveMarketService[F[_]](
     private val stateRepo: MarketStateRepository[F],
-    private val dispatcher: ActionDispatcher[F]
+    private val dispatcher: ActionDispatcher[F],
+    private val runtime: StrategyRuntime[F]
 )(using
     F: MonadThrow[F],
     clock: Clock[F],
@@ -94,48 +93,56 @@ final private class LiveMarketService[F[_]](
       case _ => warnIfUnpriced(state).as(state)
   }
 
-  override def processSignals(uid: UserId, cp: CurrencyPair, signals: List[Signal]): F[Unit] =
-    signals.headOption.traverse_ { firstSignal =>
-      modifyState(uid, cp)(_.applyCandleSignals(signals, firstSignal.time)).flatMap(dispatchIfProfileChanged)
-    }
-
-  override def processManualSignal(signal: Signal): F[Unit] =
-    modifyState(signal.userId, signal.currencyPair)(_.applyManualSignal(signal)).flatMap(dispatchIfProfileChanged)
-
-  override def updateTimeState(uid: UserId, data: MarketTimeSeriesData): F[Unit] = {
-    val interval         = data.interval.toDuration
-    val marketClosureGap = data.prices.tail.headOption
-      .map(_.time.durationBetween(data.latestTime))
-      .filter(_ > interval * 2)
-      .map(_ - interval)
-    modifyState(uid, data.currencyPair)(_.applyTimeState(data.latestTime, marketClosureGap)).flatMap { change =>
-      marketClosureGap.filter(_ => change.isDefined).traverse_ { gap =>
-        logger.info(s"shifted state by ${gap.toHours}h to adjust for market close time for $uid/${data.currencyPair}")
+  override def processSignals(uid: UserId, cp: CurrencyPair, batch: SignalBatch): F[Unit] =
+    modifyStateWithResult(uid, cp) { state =>
+      runtime.load(uid).flatMap { config =>
+        if config.revision != batch.revision then
+          logger
+            .info(
+              s"rejecting signal batch for $uid/$cp at ${batch.candleTime}: " +
+                s"configuration revision ${batch.revision} is no longer active (${config.revision})"
+            )
+            .as(None)
+        else if config.sources != batch.sources then
+          logger.info(s"rejecting signal batch for $uid/$cp at ${batch.candleTime}: indicator definitions changed").as(None)
+        else
+          val transition = ProfileTransition(state, batch)
+          F.pure(Some(transition.state -> transition.outcome))
       }
-    }
-  }
-
-  private def dispatchIfProfileChanged(change: Option[(MarketState, MarketState)]): F[Unit] =
-    change.filter((before, after) => before.profile != after.profile).traverse_ { (_, after) =>
-      dispatcher.dispatch(Action.ProcessMarketStateUpdate(after.userId, after.currencyPair))
-    }
+    }.flatMap(_.traverse_ { (_, _, outcome) =>
+      outcome match
+        case ProfileTransition.Outcome.Changed   => dispatcher.dispatch(Action.ProcessMarketStateUpdate(uid, cp))
+        case ProfileTransition.Outcome.Unchanged => F.unit
+        case ProfileTransition.Outcome.Skipped   =>
+          F.whenA(batch.signals.nonEmpty)(
+            logger.info(
+              s"skipping signal application for $uid/$cp at ${batch.candleTime}: candle was already applied or is older than the latest poll"
+            )
+          )
+    })
 
   // Returns the state before and after the accepted change, or None when `f` decides there is nothing to change.
-  private def modifyState(uid: UserId, cp: CurrencyPair)(f: MarketState => Option[MarketState]): F[Option[(MarketState, MarketState)]] = {
-    def attempt(n: Int): F[Option[(MarketState, MarketState)]] =
+  private def modifyState(uid: UserId, cp: CurrencyPair)(f: MarketState => Option[MarketState]): F[Option[(MarketState, MarketState)]] =
+    modifyStateWithResult(uid, cp)(s => F.pure(f(s).map(_ -> ()))).map(_.map((before, after, _) => before -> after))
+
+  private def modifyStateWithResult[A](uid: UserId, cp: CurrencyPair)(
+      f: MarketState => F[Option[(MarketState, A)]]
+  ): F[Option[(MarketState, MarketState, A)]] =
+    def attempt(n: Int): F[Option[(MarketState, MarketState, A)]] =
       stateRepo.find(uid, cp).flatMap(_.fold(clock.now.map(MarketState.initial(uid, cp, _)))(F.pure)).flatMap { current =>
-        f(current) match
-          case None          => F.pure(None)
-          case Some(updated) =>
+        f(current).flatMap {
+          case None                                         => F.pure(None)
+          case Some((updated, value)) if updated == current => F.pure(Some((current, current, value)))
+          case Some((updated, value))                       =>
             stateRepo.save(updated).flatMap {
-              case true                         => F.pure(Some(current -> updated))
+              case true                         => F.pure(Some((current, updated, value)))
               case false if n < MaxSaveAttempts => attempt(n + 1)
-              // Not an AppError, so ActionProcessor retries the whole action with a backoff.
               case false => F.raiseError(new IllegalStateException(s"market state for $uid/$cp kept changing after $n attempts"))
             }
+        }
       }
     attempt(1)
-  }
+
 }
 
 private object LiveMarketService:
@@ -144,6 +151,7 @@ private object LiveMarketService:
 object MarketService:
   def make[F[_]: {MonadThrow, Clock, Logger}](
       stateRepo: MarketStateRepository[F],
-      dispatcher: ActionDispatcher[F]
+      dispatcher: ActionDispatcher[F],
+      runtime: StrategyRuntime[F]
   ): F[MarketService[F]] =
-    LiveMarketService[F](stateRepo, dispatcher).pure[F]
+    LiveMarketService[F](stateRepo, dispatcher, runtime).pure[F]

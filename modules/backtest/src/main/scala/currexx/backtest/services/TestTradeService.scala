@@ -1,18 +1,14 @@
 package currexx.backtest.services
 
 import cats.{Functor, Monad}
-import cats.effect.{Ref, Temporal}
-import cats.syntax.flatMap.*
+import cats.effect.Ref
 import cats.syntax.functor.*
-import currexx.core.common.action.ActionDispatcher
 import currexx.core.common.http.SearchParams
 import currexx.core.settings.TradeSettings
 import currexx.core.trade.db.{OrderStatusRepository, TradeOrderRepository, TradeSettingsRepository}
-import currexx.core.trade.{EnterOrderStats, OrderStatistics, TradeOrderPlacement, TradeService}
+import currexx.core.trade.{EnterOrderStats, OrderStatistics, TradeOrderPlacement}
 import currexx.domain.market.{CurrencyPair, OrderPlacementStatus}
-import kirill5k.common.cats.Clock
 import currexx.domain.user.UserId
-import org.typelevel.log4cats.Logger
 
 import scala.collection.mutable.ListBuffer
 
@@ -50,16 +46,3 @@ final private class TestOrderStatusRepository[F[_]](using F: Monad[F]) extends O
       currencyBreakdown = Nil
     )
   }
-
-object TestTradeService:
-  def make[F[_]: {Temporal, Clock, Logger}](
-      initialSettings: TradeSettings,
-      clients: TestClients[F],
-      dispatcher: ActionDispatcher[F]
-  ): F[TradeService[F]] =
-    for
-      settingsRepo <- Ref.of(initialSettings).map(s => TestTradeSettingsRepository[F](s))
-      ordersRepo   <- Ref.of(ListBuffer.empty[TradeOrderPlacement]).map(o => TestTradeOrderRepository[F](o))
-      statusRepo   <- Temporal[F].pure(TestOrderStatusRepository[F]())
-      svc          <- TradeService.make(settingsRepo, ordersRepo, statusRepo, clients.broker, clients.data, dispatcher)
-    yield svc

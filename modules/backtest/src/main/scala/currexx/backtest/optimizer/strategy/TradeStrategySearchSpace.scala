@@ -2,7 +2,7 @@ package currexx.backtest.optimizer.strategy
 
 import cats.syntax.traverse.*
 import cats.syntax.foldable.*
-import currexx.core.trade.{Rule, TradeStrategy}
+import currexx.core.trade.{Rule, StrategyCheck, TradeStrategy}
 import currexx.domain.signal.Indicator
 
 import scala.util.Random
@@ -98,7 +98,8 @@ object TradeStrategySearchSpace {
       bounds: RuleParameterBounds
   ): Either[IllegalArgumentException, TradeStrategySearchSpace] =
     for
-      parameters <- RuleParameterCompiler.compile(template, bounds, IndicatorCapabilities.from(indicator))
+      inputs     <- StrategyCheck.validate(List(indicator), None).left.map(new IllegalArgumentException(_))
+      parameters <- RuleParameterCompiler.compile(template, bounds, inputs)
       space = new TradeStrategySearchSpace(template, parameters)
       _ <- space.validate(template)
     yield space

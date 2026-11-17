@@ -1,14 +1,16 @@
 package currexx.core.common.action
 
+import currexx.core.fixtures.Processing
+import currexx.core.signal.SignalBatch
 import cats.data.NonEmptyList
 import cats.effect.{Deferred, IO}
 import currexx.core.fixtures.{Markets, Signals, Users}
-import currexx.core.market.{MarketService, MarketState}
+import currexx.core.market.MarketService
 import currexx.core.monitor.MonitorService
-import currexx.core.signal.{Signal, SignalService}
+import currexx.core.signal.SignalService
 import currexx.core.trade.{BrokerPosition, TradeService}
 import currexx.core.settings.SettingsService
-import currexx.domain.market.{CandleCount, CurrencyPair, Interval, TradeOrder}
+import currexx.domain.market.{CandleCount, CurrencyPair, Interval}
 import currexx.domain.signal.Direction
 import currexx.domain.user.UserId
 import kirill5k.common.cats.test.IOWordSpec
@@ -43,89 +45,64 @@ class ActionProcessorSpec extends IOWordSpec {
       }
     }
 
-    "process manual signals separately from detected candle batches" in {
+    "process detected signal batches" in {
       val (monsvc, sigsvc, marksvc, tradesvc, settvc) = mocks
-      when(marksvc.processManualSignal(any[Signal])).thenReturn(IO.unit)
+
+      when(marksvc.processSignals(any[UserId], any[CurrencyPair], any[SignalBatch])).thenReturn(IO.unit)
 
       val signal = Signals.trend(Direction.Upward)
       val result = for
         dispatcher <- ActionDispatcher.make[IO]
         processor  <- ActionProcessor.make[IO](dispatcher, monsvc, sigsvc, marksvc, tradesvc, settvc)
-        _          <- dispatcher.dispatch(Action.ProcessManualSignal(signal))
+        _          <- dispatcher.dispatch(Action.ProcessSignals(Users.uid, Markets.gbpeur, Processing.batch(List(signal))))
         res        <- processor.run.interruptAfter(2.second).compile.drain
       yield res
 
       result.asserting { r =>
-        verify(marksvc).processManualSignal(signal)
-        verifyNoMoreInteractions(marksvc)
+        verify(marksvc).processSignals(Users.uid, Markets.gbpeur, Processing.batch(List(signal)))
         r mustBe ()
       }
     }
 
-    "process submitted signals" in {
+    "read and pass the current state to trade evaluation when its entry price is known" in {
       val (monsvc, sigsvc, marksvc, tradesvc, settvc) = mocks
-
-      when(marksvc.processSignals(any[UserId], any[CurrencyPair], anyList[Signal])).thenReturn(IO.unit)
-
-      val signal = Signals.trend(Direction.Upward)
-      val result = for
-        dispatcher <- ActionDispatcher.make[IO]
-        processor  <- ActionProcessor.make[IO](dispatcher, monsvc, sigsvc, marksvc, tradesvc, settvc)
-        _          <- dispatcher.dispatch(Action.ProcessSignals(Users.uid, Markets.gbpeur, List(signal)))
-        res        <- processor.run.interruptAfter(2.second).compile.drain
-      yield res
-
-      result.asserting { r =>
-        verify(marksvc).processSignals(Users.uid, Markets.gbpeur, List(signal))
-        r mustBe ()
-      }
-    }
-
-    "read the entry price from the broker before evaluating rules for a position held without one" in {
-      val (monsvc, sigsvc, marksvc, tradesvc, settvc) = mocks
-      val brokerPosition                              = BrokerPosition.Open(TradeOrder.Position.Buy, BigDecimal("1.1002"))
-      val repaired = Markets.state.copy(currentPosition = Some(Markets.positionState.copy(openPrice = Some(BigDecimal("1.1002")))))
-      when(marksvc.getState(any[UserId], any[CurrencyPair])).thenReturnIO(Markets.state)
-      when(tradesvc.findBrokerPosition(any[UserId], any[CurrencyPair])).thenReturnIO(brokerPosition)
-      when(marksvc.reconcileEntryPrice(any[MarketState], any[BrokerPosition])).thenReturnIO(repaired)
-      when(tradesvc.processMarketStateUpdate(any[MarketState])).thenReturn(IO.unit)
-
-      val result = for
+      val state                                       = Markets.state.copy(currentPosition = None)
+      when(marksvc.getState(Users.uid, Markets.gbpeur)).thenReturnIO(state)
+      when(tradesvc.processMarketStateUpdate(state)).thenReturnUnit
+      (for
         dispatcher <- ActionDispatcher.make[IO]
         processor  <- ActionProcessor.make[IO](dispatcher, monsvc, sigsvc, marksvc, tradesvc, settvc)
         _          <- dispatcher.dispatch(Action.ProcessMarketStateUpdate(Users.uid, Markets.gbpeur))
-        res        <- processor.run.interruptAfter(2.second).compile.drain
-      yield res
-
-      result.asserting { r =>
+        _          <- processor.run.interruptAfter(2.second).compile.drain
+      yield ()).asserting { _ =>
         verify(marksvc).getState(Users.uid, Markets.gbpeur)
-        verify(tradesvc).findBrokerPosition(Users.uid, Markets.gbpeur)
-        verify(marksvc).reconcileEntryPrice(Markets.state, brokerPosition)
+        verify(tradesvc).processMarketStateUpdate(state)
+        verifyNoMoreInteractions(tradesvc)
+        succeed
+      }
+    }
+
+    "enrich a missing entry price before passing the repaired state to trade evaluation" in {
+      val (monsvc, sigsvc, marksvc, tradesvc, settvc) = mocks
+      val snapshot                                    = Markets.state
+      val position                                    = BrokerPosition.Open(snapshot.currentPosition.get.position, BigDecimal("1.25"))
+      val repaired = snapshot.copy(currentPosition = snapshot.currentPosition.map(_.copy(openPrice = Some(BigDecimal("1.25")))))
+      when(marksvc.getState(Users.uid, Markets.gbpeur)).thenReturnIO(snapshot)
+      when(tradesvc.findBrokerPosition(Users.uid, Markets.gbpeur)).thenReturnIO(position)
+      when(marksvc.reconcileEntryPrice(snapshot, position)).thenReturnIO(repaired)
+      when(tradesvc.processMarketStateUpdate(repaired)).thenReturnUnit
+      (for
+        dispatcher <- ActionDispatcher.make[IO]
+        processor  <- ActionProcessor.make[IO](dispatcher, monsvc, sigsvc, marksvc, tradesvc, settvc)
+        _          <- dispatcher.dispatch(Action.ProcessMarketStateUpdate(Users.uid, Markets.gbpeur))
+        _          <- processor.run.interruptAfter(2.second).compile.drain
+      yield ()).asserting { _ =>
+        verify(marksvc).reconcileEntryPrice(snapshot, position)
         verify(tradesvc).processMarketStateUpdate(repaired)
-        r mustBe ()
+        succeed
       }
     }
 
-    "evaluate rules without reading the broker when the entry price is known" in {
-      val (monsvc, sigsvc, marksvc, tradesvc, settvc) = mocks
-      val priced = Markets.state.copy(currentPosition = Some(Markets.positionState.copy(openPrice = Some(BigDecimal("1.1002")))))
-      when(marksvc.getState(any[UserId], any[CurrencyPair])).thenReturnIO(priced)
-      when(tradesvc.processMarketStateUpdate(any[MarketState])).thenReturn(IO.unit)
-
-      val result = for
-        dispatcher <- ActionDispatcher.make[IO]
-        processor  <- ActionProcessor.make[IO](dispatcher, monsvc, sigsvc, marksvc, tradesvc, settvc)
-        _          <- dispatcher.dispatch(Action.ProcessMarketStateUpdate(Users.uid, Markets.gbpeur))
-        res        <- processor.run.interruptAfter(2.second).compile.drain
-      yield res
-
-      result.asserting { r =>
-        verify(marksvc).getState(Users.uid, Markets.gbpeur)
-        verify(tradesvc).processMarketStateUpdate(priced)
-        verifyNoMoreInteractions(marksvc, tradesvc)
-        r mustBe ()
-      }
-    }
   }
 
   def mocks: (MonitorService[IO], SignalService[IO], MarketService[IO], TradeService[IO], SettingsService[IO]) =

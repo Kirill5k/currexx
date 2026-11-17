@@ -57,6 +57,7 @@ enum CombinationLogic:
   case All, Any
 
 enum Indicator derives ConfiguredCodec:
+  case Named(id: IndicatorId, indicator: Indicator)
   case Composite(
       indicators: NonEmptyList[Indicator],
       combinator: CombinationLogic
@@ -102,6 +103,19 @@ enum Indicator derives ConfiguredCodec:
       stdDevLength: Int,
       stdDevMultiplier: Double
   )
+
+  def explicitId: Option[IndicatorId] = this match
+    case Named(id, _) => Some(id)
+    case _            => None
+
+  def definition: Indicator = this match
+    case Named(_, indicator) => indicator
+    case other               => other
+
+  def resolvedId: Option[IndicatorId] = explicitId.orElse(IndicatorId.defaultFor(this))
+  def leaves: List[Indicator]         = this match
+    case Composite(children, _) => children.toList.flatMap(_.leaves)
+    case leaf                   => List(leaf)
 
 object Indicator:
   given Configuration = Configuration.default

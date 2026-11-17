@@ -3,6 +3,7 @@ package currexx.core.signal
 import cats.data.NonEmptyList
 import currexx.core.fixtures.{Markets, Users}
 import currexx.domain.market.{MarketTimeSeriesData, PriceRange}
+import currexx.domain.signal.IndicatorId
 import currexx.domain.signal.{
   Boundary,
   Condition,
@@ -29,7 +30,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
-        signal mustBe Some(
+        signal mustBe List(
           Signal(
             userId = Users.uid,
             interval = Markets.timeSeriesData.interval,
@@ -45,7 +46,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
         val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
-        signal mustBe None
+        signal mustBe Nil
       }
     }
 
@@ -55,7 +56,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
-        signal mustBe Some(
+        signal mustBe List(
           Signal(
             userId = Users.uid,
             interval = Markets.timeSeriesData.interval,
@@ -71,7 +72,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(10))
         val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
-        signal mustBe None
+        signal mustBe Nil
       }
     }
 
@@ -81,32 +82,23 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
         Indicator.TrendChangeDetection(ValueSource.Close, VT.HMA(16))
       )
 
-      "return composite condition when all indicators generate signals" in {
+      "return attributed leaf signals when all indicators generate signals" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
         val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
-        signal mustBe Some(
-          Signal(
-            userId = Users.uid,
-            currencyPair = Markets.gbpeur,
-            interval = Markets.timeSeriesData.interval,
-            condition = Condition.Composite(
-              NonEmptyList.of(
-                Condition.ThresholdCrossing(20d, BigDecimal(16.294773928361835), Direction.Downward, Boundary.Lower),
-                Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(13))
-              )
-            ),
-            triggeredBy = indicator,
-            time = timeSeriesData.prices.head.time
-          )
+        signal.map(_.condition) mustBe List(
+          Condition.ThresholdCrossing(20d, BigDecimal(16.294773928361835), Direction.Downward, Boundary.Lower),
+          Condition.TrendDirectionChange(Direction.Downward, Direction.Upward, Some(13))
         )
+        signal.map(_.triggeredBy) mustBe indicator.leaves
+
       }
 
       "not return anything when only one indicator generated signal" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
         val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
-        signal mustBe None
+        signal mustBe Nil
       }
     }
 
@@ -116,24 +108,15 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
         Indicator.TrendChangeDetection(ValueSource.Close, VT.HMA(16))
       )
 
-      "return composite condition when any of indicators generate signals" in {
+      "return attributed leaf signals when any of indicators generate signals" in {
         val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(1))
         val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
-        signal mustBe Some(
-          Signal(
-            userId = Users.uid,
-            currencyPair = Markets.gbpeur,
-            interval = Markets.timeSeriesData.interval,
-            condition = Condition.Composite(
-              NonEmptyList.of(
-                Condition.ThresholdCrossing(20d, BigDecimal(32.868467410452254), Direction.Upward, Boundary.Lower)
-              )
-            ),
-            triggeredBy = indicator,
-            time = timeSeriesData.prices.head.time
-          )
+        signal.map(_.condition) mustBe List(
+          Condition.ThresholdCrossing(20d, BigDecimal(32.868467410452254), Direction.Upward, Boundary.Lower)
         )
+        signal.map(_.triggeredBy) mustBe indicator.leaves.take(1)
+
       }
     }
   }
@@ -145,7 +128,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
       val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(1))
       val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
-      signal mustBe Some(
+      signal mustBe List(
         Signal(
           userId = Users.uid,
           interval = Markets.timeSeriesData.interval,
@@ -161,7 +144,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
       val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(4))
       val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
-      signal mustBe None
+      signal mustBe Nil
     }
   }
 
@@ -172,7 +155,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
       val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(9))
       val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
-      signal mustBe Some(
+      signal mustBe List(
         Signal(
           userId = Users.uid,
           interval = Markets.timeSeriesData.interval,
@@ -188,7 +171,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
       val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(10))
       val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
-      signal mustBe None
+      signal mustBe Nil
     }
   }
 
@@ -199,7 +182,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
       val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
       val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
-      signal mustBe Some(
+      signal mustBe List(
         Signal(
           userId = Users.uid,
           interval = Markets.timeSeriesData.interval,
@@ -215,7 +198,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
       val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(3))
       val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
-      signal mustBe None
+      signal mustBe Nil
     }
   }
 
@@ -226,7 +209,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
       val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
       val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
-      signal mustBe Some(
+      signal mustBe List(
         Signal(
           userId = Users.uid,
           interval = Markets.timeSeriesData.interval,
@@ -242,7 +225,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
       val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
       val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
-      signal mustBe None
+      signal mustBe Nil
     }
   }
 
@@ -253,7 +236,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
       val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges)
       val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
-      signal mustBe Some(
+      signal mustBe List(
         Signal(
           userId = Users.uid,
           interval = Markets.timeSeriesData.interval,
@@ -269,7 +252,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
       val timeSeriesData = Markets.timeSeriesData.copy(prices = Markets.priceRanges.drop(2))
       val signal         = SignalDetector.pure.detect(Users.uid, timeSeriesData)(indicator)
 
-      signal mustBe None
+      signal mustBe Nil
     }
   }
 
@@ -287,7 +270,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
         bandIndicators(multiplier).foreach { indicator =>
           withClue(s"$indicator on $closes: ") {
             SignalDetector.pure.detect(Users.uid, data)(indicator) mustBe
-              Some(expectedSignal(data, indicator, Condition.UpperBandCrossing(direction)))
+              List(expectedSignal(data, indicator, Condition.UpperBandCrossing(direction)))
           }
         }
       }
@@ -298,8 +281,8 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
       // The full EMA(3) is [3.75, 3.5, 5, 0], so price crosses upward from 2 < 3.5 to 4 > 3.75.
       bandIndicators(0.0).foreach { indicator =>
         SignalDetector.pure.detect(Users.uid, data)(indicator) mustBe
-          Some(expectedSignal(data, indicator, Condition.UpperBandCrossing(Direction.Upward)))
-        SignalDetector.pure.detect(Users.uid, dataFor(List(4.0, 2.0)))(indicator) mustBe None
+          List(expectedSignal(data, indicator, Condition.UpperBandCrossing(Direction.Upward)))
+        SignalDetector.pure.detect(Users.uid, dataFor(List(4.0, 2.0)))(indicator) mustBe Nil
       }
     }
 
@@ -307,7 +290,7 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
       for {
         closes    <- List(List(2.0), List(2.0, 1.0))
         indicator <- bandIndicators(0.0)
-      } SignalDetector.pure.detect(Users.uid, dataFor(closes))(indicator) mustBe None
+      } SignalDetector.pure.detect(Users.uid, dataFor(closes))(indicator) mustBe Nil
     }
   }
 
@@ -318,9 +301,9 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
         val lines = Indicator.LinesCrossing(ValueSource.Close, VT.SMA(1), VT.EMA(3))
         val price = Indicator.PriceLineCrossing(ValueSource.Close, ValueRole.ChannelMiddleBand, VT.EMA(3))
         SignalDetector.pure.detect(Users.uid, data)(lines) mustBe
-          Some(expectedSignal(data, lines, Condition.LinesCrossing(direction)))
+          List(expectedSignal(data, lines, Condition.LinesCrossing(direction)))
         SignalDetector.pure.detect(Users.uid, data)(price) mustBe
-          Some(expectedSignal(data, price, Condition.PriceCrossedLine(ValueRole.ChannelMiddleBand, direction)))
+          List(expectedSignal(data, price, Condition.PriceCrossedLine(ValueRole.ChannelMiddleBand, direction)))
       }
   }
 
@@ -335,16 +318,16 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
       cases.foreach { (closes, from, to, duration) =>
         val data = dataFor(closes)
         SignalDetector.pure.detect(Users.uid, data)(indicator) mustBe
-          Some(expectedSignal(data, indicator, Condition.TrendDirectionChange(from, to, Some(duration))))
+          List(expectedSignal(data, indicator, Condition.TrendDirectionChange(from, to, Some(duration))))
       }
       List(List(4.0, 3.0), List(4.0, 4.0, 3.0)).foreach { closes =>
-        SignalDetector.pure.detect(Users.uid, dataFor(closes))(indicator) mustBe None
+        SignalDetector.pure.detect(Users.uid, dataFor(closes))(indicator) mustBe Nil
       }
     }
   }
 
   "nested composites" should {
-    "retain child order and nesting while omitting children without a signal" in {
+    "retain leaf order while omitting children without a signal" in {
       val data      = dataFor(List(4.0, 2.0, 10.0, 0.0))
       val indicator = Indicator.compositeAnyOf(
         Indicator.ThresholdCrossing(ValueSource.Close, VT.SMA(1), 20.0, -20.0),
@@ -355,19 +338,33 @@ class SignalDetectorSpec extends AnyWordSpec with Matchers {
         ),
         Indicator.ValueTracking(ValueRole.Velocity, ValueSource.Close, VT.EMA(3))
       )
-      val condition = Condition.Composite(
-        NonEmptyList.of(
-          Condition.ValueUpdated(ValueRole.Price, BigDecimal(4)),
-          Condition.Composite(
-            NonEmptyList.of(
-              Condition.ValueUpdated(ValueRole.Momentum, BigDecimal(3)),
-              Condition.ThresholdCrossing(BigDecimal(3), BigDecimal(4), Direction.Upward, Boundary.Upper)
-            )
-          ),
-          Condition.ValueUpdated(ValueRole.Velocity, BigDecimal(3.75))
-        )
+      val signals = SignalDetector.pure.detect(Users.uid, data)(indicator)
+      signals.map(_.condition) mustBe List(
+        Condition.ValueUpdated(ValueRole.Price, BigDecimal(4)),
+        Condition.ValueUpdated(ValueRole.Momentum, BigDecimal(3)),
+        Condition.ThresholdCrossing(BigDecimal(3), BigDecimal(4), Direction.Upward, Boundary.Upper),
+        Condition.ValueUpdated(ValueRole.Velocity, BigDecimal(3.75))
       )
-      SignalDetector.pure.detect(Users.uid, data)(indicator) mustBe Some(expectedSignal(data, indicator, condition))
+      signals.map(_.triggeredBy) mustBe indicator.leaves.drop(1)
+
+    }
+  }
+
+  "composite attribution" should {
+    "gate All by successful immediate children before flattening" in {
+      val data  = dataFor(List(4.0, 2.0, 10.0, 0.0))
+      val price = Indicator.ValueTracking(ValueRole.Price, ValueSource.Close, VT.SMA(1))
+      val flow  = Indicator.Named(
+        IndicatorId("flow"),
+        Indicator.ValueTracking(ValueRole.Momentum, ValueSource.Close, VT.SMA(2))
+      )
+      val silent = Indicator.ThresholdCrossing(ValueSource.Close, VT.SMA(1), 20, -20)
+      val nested = Indicator.compositeAllOf(Indicator.compositeAnyOf(price, flow), silent)
+      SignalDetector.pure.detect(Users.uid, data)(nested) mustBe Nil
+      val successful = Indicator.compositeAllOf(Indicator.compositeAnyOf(price, silent), flow)
+      val signals    = SignalDetector.pure.detect(Users.uid, data)(successful)
+      signals.map(_.triggeredBy) mustBe List(price, flow)
+      signals.map(_.condition) mustBe List(Condition.ValueUpdated(ValueRole.Price, 4), Condition.ValueUpdated(ValueRole.Momentum, 3))
     }
   }
 

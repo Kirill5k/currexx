@@ -24,7 +24,7 @@ final private class LiveSettingsService[F[_]](
       .recoverWith { case _: AppError.NotSetup => repository.createFor(uid) >> get(uid) }
 
   override def update(gs: GlobalSettings): F[Unit] =
-    repository.update(gs)
+    F.fromEither(StrategyConfiguration.from(gs)).flatMap(_ => repository.update(gs))
 
   override def createFor(uid: UserId): F[Unit] =
     repository.createFor(uid)

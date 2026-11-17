@@ -17,7 +17,7 @@ import currexx.core.common.action.{Action, ActionDispatcher}
 import currexx.core.common.http.SearchParams
 import currexx.core.common.effects.*
 import currexx.core.market.{MarketProfile, MarketState}
-import currexx.core.settings.TradeSettings
+import currexx.core.settings.{StrategyRuntime, TradeSettings}
 import currexx.core.trade.TradeAction
 import currexx.core.trade.db.{OrderStatusRepository, TradeOrderRepository, TradeSettingsRepository}
 import currexx.domain.errors.AppError
@@ -47,7 +47,8 @@ final private class LiveTradeService[F[_]](
     private val orderStatusRepository: OrderStatusRepository[F],
     private val brokerClient: BrokerClient[F],
     private val marketDataClient: MarketDataClient[F],
-    private val dispatcher: ActionDispatcher[F]
+    private val dispatcher: ActionDispatcher[F],
+    private val runtime: StrategyRuntime[F]
 )(using
     F: Temporal[F],
     clock: Clock[F],
@@ -124,31 +125,36 @@ final private class LiveTradeService[F[_]](
         .traverse(to => submitOrderPlacement(TradeOrderPlacement(uid, to, settings.broker, time)))
     yield ()
 
-  override def processMarketStateUpdate(state: MarketState): F[Unit] = {
-    val previousProfile = state.previousProfile.getOrElse(MarketProfile())
-    for
-      settings <- settingsRepository.get(state.userId)
-      closeAction = Rule.findTriggeredAction(settings.strategy.closeRules, state, previousProfile)
-      openAction  = Rule.findTriggeredAction(settings.strategy.openRules, state, previousProfile)
-      finalAction = (state.currentPosition, closeAction, openAction) match {
-        // --- Case 1: We are in a position AND a close rule was triggered. ---
-        // The close rule takes highest priority. We exit the position.
-        case (Some(_), Some(action), _) => Some(action) // `action` will be `ClosePosition`
-        // --- Case 2: We are in a position AND an *opposite* open rule was triggered. ---
-        // This is the "Stop and Reverse" (SAR) logic.
-        case (Some(pos), None, Some(TradeAction.OpenShort)) if pos.position == TradeOrder.Position.Buy =>
-          // We are long, but an OpenShort signal appeared. We need a new "FlipToShort" action.
-          Some(TradeAction.FlipToShort)
-        case (Some(pos), None, Some(TradeAction.OpenLong)) if pos.position == TradeOrder.Position.Sell =>
-          // We are short, but an OpenLong signal appeared.
-          Some(TradeAction.FlipToLong)
-        // --- Case 3: We are flat AND an open rule was triggered. ---
-        case (None, _, Some(action)) => Some(action) // `action` will be `OpenLong` or `OpenShort`
-        // --- Default Case: No action to be taken ---
-        case _ => None
+  override def processMarketStateUpdate(state: MarketState): F[Unit] =
+    runtime.load(state.userId).flatMap { config =>
+      F.fromOption(config.trade, AppError.NotSetup("Trade")).flatMap { settings =>
+        if !state.configRevision.contains(config.revision) || state.sources != config.sources then
+          logger.info(s"skipping rule evaluation for ${state.userId}/${state.currencyPair}: configuration changed")
+        else evaluateState(state, settings).traverse_(executeAction(_, state, settings))
       }
-      _ <- finalAction.traverse_(executeAction(_, state, settings))
-    yield ()
+    }
+
+  private def evaluateState(state: MarketState, settings: TradeSettings): Option[TradeAction] = {
+    val previousProfile = state.previousProfile.getOrElse(MarketProfile())
+    val closeAction     = Rule.findTriggeredAction(settings.strategy.closeRules, state, previousProfile)
+    val openAction      = Rule.findTriggeredAction(settings.strategy.openRules, state, previousProfile)
+    (state.currentPosition, closeAction, openAction) match {
+      // --- Case 1: We are in a position AND a close rule was triggered. ---
+      // The close rule takes highest priority. We exit the position.
+      case (Some(_), Some(action), _) => Some(action) // `action` will be `ClosePosition`
+      // --- Case 2: We are in a position AND an *opposite* open rule was triggered. ---
+      // This is the "Stop and Reverse" (SAR) logic.
+      case (Some(pos), None, Some(TradeAction.OpenShort)) if pos.position == TradeOrder.Position.Buy =>
+        // We are long, but an OpenShort signal appeared. We need a new "FlipToShort" action.
+        Some(TradeAction.FlipToShort)
+      case (Some(pos), None, Some(TradeAction.OpenLong)) if pos.position == TradeOrder.Position.Sell =>
+        // We are short, but an OpenLong signal appeared.
+        Some(TradeAction.FlipToLong)
+      // --- Case 3: We are flat AND an open rule was triggered. ---
+      case (None, _, Some(action)) => Some(action) // `action` will be `OpenLong` or `OpenShort`
+      // --- Default Case: No action to be taken ---
+      case _ => None
+    }
   }
 
   private def executeAction(action: TradeAction, state: MarketState, settings: TradeSettings): F[Unit] = {
@@ -265,6 +271,15 @@ object TradeService:
       orderStatusRepository: OrderStatusRepository[F],
       brokerClient: BrokerClient[F],
       marketDataClient: MarketDataClient[F],
-      dispatcher: ActionDispatcher[F]
+      dispatcher: ActionDispatcher[F],
+      runtime: StrategyRuntime[F]
   ): F[TradeService[F]] =
-    LiveTradeService[F](settingsRepo, orderRepository, orderStatusRepository, brokerClient, marketDataClient, dispatcher).pure[F]
+    LiveTradeService[F](
+      settingsRepo,
+      orderRepository,
+      orderStatusRepository,
+      brokerClient,
+      marketDataClient,
+      dispatcher,
+      runtime
+    ).pure[F]

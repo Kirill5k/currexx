@@ -3,7 +3,8 @@ package currexx.backtest.optimizer.strategy
 import cats.syntax.traverse.*
 import cats.syntax.foldable.*
 import currexx.backtest.optimizer.Checks
-import currexx.core.trade.{Rule, TradeStrategy}
+import currexx.domain.signal.{Indicator, IndicatorId}
+import currexx.core.trade.{Rule, StrategyCheck, TradeStrategy}
 import currexx.domain.signal.Direction
 
 import scala.concurrent.duration.*
@@ -20,7 +21,7 @@ private[strategy] object RuleParameterCompiler {
   def compile(
       template: TradeStrategy,
       bounds: RuleParameterBounds,
-      inputs: IndicatorCapabilities
+      inputs: Map[IndicatorId, Indicator]
   ): Either[IllegalArgumentException, Vector[LeafParameter]] =
     for
       _ <- (bounds.numeric.keys ++ bounds.durations.keys).toVector.sortBy(_.toString).traverse_ {
@@ -29,7 +30,11 @@ private[strategy] object RuleParameterCompiler {
         case _ => Right(())
       }
       leaves <- RuleTree.leaves(template).zipWithIndex.toList.traverse { case ((path, leaf), order) =>
-        RuleInputs.validateLeaf(leaf, path, inputs).flatMap(_ => fields(path, leaf, order))
+        StrategyCheck
+          .validateCondition(leaf, inputs)
+          .left
+          .map(message => new IllegalArgumentException(s"$message at $path"))
+          .flatMap(_ => fields(path, leaf, order))
       }
       available = leaves.foldLeft(Fields())(_ ++ _)
       numericGroups  <- resolve(bounds.numeric, available.numeric, "numeric", numericTarget, value => DoubleRange(value, value, 1.0))
@@ -112,15 +117,18 @@ private[strategy] object RuleParameterCompiler {
         write: PartialFunction[(C, FiniteDuration), C]
     ): Fields = Fields(durations = Vector(Field(key(RuleParameter.Duration), Some(target), order, value.toCoarsest, read, write)))
     leaf match
-      case C.TrendChangedTo(d)      => moving(d).map(_ => Fields())
-      case C.TrendIs(d)             => moving(d).map(_ => Fields())
-      case C.CrossoverOccurred(d)   => moving(d).map(_ => Fields())
-      case C.UpperBandCrossed(d)    => moving(d).map(_ => Fields())
-      case C.LowerBandCrossed(d)    => moving(d).map(_ => Fields())
-      case C.PriceCrossedLine(_, d) => moving(d).map(_ => Fields())
-      case C.TrendActiveFor(value)  =>
+      case C.TrendChangedTo(d, _)      => moving(d).map(_ => Fields())
+      case C.TrendIs(d, _)             => moving(d).map(_ => Fields())
+      case C.CrossoverOccurred(d, _)   => moving(d).map(_ => Fields())
+      case C.UpperBandCrossed(d, _)    => moving(d).map(_ => Fields())
+      case C.LowerBandCrossed(d, _)    => moving(d).map(_ => Fields())
+      case C.PriceCrossedLine(_, d, _) => moving(d).map(_ => Fields())
+      case C.TrendActiveFor(value, _)  =>
         Right(
-          duration(value, RuleTarget.TrendAge)({ case C.TrendActiveFor(d) => d }, { case (_: C.TrendActiveFor, d) => C.TrendActiveFor(d) })
+          duration(value, RuleTarget.TrendAge)(
+            { case C.TrendActiveFor(d, _) => d },
+            { case (c: C.TrendActiveFor, d) => c.copy(duration = d) }
+          )
         )
       case C.PositionOpenFor(value) =>
         Right(
@@ -129,32 +137,32 @@ private[strategy] object RuleParameterCompiler {
             { case (_: C.PositionOpenFor, d) => C.PositionOpenFor(d) }
           )
         )
-      case C.VelocityCrossedLevel(value, direction) =>
+      case C.VelocityCrossedLevel(value, direction, _) =>
         moving(direction).map { _ =>
           number(RuleParameter.Level, value, _ => true)(
-            { case C.VelocityCrossedLevel(l, _) => l },
-            { case (C.VelocityCrossedLevel(_, d), l) => C.VelocityCrossedLevel(l, d) }
+            { case C.VelocityCrossedLevel(l, _, _) => l },
+            { case (c: C.VelocityCrossedLevel, l) => c.copy(level = l) }
           )
         }
-      case C.VelocityIsBelow(value) =>
+      case C.VelocityIsBelow(value, _) =>
         Right(
           number(RuleParameter.Threshold, value, _ >= 0)(
-            { case C.VelocityIsBelow(t) => t },
-            { case (_: C.VelocityIsBelow, t) => C.VelocityIsBelow(t) }
+            { case C.VelocityIsBelow(t, _) => t },
+            { case (c: C.VelocityIsBelow, t) => c.copy(threshold = t) }
           )
         )
-      case C.ValueIs(_, _, value) =>
+      case C.ValueIs(_, _, value, _) =>
         Right(
           number(RuleParameter.Level, value, _ => true)(
-            { case C.ValueIs(_, _, l) => l },
-            { case (C.ValueIs(r, op, _), l) => C.ValueIs(r, op, l) }
+            { case C.ValueIs(_, _, l, _) => l },
+            { case (c: C.ValueIs, l) => c.copy(level = l) }
           )
         )
-      case C.PriceMovedAgainstEntry(value) =>
+      case C.PriceMovedAgainstEntry(value, _, _) =>
         Right(
           number(RuleParameter.AtrMultiplier, value, _ > 0, Some(RuleTarget.AtrStop))(
-            { case C.PriceMovedAgainstEntry(n) => n },
-            { case (_: C.PriceMovedAgainstEntry, n) => C.PriceMovedAgainstEntry(n) }
+            { case C.PriceMovedAgainstEntry(n, _, _) => n },
+            { case (c: C.PriceMovedAgainstEntry, n) => c.copy(nAtr = n) }
           )
         )
       case _: C.MomentumEntered | _: C.MomentumIsIn | _: C.MomentumIs | _: C.PreviousVolatilityIs | _: C.VolatilityIs | _: C.VelocityIs |

@@ -1,14 +1,20 @@
 package currexx.core.market
 
-import cats.effect.IO
+import cats.MonadThrow
+import cats.effect.{IO, Ref}
+import cats.syntax.foldable.*
 import currexx.core.MockActionDispatcher
-import currexx.domain.user.UserId
 import currexx.core.common.action.Action
+import currexx.core.fixtures.Processing
+import currexx.core.fixtures.{Markets, Settings, Signals, Trades, Users}
 import currexx.core.market.db.MarketStateRepository
-import currexx.core.fixtures.{Markets, Signals, Trades, Users}
+import currexx.core.signal.SignalBatch
+import currexx.core.settings.{StrategyConfiguration, StrategyRuntime}
+import currexx.core.settings.db.SettingsRepository
 import currexx.core.trade.BrokerPosition
-import currexx.domain.market.{CurrencyPair, OrderExecution, TradeOrder}
+import currexx.domain.market.{CurrencyPair, Interval, OrderExecution, TradeOrder}
 import currexx.domain.signal.{Condition, Direction, ValueRole}
+import currexx.domain.user.UserId
 import kirill5k.common.cats.Clock
 import kirill5k.common.cats.test.IOWordSpec
 import kirill5k.common.syntax.time.*
@@ -28,7 +34,7 @@ class MarketServiceSpec extends IOWordSpec {
         when(stateRepo.deleteAll(any[UserId])).thenReturnUnit
 
         val result = for
-          svc   <- MarketService.make[IO](stateRepo, disp)
+          svc   <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
           state <- svc.clearState(Users.uid, true)
         yield state
 
@@ -44,7 +50,7 @@ class MarketServiceSpec extends IOWordSpec {
         when(stateRepo.deleteAll(any[UserId])).thenReturnUnit
 
         val result = for
-          svc   <- MarketService.make[IO](stateRepo, disp)
+          svc   <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
           state <- svc.clearState(Users.uid, false)
         yield state
 
@@ -60,7 +66,7 @@ class MarketServiceSpec extends IOWordSpec {
         when(stateRepo.delete(any[UserId], any[CurrencyPair])).thenReturnUnit
 
         val result = for
-          svc   <- MarketService.make[IO](stateRepo, disp)
+          svc   <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
           state <- svc.clearState(Users.uid, Markets.gbpeur, true)
         yield state
 
@@ -78,7 +84,7 @@ class MarketServiceSpec extends IOWordSpec {
         when(stateRepo.getAll(any[UserId])).thenReturnIO(List(Markets.state))
 
         val result = for
-          svc   <- MarketService.make[IO](stateRepo, disp)
+          svc   <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
           state <- svc.getState(Users.uid)
         yield state
 
@@ -106,7 +112,7 @@ class MarketServiceSpec extends IOWordSpec {
         when(stateRepo.save(any[MarketState])).thenReturnIO(true)
 
         val result = for
-          svc <- MarketService.make[IO](stateRepo, disp)
+          svc <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
           _   <- svc.processTradeOrderPlacement(Trades.order.copy(executions = executions, brokerPosition = brokerPosition))
         yield ()
         result.map { _ =>
@@ -183,7 +189,7 @@ class MarketServiceSpec extends IOWordSpec {
         when(stateRepo.update(any[UserId], any[CurrencyPair], any[Option[PositionState]])).thenReturn(IO.unit)
 
         val result = for
-          svc   <- MarketService.make[IO](stateRepo, disp)
+          svc   <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
           state <- svc.processTradeOrderPlacement(Trades.order.copy(order = TradeOrder.Exit(Markets.gbpeur, 1.3)))
         yield state
 
@@ -196,7 +202,12 @@ class MarketServiceSpec extends IOWordSpec {
     }
 
     "reconcileEntryPrice" should {
-      val unpriced = Markets.state.copy(currentPosition = Some(PositionState(TradeOrder.Position.Buy, Markets.ts)), version = Some(1))
+      val unpriced = Markets.state.copy(
+        currentPosition = Some(PositionState(TradeOrder.Position.Buy, Markets.ts)),
+        version = Some(1),
+        configRevision = Some(0L),
+        sources = Processing.sources
+      )
       val price    = BigDecimal("1.1002")
       val repaired = unpriced.copy(currentPosition = Some(PositionState(TradeOrder.Position.Buy, Markets.ts, Some(price))))
 
@@ -205,7 +216,7 @@ class MarketServiceSpec extends IOWordSpec {
         when(stateRepo.save(any[MarketState])).thenReturnIO(true)
 
         val result = for
-          svc   <- MarketService.make[IO](stateRepo, disp)
+          svc   <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
           state <- svc.reconcileEntryPrice(unpriced, BrokerPosition.Open(TradeOrder.Position.Buy, price))
         yield state
 
@@ -214,6 +225,21 @@ class MarketServiceSpec extends IOWordSpec {
           verifyNoMoreInteractions(stateRepo)
           disp.submittedActions mustBe empty
           res mustBe repaired
+        }
+      }
+
+      "repair a missing price without loading or validating strategy configuration" in {
+        val (stateRepo, disp) = mocks
+        when(stateRepo.save(any[MarketState])).thenReturnIO(true)
+        val invalid = Processing.runtime(_ => IO.raiseError(new IllegalStateException("invalid strategy")))
+        (for
+          service <- MarketService.make[IO](stateRepo, disp, invalid)
+          result  <- service.reconcileEntryPrice(unpriced, BrokerPosition.Open(TradeOrder.Position.Buy, price))
+        yield result).asserting { result =>
+          result mustBe repaired
+          verify(stateRepo).save(repaired)
+          verifyNoMoreInteractions(stateRepo)
+          disp.submittedActions mustBe empty
         }
       }
 
@@ -232,7 +258,7 @@ class MarketServiceSpec extends IOWordSpec {
           val (stateRepo, disp) = mocks
 
           val result = for
-            svc <- MarketService.make[IO](stateRepo, disp)
+            svc <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
             res <- svc.reconcileEntryPrice(state, brokerPosition)
           yield res
 
@@ -257,7 +283,7 @@ class MarketServiceSpec extends IOWordSpec {
           when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(latest)
 
           val result = for
-            svc <- MarketService.make[IO](stateRepo, disp)
+            svc <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
             res <- svc.reconcileEntryPrice(unpriced, BrokerPosition.Open(TradeOrder.Position.Buy, price))
           yield res
 
@@ -273,20 +299,68 @@ class MarketServiceSpec extends IOWordSpec {
     }
 
     "processSignals" should {
+      "reject batches from inactive configurations before saving state" in {
+        val settings = mock[SettingsRepository[IO]]
+        val states   = mock[MarketStateRepository[IO]]
+        val config   = StrategyConfiguration.from(Settings.global.copy(revision = 2L)).toOption.get
+        when(settings.get(Users.uid)).thenReturnIO(Settings.global.copy(revision = 2L))
+        val batch    = Processing.batch(Nil).copy(revision = 2L, sources = config.sources, closureGap = Some(71.hours))
+        val obsolete = List(batch.copy(revision = 1L), batch.copy(sources = Map.empty))
+        when(states.find(Users.uid, Markets.gbpeur)).thenReturnSome(Markets.state)
+        val dispatcher = MockActionDispatcher[IO]
+        (for
+          service <- MarketService.make[IO](states, dispatcher, StrategyRuntime.make(settings))
+          _       <- obsolete.traverse_(service.processSignals(Users.uid, Markets.gbpeur, _))
+        yield ()).asserting { _ =>
+          verify(states, times(obsolete.size)).find(Users.uid, Markets.gbpeur)
+          verifyNoMoreInteractions(states)
+          dispatcher.submittedActions mustBe empty
+        }
+      }
+
+      "recheck the configuration after an optimistic write conflict" in {
+        val states  = mock[MarketStateRepository[IO]]
+        val runtime = mock[StrategyRuntime[IO]]
+        val batch   = Processing.batch(List(Signals.trend(Direction.Downward)))
+        when(states.find(Users.uid, Markets.gbpeur)).thenReturnSome(Markets.state)
+        when(runtime.load(Users.uid)).thenReturn(
+          Processing.fixed.load(Users.uid),
+          Processing.fixed.load(Users.uid).map(_.copy(revision = 1L))
+        )
+        when(states.save(any[MarketState])).thenReturnIO(false)
+        val dispatcher = MockActionDispatcher[IO]
+        (for
+          service <- MarketService.make[IO](states, dispatcher, runtime)
+          _       <- service.processSignals(Users.uid, Markets.gbpeur, batch)
+        yield ()).asserting { _ =>
+          verify(states, times(2)).find(Users.uid, Markets.gbpeur)
+          verify(states).save(any[MarketState])
+          verify(runtime, times(2)).load(Users.uid)
+          dispatcher.submittedActions mustBe empty
+        }
+      }
+
       "save the updated state and evaluate rules when the profile changes" in {
         val signal            = Signals.trend(Direction.Downward)
         val (stateRepo, disp) = mocks
-        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(Markets.state)
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(configuredState)
         when(stateRepo.save(any[MarketState])).thenReturnIO(true)
 
         val result = for
-          svc <- MarketService.make[IO](stateRepo, disp)
-          _   <- svc.processSignals(Users.uid, Markets.gbpeur, List(signal))
+          svc <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
+          _   <- svc.processSignals(Users.uid, Markets.gbpeur, Processing.batch(List(signal)))
         yield ()
 
         result.asserting { _ =>
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
-          verify(stateRepo).save(Markets.state.applyCandleSignals(List(signal), signal.time).get)
+          verify(stateRepo).save(
+            configuredState.copy(
+              profile = MarketProfileUpdater.update(configuredState.profile, signal),
+              previousProfile = Some(configuredState.profile),
+              lastCandleTime = Some(signal.time),
+              lastTimeStateCandle = Some(signal.time)
+            )
+          )
           disp.submittedActions mustBe List(Action.ProcessMarketStateUpdate(Users.uid, Markets.gbpeur))
         }
       }
@@ -294,16 +368,16 @@ class MarketServiceSpec extends IOWordSpec {
       "save the candle watermark without evaluating rules when the profile is unchanged" in {
         val signal            = Signals.trend(Direction.Upward)
         val (stateRepo, disp) = mocks
-        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(Markets.state)
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(configuredState)
         when(stateRepo.save(any[MarketState])).thenReturnIO(true)
 
         val result = for
-          svc <- MarketService.make[IO](stateRepo, disp)
-          _   <- svc.processSignals(Users.uid, Markets.gbpeur, List(signal))
+          svc <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
+          _   <- svc.processSignals(Users.uid, Markets.gbpeur, Processing.batch(List(signal)))
         yield ()
 
         result.asserting { _ =>
-          verify(stateRepo).save(Markets.state.copy(lastCandleTime = Some(signal.time)))
+          verify(stateRepo).save(configuredState.copy(lastCandleTime = Some(signal.time), lastTimeStateCandle = Some(signal.time)))
           disp.submittedActions mustBe empty
         }
       }
@@ -311,12 +385,16 @@ class MarketServiceSpec extends IOWordSpec {
       "skip older and repeated candles without saving" in {
         val candleTime        = Markets.ts.plus(2.hours)
         val (stateRepo, disp) = mocks
-        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(Markets.state.copy(lastCandleTime = Some(candleTime)))
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(configuredState.copy(lastCandleTime = Some(candleTime)))
 
         val result = for
-          svc <- MarketService.make[IO](stateRepo, disp)
-          _   <- svc.processSignals(Users.uid, Markets.gbpeur, List(Signals.trend(Direction.Downward, time = candleTime.minus(1.hour))))
-          _   <- svc.processSignals(Users.uid, Markets.gbpeur, List(Signals.trend(Direction.Downward, time = candleTime)))
+          svc <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
+          _   <- svc.processSignals(
+            Users.uid,
+            Markets.gbpeur,
+            Processing.batch(List(Signals.trend(Direction.Downward, time = candleTime.minus(1.hour))))
+          )
+          _ <- svc.processSignals(Users.uid, Markets.gbpeur, Processing.batch(List(Signals.trend(Direction.Downward, time = candleTime))))
         yield ()
 
         result.asserting { _ =>
@@ -333,13 +411,23 @@ class MarketServiceSpec extends IOWordSpec {
         when(stateRepo.save(any[MarketState])).thenReturnIO(true)
 
         val result = for
-          svc <- MarketService.make[IO](stateRepo, disp)
-          _   <- svc.processSignals(Users.uid, Markets.gbpeur, List(signal))
+          svc <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
+          _   <- svc.processSignals(Users.uid, Markets.gbpeur, Processing.batch(List(signal)))
         yield ()
 
         result.asserting { _ =>
           verify(stateRepo).save(
-            MarketState.initial(Users.uid, Markets.gbpeur, Markets.ts).applyCandleSignals(List(signal), signal.time).get
+            MarketState
+              .initial(Users.uid, Markets.gbpeur, Markets.ts)
+              .copy(
+                profile = MarketProfileUpdater.update(MarketProfile(), signal),
+                previousProfile = Some(MarketProfile()),
+                configRevision = Some(0L),
+                sources = Processing.sources,
+                interval = Some(Interval.H1),
+                lastCandleTime = Some(signal.time),
+                lastTimeStateCandle = Some(signal.time)
+              )
           )
           disp.submittedActions mustBe List(Action.ProcessMarketStateUpdate(Users.uid, Markets.gbpeur))
         }
@@ -349,32 +437,49 @@ class MarketServiceSpec extends IOWordSpec {
         val olderTime  = Markets.ts.plus(1.hour)
         val candleTime = Markets.ts.plus(2.hours)
         val committed  =
-          Markets.state.copy(profile = Markets.profile.copy(trend = Some(TrendState(Direction.Downward, olderTime))), version = Some(1))
+          configuredState.copy(
+            profile = MarketProfileUpdater.update(configuredState.profile, Signals.trend(Direction.Downward, time = olderTime)),
+            version = Some(1)
+          )
         val signal = Signals.make(Users.uid, candleTime, Markets.gbpeur, Condition.ValueUpdated(ValueRole.Price, BigDecimal("1.25")))
         val (stateRepo, disp) = mocks
-        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(Markets.state)), IO.pure(Some(committed)))
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturn(IO.pure(Some(configuredState)), IO.pure(Some(committed)))
         when(stateRepo.save(any[MarketState])).thenReturn(IO.pure(false), IO.pure(true))
 
         val result = for
-          svc <- MarketService.make[IO](stateRepo, disp)
-          _   <- svc.processSignals(Users.uid, Markets.gbpeur, List(signal))
+          svc <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
+          _   <- svc.processSignals(Users.uid, Markets.gbpeur, Processing.batch(List(signal)))
         yield ()
 
         result.asserting { _ =>
-          verify(stateRepo).save(Markets.state.applyCandleSignals(List(signal), candleTime).get)
-          verify(stateRepo).save(committed.applyCandleSignals(List(signal), candleTime).get)
+          verify(stateRepo).save(
+            configuredState.copy(
+              profile = MarketProfileUpdater.update(configuredState.profile, signal),
+              previousProfile = Some(configuredState.profile),
+              lastCandleTime = Some(candleTime),
+              lastTimeStateCandle = Some(candleTime)
+            )
+          )
+          verify(stateRepo).save(
+            committed.copy(
+              profile = MarketProfileUpdater.update(committed.profile, signal),
+              previousProfile = Some(committed.profile),
+              lastCandleTime = Some(candleTime),
+              lastTimeStateCandle = Some(candleTime)
+            )
+          )
           disp.submittedActions mustBe List(Action.ProcessMarketStateUpdate(Users.uid, Markets.gbpeur))
         }
       }
 
       "stop after a bounded number of conflicting attempts" in {
         val (stateRepo, disp) = mocks
-        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(Markets.state)
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(configuredState)
         when(stateRepo.save(any[MarketState])).thenReturnIO(false)
 
         val result = for
-          svc <- MarketService.make[IO](stateRepo, disp)
-          res <- svc.processSignals(Users.uid, Markets.gbpeur, List(Signals.trend(Direction.Downward))).attempt
+          svc <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
+          res <- svc.processSignals(Users.uid, Markets.gbpeur, Processing.batch(List(Signals.trend(Direction.Downward)))).attempt
         yield res
 
         result.asserting { res =>
@@ -385,78 +490,75 @@ class MarketServiceSpec extends IOWordSpec {
         }
       }
 
-      "ignore empty batches" in {
+      "log the configuration guard's reason even when the rejected batch is empty" in {
+        val underlying        = summon[Logger[IO]]
         val (stateRepo, disp) = mocks
-        val result            = for
-          svc <- MarketService.make[IO](stateRepo, disp)
-          _   <- svc.processSignals(Users.uid, Markets.gbpeur, Nil)
-        yield ()
-
-        result.asserting { _ =>
-          verifyNoInteractions(stateRepo)
-          disp.submittedActions mustBe empty
-        }
-      }
-    }
-
-    "processManualSignal" should {
-      "save the updated profile without moving the candle watermark" in {
-        val manualSignal      = Signals.trend(Direction.Downward, time = Markets.ts.minus(1.hour))
-        val initialState      = Markets.state.copy(lastCandleTime = Some(Markets.ts))
-        val (stateRepo, disp) = mocks
-        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(initialState)
-        when(stateRepo.save(any[MarketState])).thenReturnIO(true)
-
-        val result = for
-          svc <- MarketService.make[IO](stateRepo, disp)
-          _   <- svc.processManualSignal(manualSignal)
-        yield ()
-
-        result.asserting { _ =>
-          verify(stateRepo).save(
-            initialState.copy(
-              profile = Markets.profile.copy(trend = Some(TrendState(Direction.Downward, manualSignal.time))),
-              previousProfile = Some(Markets.profile)
-            )
+        when(stateRepo.find(Users.uid, Markets.gbpeur)).thenReturnSome(configuredState)
+        (for
+          messages <- Ref.of[IO, List[String]](Nil)
+          logger = new Logger[IO]:
+            export underlying.{debug, error, trace, warn}
+            def info(message: => String): IO[Unit]               = messages.update(_ :+ message)
+            def info(t: Throwable)(message: => String): IO[Unit] = info(message)
+          service <- MarketService.make[IO](stateRepo, disp, Processing.fixed)(using
+            MonadThrow[IO],
+            summon[Clock[IO]],
+            logger
           )
-          disp.submittedActions mustBe List(Action.ProcessMarketStateUpdate(Users.uid, Markets.gbpeur))
-        }
-      }
-
-      "not save anything when the signal leaves the profile unchanged" in {
-        val (stateRepo, disp) = mocks
-        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(Markets.state)
-
-        val result = for
-          svc <- MarketService.make[IO](stateRepo, disp)
-          _   <- svc.processManualSignal(Signals.trend(Direction.Upward))
-        yield ()
-
-        result.asserting { _ =>
+          _      <- service.processSignals(Users.uid, Markets.gbpeur, Processing.batch(Nil).copy(revision = 1L))
+          logged <- messages.get
+        yield logged).asserting { messages =>
+          messages mustBe List(
+            s"rejecting signal batch for ${Users.uid}/${Markets.gbpeur} at ${Markets.ts}: " +
+              "configuration revision 1 is no longer active (0)"
+          )
           verify(stateRepo).find(Users.uid, Markets.gbpeur)
           verifyNoMoreInteractions(stateRepo)
           disp.submittedActions mustBe empty
         }
       }
+
+      "advance only the time cursor for empty batches without evaluating rules" in {
+        val (stateRepo, disp) = mocks
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(configuredState)
+        when(stateRepo.save(any[MarketState])).thenReturnIO(true)
+        val result = for
+          svc <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
+          _   <- svc.processSignals(Users.uid, Markets.gbpeur, Processing.batch(Nil))
+        yield ()
+
+        result.asserting { _ =>
+          verify(stateRepo).save(configuredState.copy(lastTimeStateCandle = Some(Markets.ts)))
+          disp.submittedActions mustBe empty
+        }
+      }
     }
 
-    "updateTimeState" should {
+    "closure adjustment in a batch" should {
       val candleTime  = Markets.ts.plus(1.day)
       val dataWithGap = Markets.timeSeriesData.copy(prices = Markets.priceRanges.head.copy(time = candleTime) :: Markets.priceRanges)
 
       "shift the state when the gap between the latest two candles is greater than two intervals" in {
         val (stateRepo, disp) = mocks
-        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(Markets.state)
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(configuredState)
         when(stateRepo.save(any[MarketState])).thenReturnIO(true)
 
         val result = for
-          svc <- MarketService.make[IO](stateRepo, disp)
-          _   <- svc.updateTimeState(Users.uid, dataWithGap)
+          svc <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
+          _   <- svc.processSignals(
+            Users.uid,
+            dataWithGap.currencyPair,
+            Processing
+              .batch(Nil)
+              .copy(interval = dataWithGap.interval, candleTime = dataWithGap.latestTime, closureGap = SignalBatch.closureGap(dataWithGap))
+          )
         yield ()
 
         result.asserting { _ =>
           verify(stateRepo).save(
-            Markets.state.adjustForMarketClosure(1.day - 1.hour, candleTime).copy(lastTimeStateCandle = Some(candleTime))
+            configuredState
+              .adjustForMarketClosure(1.day - 1.hour, candleTime)
+              .copy(lastTimeStateCandle = Some(candleTime))
           )
           disp.submittedActions mustBe empty
         }
@@ -464,27 +566,48 @@ class MarketServiceSpec extends IOWordSpec {
 
       "only record the candle when there is no significant gap" in {
         val (stateRepo, disp) = mocks
-        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(Markets.state)
+        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(configuredState)
         when(stateRepo.save(any[MarketState])).thenReturnIO(true)
 
         val result = for
-          svc <- MarketService.make[IO](stateRepo, disp)
-          _   <- svc.updateTimeState(Users.uid, Markets.timeSeriesData)
+          svc <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
+          _   <- svc.processSignals(
+            Users.uid,
+            Markets.timeSeriesData.currencyPair,
+            Processing
+              .batch(Nil)
+              .copy(
+                interval = Markets.timeSeriesData.interval,
+                candleTime = Markets.timeSeriesData.latestTime,
+                closureGap = SignalBatch.closureGap(Markets.timeSeriesData)
+              )
+          )
         yield ()
 
         result.asserting { _ =>
-          verify(stateRepo).save(Markets.state.copy(lastTimeStateCandle = Some(Markets.timeSeriesData.latestTime)))
+          verify(stateRepo).save(
+            configuredState.copy(
+              lastTimeStateCandle = Some(Markets.timeSeriesData.latestTime)
+            )
+          )
           disp.submittedActions mustBe empty
         }
       }
 
       "skip a gap that was already applied" in {
         val (stateRepo, disp) = mocks
-        when(stateRepo.find(any[UserId], any[CurrencyPair])).thenReturnSome(Markets.state.copy(lastTimeStateCandle = Some(candleTime)))
+        when(stateRepo.find(any[UserId], any[CurrencyPair]))
+          .thenReturnSome(configuredState.copy(lastCandleTime = Some(candleTime), lastTimeStateCandle = Some(candleTime)))
 
         val result = for
-          svc <- MarketService.make[IO](stateRepo, disp)
-          _   <- svc.updateTimeState(Users.uid, dataWithGap)
+          svc <- MarketService.make[IO](stateRepo, disp, Processing.fixed)
+          _   <- svc.processSignals(
+            Users.uid,
+            dataWithGap.currencyPair,
+            Processing
+              .batch(Nil)
+              .copy(interval = dataWithGap.interval, candleTime = dataWithGap.latestTime, closureGap = SignalBatch.closureGap(dataWithGap))
+          )
         yield ()
 
         result.asserting { _ =>
@@ -495,6 +618,12 @@ class MarketServiceSpec extends IOWordSpec {
       }
     }
   }
+
+  private val configuredState = Markets.state.copy(
+    configRevision = Some(0L),
+    interval = Some(Interval.H1),
+    sources = Processing.sources
+  )
 
   def mocks: (MarketStateRepository[IO], MockActionDispatcher[IO]) =
     (mock[MarketStateRepository[IO]], MockActionDispatcher[IO])

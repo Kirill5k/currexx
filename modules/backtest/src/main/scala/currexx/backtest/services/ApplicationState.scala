@@ -1,6 +1,6 @@
 package currexx.backtest.services
 
-import cats.Monad
+import cats.MonadThrow
 import cats.data.NonEmptyList
 import cats.effect.{Ref, Temporal}
 import cats.effect.std.Queue
@@ -9,7 +9,7 @@ import cats.syntax.functor.*
 import currexx.backtest.{DataWindow, MarketMark, TestSettings}
 import currexx.core.common.action.Action
 import currexx.core.market.MarketState
-import currexx.core.settings.{SignalSettings, TradeSettings}
+import currexx.core.settings.{GlobalSettings, StrategyConfiguration, TradeSettings}
 import currexx.core.trade.TradeOrderPlacement
 import currexx.domain.market.{CurrencyPair, MarketTimeSeriesData, OpenedTradeOrder}
 import currexx.domain.user.UserId
@@ -21,9 +21,9 @@ import scala.concurrent.duration.*
 
 final class ApplicationState[F[_]](
     val marketStateRef: Ref[F, MarketState],
+    val configurationRef: Ref[F, StrategyConfiguration],
     val tradeSettingsRef: Ref[F, TradeSettings],
     val tradeOrdersRef: Ref[F, ListBuffer[TradeOrderPlacement]],
-    val signalSettingsRef: Ref[F, SignalSettings],
     val clockRef: Ref[F, Option[Instant]],
     val dataRef: Ref[F, Option[MarketTimeSeriesData]],
     val marketMarksRef: Ref[F, List[MarketMark]],
@@ -31,7 +31,7 @@ final class ApplicationState[F[_]](
     val dispatcherQueue: Queue[F, Action],
     val userIdRef: Ref[F, UserId],
     val brokerPositionsRef: Ref[F, Map[CurrencyPair, OpenedTradeOrder]]
-)(using F: Monad[F]) {
+)(using F: MonadThrow[F]) {
 
   private val fetchTimeOffset: FiniteDuration = 100.seconds
 
@@ -62,10 +62,13 @@ final class ApplicationState[F[_]](
 
   def reset(newSettings: TestSettings): F[Unit] =
     for
+      configuration <- F.fromEither(
+        StrategyConfiguration.from(GlobalSettings(newSettings.userId, Some(newSettings.signal), Some(newSettings.trade), None))
+      )
+      _ <- configurationRef.update(old => configuration.copy(revision = old.revision + 1))
       _ <- marketStateRef.set(newSettings.marketState)
       _ <- tradeSettingsRef.set(newSettings.trade)
       _ <- tradeOrdersRef.set(ListBuffer.empty[TradeOrderPlacement])
-      _ <- signalSettingsRef.set(newSettings.signal)
       _ <- clockRef.set(None)
       _ <- dataRef.set(None)
       _ <- marketMarksRef.set(Nil)
@@ -79,22 +82,25 @@ final class ApplicationState[F[_]](
 object ApplicationState {
   def make[F[_]: Temporal](settings: TestSettings): F[ApplicationState[F]] =
     for
-      dispatcherQueue   <- Queue.bounded[F, Action](1024)
-      clockRef          <- Ref.of[F, Option[Instant]](None)
-      dataRef           <- Ref.of[F, Option[MarketTimeSeriesData]](None)
-      marketMarksRef    <- Ref.of[F, List[MarketMark]](Nil)
-      dataWindowRef     <- Ref.of[F, Option[DataWindow]](None)
-      marketStateRef    <- Ref.of[F, MarketState](settings.marketState)
-      tradeSettingsRef  <- Ref.of[F, TradeSettings](settings.trade)
-      tradeOrdersRef    <- Ref.of[F, ListBuffer[TradeOrderPlacement]](ListBuffer.empty)
-      signalSettingsRef <- Ref.of[F, SignalSettings](settings.signal)
-      userIdRef         <- Ref.of[F, UserId](settings.userId)
-      brokerPositions   <- Ref.of[F, Map[CurrencyPair, OpenedTradeOrder]](Map.empty)
+      configuration <- Temporal[F].fromEither(
+        StrategyConfiguration.from(GlobalSettings(settings.userId, Some(settings.signal), Some(settings.trade), None))
+      )
+      configurationRef <- Ref.of[F, StrategyConfiguration](configuration)
+      dispatcherQueue  <- Queue.bounded[F, Action](1024)
+      clockRef         <- Ref.of[F, Option[Instant]](None)
+      dataRef          <- Ref.of[F, Option[MarketTimeSeriesData]](None)
+      marketMarksRef   <- Ref.of[F, List[MarketMark]](Nil)
+      dataWindowRef    <- Ref.of[F, Option[DataWindow]](None)
+      marketStateRef   <- Ref.of[F, MarketState](settings.marketState)
+      tradeSettingsRef <- Ref.of[F, TradeSettings](settings.trade)
+      tradeOrdersRef   <- Ref.of[F, ListBuffer[TradeOrderPlacement]](ListBuffer.empty)
+      userIdRef        <- Ref.of[F, UserId](settings.userId)
+      brokerPositions  <- Ref.of[F, Map[CurrencyPair, OpenedTradeOrder]](Map.empty)
     yield ApplicationState[F](
       marketStateRef = marketStateRef,
+      configurationRef = configurationRef,
       tradeSettingsRef = tradeSettingsRef,
       tradeOrdersRef = tradeOrdersRef,
-      signalSettingsRef = signalSettingsRef,
       clockRef = clockRef,
       dataRef = dataRef,
       marketMarksRef = marketMarksRef,

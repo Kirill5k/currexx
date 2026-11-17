@@ -64,14 +64,10 @@ final private class LiveActionProcessor[F[_]](
         tradeService.fetchMarketData(uid, cps, interval, candleCount)
     case Action.ProcessMarketData(uid, data) =>
       logger.info(s"processing market data for $uid/${data.currencyPair} (time=${data.latestTime}, source=${data.source})") *>
-        marketService.updateTimeState(uid, data) *>
         signalService.processMarketData(uid, data)
-    case Action.ProcessSignals(uid, cp, signals) =>
-      logger.info(s"processing ${signals.size} submitted signals for $uid/$cp") *>
-        marketService.processSignals(uid, cp, signals)
-    case Action.ProcessManualSignal(signal) =>
-      logger.info(s"processing manual signal for ${signal.userId}/${signal.currencyPair}") *>
-        marketService.processManualSignal(signal)
+    case Action.ProcessSignals(uid, cp, batch) =>
+      F.whenA(batch.signals.nonEmpty)(logger.info(s"processing ${batch.signals.size} signals for $uid/$cp")) *>
+        marketService.processSignals(uid, cp, batch)
     case Action.AssertProfit(uid, cps, limits) =>
       logger.info(s"verifying current position for $uid/$cps") *>
         tradeService.closeOrderIfProfitIsOutsideRange(uid, cps, limits)

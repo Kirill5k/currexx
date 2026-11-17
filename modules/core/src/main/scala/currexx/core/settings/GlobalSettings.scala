@@ -31,5 +31,6 @@ final case class GlobalSettings(
     userId: UserId,
     signal: Option[SignalSettings],
     trade: Option[TradeSettings],
-    note: Option[String]
+    note: Option[String],
+    revision: Long = 0L
 )
