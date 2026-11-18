@@ -17,7 +17,7 @@ object BatchBacktester extends IOApp.Simple {
   val strategies: List[(String, TestStrategy)] = StrategyCatalogue.batch
 
   val riskSettings: RiskSettings = RiskSettings()
-  val candleCount: CandleCount   = CandleCount.Default
+  val candleCount: CandleCount   = CandleCount.fromUnsafe(250)
 
   def runOne(
       name: String,

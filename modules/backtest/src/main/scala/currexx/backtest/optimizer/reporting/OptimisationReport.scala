@@ -73,5 +73,5 @@ final case class OptimisationReport(
     baseCandidate: TestStrategy,
     fixedIndicators: Set[Indicator],
     ruleBounds: RuleParameterBounds,
-    candleCount: CandleCount = CandleCount.Default
+    candleCount: CandleCount
 )

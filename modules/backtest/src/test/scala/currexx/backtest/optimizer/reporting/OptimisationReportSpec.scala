@@ -482,7 +482,8 @@ class OptimisationReportSpec extends IOWordSpec {
           target = target,
           baseCandidate = base,
           fixedIndicators = Set.empty,
-          ruleBounds = RuleParameterBounds()
+          ruleBounds = RuleParameterBounds(),
+          candleCount = round.candleCount
         )
         val lines         = OptimisationReportRenderer.sections(report).flatMap(_._2)
         val baseLines     = lines.filter(_.startsWith("Base candidate: "))
@@ -544,7 +545,8 @@ class OptimisationReportSpec extends IOWordSpec {
         target = OptimisationTarget.Indicator,
         baseCandidate = base.candidate,
         fixedIndicators = Set.empty,
-        ruleBounds = RuleParameterBounds()
+        ruleBounds = RuleParameterBounds(),
+        candleCount = round.candleCount
       )
       val text = OptimisationReportRenderer.sections(report).flatMap(_._2).mkString("\n")
       text must include("UPGRADE APPROVED")
@@ -585,7 +587,8 @@ class OptimisationReportSpec extends IOWordSpec {
         target = OptimisationTarget.Strategy,
         baseCandidate = base.candidate,
         fixedIndicators = Set(base.candidate.indicator),
-        ruleBounds = RuleParameterBounds()
+        ruleBounds = RuleParameterBounds(),
+        candleCount = round.candleCount
       )
       val sections              = OptimisationReportRenderer.sections(report)
       val lines                 = sections.toMap.apply("Upgrade decision")
@@ -649,7 +652,8 @@ class OptimisationReportSpec extends IOWordSpec {
         target = OptimisationTarget.Indicator,
         baseCandidate = target,
         fixedIndicators = Set.empty,
-        ruleBounds = RuleParameterBounds()
+        ruleBounds = RuleParameterBounds(),
+        candleCount = round.candleCount
       )
       val text = OptimisationReportRenderer.sections(report).flatMap { case (heading, lines) => heading :: lines }.mkString("\n")
       text must include("Search ranking: report-test")
@@ -710,7 +714,8 @@ class OptimisationReportSpec extends IOWordSpec {
         target = OptimisationTarget.Indicator,
         baseCandidate = target,
         fixedIndicators = Set.empty,
-        ruleBounds = RuleParameterBounds()
+        ruleBounds = RuleParameterBounds(),
+        candleCount = round.candleCount
       )
       val sections    = OptimisationReportRenderer.sections(report).toMap
       val comparisons = sections("Baseline comparisons").mkString("\n")
@@ -755,7 +760,8 @@ class OptimisationReportSpec extends IOWordSpec {
         target = OptimisationTarget.Indicator,
         baseCandidate = candidate,
         fixedIndicators = Set.empty,
-        ruleBounds = RuleParameterBounds()
+        ruleBounds = RuleParameterBounds(),
+        candleCount = round.candleCount
       )
       val text = OptimisationReportRenderer.sections(report).flatMap(_._2).mkString("\n")
       text must include("strongest seed on training (literal): +0.000000")
@@ -791,7 +797,8 @@ class OptimisationReportSpec extends IOWordSpec {
         target = OptimisationTarget.Indicator,
         baseCandidate = target,
         fixedIndicators = Set.empty,
-        ruleBounds = RuleParameterBounds()
+        ruleBounds = RuleParameterBounds(),
+        candleCount = round.candleCount
       )
       val text = OptimisationReportRenderer.sections(report).flatMap(_._2).mkString("\n")
       text must include(
@@ -826,7 +833,8 @@ class OptimisationReportSpec extends IOWordSpec {
         target = OptimisationTarget.Indicator,
         baseCandidate = candidate,
         fixedIndicators = Set.empty,
-        ruleBounds = RuleParameterBounds()
+        ruleBounds = RuleParameterBounds(),
+        candleCount = round.candleCount
       )
       val text = OptimisationReportRenderer.sections(report).flatMap(_._2).mkString("\n")
       text must include("Validation diagnostics unavailable: no validation measurements.")

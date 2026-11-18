@@ -72,13 +72,7 @@ object Optimisation {
         finalTopN = baselines.shortlistSize,
         renderIndividual = renderCandidate
       )
-      progressTracker = new ReportingTracker(
-        Tracker.composite(markdown, logging),
-        diagnostics,
-        round.corpus.foldCount,
-        searchObjective = round.searchObjective,
-        renderCandidate = renderCandidate
-      )
+      progressTracker = new ReportingTracker(Tracker.composite(markdown, logging), diagnostics, round)
       algorithm <- round.parameters match
         case params: Parameters.GA   => ga[F](round, params, space, baselines, search, objective, progressTracker, diagnostics, catalogue)
         case params: Parameters.SCGA => scga[F](round, params, space, baselines, search, objective, progressTracker, diagnostics, catalogue)
@@ -187,7 +181,7 @@ object Optimisation {
         builder = new OptimisationReportBuilder(round, space, objective.inspect, diagnostics, catalogue)
         _ <- (progressTracker.displayCompletedRankings(finalists) >>
           builder.build(result, snapshot, finished - started).flatMap(progressTracker.displayReport))
-          .handleErrorWith(error => progressTracker.displayReportFailure(round.name, error).attempt.void)
+          .handleErrorWith(error => progressTracker.displayReportFailure(error).attempt.void)
       yield result
     override val searchSpace: OptimisationSearchSpace                   = space
     override val tracker: Tracker[F, TestStrategy]                      = progressTracker

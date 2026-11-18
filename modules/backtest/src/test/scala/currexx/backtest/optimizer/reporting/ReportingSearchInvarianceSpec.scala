@@ -7,6 +7,7 @@ import currexx.algorithms.operators.{Elitism, Selector, Validator}
 import currexx.algorithms.operators.species.SpeciesOperators
 import currexx.algorithms.progress.{Progress, Tracker}
 import currexx.backtest.{OrderStats, TestStrategy}
+import currexx.backtest.MarketDataProvider.Corpus
 import currexx.backtest.optimizer.*
 import currexx.core.trade.{Rule, TradeAction, TradeStrategy}
 import currexx.backtest.optimizer.strategy.{RuleList, RuleParameter, RuleParameterBounds, RuleParameterPath, RulePath, RuleTarget}
@@ -73,19 +74,17 @@ class ReportingSearchInvarianceSpec extends IOWordSpec {
   private def run(params: Parameters.GA | Parameters.SCGA, targetMode: OptimisationTarget, instrumented: Boolean): IO[Outcome] = IO.defer {
     // Reusing this IO must recreate the generator, including the initial oversampling draws.
     given random: Random = Random(42)
+    val round            = OptimisationRound(
+      "invariance",
+      target,
+      params,
+      scoring,
+      corpus = Corpus(List.fill(foldCount)(Nil)),
+      target = targetMode,
+      ruleBounds = if (targetMode == OptimisationTarget.Indicator) RuleParameterBounds() else bounds
+    )
     for {
-      space <- IO.fromEither(
-        OptimisationSearchSpace.forRound(
-          OptimisationRound(
-            "invariance",
-            target,
-            params,
-            scoring,
-            target = targetMode,
-            ruleBounds = if (targetMode == OptimisationTarget.Indicator) RuleParameterBounds() else bounds
-          )
-        )
-      )
+      space       <- IO.fromEither(OptimisationSearchSpace.forRound(round))
       search      <- OptimisationSearchOperators.make[IO](space)
       calls       <- Ref.of[IO, Map[(TestStrategy, Int), Int]](Map.empty)
       validations <- Ref.of[IO, Vector[TestStrategy]](Vector.empty)
@@ -106,7 +105,7 @@ class ReportingSearchInvarianceSpec extends IOWordSpec {
         override def displayNote(title: String, lines: List[String]): IO[Unit]             = notes.update(_ :+ title)
       }
       tracker = diagnostics.fold[Tracker[IO, TestStrategy]](delegate) { observed =>
-        new ReportingTracker(delegate, observed, foldCount, logInterval = 1)
+        new ReportingTracker(delegate, observed, round, logInterval = 1)
       }
       population <- params match {
         case ga: Parameters.GA =>

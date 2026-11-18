@@ -5,6 +5,7 @@ import currexx.backtest.{OrderStats, TestStrategy}
 import currexx.backtest.MarketDataProvider.{Corpus, Dataset, DateRange}
 import currexx.backtest.optimizer.ScoringFunction
 import currexx.core.trade.{Rule, TradeAction, TradeStrategy}
+import currexx.domain.market.CandleCount
 import currexx.domain.signal.{Indicator, ValueRole, ValueSource, ValueTransformation as VT}
 import cats.effect.IO
 import cats.syntax.traverse.*
@@ -81,10 +82,11 @@ class OptimisationSpec extends IOWordSpec {
       given Random = Random(91)
       val params   = Parameters.GA(1, 0, 0.0, 0.0, 0.0, shuffle = false)
       val label    = s"undersized-population-${UUID.randomUUID()}"
+      val config   = round(label, params).copy(candleCount = CandleCount.fromUnsafe(250))
 
       val result = Files.forAsync[IO].tempDirectory.use { outputDirectory =>
         for
-          algorithm <- Optimisation.make[IO](round(label, params), 1, outputDirectory = outputDirectory)
+          algorithm <- Optimisation.make[IO](config, 1, outputDirectory = outputDirectory)
           outcome   <- algorithm.optimise.attempt
           reports   <- readReports(outputDirectory, label)
         yield (outcome, reports)
@@ -94,6 +96,7 @@ class OptimisationSpec extends IOWordSpec {
         outcome.isLeft mustBe true
         outcome.swap.toOption.get.getMessage must include("seed")
         reports must have size 1
+        reports.head._2.linesIterator.toList must contain("Candle count: 250")
         (reports.head._2 must not).include("## Final Results")
       }
     }
@@ -165,6 +168,7 @@ class OptimisationSpec extends IOWordSpec {
         val (path, content) = reports.head
         path.fileName.toString must startWith("ga-optimisation-")
         content must include(s"# Genetic Algorithm Run: $label")
+        content.linesIterator.takeWhile(_ != "## Final Results").toList must contain("Candle count: 100")
         content must include(s"**Target:** ${strategy.indicator}")
         content must include(s"Base candidate: ${strategy.asJson.noSpaces}")
         content must include(s"**Parameters:** $params")
@@ -193,11 +197,12 @@ class OptimisationSpec extends IOWordSpec {
         maxSpecies = 2,
         interspeciesMatingProbability = 0.0
       )
-      val label = s"scga-factory-test-${UUID.randomUUID()}"
+      val label  = s"scga-factory-test-${UUID.randomUUID()}"
+      val config = round(label, params).copy(candleCount = CandleCount.fromUnsafe(500))
 
       val result = Files.forAsync[IO].tempDirectory.use { outputDirectory =>
         for
-          algorithm <- Optimisation.make[IO](round(label, params), evaluatorPoolSize = 1, outputDirectory = outputDirectory)
+          algorithm <- Optimisation.make[IO](config, evaluatorPoolSize = 1, outputDirectory = outputDirectory)
           finalists <- algorithm.optimise.map(_.finalists)
           replayed  <- finalists.map(_._1).traverse(algorithm.validate)
           _         <- algorithm.tracker.displayNote("Validation replay", List("SCGA validation replay completed."))
@@ -219,6 +224,9 @@ class OptimisationSpec extends IOWordSpec {
         val (path, content) = reports.head
         path.fileName.toString must startWith("scga-optimisation-")
         content must include(s"# Species-Conserving Genetic Algorithm Run: $label")
+        val (progress, results) = content.linesIterator.toList.span(_ != "## Final Results")
+        progress must contain("Candle count: 500")
+        results must contain("Candle count: 500")
         content must include(s"**Parameters:** $params")
         content must include("## Final Results")
         content must include("**Top 2 members:**")

@@ -11,6 +11,7 @@ import currexx.backtest.optimizer.{
   UpgradeDecision
 }
 import currexx.backtest.TestStrategy
+import currexx.domain.market.CandleCount
 import io.circe.syntax.*
 
 /** Text is derived from completed measurements; rendering never evaluates a candidate. */
@@ -21,7 +22,11 @@ object OptimisationReportRenderer:
       error.toString
     )
 
-  val progressIntro: List[String] = List(
+  private def candleCountLine(count: CandleCount): String = s"Candle count: ${count.value}"
+
+  def runOverview(candleCount: CandleCount): List[String] = List(
+    candleCountLine(candleCount),
+    "",
     "Top-member fitness uses the generation's rotating search folds; values across generations are not directly comparable.",
     "Stable progress uses all search folds. First seen means the first successful search evaluation; initial population is generation 0."
   )
@@ -63,7 +68,7 @@ object OptimisationReportRenderer:
       round: OptimisationRound,
       population: ValidatedPopulation[TestStrategy],
       championBreaches: List[ScoringFunction.Violation]
-  ): List[String] = round.corpus.describe ::: List(s"Candle count: ${round.candleCount.value}", "") ::: outcome(
+  ): List[String] = round.corpus.describe ::: List(candleCountLine(round.candleCount), "") ::: outcome(
     population,
     championBreaches,
     round.corpus.validationFold.nonEmpty,
@@ -121,7 +126,7 @@ object OptimisationReportRenderer:
       .toList
     List(
       s"Optimisation target: ${report.target}",
-      s"Candle count: ${report.candleCount.value}",
+      candleCountLine(report.candleCount),
       s"Rule parameter bounds: ${RuleBoundsRenderer.json(report.ruleBounds).noSpaces}"
     ) ::: fixedIndicators ::: fixed ::: List(s"Base candidate: ${report.baseCandidate.asJson.noSpaces}")
 

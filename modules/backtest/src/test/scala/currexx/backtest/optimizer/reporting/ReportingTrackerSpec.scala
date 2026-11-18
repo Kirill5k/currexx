@@ -6,7 +6,7 @@ import cats.effect.{IO, Ref}
 import currexx.algorithms.{EvaluationPhase, Fitness, Parameters, ValidatedPopulation}
 import currexx.algorithms.progress.{Progress, Tracker}
 import currexx.backtest.MarketDataProvider.Corpus
-import currexx.backtest.optimizer.{OptimisationTarget, SearchObjectiveConfig}
+import currexx.backtest.optimizer.{OptimisationRound, OptimisationRounds, OptimisationTarget, ScoringFunction, SearchObjectiveConfig}
 import currexx.backtest.optimizer.strategy.RuleParameterBounds
 import currexx.domain.signal.{Indicator, ValueSource, ValueTransformation as VT}
 import kirill5k.common.cats.test.IOWordSpec
@@ -15,9 +15,17 @@ import scala.concurrent.duration.*
 
 class ReportingTrackerSpec extends IOWordSpec {
   private val indicator = TestStrategy(Indicator.TrendChangeDetection(ValueSource.Close, VT.SMA(10)), TradeStrategy(Nil, Nil))
-  private val report    = OptimisationReport(
+  private val round     = OptimisationRound(
     "report-test",
-    Corpus(Nil),
+    indicator,
+    OptimisationRounds.gaParameters,
+    ScoringFunction.Consistent(),
+    corpus = Corpus(Nil),
+    target = OptimisationTarget.Indicator
+  )
+  private val report = OptimisationReport(
+    round.name,
+    round.corpus,
     Vector.empty,
     Nil,
     Map.empty,
@@ -29,7 +37,8 @@ class ReportingTrackerSpec extends IOWordSpec {
     target = OptimisationTarget.Indicator,
     baseCandidate = indicator,
     fixedIndicators = Set.empty,
-    ruleBounds = RuleParameterBounds()
+    ruleBounds = RuleParameterBounds(),
+    candleCount = round.candleCount
   )
 
   private def noteTracker(write: (String, List[String]) => IO[Unit], finalCall: IO[Unit] = IO.unit): Tracker[IO, TestStrategy] =
@@ -52,9 +61,7 @@ class ReportingTrackerSpec extends IOWordSpec {
         tracker = new ReportingTracker(
           delegate,
           diagnostics,
-          1,
-          searchObjective = SearchObjectiveConfig.BaselineRelative(),
-          renderCandidate = CandidateDisplay.forTarget(OptimisationTarget.Strategy)
+          round.copy(searchObjective = SearchObjectiveConfig.BaselineRelative(), target = OptimisationTarget.Strategy)
         )
         finalists = Vector((indicator, Fitness(2.0), Fitness(1.0)))
         _       <- tracker.displayFinal(finalists)
@@ -84,7 +91,7 @@ class ReportingTrackerSpec extends IOWordSpec {
           (title, _) => notes.update(_ :+ title),
           calls.update(_ + 1) >> IO.raiseError(failure)
         )
-        tracker = new ReportingTracker(delegate, diagnostics, foldCount = 1)
+        tracker = new ReportingTracker(delegate, diagnostics, round)
         beforeDecision <- tracker.displayFinal(report.finalists).attempt
         callsBefore    <- calls.get
         afterDecision  <- tracker.displayCompletedRankings(report.finalists).attempt
@@ -105,7 +112,7 @@ class ReportingTrackerSpec extends IOWordSpec {
       val result = for {
         diagnostics <- RunDiagnostics.make[IO]
         notes       <- Ref.of[IO, List[(String, List[String])]](Nil)
-        tracker = new ReportingTracker(noteTracker((title, lines) => notes.update(_ :+ (title -> lines))), diagnostics, foldCount = 1)
+        tracker = new ReportingTracker(noteTracker((title, lines) => notes.update(_ :+ (title -> lines))), diagnostics, round)
         _       <- tracker.displayReport(report)
         written <- notes.get
       } yield written
@@ -120,8 +127,8 @@ class ReportingTrackerSpec extends IOWordSpec {
       val result  = for {
         diagnostics <- RunDiagnostics.make[IO]
         notes       <- Ref.of[IO, List[(String, List[String])]](Nil)
-        tracker = new ReportingTracker(noteTracker((title, lines) => notes.update(_ :+ (title -> lines))), diagnostics, foldCount = 1)
-        _       <- tracker.displayReportFailure(report.roundName, failure)
+        tracker = new ReportingTracker(noteTracker((title, lines) => notes.update(_ :+ (title -> lines))), diagnostics, round)
+        _       <- tracker.displayReportFailure(failure)
         written <- notes.get
       } yield written
 
@@ -141,7 +148,7 @@ class ReportingTrackerSpec extends IOWordSpec {
         delegate = noteTracker { (title, lines) =>
           notes.update(_ :+ (title -> lines)) >> (if (title == sections(1)._1) IO.raiseError(failure) else IO.unit)
         }
-        tracker = new ReportingTracker(delegate, diagnostics, foldCount = 1)
+        tracker = new ReportingTracker(delegate, diagnostics, round)
         outcome <- tracker.displayReport(report).attempt
         written <- notes.get
       } yield (outcome, written)
@@ -159,8 +166,8 @@ class ReportingTrackerSpec extends IOWordSpec {
         diagnostics <- RunDiagnostics.make[IO]
         notes       <- Ref.of[IO, List[(String, List[String])]](Nil)
         delegate = noteTracker((title, lines) => notes.update(_ :+ (title -> lines)) >> IO.raiseError(sinkFailure))
-        tracker  = new ReportingTracker(delegate, diagnostics, foldCount = 1)
-        outcome <- tracker.displayReportFailure(report.roundName, reportFailure).attempt
+        tracker  = new ReportingTracker(delegate, diagnostics, round)
+        outcome <- tracker.displayReportFailure(reportFailure).attempt
         written <- notes.get
       } yield (outcome, written)
 
@@ -183,7 +190,7 @@ class ReportingTrackerSpec extends IOWordSpec {
           def displayNote(title: String, lines: List[String]): IO[Unit]             = notes.update(_ :+ (title -> lines))
         }
         _ <- diagnostics.observed(indicator, EvaluationPhase.Search(3), List(1.0, 1.0, 1.0))
-        tracker = new ReportingTracker(delegate, diagnostics, foldCount = 6)
+        tracker = new ReportingTracker(delegate, diagnostics, round.copy(corpus = Corpus(List.fill(6)(Nil))))
         ninth   = Progress.Population(9, 150, Vector(indicator -> Fitness(0.7)))
         tenth   = Progress.Population(10, 150, Vector(indicator -> Fitness(0.2)))
         _         <- tracker.displayProgress(ninth)

@@ -5,29 +5,27 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import currexx.algorithms.{Parameters, ValidatedPopulation}
 import currexx.algorithms.progress.{Progress, Tracker}
-import currexx.backtest.optimizer.SearchObjectiveConfig
 import currexx.backtest.TestStrategy
+import currexx.backtest.optimizer.{OptimisationRound, SearchObjectiveConfig}
 
 /** Renders progress and completed diagnostics through the existing output sinks. */
 final class ReportingTracker[F[_]: Monad](
     delegate: Tracker[F, TestStrategy],
     diagnostics: RunDiagnostics[F],
-    foldCount: Int,
-    logInterval: Int = 10,
-    searchObjective: SearchObjectiveConfig = SearchObjectiveConfig.Current,
-    renderCandidate: TestStrategy => String = _.toString
+    round: OptimisationRound,
+    logInterval: Int = 10
 ) extends Tracker[F, TestStrategy]:
 
   override def displayInitial(target: TestStrategy, params: Parameters[?]): F[Unit] =
     delegate.displayInitial(target, params) >>
-      delegate.displayNote("Reading progress fitness", OptimisationReportRenderer.progressIntro)
+      delegate.displayNote("Run overview", OptimisationReportRenderer.runOverview(round.candleCount))
 
   override def displayProgress(progress: Progress[TestStrategy]): F[Unit] =
     delegate.displayProgress(progress) >> Monad[F].whenA(progress.currentGen % logInterval == 0) {
       diagnostics.snapshot.flatMap { snapshot =>
         delegate.displayNote(
           s"Stable progress: generation ${progress.currentGen}",
-          OptimisationReportRenderer.progress(snapshot, progress.currentGen, foldCount)
+          OptimisationReportRenderer.progress(snapshot, progress.currentGen, round.corpus.foldCount)
         )
       }
     }
@@ -37,8 +35,9 @@ final class ReportingTracker[F[_]: Monad](
 
   // Generic algorithms finish before the upgrade policy runs. Delay final output until the completed decision is available.
   def displayCompletedRankings(population: ValidatedPopulation[TestStrategy]): F[Unit] =
-    if (searchObjective == SearchObjectiveConfig.Current) delegate.displayFinal(population)
+    if (round.searchObjective == SearchObjectiveConfig.Current) delegate.displayFinal(population)
     else
+      val renderCandidate = CandidateDisplay.forTarget(round.target)
       delegate.displayNote(
         "Final rankings (separate objectives)",
         List("Search fitness uses the baseline-relative objective. Absolute validation fitness uses the quality scorer.") :::
@@ -53,6 +52,6 @@ final class ReportingTracker[F[_]: Monad](
       delegate.displayNote(title, lines)
     }
 
-  def displayReportFailure(roundName: String, error: Throwable): F[Unit] =
-    val (title, lines) = OptimisationReportRenderer.incompleteDiagnostics(roundName, error)
+  def displayReportFailure(error: Throwable): F[Unit] =
+    val (title, lines) = OptimisationReportRenderer.incompleteDiagnostics(round.name, error)
     delegate.displayNote(title, lines)
