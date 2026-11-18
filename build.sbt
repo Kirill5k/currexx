@@ -108,15 +108,13 @@ val backtest = project
     //   < 8GB RAM: use -Xms2g -Xmx4g
     //   > 16GB RAM: use -Xms8g -Xmx16g
     Compile / run / javaOptions ++= Seq(
-      "-Xms8g",                                // Initial heap size
-      "-Xmx16g",                               // Maximum heap size
-      "-XX:+UseG1GC",                          // Use G1 garbage collector
-      "-XX:MaxGCPauseMillis=200",              // Target max GC pause
-      "-XX:G1ReservePercent=10",               // Reserve heap to reduce GC
-      "-XX:InitiatingHeapOccupancyPercent=45", // When to start GC
-      "-Xss2m",                                // Stack size
-      "-XX:+TieredCompilation",                // Use tiered compilation
-      "-XX:TieredStopAtLevel=4"                // Maximum optimization level
+      "-Xms8g",
+      "-Xmx16g",
+      "-Xss2m",
+      "-XX:+UseG1GC",
+      "-XX:MaxGCPauseMillis=500",
+      "--sun-misc-unsafe-memory-access=allow",
+      "-Dsun.rmi.log.useOld=true"
     )
   )
 

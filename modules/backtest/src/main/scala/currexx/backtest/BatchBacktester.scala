@@ -1,6 +1,7 @@
 package currexx.backtest
 
 import cats.effect.{IO, IOApp}
+import cats.syntax.traverse.*
 import currexx.backtest.services.{PeriodSimulation, TestServices}
 import currexx.core.signal.SignalDetector
 import currexx.domain.market.CandleCount
@@ -57,27 +58,27 @@ object BatchBacktester extends IOApp.Simple {
     * A val that nets +6000 over the two might have earned +7600 in one and lost -1600 in the other, and a single number cannot show that -
     * see the note in `TestStrategy` on what the 2023-24 year separates. The later evaluation is last; s10_v2 has reused it for development.
     */
+
   override val run: IO[Unit] = List(
     "searched 2023-07..2024-06 (12 months, in sample)"                      -> MarketDataProvider.majors1h_202307_202406,
     "searched 2024-07..2025-07 (12 months, in sample)"                      -> MarketDataProvider.majors1h,
     "searched 2023-07..2025-07 (24 months, in sample)"                      -> MarketDataProvider.majors1hSearched,
     "historical 2025-12..2026-06 (7 months, reused for s10_v2 development)" -> MarketDataProvider.majors1hHoldout
-  ).foldLeft(IO.pure(List.empty[String])) { case (acc, (label, datasets)) =>
-    acc.flatMap { sections =>
-      strategies
-        .foldLeft(IO.pure(List.empty[String])) { (lines, kv) =>
-          lines.flatMap(ls => runOne(kv._1, kv._2, datasets).map(l => ls :+ l))
-        }
-        .map(lines => sections :+ s"--- $label ---\n${lines.mkString("\n")}")
-    }
-  }.flatMap(sections => IO.println("\n===== BATCH RESULTS =====\n\n" + sections.mkString("\n\n")))
-    .flatMap(_ =>
-      IO.println("""
-          |forced - positions still open when the data ran out, liquidated at the final mark price
-          |exp - expectancy - Average net profit per closed trade
-          |PF - profit factor - Relationship between winning and losing closed trades (1.5 means $1.50 won for every $1 lost)
-          |DD - drawdown - Largest peak-to-trough decline in portfolio equity at candle closes and executions, including open P&L and costs
-          |sharpe - Risk-adjusted performance calculated from monthly equity returns and annualized. Higher means returns were more consistent
-          |""".stripMargin)
-    )
+  ).traverse { case (label, datasets) =>
+    strategies
+      .traverse { case (name, strategy) => runOne(name, strategy, datasets) }
+      .map(lines => s"--- $label ---\n${lines.mkString("\n")}")
+  }.flatMap { sections =>
+    IO.println(s"""
+         |===== BATCH RESULTS =====
+         |
+         |${sections.mkString("\n\n")}
+         |
+         |forced - positions still open when the data ran out, liquidated at the final mark price
+         |exp - expectancy - Average net profit per closed trade
+         |PF - profit factor - Relationship between winning and losing closed trades (1.5 means ${"$"}1.50 won for every ${"$"}1 lost)
+         |DD - drawdown - Largest peak-to-trough decline in portfolio equity at candle closes and executions, including open P&L and costs
+         |sharpe - Risk-adjusted performance calculated from monthly equity returns and annualized. Higher means returns were more consistent
+         |""".stripMargin)
+  }
 }

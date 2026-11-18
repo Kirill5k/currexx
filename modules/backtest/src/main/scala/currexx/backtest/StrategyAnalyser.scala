@@ -1,6 +1,7 @@
 package currexx.backtest
 
 import cats.effect.{ExitCode, IO, IOApp}
+import cats.syntax.traverse.*
 import currexx.backtest.services.{PeriodSimulation, TestServices}
 import currexx.core.signal.SignalDetector
 import currexx.domain.market.{CandleCount, CurrencyPair, TradeOrder as TO}
@@ -156,9 +157,7 @@ object StrategyAnalyser extends IOApp {
     else {
       val selected = if (args.isEmpty) catalogue else catalogue.filter(kv => args.contains(kv._1))
       selected
-        .foldLeft(IO.pure(List.empty[String])) { (acc, kv) =>
-          acc.flatMap(reports => statsPerPair(kv._2).map(stats => reports :+ report(kv._1, stats)))
-        }
+        .traverse { case (name, strategy) => statsPerPair(strategy).map(stats => report(name, stats)) }
         .flatMap(reports => IO.println("\n===== STRATEGY ANALYSIS =====\n" + reports.mkString("\n\n")))
         .as(ExitCode.Success)
     }
