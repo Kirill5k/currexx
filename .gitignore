@@ -13,8 +13,6 @@ project/plugins/project/
 .lib/
 docs/*
 
-modules/backtest/src/main/scala/currexx/backtest/OptimiserBenchmark.scala
-
 ### JEnv template
 # JEnv local Java version configuration file
 .java-version
