@@ -30,10 +30,19 @@ object Volatility {
       highs: Array[Double],
       lows: Array[Double],
       length: Int
+  ): Array[Double] =
+    averageTrueRange(closings, highs, lows, length, closings.length)
+
+  def averageTrueRange(
+      closings: Array[Double],
+      highs: Array[Double],
+      lows: Array[Double],
+      length: Int,
+      outputCount: Int
   ): Array[Double] = {
     require(length > 0, "ATR period must be positive")
     val size   = math.min(closings.length, math.min(highs.length, lows.length))
-    val result = new Array[Double](size)
+    val result = new Array[Double](math.min(size, outputCount))
     if (size > 1 && length <= size) {
       val window = new Array[Double](length)
       val last   = size - 1
@@ -71,7 +80,7 @@ object Volatility {
           } else {
             (prevAtr * (length - 1) + tr) / length
           }
-          result(i) = currentAtr
+          if (i < result.length) result(i) = currentAtr
           prevAtr = currentAtr
         }
         prevClose = closings(i)

@@ -21,9 +21,12 @@ object MomentumOscillators {
     relativeStrengthIndex(values.toArray, length).toList
 
   /** Returns newest-first RSI values without mutating the input. The period must be positive. */
-  def relativeStrengthIndex(values: Array[Double], length: Int): Array[Double] = {
+  def relativeStrengthIndex(values: Array[Double], length: Int): Array[Double] =
+    relativeStrengthIndex(values, length, values.length)
+
+  def relativeStrengthIndex(values: Array[Double], length: Int, outputCount: Int): Array[Double] = {
     require(length > 0, "RSI period must be positive")
-    val result = new Array[Double](values.length)
+    val result = new Array[Double](math.min(values.length, outputCount))
     if (values.length <= length) {
       java.util.Arrays.fill(result, 50.0)
     } else {
@@ -34,7 +37,7 @@ object MomentumOscillators {
       var count     = 1
 
       while (count <= length) {
-        result(index) = 50.0
+        if (index < result.length) result(index) = 50.0
         index -= 1
         val currentValue = values(index)
         val diff         = currentValue - prevValue
@@ -46,8 +49,10 @@ object MomentumOscillators {
 
       var avgGain = gainSum / length
       var avgLoss = lossSum / length
-      val firstRs = if (avgLoss == 0.0) 100.0 else avgGain / avgLoss
-      result(index) = 100.0 - (100.0 / (1.0 + firstRs))
+      if (index < result.length) {
+        val firstRs = if (avgLoss == 0.0) 100.0 else avgGain / avgLoss
+        result(index) = 100.0 - (100.0 / (1.0 + firstRs))
+      }
       index -= 1
 
       while (index >= 0) {
@@ -57,8 +62,10 @@ object MomentumOscillators {
         val currentLoss  = diff.min(0.0).abs
         avgGain = (avgGain * (length - 1) + currentGain) / length
         avgLoss = (avgLoss * (length - 1) + currentLoss) / length
-        val rs = if (avgLoss == 0.0) 100.0 else avgGain / avgLoss
-        result(index) = 100.0 - (100.0 / (1.0 + rs))
+        if (index < result.length) {
+          val rs = if (avgLoss == 0.0) 100.0 else avgGain / avgLoss
+          result(index) = 100.0 - (100.0 / (1.0 + rs))
+        }
         prevValue = currentValue
         index -= 1
       }
@@ -468,17 +475,29 @@ object MomentumOscillators {
       lows: Array[Double],
       volumes: Array[Double],
       length: Int
+  ): Array[Double] =
+    chaikinMoneyFlow(closings, highs, lows, volumes, length, closings.length)
+
+  def chaikinMoneyFlow(
+      closings: Array[Double],
+      highs: Array[Double],
+      lows: Array[Double],
+      volumes: Array[Double],
+      length: Int,
+      outputCount: Int
   ): Array[Double] = {
     require(length > 0, "CMF period must be positive")
-    val size             = math.min(math.min(closings.length, highs.length), math.min(lows.length, volumes.length))
-    val moneyFlowVolumes = new Array[Double](size)
-    val result           = new Array[Double](size)
-    var index            = size - 1
+    val size   = math.min(math.min(closings.length, highs.length), math.min(lows.length, volumes.length))
+    val result = new Array[Double](math.min(size, outputCount))
+    if (length > size || result.isEmpty) return result
+    val inputCount       = math.min(size.toLong, result.length.toLong + length - 1).toInt
+    val moneyFlowVolumes = new Array[Double](inputCount)
+    var index            = inputCount - 1
     while (index >= 0) {
       val range        = highs(index) - lows(index)
       val mfMultiplier = if (range == 0.0) 0.0 else ((closings(index) - lows(index)) - (highs(index) - closings(index))) / range
       moneyFlowVolumes(index) = mfMultiplier * volumes(index)
-      if (size - index >= length) {
+      if (index < result.length && size - index >= length) {
         var cursor = index + length - 1
         var volSum = volumes(cursor)
         var mfvSum = moneyFlowVolumes(cursor)

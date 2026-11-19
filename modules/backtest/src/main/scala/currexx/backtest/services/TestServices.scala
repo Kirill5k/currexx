@@ -40,22 +40,28 @@ final class TestServices[F[_]] private (
         // The first window only primes the simulator; there is no next-bar fill for it yet.
         F.unit
 
-      case (Some(signalData), currentData) =>
-        for
-          _      <- appState.prepareExecution(currentData)
-          userId <- appState.userIdRef.get
-          _      <- signalService.processMarketData(userId, signalData, signalDetector)
-          _      <- collectPendingActions { case Action.ProcessSignals(uid, cp, batch) =>
-            marketService.processSignals(uid, cp, batch)
-          }
-          _ <- collectPendingActions { case Action.ProcessMarketStateUpdate(uid, cp) =>
-            marketService.getState(uid, cp).flatMap(tradeService.processMarketStateUpdate)
-          }
-          _ <- collectPendingActions { case Action.ProcessTradeOrderPlacement(top) =>
-            marketService.processTradeOrderPlacement(top)
-          }
-        yield ()
+      case (Some(signalData), currentData) => processBar(signalData, ExecutionInput.from(currentData), signalDetector)
     }
+
+  private[services] def processBar(
+      signalData: MarketTimeSeriesData,
+      current: ExecutionInput,
+      signalDetector: SignalDetector
+  ): F[Unit] =
+    for
+      _      <- appState.prepareExecution(current)
+      userId <- appState.userIdRef.get
+      _      <- signalService.processMarketData(userId, signalData, signalDetector)
+      _      <- collectPendingActions { case Action.ProcessSignals(uid, cp, batch) =>
+        marketService.processSignals(uid, cp, batch)
+      }
+      _ <- collectPendingActions { case Action.ProcessMarketStateUpdate(uid, cp) =>
+        marketService.getState(uid, cp).flatMap(tradeService.processMarketStateUpdate)
+      }
+      _ <- collectPendingActions { case Action.ProcessTradeOrderPlacement(top) =>
+        marketService.processTradeOrderPlacement(top)
+      }
+    yield ()
 
   def getOrderStats(riskSettings: RiskSettings = RiskSettings()): F[OrderStats] =
     for

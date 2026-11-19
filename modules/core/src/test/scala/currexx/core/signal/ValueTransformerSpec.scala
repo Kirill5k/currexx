@@ -61,6 +61,20 @@ class ValueTransformerSpec extends AnyWordSpec with Matchers {
       }
     }
 
+    "preserve the exact newest output at each requested depth" in {
+      val window = new NumericalWindow(data)
+      val source = window.closings
+      val stages = List(VT.SMA(2), VT.JMA(2, 0, 2), VT.RSX(2), VT.ATR(2), VT.StandardDeviation(2), VT.CMF(2))
+      for {
+        stage <- stages ++ stages.map(last => VT.Sequenced(List(VT.EMA(2), last)))
+        count <- 0 to 4
+      } {
+        val full   = transformer.transformTo(source, window, stage)
+        val prefix = transformer.transformTo(source, window, stage, count)
+        prefix.toList.map(java.lang.Double.doubleToRawLongBits) mustBe full.take(count).toList.map(java.lang.Double.doubleToRawLongBits)
+      }
+    }
+
     "feed each sequence stage the preceding result" in {
       val window = new NumericalWindow(data)
       val source = window.closings

@@ -45,7 +45,7 @@ final private class PureSignalDetector extends SignalDetector {
       indicator: Indicator.ThresholdCrossing
   ): Option[Signal] =
     val source      = ValueTransformer.extractFrom(window, indicator.source)
-    val transformed = ValueTransformer.transformTo(source, window, indicator.transformation)
+    val transformed = ValueTransformer.transformTo(source, window, indicator.transformation, 2)
     Condition
       .thresholdCrossing(transformed, indicator.lowerBoundary, indicator.upperBoundary)
       .map(makeSignal(uid, window, indicator))
@@ -67,8 +67,8 @@ final private class PureSignalDetector extends SignalDetector {
       indicator: Indicator.LinesCrossing
   ): Option[Signal] =
     val source = ValueTransformer.extractFrom(window, indicator.source)
-    val line1  = ValueTransformer.transformTo(source, window, indicator.line1Transformation)
-    val line2  = ValueTransformer.transformTo(source, window, indicator.line2Transformation)
+    val line1  = ValueTransformer.transformTo(source, window, indicator.line1Transformation, 2)
+    val line2  = ValueTransformer.transformTo(source, window, indicator.line2Transformation, 2)
     Condition
       .linesCrossing(line1, line2)
       .map(makeSignal(uid, window, indicator))
@@ -79,7 +79,7 @@ final private class PureSignalDetector extends SignalDetector {
       indicator: Indicator.KeltnerChannel
   ): Option[Signal] =
     val priceLine              = ValueTransformer.extractFrom(window, indicator.source)
-    val middleBand             = ValueTransformer.transformTo(priceLine, window, indicator.middleBand)
+    val middleBand             = ValueTransformer.transformTo(priceLine, window, indicator.middleBand, 2)
     val atrLine                = ValueTransformer.averageTrueRange(window.closings, window, indicator.atrLength)
     val (upperBand, lowerBand) = bands(middleBand, atrLine, indicator.atrMultiplier)
     Condition
@@ -92,7 +92,7 @@ final private class PureSignalDetector extends SignalDetector {
       indicator: Indicator.VolatilityRegimeDetection
   ): Option[Signal] =
     val atrLine   = ValueTransformer.averageTrueRange(window.closings, window, indicator.atrLength)
-    val atrMaLine = ValueTransformer.transformTo(atrLine, window, indicator.smoothingType)
+    val atrMaLine = ValueTransformer.transformTo(atrLine, window, indicator.smoothingType, 3)
     Condition
       .volatilityRegimeChange(atrLine, atrMaLine)
       .map(makeSignal(uid, window, indicator))
@@ -103,7 +103,7 @@ final private class PureSignalDetector extends SignalDetector {
       indicator: Indicator.ValueTracking
   ): Option[Signal] = {
     val source      = ValueTransformer.extractFrom(window, indicator.source)
-    val transformed = ValueTransformer.transformTo(source, window, indicator.transformation)
+    val transformed = ValueTransformer.transformTo(source, window, indicator.transformation, 1)
     transformed.headOption.map { latestValue =>
       makeSignal(uid, window, indicator)(Condition.ValueUpdated(indicator.role, BigDecimal.valueOf(latestValue)))
     }
@@ -122,7 +122,7 @@ final private class PureSignalDetector extends SignalDetector {
       plc: Indicator.PriceLineCrossing
   ): Option[Signal] =
     val priceLine = ValueTransformer.extractFrom(window, plc.source)
-    val otherLine = ValueTransformer.transformTo(priceLine, window, plc.transformation)
+    val otherLine = ValueTransformer.transformTo(priceLine, window, plc.transformation, 2)
     Condition.priceCrossedLine(priceLine, otherLine, plc.role).map(makeSignal(uid, window, plc))
 
   private def detectBollingerBandsCrossing(
@@ -131,8 +131,8 @@ final private class PureSignalDetector extends SignalDetector {
       indicator: Indicator.BollingerBands
   ): Option[Signal] =
     val priceLine              = ValueTransformer.extractFrom(window, indicator.source)
-    val middleBandLine         = ValueTransformer.transformTo(priceLine, window, indicator.middleBand)
-    val stdDevLine             = Statistics.standardDeviation(priceLine, indicator.stdDevLength)
+    val middleBandLine         = ValueTransformer.transformTo(priceLine, window, indicator.middleBand, 2)
+    val stdDevLine             = Statistics.standardDeviation(priceLine, indicator.stdDevLength, 2)
     val (upperBand, lowerBand) = bands(middleBandLine, stdDevLine, indicator.stdDevMultiplier)
     Condition
       .bandCrossing(priceLine, upperBand, lowerBand)

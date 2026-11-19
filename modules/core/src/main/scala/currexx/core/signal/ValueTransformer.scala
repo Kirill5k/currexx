@@ -10,18 +10,20 @@ private[signal] object ValueTransformer {
   def averageTrueRange(values: Array[Double], window: NumericalWindow, length: Int): Array[Double] =
     Volatility.averageTrueRange(values, window.highs, window.lows, length)
 
-  def transformTo(values: Array[Double], window: NumericalWindow, vt: VT): Array[Double] =
+  def transformTo(values: Array[Double], window: NumericalWindow, vt: VT, outputCount: Int = Int.MaxValue): Array[Double] =
     vt match {
+      case VT.Sequenced(Nil)             => values
       case VT.Sequenced(transformations) =>
-        transformations.foldLeft(values)((current, transformation) => transformTo(current, window, transformation))
-      case VT.StandardDeviation(length)              => Statistics.standardDeviation(values, length)
-      case VT.ATR(length)                            => averageTrueRange(values, window, length)
-      case VT.RSX(length)                            => MomentumOscillators.relativeStrengthIndex(values, length)
+        val intermediate = transformations.init.foldLeft(values)((current, transformation) => transformTo(current, window, transformation))
+        transformTo(intermediate, window, transformations.last, outputCount)
+      case VT.StandardDeviation(length)              => Statistics.standardDeviation(values, length, outputCount)
+      case VT.ATR(length)                            => Volatility.averageTrueRange(values, window.highs, window.lows, length, outputCount)
+      case VT.RSX(length)                            => MomentumOscillators.relativeStrengthIndex(values, length, outputCount)
       case VT.WMA(length)                            => MovingAverages.weighted(values, length)
-      case VT.SMA(length)                            => MovingAverages.simple(values, length)
+      case VT.SMA(length)                            => MovingAverages.simple(values, length, outputCount)
       case VT.EMA(length)                            => MovingAverages.exponential(values, length)
       case VT.HMA(length)                            => MovingAverages.hull(values, length)
-      case VT.JMA(length, phase, power)              => MovingAverages.jurikSimplified(values, length, phase, power)
+      case VT.JMA(length, phase, power)              => MovingAverages.jurikSimplified(values, length, phase, power, outputCount)
       case VT.Kalman(gain, measurementNoise)         => Filters.kalman(values, gain, measurementNoise)
       case VT.KalmanVelocity(gain, measurementNoise) => Filters.kalmanVelocity(values, gain, measurementNoise)
       case VT.JRSX(length)                           => MomentumOscillators.jurikRelativeStrengthIndex(values, length)
@@ -35,7 +37,7 @@ private[signal] object ValueTransformer {
       case VT.ParabolicSAR(afStart, afMax, afStep) =>
         MomentumOscillators.parabolicSAR(window.highs, window.lows, afStart, afMax, afStep)
       case VT.CMF(length) =>
-        MomentumOscillators.chaikinMoneyFlow(window.closings, window.highs, window.lows, window.volumes, length)
+        MomentumOscillators.chaikinMoneyFlow(window.closings, window.highs, window.lows, window.volumes, length, outputCount)
       case VT.NMA(length, signalLength, lambda, ma) =>
         MovingAverages.nyquist(values, length, signalLength, lambda, ma.calculation)
     }

@@ -14,11 +14,13 @@ object Statistics {
   def standardDeviation(values: List[Double], n: Int): List[Double] = standardDeviation(values.toArray, n).toList
 
   /** Returns newest-first sample standard deviations without mutating the input. The period must be positive. */
-  def standardDeviation(values: Array[Double], n: Int): Array[Double] = {
+  def standardDeviation(values: Array[Double], n: Int): Array[Double] = standardDeviation(values, n, values.length)
+
+  def standardDeviation(values: Array[Double], n: Int, outputCount: Int): Array[Double] = {
     require(n > 0, "Standard-deviation period must be positive")
-    val result = new Array[Double](values.length)
+    val result = new Array[Double](math.min(values.length, outputCount))
     if (n > 1 && n <= values.length) {
-      var i = values.length - n
+      var i = math.min(result.length - 1, values.length - n)
       while (i >= 0) {
         val oldest = i + n - 1
         var sum    = values(oldest)

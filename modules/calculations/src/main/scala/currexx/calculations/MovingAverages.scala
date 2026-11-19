@@ -47,8 +47,10 @@ object MovingAverages {
   def simple(values: List[Double], n: Int): List[Double] = simple(values.toArray, n).toList
 
   /** Array-level SMA kernel — for use as maCalc in triple/nyquist. */
-  def simple(arr: Array[Double], n: Int): Array[Double] = {
-    val result     = new Array[Double](arr.length)
+  def simple(arr: Array[Double], n: Int): Array[Double] = simple(arr, n, arr.length)
+
+  def simple(arr: Array[Double], n: Int, outputCount: Int): Array[Double] = {
+    val result     = new Array[Double](math.min(arr.length, outputCount))
     val window     = new Array[Double](n) // circular buffer
     var wStart     = 0
     var wSize      = 0
@@ -61,12 +63,12 @@ object MovingAverages {
         window(wSize) = price
         wSize += 1
         runningSum += price
-        result(i) = if (wSize < n) price else runningSum / n
+        if (i < result.length) result(i) = if (wSize < n) price else runningSum / n
       } else {
         runningSum += price - window(wStart)
         window(wStart) = price
         wStart = (wStart + 1) % n
-        result(i) = runningSum / n
+        if (i < result.length) result(i) = runningSum / n
       }
       i -= 1
     }
@@ -252,19 +254,28 @@ object MovingAverages {
       phase: Int,
       power: Int
   ): Array[Double] =
+    jurikSimplified(values, length, phase, power, values.length)
+
+  def jurikSimplified(
+      values: Array[Double],
+      length: Int,
+      phase: Int,
+      power: Int,
+      outputCount: Int
+  ): Array[Double] =
     if (values.isEmpty) Array.emptyDoubleArray
     else {
       val beta   = 0.45 * (length - 1) / (0.45 * (length - 1) + 2)
       val pr     = if (phase < -100) 0.5 else if (phase > 100) 2.5 else phase / 100.0 + 1.5
       val alpha  = math.pow(beta, power)
-      val result = new Array[Double](values.length)
+      val result = new Array[Double](math.min(values.length, outputCount))
       val last   = values.length - 1
 
       var ma1  = values(last)
       var det0 = 0.0
       var det1 = 0.0
       var jma  = values(last)
-      result(last) = jma
+      if (last < result.length) result(last) = jma
       var i = last - 1
 
       while (i >= 0) {
@@ -275,7 +286,7 @@ object MovingAverages {
         val ma2 = ma1 + pr * det0
         det1 = (ma2 - prevJma) * math.pow(1 - alpha, 2) + math.pow(alpha, 2) * det1
         jma = prevJma + det1
-        result(i) = jma
+        if (i < result.length) result(i) = jma
         i -= 1
       }
       result

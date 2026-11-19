@@ -13,13 +13,13 @@ import currexx.backtest.optimizer.reporting.RunDiagnostics
 import currexx.backtest.services.{PeriodSimulation, TestServicesPool}
 import currexx.core.signal.SignalDetector
 import currexx.backtest.TestStrategy
-import currexx.domain.market.{CandleCount, CurrencyPair, MarketTimeSeriesData}
+import currexx.domain.market.{CandleCount, CurrencyPair}
 import currexx.domain.signal.Indicator
 
 /** Loads a corpus once and executes its pair simulations through a bounded, reusable services pool. */
 final private[optimizer] class OptimisationBacktest[F[_]: {Async, Parallel}] private (
-    searchData: List[List[List[MarketTimeSeriesData]]],
-    validationData: List[List[MarketTimeSeriesData]],
+    searchData: List[List[PeriodSimulation.Prepared]],
+    validationData: List[PeriodSimulation.Prepared],
     pool: TestServicesPool[F],
     otherIndicators: List[Indicator],
     signalDetector: SignalDetector,
@@ -41,17 +41,17 @@ final private[optimizer] class OptimisationBacktest[F[_]: {Async, Parallel}] pri
     run(validationData, candidate, stage)
 
   private def run(
-      dataSets: List[List[MarketTimeSeriesData]],
+      dataSets: List[PeriodSimulation.Prepared],
       candidate: TestStrategy,
       stage: RunDiagnostics.Stage
   ): F[List[(CurrencyPair, OrderStats)]] =
     dataSets.parTraverse { testData =>
-      pool.use(TestSettings.make(testData.head.currencyPair, candidate.rules, candidate.indicator :: otherIndicators)) { services =>
+      pool.use(TestSettings.make(testData.currencyPair, candidate.rules, candidate.indicator :: otherIndicators)) { services =>
         for
           _     <- diagnostics.traverse_(_.pairStarted(stage))
-          stats <- PeriodSimulation.run(services, testData, signalDetector)
+          stats <- PeriodSimulation.runPrepared(services, testData, signalDetector)
           _     <- diagnostics.traverse_(_.pairCompleted(stage))
-        yield testData.head.currencyPair -> stats
+        yield testData.currencyPair -> stats
       }
     }
 }
@@ -72,16 +72,19 @@ private[optimizer] object OptimisationBacktest {
       )
       folds      <- corpus.searchFolds.traverse(_.parTraverse(readData[F](_, candleCount)))
       validation <- corpus.validationFold.parTraverse(readData[F](_, candleCount))
-      settings = TestSettings.make(folds.head.head.head.currencyPair, strategy.rules, strategy.indicator :: otherIndicators)
+      settings = TestSettings.make(folds.head.head.currencyPair, strategy.rules, strategy.indicator :: otherIndicators)
       pool <- TestServicesPool.make[F](settings, poolSize)
     yield new OptimisationBacktest(folds, validation, pool, otherIndicators, signalDetector, diagnostics)
 
-  private def readData[F[_]: Async](dataset: Dataset, candleCount: CandleCount): F[List[MarketTimeSeriesData]] =
+  private def readData[F[_]: Async](dataset: Dataset, candleCount: CandleCount): F[PeriodSimulation.Prepared] =
     MarketDataProvider.read[F](dataset, candleCount).compile.toList.flatMap { data =>
-      Async[F]
-        .raiseUnless(data.size >= 2)(
-          new IllegalArgumentException(s"Insufficient bars for ${candleCount.value}-candle warm-up, priming and execution: $dataset")
-        )
-        .as(data)
+      Async[F].fromEither(
+        PeriodSimulation
+          .prepare(data)
+          .left
+          .map(_ =>
+            new IllegalArgumentException(s"Insufficient bars for ${candleCount.value}-candle warm-up, priming and execution: $dataset")
+          )
+      )
     }
 }

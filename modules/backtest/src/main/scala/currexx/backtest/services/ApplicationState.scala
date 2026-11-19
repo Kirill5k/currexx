@@ -19,6 +19,23 @@ import java.time.Instant
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration.*
 
+final private[services] case class ExecutionInput(data: MarketTimeSeriesData, mark: MarketMark, window: DataWindow, time: Instant)
+
+private[services] object ExecutionInput:
+  val fetchTimeOffset: FiniteDuration = 100.seconds
+
+  def from(currentData: MarketTimeSeriesData): ExecutionInput =
+    val currentBar    = currentData.prices.head
+    val executionBar  = currentBar.copy(close = currentBar.open)
+    val executionData = currentData.copy(prices = NonEmptyList(executionBar, currentData.prices.tail))
+    val executionTime = currentBar.time.plus(fetchTimeOffset)
+    val closeMark     = MarketMark(
+      price = BigDecimal(currentBar.close),
+      // A bar's end is exclusive: a close at midnight belongs to the preceding day/month.
+      observedAt = currentBar.time.plus(currentData.interval.toDuration).minusNanos(1)
+    )
+    ExecutionInput(executionData, closeMark, DataWindow(currentBar.time, closeMark.observedAt), executionTime)
+
 final class ApplicationState[F[_]](
     val marketStateRef: Ref[F, MarketState],
     val configurationRef: Ref[F, StrategyConfiguration],
@@ -33,31 +50,22 @@ final class ApplicationState[F[_]](
     val brokerPositionsRef: Ref[F, Map[CurrencyPair, OpenedTradeOrder]]
 )(using F: MonadThrow[F]) {
 
-  private val fetchTimeOffset: FiniteDuration = 100.seconds
-
   // The simulator clock includes a fetch delay; accounting uses the open at which the order actually filled.
-  def accountingTime(time: Instant): Instant = time.minusNanos(fetchTimeOffset.toNanos)
+  def accountingTime(time: Instant): Instant = time.minusNanos(ExecutionInput.fetchTimeOffset.toNanos)
 
   // Stages the current bar for execution: orders fill at the bar's open (close overwritten with open),
   // records the real close for equity accounting, and advances the clock to the
   // fetch time. Signals still run against the fully closed previous candle, so fills never use a close
   // that is only known retrospectively.
   def prepareExecution(currentData: MarketTimeSeriesData): F[Unit] =
-    val currentBar    = currentData.prices.head
-    val executionBar  = currentBar.copy(close = currentBar.open)
-    val executionData = currentData.copy(prices = NonEmptyList(executionBar, currentData.prices.tail))
-    val executionTime = currentBar.time.plus(fetchTimeOffset)
-    val closeMark     = MarketMark(
-      price = BigDecimal(currentBar.close),
-      // A bar's end is exclusive: a close at midnight belongs to the preceding day/month.
-      observedAt = currentBar.time.plus(currentData.interval.toDuration).minusNanos(1)
-    )
-    val barWindow = DataWindow(currentBar.time, closeMark.observedAt)
+    prepareExecution(ExecutionInput.from(currentData))
+
+  private[services] def prepareExecution(input: ExecutionInput): F[Unit] =
     for
-      _ <- marketMarksRef.update(closeMark :: _)
-      _ <- dataRef.set(Some(executionData))
-      _ <- clockRef.set(Some(executionTime))
-      _ <- dataWindowRef.update(_.fold(Some(barWindow))(window => Some(window.union(barWindow))))
+      _ <- marketMarksRef.update(input.mark :: _)
+      _ <- dataRef.set(Some(input.data))
+      _ <- clockRef.set(Some(input.time))
+      _ <- dataWindowRef.update(_.fold(Some(input.window))(window => Some(window.union(input.window))))
     yield ()
 
   def reset(newSettings: TestSettings): F[Unit] =
