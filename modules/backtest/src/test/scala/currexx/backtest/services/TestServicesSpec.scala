@@ -226,6 +226,28 @@ class TestServicesSpec extends IOWordSpec {
   }
 
   "PeriodSimulation" should {
+    "produce the same trades and equity in both list loops as in the stream" in {
+      val data = List(
+        bar("2026-01-31T22:00:00Z", interval = Interval.H1),
+        bar("2026-01-31T23:00:00Z", close = 0.9, interval = Interval.H1),
+        bar("2026-02-01T00:00:00Z", open = 1.05, close = 1.1, interval = Interval.H1)
+      )
+      val detector = SignalDetector.pure
+      (for
+        services <- TestServices.make[IO](settings)
+        expected <- PeriodSimulation.runStream(services, Stream.emits(data).covary[IO], detector, RiskSettings())
+        _        <- services.reset(settings)
+        direct   <- PeriodSimulation.run(services, data, detector)
+        _        <- services.reset(settings)
+        period   <- IO.fromEither(PeriodSimulation.prepare(data))
+        prepared <- PeriodSimulation.runPrepared(services, period, detector)
+      yield (expected, direct, prepared)).asserting { case (expected, direct, prepared) =>
+        expected.total mustBe 1
+        direct mustBe expected
+        prepared mustBe expected
+      }
+    }
+
     "reject data with no execution window after priming" in {
       val prime = bar("2026-01-31T22:00:00Z", interval = Interval.H1)
       (for

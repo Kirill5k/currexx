@@ -15,7 +15,15 @@ object PeriodSimulation:
       signalDetector: SignalDetector = SignalDetector.pure,
       riskSettings: RiskSettings = RiskSettings()
   ): F[OrderStats] =
-    runStream(services, Stream.emits(data).covary[F], signalDetector, riskSettings)
+    def loop(previous: MarketTimeSeriesData, remaining: List[MarketTimeSeriesData]): F[OrderStats] =
+      remaining match
+        case current :: rest =>
+          services.processBar(previous, ExecutionInput.from(current), signalDetector).flatMap(_ => loop(current, rest))
+        case Nil => services.getOrderStats(riskSettings)
+
+    data match
+      case first :: (rest @ _ :: _) => Temporal[F].unit.flatMap(_ => loop(first, rest))
+      case _ => Temporal[F].raiseError(new IllegalArgumentException("Insufficient market-data windows for priming and execution"))
 
   final class Prepared private[PeriodSimulation] (
       val currencyPair: CurrencyPair,
@@ -34,13 +42,12 @@ object PeriodSimulation:
       period: Prepared,
       signalDetector: SignalDetector
   ): F[OrderStats] =
-    Stream
-      .emits(period.steps)
-      .covary[F]
-      .evalMap((signal, current) => services.processBar(signal, current, signalDetector))
-      .compile
-      .drain
-      .flatMap(_ => services.getOrderStats())
+    def loop(steps: List[(MarketTimeSeriesData, ExecutionInput)]): F[OrderStats] =
+      steps match
+        case (signal, current) :: rest => services.processBar(signal, current, signalDetector).flatMap(_ => loop(rest))
+        case Nil                       => services.getOrderStats()
+
+    loop(period.steps)
 
   private[backtest] def runStream[F[_]: Temporal](
       services: TestServices[F],
